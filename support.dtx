@@ -1,0 +1,999 @@
+% 
+% \iffalse driver
+%<*driver>
+\documentclass{mtmtcl}
+\begin{document}
+\DocInput{support.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% 
+% 
+% \section{Data export}
+% 
+% 
+% The basic format for exporting structure elements is as a 
+% data-is-code tree.
+% 
+% The |tdom| package has such a format for XML data, where a node has 
+% one of the two forms
+% \begin{displaysyntax}
+%   \word{tag-name} \word{attributes-dict} \word{child-list}\par
+%   |#text| \word{string}
+% \end{displaysyntax}
+% This seems a good guideline to follow, and many tags from MathML 
+% appear useful. There are however also aspects of MathML which seem 
+% strange or impractical, so I don't want to adopt it as primary export 
+% format; at most it can be expected that the primary export format can 
+% be converted to MathML without too much work.
+% 
+% 
+% \subsection{Basic syntax}
+% 
+% Much of mathematics is stated in terms of binary operations, so it 
+% makes sense to have a \describestring+[tag]{binop} tag for binary 
+% operation nodes. The many binary operations which are associative are 
+% however better served by an $n$-ary operation node 
+% \describestring+[tag]{assop}, as that is the level at which they will 
+% typically be processed. In both cases, the children of a node are its 
+% operands.
+% 
+% Three attributes which seem immediately relevant are:
+% \begin{description}
+%   \renewcommand{\makelabel}[1]{\describestring*+[attribute]{#1}}
+%   \item[symbol]
+%     The symbol used to denote the operation. A suitable default 
+%     could be empty string, to denote invisible multiplication\slash 
+%     juxtaposition.
+%   \item[priority]
+%     The priority (binding strength) associated with the symbol. Could 
+%     default to $3$ for invisible multiplication, $1$ for $+$, and $2$ 
+%     for everything else.
+%   \item[mtmtcl-path]
+%     A list of ``method names'' for accessing the operation 
+%     underlying the node. The intention for this attribute is to 
+%     simplify postprocessing of a raw exported structure, to 
+%     e.g.~change the symbol used for some operation.
+% \end{description}
+% 
+% Another tag that turns out to be useful is 
+% \describestring+[tag]{integer}, which is for encoding integers. It 
+% has no children, and its main attribute is 
+% \describestring+[attribute]{value}, which of course contains the 
+% value. The main reason for introducing this tag is that the 
+% \emph{factors} $1$ and $-1$ should normally be eliminated from 
+% expressions before they are formatted. This would be a lot harder 
+% if these integers were marked up using MathML-tags, since that to 
+% a much greater extent requires parsing text.
+% 
+% \begin{APIspec}{export}{1.0}
+%   This interface is applicable to principal structures. It provides 
+%   a method |export| for converting the internal representation of 
+%   an element to an external format. The syntax for this method is:
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{export}
+%       \word{element} \word{path} \word{options-dict}
+%       \begin{regblock}[\regstar] \word{option} \word{value} 
+%       \end{regblock}
+%     \end{APImethod}
+%       where \word{element} is the element to export. The return 
+%       value should have the form of an XML-tree as described above. 
+%       In want of a \mtl-native way of encoding some concept, it is 
+%       recommended that MathML or OpenMath elements are used.
+%       
+%       The \word{path} is a list of strings, typically a list of 
+%       method names. The purpose of this list is to establish a 
+%       system for addressing subordinate structures by mirroring the 
+%       command prefix that would be used to access its methods. If a 
+%       structure $S_1$ makes use of the |export| method of another 
+%       structure $S_2$ and $S_2$ can be accessed using the $s$ 
+%       method of $S_1$, then the \texttt{[$S_2$ export $\dotsb$]} 
+%       call should append $s$ to the \word{path} it was called with.
+%       
+%       The option--value pairs can be used to influence the way in 
+%       which the value gets encoded, as can the \word{options-dict}. 
+%       The keys in this dictionary are \word{path}s, whereas the 
+%       values are option--value dictionaries.
+%   \end{APIdescription}
+%   Note that it is not specified how to merge options specified in 
+%   the \word{option-dict} with options explicit in the call; this 
+%   might well have to vary from case to case. Nor is it specified 
+%   whether the options in the $p$ entry of the \word{options-dict} 
+%   apply only for the structure called with $p$ as \word{path}, or 
+%   e.g.~also for entries whose \word{path} has $p$ as a prefix; 
+%   deciding this requires more experience.
+% \end{APIspec}
+% 
+% 
+% \begin{proc}[mtmtcl::export]{recursive_call}
+%   This procedure provides a transparent implementation of a 
+%   transforming operation on a tag type by applying the operation 
+%   recursively to all children and then recombining the transformed 
+%   children with the original tag and attributes. The call syntax is 
+%   designed for use as a |namespace unknown| command, i.e., it is
+%   \begin{displaysyntax}
+%     |::mtmtcl::export::recursive_call| \word{tag} \word{attributes} 
+%     \word{children} \word{argument}\regstar
+%   \end{displaysyntax}
+%   \begin{tcl}
+namespace eval ::mtmtcl::export {
+   proc recursive_call {tag attr childL args} {
+      set newL [list]
+      foreach child $childL {
+         lappend newL [uplevel 1 $child $args]
+      }
+      return [list $tag $attr $newL]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}[mtmtcl::export]{#text}
+%   This procedure is a complement to |recursive_call| which handles 
+%   the exceptional case of |#text| nodes, since these do not follow 
+%   the general pattern. It simply returns the node.
+%   \begin{tcl}
+proc ::mtmtcl::export::#text {str args} {list #text $str}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Expanding minuses}
+% 
+% By convention, integer factors that are $1$ should be silently 
+% omitted, and integer factors that are $-1$ should be converted to a 
+% negation (unary minus), which in turn should be fused with a 
+% preceeding binary plus if there is one. Therefore it seems useful 
+% to introduce a tag \describestring+[tag]{negate} for the negation, 
+% and a corresponding operation which removes these factors.
+% 
+% This operation resides in the |mtmtcl::export::un1| namespace and 
+% has the call syntax
+% \begin{displaysyntax}
+%   \meta{node} \word{option-dict}
+% \end{displaysyntax}
+% where the \word{option-dict} is indexed by \mtl-path and can 
+% contain options directing the processing. It returns a converted 
+% \meta{node}.
+% \setnamespace{mtmtcl::export::un1}
+% \begin{tcl}
+namespace eval ::mtmtcl::export::un1 {
+   namespace unknown ::mtmtcl::export::recursive_call
+}
+% \end{tcl}
+% 
+% \begin{proc}{binop}
+%   Multiplication by an integer factor is typically coded as a 
+%   |binop| node for a |.| or possibly |integer.| operation.
+%   \begin{tcl}
+proc ::mtmtcl::export::un1::binop {attrD childL optD} {
+   if {[lindex $childL 0 0] eq "integer" &&\
+     [dict exists $attrD mtmtcl-path] &&\
+     [lindex [dict get $attrD mtmtcl-path] end] in {. integer.}}\
+   then {
+      set value [dict get [lindex $childL 0 1] value]
+      if {$value == 1} then {
+         return [lindex $childL 1]
+      } elseif {$value == -1} then {
+         return [list negate [
+           dict create mtmtcl-path [lreplace\
+             [dict get $attrD mtmtcl-path] end end -]
+         ] [lrange $childL 1 1]]
+      }
+   }
+   ::mtmtcl::export::recursive_call binop $attrD $childL $optD
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{#text}
+%   This exceptional node must be explicitly defined, since the 
+%   unknown handler won't get it right.
+%   \begin{tcl}
+interp alias {} ::mtmtcl::export::un1::#text {} ::mtmtcl::export::#text
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Fencing}
+% 
+% The tree structure for data make parentheses unnecessary, but 
+% traditional (linear) notation requires parentheses. It is possible to 
+% insert parentheses when generating linear notation, but this gets 
+% rather complicated and it is generally better to have many simple 
+% operations than one complex. Splitting it up requires an explicit 
+% representation for parentheses, and as it happens, MathML has a tag 
+% \describestring+[tag]{mfenced} with precisely this meaning. The 
+% attributes defined for such elements are
+% \begin{description}
+%   \renewcommand{\makelabel}[1]{\describestring*+[attribute]{#1}}
+%   \item[open]
+%     The symbol for the opening delimiter, defaults to `|(|'.
+%   \item[close]
+%     The symbol for the closing delimiter, defaults to `|)|'.
+%   \item[separators]
+%     List of separator characters, defaults to `|,|'. (Separators 
+%     are inserted between children if there are more than one.) 
+%     
+%     This is a standard attribute in MathML, but not relevant here 
+%     at the moment; it is probably safe to ignore it for the moment.
+%   \item[bigsize]
+%     \TeX y |\big|ness step for delimiters. Integer. Defaults to $0$ 
+%     (base size).
+%     
+%     This is not a MathML attribute, but something introduced to 
+%     simplify conversion to \LaTeX: one operation inserts |mfenced| 
+%     nodes, another equips them with suitable values for the 
+%     |bigsize| attribute.
+% \end{description}
+% 
+% 
+% 
+% 
+% 
+% 
+% \subsection{Export to \LaTeX}
+% 
+% The basic idea is to use data-is-code in the namespace 
+% |mtmtcl::export::latex|.
+% \setnamespace{mtmtcl::export::latex}
+% \begin{tcl}
+namespace eval ::mtmtcl::export::latex {}
+% \end{tcl}
+% The syntax of this operation is
+% \begin{displaysyntax}
+%   \meta{node} \word{width} \word{firstofs}
+% \end{displaysyntax}
+% It returns \LaTeX\ code for the \meta{node} (which is assumed to 
+% contain all necessary parentheses and such), as one or several 
+% lines. The line width should not exceed \word{width}, and the 
+% length of the first line should not exceed \(\mathit{width} - 
+% \mathit{firstofs}\) characters.
+% 
+% \begin{tcl}
+namespace eval ::mtmtcl::export::latex {
+% \end{tcl}
+% \begin{proc}{unknown}
+%   The |unknown| procedure redirects to |assop|, which defaults to 
+%   concatenating the children.
+%   \begin{tcl}
+   proc unknown {tag attr childL width ofs} {
+      assop {} $childL $width $ofs
+   }
+%   \end{tcl}
+% \end{proc}
+% By making it the namespace-specific unknown handler, unknown tags 
+% can mostly be handled gracefully.
+% \begin{tcl}
+   namespace unknown unknown
+}
+% \end{tcl}
+% 
+% \begin{proc}{#text}
+%   A very simple treatment of |#text| nodes would be to assume that 
+%   they are atomic \LaTeX\ formulae. The overall syntax is
+%   \begin{displaysyntax}
+%     ::mtmtcl::export::latex::\#text \word{string} \word{method} 
+%     \word{args}\regstar
+%   \end{displaysyntax}
+%   
+%   \begin{tcl}
+proc ::mtmtcl::export::latex::\#text {str width ofs} {
+   if {[string length $str] + $ofs <= $width} then {
+      return $str
+   } else {
+      return "\%\n$str"
+   }
+}
+%   \end{tcl}
+%   Should that be two cases, though? Maybe |#text| items are simply 
+%   beyond wrapping over lines, and it should be left to the caller 
+%   to handle the actual length of the string?
+% \end{proc}
+% 
+% \begin{proc}{integer}
+%   The main task for this procedure is to extract the |value| 
+%   attribute, but it also makes sure the formatting is as a base-10 
+%   number.
+%   \begin{tcl}
+proc ::mtmtcl::export::latex::integer {attrD childL width ofs} {
+   format %d [dict get $attrD value]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{negate}
+%   This procedure inserts a minus in front of the expression.
+%   \begin{tcl}
+proc ::mtmtcl::export::latex::negate {attrD childL width ofs} {
+   return "- [{*}[lindex $childL 0] $width [expr {$ofs+2}]]"
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{assop}
+%   First construct a list of unbreakable ``boxes'', then insert 
+%   separators (single space or new line) between the boxes. The 
+%   first box is simply the first child formatted, but subsequent 
+%   boxes consist of symbol and child.
+%   
+%   Attempt to fit first child on first line, subsequent children on 
+%   continuation lines. 
+%   \begin{tcl}
+proc ::mtmtcl::export::latex::assop {attrD childL width ofs} {
+   if {[dict exists $attrD symbol]} then {
+      set op "[dict get $attrD symbol] "
+   } else {set op ""}
+   incr width -2
+   set boxL [list [{*}[lindex $childL 0] $width [expr {$ofs-2}]]]
+%   \end{tcl}
+%   The following is ugly\Dash this procedure is turning into a 
+%   kitchen sink.
+%   \begin{tcl}
+   if {$op eq "+ "} then {
+      foreach child [lrange $childL 1 end] {
+         if {[lindex $child 0] eq "negate"} then {
+            lappend boxL "- [{*}[lindex $child 2 0] $width 2]"
+         } else {
+            lappend boxL "+ [{*}$child $width 2]"
+         }
+      }
+   } else {
+      foreach child [lrange $childL 1 end] {
+         lappend boxL "$op[{*}$child $width [string length $op]]"
+      }
+   }
+   set res ""
+   set left [expr {$width + 2 - $ofs}]
+   set clean 1
+   foreach box $boxL {
+      if {[string first \n $box] >= 0} then {
+         if {!$clean} then {append res "\n  "}
+         append res [string map {\n "\n  "} $box] "\n  "
+         set left $width
+         set clean 1
+      } elseif {$clean} then {
+         append res $box
+         set left [expr {$left - [string length $box] - 1}]
+         set clean 0
+      } elseif {[string length $box] > $left} then {
+         append res "\n  " $box
+         set left [expr {$width - [string length $box] - 1}]
+      } else {
+         append res " " $box
+         set left [expr {$left - [string length $box] - 1}]
+      }
+   }
+   return [string trim $res]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{binop}
+%   It seems possible to make this an alias to |assop|.
+%   \begin{tcl}
+interp alias {} ::mtmtcl::export::latex::binop \
+  {} ::mtmtcl::export::latex::assop
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{mfenced}
+%   \begin{tcl}
+proc ::mtmtcl::export::latex::mfenced {attrD childL width ofs} {
+   error "Unimplemented"
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \section{Auxilliary interfaces}
+% 
+% \begin{tcl}
+%<*pkg>
+namespace eval ::mtmtcl::support {}
+% \end{tcl}
+% \setnamespace{mtmtcl::support}
+% 
+% \begin{proc}{constant}
+%   This procedure takes one argument and returns it.
+%   \begin{tcl}
+proc ::mtmtcl::support::constant {arg} {return $arg}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Equality}
+% 
+% In some cases, it is important to have a canonical representation for 
+% an value. The most immediate need for this occurs when values are 
+% used as keys in \Tcl\ dictionaries, as equality of keys is always 
+% string equality. There are two naturally occurring approaches to 
+% canonical representation: automatic and manual conversion to 
+% canonical form. Automatic canonicity is something often seen with 
+% numbers (in particular integers), whereas for quotient algebras the 
+% problem of canonical representation (normal forms) is felt even at 
+% the mathematical level.
+% 
+% In \Tcl, lists are containers with automatic canonicity\Ldash two 
+% lists generated by list commands are equal as strings if and only if 
+% they have the same number of elements and the $i$th elements of the 
+% lists are equal as strings\Dash whereas dictionaries are not. The 
+% catch for dictionaries is that the order of the keys is not uniquely 
+% determined, and even though only a few orders occur in practice, 
+% the exact order used depends on how the dictionary was constructed. 
+% 
+% 
+% \begin{APIspec}{equality}{1.0}
+%   The |equality| interface v\,1.0 is applicable to principal 
+%   structures. It implies that there exists a method
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     which returns a boolean, and thus constitutes a binary relation 
+%     on the principal set of elements $S$. Moreover this relation 
+%     must be an equivalence relation, i.e.,
+%     \begin{displaysyntax}
+%       [\meta{structure} = $a$ $a$]
+%     \end{displaysyntax}
+%     is boolean true for any \(a \in S\) (reflexivity),
+%     \begin{displaysyntax}
+%       [\meta{structure} = $a$ $b$]\par
+%       [\meta{structure} = $b$ $a$]
+%     \end{displaysyntax}
+%     are equivalent for any \(a,b \in S\) (symmetry), and for all 
+%     \(a,b,c \in S\) if both of 
+%     \begin{displaysyntax}
+%       [\meta{structure} = $a$ $b$]\par
+%       [\meta{structure} = $b$ $c$]
+%     \end{displaysyntax}
+%     are true then
+%     \begin{displaysyntax}
+%       [\meta{structure} = $a$ $c$]
+%     \end{displaysyntax}
+%     must be true as well (transitivity).
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \begin{definition}
+%   A method taking as input zero or more elements of structures 
+%   which support the |equality| v\,1.0 interface is said to be 
+%   \defining{congruent} if two arguments lists which are pointwise 
+%   |=|-equal produce equal output, where the latter `equal' should 
+%   be interpreted in accordance to how the output values of the 
+%   method is described.
+% \end{definition}
+% 
+% \begin{APIspec}{equality}{1.1}
+%   Version 1.1 of the |equality| interface extends the |=| to be 
+%   variadic.
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{=}
+%       \word{element}\regstar
+%     \end{APImethod}
+%     Returns boolean true if the binary form would return true for 
+%     any two of \word{element}s.
+%     
+%     As usual, the status of |=| as equivalence relation implies that
+%     \begin{displaysyntax}
+%       [$S$ = $a_1$ $a_2$ $\dots$ $a_n$]
+%     \end{displaysyntax}
+%     is true if and only if all of
+%     \begin{displaysyntax}
+%       [$S$ = $a_1$ $a_2$]\par
+%       [$S$ = $a_2$ $a_3$]\par
+%       $\vdots$\par
+%       [$S$ = $a_{n-1}$ $a_n$]
+%     \end{displaysyntax}
+%     are true.
+%   \end{APIdescription}
+%   The nullary and unary forms of |=| always return true, but this is 
+%   sensible behaviour when applied to expanded lists. In particular, 
+%   it is a consequence of having as property that adding extra 
+%   \word{element}s can change the result from true to false, but not 
+%   vice versa.
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{canonise}{1.0}
+%   The |canonise| interface v\,1.0 is applicable to principal 
+%   structures. It implies that there exists a method
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{canonise}
+%       \word{element}
+%     \end{APImethod}
+%       which returns the canonical form of the \word{element}. This 
+%       method has to satisfy the property that
+%       \begin{displaysyntax}
+%         [$S$ canonise [$S$ canonise $a$]]\par
+%         [$S$ canonise $a$]
+%       \end{displaysyntax}
+%       are equal as strings for all elements $a$ of the 
+%       \meta{structure} $S$.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \begin{APIspec}{canonise}{1.1}
+%   It is natural to relate canonicity to equality, but that requires 
+%   having an equality relation to relate it to.
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method satisfies the \texttt{equality} (v\,1.0) interface.
+%       
+%     \begin{APImethod}{canonise}
+%       \word{element}
+%     \end{APImethod}
+%       Two elements $a$ and $b$ of a \meta{structure} $S$ are 
+%       |=|-equal if and only if the two expressions
+%       \begin{displaysyntax}
+%         [$S$ canonise $a$]\par
+%         [$S$ canonise $b$]
+%       \end{displaysyntax}
+%       are equal as strings.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{onlycanonical}{1.0}
+%   The |onlycanonical| interface is applicable to arbitrary structure. 
+%   Version 1.0 of it means that the \emph{only} valid representations 
+%   for elements are the canonical ones.
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{autocanonical}{1.0}
+%   The |autocanonical| interface v\,1.0 is applicable to 
+%   arbitrary structures. It is supported if all elements computed 
+%   by the structure methods are on canonical form.
+% \end{APIspec}
+% 
+% Version~1.0 of |autocanonical| is problematic in that it makes a 
+% vague reference to ``all elements computed by the structure''\Dash 
+% a promise that it might be hard to verify. Two alternatives are:
+% \begin{enumerate}
+%   \item
+%     Split |autocanonical| into a family of interfaces (one for each 
+%     method).
+%   \item
+%     Create a new version of the interface which makes provides a 
+%     method for quering whether a method is autocanonical.
+% \end{enumerate}
+% Both are possible, although the first looks a bit strange.
+% 
+% \begin{APIspec}{autocanonical \meta{method}}{1.0}
+%   This interface claims that elements output from the \meta{method} 
+%   are on canonical form.
+% \end{APIspec}
+% 
+% \begin{APIspec}{autocanonical}{2.0}
+%   Structures supporting version 2.0 of the |autocanonical| interface 
+%   have a method
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{autocanonical}
+%       \word{method}
+%     \end{APImethod}
+%       This call returns a boolean. If it returns boolean true, then 
+%       this \meta{structure} has a method \word{method} which only 
+%       outputs elements on canonical form.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \begin{tcl}
+namespace eval ::mtmtcl::sets {}
+% \end{tcl}
+% \setnamespace{mtmtcl::set}
+% 
+% \begin{APIspec}{finite set}{1.0}
+%   The |finite set| interface v\,1 is for sets like 
+%   $\{a_1,\dotsc,a_n\}$ that are introduced by listing all the 
+%   elements. It is in particular a single-sorted interface.
+%   
+%   \begin{APIdescription}{set}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies v\,1.0 of the |equality| interface.
+%       
+%     \begin{APImethod}{elements}
+%     \end{APImethod}
+%       The |elements| method returns the list of elements in the set. 
+%       No two elements of this list may be |=|-equal.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \begin{APIspec}{finite set}{1.1}
+%   Version 1.1 of |finite set| refines version 1.0 by making it 
+%   possible to identify elements by index.
+%   \begin{APIdescription}{set}
+%     \begin{APImethod}{elements}
+%     \end{APImethod}
+%       The order of elements in the list returned by this method must 
+%       not change over time.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% 
+% \begin{proc}{finite_ordinal}
+%   In set theory (at least the most common flavours of it), the 
+%   \emph{ordinal numbers} is a number system construction where each 
+%   number is the set of all smaller numbers, so that \(0 = 
+%   \emptyset\), \(1 = \{0\} = \{\emptyset\}\), \(2 = \{0,1\} = \bigl\{ 
+%   \emptyset, \{\emptyset\} \bigr\}\), \(3 = \{0,1,2\} = \Bigl\{ 
+%   \emptyset, \{\emptyset\}, \bigl\{ \emptyset, \{\emptyset\} \bigr\} 
+%   \Bigr\}\), and so on. Theoretically this is useful mostly for the 
+%   infinite ordinals, where one can define the first inifinite ordinal 
+%   $\omega$ simply as the set of all finite ordinals (natural 
+%   numbers), and then continue with \(\omega + 1 = \omega \cup 
+%   \{\omega\}\), \(\omega + 2 = \omega \cup \{\omega, \omega+1\}\), 
+%   etc., with the first uncountable ordinal arising precisely as the 
+%   set of all countable ordinals. Obviously, these transfinite 
+%   applications are not the subject here.
+%   
+%   Instead, this procedure merely usurps the name for the family of 
+%   finite set structures of the form $\{0,\dotsc,n-1\}$, since these 
+%   technically happen to be finite ordinals. The basic call syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::sets::finite_ordinal| \word{cardinality}
+%     \word{method} \word{argument}\regstar
+%   \end{displaysyntax}
+%   whereas the return value depends on the \word{method}.
+%   \begin{tcl}
+proc ::mtmtcl::sets::finite_ordinal {card method args} {
+   switch -- $method {
+%   \end{tcl}
+%   
+%   \begin{procmethod}{elements}
+%     This is the main method of this structure: construct a list of 
+%     the integers $0$ through one less than the cardinality.
+%     \begin{tcl}
+      elements {
+         set res [list]
+         for {set n 0} {$n < $card} {incr n} {lappend res $n}
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{=}
+%     Equality is straightforward.
+%     \begin{tcl}
+      = { expr {[lindex $args 0] == [lindex $args 1]} }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{canonise}
+%     However, since the above allows arbitrary integer 
+%     representations, it might be best to define a canonisation 
+%     method as well. This can be a good place to check argument 
+%     validity.
+%     \begin{tcl}
+      canonise {
+         if {
+           [string is integer -strict [lindex $args 0]] &&\
+           [lindex $args 0] >= 0 && [lindex $args 0] < $card
+         } then {
+            return [expr {[lindex $args 0] + 0}]
+         } else {
+            return -code error "Not an element"
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     Finally, the supported interfaces must be listed.
+%     \begin{tcl}
+      API {
+         ::APIutil::API {equality 1.0  "finite set" 1.1 \
+            canonise 1.0} {*}$args
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{tcl}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{string_set}
+%   This procedure implements a finite set of strings as a structure. 
+%   The basic call syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::sets::string_set| \word{element-list}
+%     \word{method} \word{argument}\regstar
+%   \end{displaysyntax}
+%   whereas the return value depends on the \word{method}.
+%   \begin{tcl}
+proc ::mtmtcl::sets::string_set {elements method args} {
+   switch -- $method {
+%   \end{tcl}
+%   
+%   \begin{procmethod}{elements}
+%     The list of elements is simply the |elements| parameter.
+%     \begin{tcl}
+      elements {return $elements}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{=}
+%     Equality is as strings.
+%     \begin{tcl}
+      = { string equal [lindex $args 0] [lindex $args 1] }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{canonise}
+%     The only valid representations are the canonical ones, but 
+%     it is convenient to provide a canonisation method for users 
+%     that expect one, even if it is trivial.
+%     \begin{tcl}
+      canonise {return [lindex $args 0]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{export}
+%     A first stab at implementation of this is to take the element 
+%     as a |#text| node.
+%     \begin{tcl}
+      export {
+         return [list \#text [lindex $args 0]]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     Finally, the supported interfaces must be listed.
+%     \begin{tcl}
+      API {
+         ::APIutil::API {equality 1.0  "finite set" 1.1 \
+            canonise 1.0  onlycanonical 1.0  export 1.0} {*}$args
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{tcl}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \subsection{Naming}
+% 
+% It is often useful to have symbolic names (that are independent of 
+% the string representation) for important structure elements, and 
+% translate back and forth between elements and names. Possible 
+% applications of this include
+% \begin{longtable}{ll}
+%   \textbf{Command}& \textbf{Result}\endhead
+%   |float named pi|& $3.14159265359$\\
+%   |float named e|&  $2.71828182846$\\
+%   |integer named Taxicab(2)|& $1729$\\
+%   $\mathbb{C}$| named i|& $i = \sqrt{-1}$\\
+%   $\mathbb{Q}[x,y]$| named x|& $x$
+% \end{longtable}\noindent
+% with the last two perhaps being the most interesting\Dash to give 
+% practical access to distinguished generators of a structure. 
+% Accordingly, some of the |generated|\dots\ interfaces below return 
+% names of generators (rather than the actual generator elements) since 
+% this is more convenient for several applications.
+% 
+% \begin{APIspec}{named element}{1.0}
+%   The \verb*|named element| interface provides the basic 
+%   functionality of mapping symbolic names to structure elements.
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{named}
+%       \word{string}
+%     \end{APImethod}
+%       Returns the structure element whose symbolic name is 
+%       \word{string}. It is not required that all return values are of 
+%       the same sort, but whatever provides the name \word{string} 
+%       should also provide information about what sort of element it 
+%       denotes.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% A natural extension would be to have an inverse operation |nameof| 
+% which returns the name of an element (or throws an error if it isn't 
+% one of the named elements), but this is complicated by the 
+% possibility of having several sorts; it is in principle possible that 
+% the same string could be the representation of two different named 
+% elements (provided they have different sorts). On the other hand, it 
+% could also be reasonable in some cases to have several names for a 
+% single element\dots
+% 
+% Another natural extension is to have an operation |names| which 
+% returns the list of known symbolic names of elements. This would in 
+% particular imply that the list is finite, which is closely related to 
+% the property of being finitely generated.
+% 
+% 
+% \subsection{Understructure access}
+% 
+% It could be convenient, as a curtesy by adapters and adaptors, to 
+% provide access to the underlying structure. Algorithms should not 
+% make use of this, but it can be awfully useful for debugging.
+% 
+% The natural format would be to have a method which accesses the 
+% underlying structure, but what should it be called? Possibilities 
+% are:
+% \begin{longtable}{lp{0.6\linewidth}}
+%   base& But that's too close to basis and such.\\
+%   understructure& Surprisingly enough, an official English word. 
+%     Feels a bit childish, though (perhaps because it mixes Germanic 
+%     and Latin words).\\
+%   foundation& Certainly posh enough, and seems unclaimed in math.\\
+%   fundament& Ditto.\\
+%   stem& To the point, but could perhaps be useful for other things.
+% \end{longtable}
+% Since it's not to be used in production, |understructure| might 
+% actually be appropriate; otherwise |fundament| seems best.
+% 
+% 
+% \subsection{Products}
+% 
+% \begin{APIspec}{direct product}{1.0}
+%   A \texttt{direct product} of structures has elements composed from 
+%   component structure elements.
+%   
+%   \begin{APIdescription}{product}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method satisfies the \texttt{equality} (v\,1.0) interface.
+%       
+%     \begin{APImethod}{no.components}
+%     \end{APImethod}
+%       This method returns the number of factors (components) in the 
+%       product.
+%       
+%     \begin{APImethod}{component}
+%       \word{index} \word{method} \word{argument}\regstar
+%     \end{APImethod}
+%       This method gives easy access to component structure methods. 
+%       The \word{index} $i$ is an integer \(0 \leqslant i < n\) where 
+%       $n$ is the number of factors. The command prefix
+%       \begin{displaysyntax}
+%         \meta{product} component \word{index}
+%       \end{displaysyntax}
+%       is a command prefix for the \word{index}th component of the 
+%       structure.
+%       
+%     \begin{APImethod}{index}
+%       \word{index} \word{element}
+%     \end{APImethod}
+%       This returns the projection of the \word{element} onto the 
+%       \word{index}th component, an element of the \word{index}th 
+%       component structure.
+%       
+%     \begin{APImethod}{tuple}
+%       \word{component}\regstar
+%     \end{APImethod}
+%       The $i$th \word{component} must be an element of the $i$th 
+%       component structure, and there must be exactly 
+%       \texttt{[\meta{product} no.components]} \word{component} 
+%       arguments. This returns the element of the \meta{product} 
+%       structure which consists of the specified \word{component}s.
+%   \end{APIdescription}
+%   
+%   If
+% \end{APIspec}
+% 
+% 
+% 
+% \subsection{Random structure elements}
+% 
+% For e.g.~testing purposes, it is sometimes convenient to have a 
+% source of arbitrary structure elements. Practically this can be 
+% implemented as a method which generates ``random'' structure 
+% elements from a given source of ``random'' data.
+% 
+% 
+% \begin{APIspec}{random element}{1.0}
+%   This interface is applicable to principal structures. 
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{random}
+%       \word{PRNG}
+%     \end{APImethod}
+%       This method returns a random element in the structure. 
+%       The \word{PRNG} is a prefix supporting the \APIref+{random 
+%       bit}{1.0} and \APIref+{random integer}{1.0} interfaces. 
+%       The |random| method should use it as its source of random 
+%       data.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% 
+% \subsection{Random number generators}
+% 
+% Random number generators are present in \mtl\ primarily because the 
+% |random element| interface needs them. The definitions here follow 
+% those of \emph{The API convention} documentation~\cite{LH:API}.
+% 
+% 
+% \begin{APIspec}{random bit}{1.0}
+%   Version 1.0 of |random bit| offers the basic ``flip of a coin''.
+%   \begin{APIdescription}{PRNG}
+%     \begin{APImethod}{bit}
+%     \end{APImethod}
+%     Returns |0| or |1|, randomly and with equal probability.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \begin{APIspec}{random bit}{2.0}
+%   Version 2.0 of |random bit| adds the possibility that the 
+%   mechanisms for pseudo-random number generation are present even if 
+%   they are uninitialised.
+%   \begin{APIdescription}{PRNG}
+%     \begin{APImethod}{seeded}
+%     \end{APImethod}
+%     The |seeded| method is used to check whether \meta{PRNG} is 
+%     seeded. It returns |0| if \meta{PRNG} is not fully seeded and 
+%     therefore cannot produce output, |1| if \meta{PRNG} has been 
+%     fully seeded, and |-1| if it has not been fully seeded but can 
+%     generate output anyway.
+%     
+%     \begin{APImethod}{bit}
+%     \end{APImethod}
+%     If the |seeded| method returns a boolean true value, then |bit| 
+%     will return |0| or |1|, randomly and with equal probability. 
+%     The behaviour of |bit| is unspecified if |seeded| returns a 
+%     boolean false value.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{random integer}{1.0}
+%   Version 1.0 of |random integer| offers the basic ``throw of a 
+%   dice'' (with variable number of sides).
+%   \begin{APIdescription}{PRNG}
+%     \begin{APImethod}{integer}
+%       \word{min}\regopt\ \word{max}
+%     \end{APImethod}
+%     Returns an integer $n$ such that \(\mathit{min} \leqslant n 
+%     \leqslant \mathit{max}\). If omitted, \word{min} defaults to 
+%     $1$. It is an error if \(\mathit{min} > \mathit{max}\). All 
+%     valid return values should have the same probability.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \begin{APIspec}{random integer}{2.0}
+%   Version 2.0 of |random integer| adds the possibility of signalling 
+%   that the mechanisms for pseudo-random number generation are present 
+%   even if they are uninitialised.
+%   
+%   \begin{APIdescription}{PRNG}
+%     \begin{APImethod}{seeded}
+%     \end{APImethod}
+%     The |seeded| method is used to check whether \meta{PRNG} is 
+%     seeded. It returns |0| if \meta{PRNG} is not fully seeded and 
+%     therefore cannot produce output, |1| if \meta{PRNG} has been 
+%     fully seeded, and |-1| if it has not been fully seeded but can 
+%     generate output anyway.
+%     
+%     \begin{APImethod}{integer}
+%       \word{min}\regopt\ \word{max}
+%     \end{APImethod}
+%     If the |seeded| method returns a boolean true value, then 
+%     |integer| returns an integer $n$ such that \(\mathit{min} 
+%     \leqslant n \leqslant \mathit{max}\). If omitted, \word{min} 
+%     defaults to $1$. It is an error if \(\mathit{min} > 
+%     \mathit{max}\). All valid return values should have the same 
+%     probability.
+%     
+%     The behaviour of |integer| is unspecified if |seeded| returns 
+%     a boolean false value.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% 
+\endinput
+

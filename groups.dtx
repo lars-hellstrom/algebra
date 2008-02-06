@@ -1,0 +1,1302 @@
+% 
+% \iffalse
+%<*driver>
+\documentclass{mtmtcl}
+\begin{document}
+\DocInput{groups.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% 
+% \part{Groups and variants}
+% 
+% While basic courses in abstract algebra typically begin with groups 
+% or fields, there is also the ``Bourbaki'' style of beginning with a 
+% magma (set with one binary operation not known to satisfy any 
+% axioms). Going that far is not immediately useful, but semigroups and 
+% monoids have the direct applications that it is not necessary to 
+% separately define associative rings and associative unital rings, 
+% since these are the same things as rings which also satisfy the 
+% axioms for a semigroup and monoid, respectively.
+% 
+% \begin{tcl}
+namespace eval ::mtmtcl::groups {}
+% \end{tcl}
+% \setnamespace{mtmtcl::groups}
+% 
+% 
+% \section{Basic versions}
+% 
+% The general trend for \texttt{group} and other group-related 
+% interface classes is that version~1.0 provides the fundamental 
+% operations, whereas higher version numbers add more and more derived 
+% operations (variadic operation, powers, power products). The 
+% \texttt{semigroup}, \texttt{monoid}, and \texttt{group} interfaces 
+% all employ a multiplicative notation; see \tclverb*|additive group| 
+% for the additive counterpart.
+% 
+% 
+% \begin{APIspec}{semigroup}{1.0}
+%   The \texttt{semigroup} interface (v\,1.0) prescribes two methods: 
+%   the binary operation |*| and the equality relation |=|.
+%   \begin{APIdescription}{semigroup}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies version~1.0 of the \texttt{equality} 
+%       interface.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method is an associative binary operation. This implies 
+%       that every \meta{semigroup} $G$ must have the property that the 
+%       two expressions
+%       \begin{displaysyntax}
+%         [$G$ * [$G$ * $a$ $b$] $c$]\par
+%         [$G$ * $a$ [$G$ * $b$ $c$]]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$, $b$, and $c$.
+%   \end{APIdescription}
+%   The |*| method is congruent.
+% \end{APIspec}
+% 
+% \begin{APIspec}{monoid}{1.0}
+%   The \texttt{monoid} interface is an extension of \texttt{semigroup} 
+%   which adds a multiplicative unit method.
+%   \begin{APIdescription}{monoid}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies version~1.0 of the \texttt{equality} 
+%       interface.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method satisfies version~1.0 of the \texttt{semigroup} 
+%       interface.
+%       
+%     \begin{APImethod}{1}
+%     \end{APImethod}
+%       The |1| method returns the identity element of the monoid. The 
+%       relevant axiom says that the three expressions
+%       \begin{displaysyntax}
+%         [$G$ * [$G$ 1] $a$]\par
+%         [$G$ * $a$ [$G$ 1]]\par
+%         $a$
+%       \end{displaysyntax}
+%       are |=|-equal for every element $a$ of the \meta{monoid} $G$.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% \begin{proc}{string_free_monoid}
+%   This procedure is implements the free \texttt{monoid} of 
+%   strings (over the Unicode alphabet). The overall syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::groups::string_free_monoid|
+%     \word{subcommand} \word{argument}\regstar
+%   \end{displaysyntax}
+%   and the implemented subcommands are |API|, |=|, |*|, and |1|.
+%   \begin{tcl}
+proc ::mtmtcl::groups::string_free_monoid {method args} {
+   switch -- $method {
+%   \end{tcl}
+%   \begin{procmethod}{=}
+%     String equality is implemented by the \Tcl\ core.
+%     \begin{tcl}
+      = {string equal [lindex $args 0] [lindex $args 1]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{*}
+%     The product of two lists is their concatenation. 
+%     \begin{tcl}
+      * {join $args ""}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{1}
+%     The identity element is the empty string.
+%     \begin{tcl}
+      1 {return ""}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     It just so happens that the definition of |*| above satifies 
+%     not only v\,1.0 but also v\,1.1 of \texttt{semigroup} and 
+%     \texttt{monoid}, so we might as well say so. Furthermore every 
+%     string has a unique representation, so we can declare support 
+%     for the \texttt{onlycanonical} and \texttt{autocanonical} 
+%     interfaces as well.
+%     \begin{tcl}
+      API {
+         ::APIutil::API {equality 1.0  autocanonical 1.0 \
+           onlycanonical 1.0  semigroup 1.1  monoid 1.1} {*}$args
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   It doesn't hurt to give an informative error message.
+%   \begin{tcl}
+      default {
+         return -code error "Unknown method \"$method\": must be\
+           =, *, 1, or API"
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{APIspec}{group}{1.0}
+%   The \texttt{group} interface is an extension of \texttt{monoid} 
+%   with a multplicative inverse operation.
+%   
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies version~1.0 of the \texttt{equality} 
+%       interface.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method satisfies version~1.0 of the \texttt{semigroup} 
+%       interface.
+%       
+%     \begin{APImethod}{1}
+%     \end{APImethod}
+%       The |1| method satisfies version~1.0 of the \texttt{monoid} 
+%       interface.
+%       
+%     \begin{APImethod}{inverse}
+%       \word{element}
+%     \end{APImethod}
+%       The inversion operation |inverse| has the property that
+%       \begin{displaysyntax}
+%         [$G$ * $a$ [$G$ inverse $a$]]\par
+%         [$G$ * [$G$ inverse $a$] $a$]\par
+%         [$G$ 1]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$ of the \meta{group} $G$.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% Additive groups, like multiplicative groups, can be specified as 
+% extensions of additive semigroups or monoids, but these aren't all 
+% that common, so it is probably easier to do it all in one go.
+% 
+% \begin{APIspec}{additive group}{1.0}
+%   In the additive notation for a group, the binary operation is $+$, 
+%   the identity element is $0$, and the inversion operation is $-$.
+%   
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies version~1.0 of the \texttt{equality} 
+%       interface.
+%       
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |+| operation is binary group operation. By 
+%       associativity, the two expressions
+%       \begin{displaysyntax}
+%         [$G$ + [$G$ + $a$ $b$] $c$]\par
+%         [$G$ + $a$ [$G$ + $b$ $c$]]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$, $b$, and $c$ of a 
+%       \meta{group} $G$.
+%     
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%       The |0| method returns the identity element of the 
+%       group. The relevant axiom says that the three expressions
+%       \begin{displaysyntax}
+%         [$G$ + [$G$ 0] $a$]\par
+%         [$G$ + $a$ [$G$ 0]]\par
+%         $a$
+%       \end{displaysyntax}
+%       are |=|-equal for each element $a$ of a \meta{group} $G$.
+%       
+%     \begin{APImethod}{-}
+%       \word{element}
+%     \end{APImethod}
+%       The inversion operation |-| has the property that
+%       \begin{displaysyntax}
+%         [$G$ + $a$ [$G$ - $a$]]\par
+%         [$G$ + [$G$ - $a$] $a$]\par
+%         [$G$ 0]
+%       \end{displaysyntax}
+%       are |=|-equal for each element $a$ of a \meta{group} $G$.
+%   \end{APIdescription}
+%   All methods are congruent. Note that |additive group| does 
+%   \emph{not} require the group to be abelian.
+% \end{APIspec}
+% 
+% 
+% 
+% 
+% 
+% \section{User-friendly extensions}
+% 
+% While the methods specified by interfaces in the previous section 
+% suffice for any computation with elements in a semigroup, monoid, or 
+% group, it is often possible to provide more optimised implementation 
+% of specific operations. One example is that one $n$-ary product might 
+% be quicker to compute than $n-1$ binary products.
+% 
+% \begin{APIspec}{semigroup}{1.1}
+%   Version~1.1 of \texttt{semigroup} extends the |*| operation to be 
+%   variadic:
+%   \begin{APIdescription}{semigroup}
+%     \begin{APImethod}{*}
+%       \word{element}\regplus
+%     \end{APImethod}
+%       The unary form of this method returns the original 
+%       element, or more precisely, the two expressions
+%       \begin{displaysyntax}
+%         [$G$ * $a$]
+%         \par
+%         $a$
+%       \end{displaysyntax}
+%       are |=|-equal for every element $a$ of the \meta{semigroup} 
+%       $G$. The general identity for the variadic form is that the 
+%       two expressions
+%       \begin{displaysyntax}
+%         [$G$ * [$G$ * \meta{$L_a$}] [$G$ * \meta{$L_b$}]]
+%         \par
+%         [$G$ * \meta{$L_a$} \meta{$L_b$}]
+%       \end{displaysyntax}
+%       are |=|-equal for any two nonempty lists $L_a$ and $L_b$ of 
+%       elements of the \meta{semigroup} $G$.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{monoid}{1.1}
+%   Version~1.1 of \texttt{monoid} extends the |*| operation to be 
+%   variadic. It goes one step further than its \texttt{semigroup} 
+%   counterpart by allowing also a nullary multiplication.
+%   \begin{APIdescription}{monoid}
+%     \begin{APImethod}{*}
+%       \word{element}\regstar
+%     \end{APImethod}
+%       This method satisfies version 1.1 of the |semigroup| interface, 
+%       and in addition the two expressions
+%       \begin{displaysyntax}
+%         [$G$ * [$G$ * \meta{$L_a$}] [$G$ * \meta{$L_b$}]]
+%         \par
+%         [$G$ * \meta{$L_a$} \meta{$L_b$}]
+%       \end{displaysyntax}
+%       are |=|-equal for any two lists (not just nonempty lists) 
+%       $L_a$ and $L_b$ of elements of the \meta{monoid} $G$.
+%       
+%       It follows that the nullary form of the |*| method returns 
+%       the unit element, because \texttt{[$G$ *]} is by the unit axiom 
+%       equal to \texttt{[$G$ * [$G$ 1] [$G$ *]]}, which by the unary 
+%       |*| axiom is equal to \texttt{[$G$ * [$G$ * [$G$ 1]] [$G$ *]]}, 
+%       which by the variadic axiom is equal to 
+%       \texttt{[$G$ * [$G$ 1]]}, which by the unary |*| axiom is equal 
+%       to \texttt{[$G$ 1]}.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{group}{1.1}
+%   Version~1.1 of \texttt{group} extends the |*| operation to be 
+%   variadic:
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{*}
+%       \word{element}\regstar
+%     \end{APImethod}
+%       This method satisfies version 1.1 of the |monoid| interface.
+%       
+%       \begin{remark}
+%         When the |inverse| is available, the unary |*| axiom becomes 
+%         redundant.
+%       \end{remark}
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% 
+% \begin{proc}{list_free_monoid_1.1}
+%   This procedure is an adapter which implements the free 
+%   \texttt{monoid}~(v\,1.1) over a structure with 
+%   \texttt{equality}~(v\,1.0). The overall syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::groups::list_free_monoid_1.1| \word{base structure} 
+%     \word{subcommand} \word{argument}\regstar
+%   \end{displaysyntax}
+%   and the return value depends on the \word{subcommand}.
+%   
+%   \begin{tcl}
+proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
+   switch -- $method {
+%   \end{tcl}
+%   \begin{procmethod}{=}
+%     Two lists are equal if they are the same length and 
+%     corresponding list elements are equal.
+%     \begin{tcl}
+      = {
+         if {[llength [lindex $args 0]] != [llength [lindex $args 1]]}\
+         then {return 0}
+         foreach x [lindex $args 0] y [lindex $args 1] {
+            if {![{*}$base = $x $y]} then {return 0}
+         }
+         return 1
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{*}
+%     The product of a collection of lists is their concatenation. 
+%     (That this is so easy to implement is the reason this adapter 
+%     doesn't stop at \texttt{monoid} v\,1.0.)
+%     \begin{tcl}
+      * {
+         return [concat {*}$args]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{1}
+%     The identity element is the empty list.
+%     \begin{tcl}
+      1 {return [list]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{canonise}
+%     Canonisation means canonise each list element and rebuild the 
+%     list with canonical representation.
+%     \begin{tcl}
+      canonise {
+         set res [list]
+         foreach item [lindex $args 0] {
+            lappend res [{*}$base canonise $item]
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{named}
+%     Elements of the base structure are accepted as names for the 
+%     length $1$ list containing that element.
+%     \begin{tcl}
+      named {return [lrange $args 0 0]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{namestructure}
+%     The base structure is made available via the |namestructure| 
+%     method.
+%     \begin{tcl}
+      namestructure {uplevel 1 $base $args}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{* decomposition}
+%     There is a trivial element decomposition which puts the power 
+%     $1$ on everything.
+%     \begin{tcl}
+      {* decomposition} {
+         set res {}
+         foreach item [lindex $args 0] {
+            lappend res $item 1
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{export}
+%     Exporting is pretty straightforward: just form the product of 
+%     the exports of each element separately. This may serve as an 
+%     example of how to handle the paths.
+%     \begin{tcl}
+      export {
+         lassign $args L path optD
+         set childL [list]
+         set bpath [linsert $path end namestructure]
+         foreach factor $L {
+            lappend childL [{*}$base export $factor $bpath $optD]
+         }
+         if {[llength $childL]} then {
+            return [list assop [
+               dict create  mtmtcl-path [linsert $path end *]
+            ] $childL]
+         } else {
+            return [list #text 1]
+         }
+      }
+%     \end{tcl}
+%     In a free monoid with power operation, it might be more 
+%     appropriate to use powers as much as possible when expressing 
+%     the element.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     The base structure API is only queried when the |API| method is 
+%     called. The adapter denounces support for everything unless the 
+%     base structure at least supports \texttt{equality}.
+%     \begin{tcl}
+      API {
+         set D [dict create]
+         if {[{*}$base API equality 1.0]} then {
+            dict lappend D equality 1.0 
+            dict lappend D semigroup 1.1 
+            dict lappend D monoid 1.1
+            dict lappend D "named element" 1.0
+            dict lappend D "* decomposition" 1.0
+         }
+         if {[{*}$base API canonise 1.0]} then {
+            dict set D canonise 1.0 
+         }
+         if {[{*}$base API export 1.0]} then {
+            dict set D export 1.0 
+         }
+         ::APIutil::API $D {*}$args
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   It doesn't hurt to give an informative error message.
+%   \begin{tcl}
+      default {
+         return -code error "Unknown method \"$method\""
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% Another example is that there might be quicker ways of computing 
+% powers than repeated multiplication\Dash even when that means 
+% squaring at $O(\log_2 n)$ multiplications rather the $n-1$ required 
+% by the trivial algorithm of multiplying by the base. Examples include:
+% \begin{enumerate}
+%   \item
+%     Diagonalisation of matrices (or more generally, transformation to 
+%     Jordan normal form), since powers of a diagonal matrix can be 
+%     computed without matrix multiplication.
+%   \item
+%     Employing knowledge about periods to limit the powers that need 
+%     to be computed. A permutation can be factorised into 
+%     cycles, and the order of each cycle is equal to its length.
+% \end{enumerate}
+% In such cases, an implementation of a power method constitutes a 
+% useful addition to a group.
+% 
+% \begin{APIspec}{group}{1.2}
+%   Version 1.2 of \texttt{group} improves on v\,1.1 by adding a power 
+%   method.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{^}
+%       \word{element} \word{integer}
+%     \end{APImethod}
+%       The value of \texttt{[\meta{group} \^{} $a$ $n$]} is $a^n$.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% \begin{APIspec}{group}{1.3}
+%   Version 1.3 of \texttt{group} improves on v\,1.2 by adding a power 
+%   product method |*^|, analogous to a linear combination.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{*^}
+%       \begin{regblock}[\regstar] \word{element} \word{integer} 
+%       \end{regblock}
+%     \end{APImethod}
+%       The value of
+%       \begin{displaysyntax}
+%         [\meta{group} *\^{} $a_1$ $n_1$ $\dots$ $a_k$ $n_k$]
+%       \end{displaysyntax}
+%       is $a_1^{n_1} \dotsb a_k^{n_k}$, i.e., on one hand
+%       \begin{displaysyntax}
+%         [$G$ |*^| $a$ $n$]\par
+%         [$G$ |^| $a$ $n$]
+%       \end{displaysyntax}
+%       are |=|-equal for every element $a$ and integer $n$, and on the 
+%       other,
+%       \begin{displaysyntax}
+%         [$G$ |*^| \meta{$L_a$} \meta{$L_b$}]\par
+%         [$G$ * [$G$ |*^| \meta{$L_a$}] [$G$ |*^| \meta{$L_b$}]]
+%       \end{displaysyntax}
+%       for all lists $L_a$ and $L_b$ with the structure
+%       \begin{quote}
+%         \begin{regblock}[\regstar] \word{element} \word{integer} 
+%         \end{regblock}
+%       \end{quote}
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% 
+% \begin{proc}{power_product_monoid_1.3}
+%   The |power_product_monoid_1.3| procedure implements 
+%   multiplicative free abelian monoids, denoted as power products. 
+%   The \meta{monoid} command prefix is
+%   \begin{displaysyntax}
+%     |power_product_monoid| \word{generator set}
+%   \end{displaysyntax}
+%   where the \word{generator set} is the command prefix of a 
+%   \APIref*{finite set}{1.1}.
+%   
+%   Elements are lists of exponents, where the $i$th exponent 
+%   corresponds to the $i$th generator. The exponents are native 
+%   non-negative integers.
+%   
+%   \begin{tcl}
+proc ::mtmtcl::groups::power_product_monoid_1.3 {base method args} {
+   switch -- $method {
+%   \end{tcl}
+%   \begin{procmethod}{=}
+%     Since all elements are lists of the same length, two lists 
+%     are equal if corresponding list elements are equal.
+%     \begin{tcl}
+      = {
+         foreach x [lindex $args 0] y [lindex $args 1] {
+            if {$x != $y]} then {return 0}
+         }
+         return 1
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{1}
+%     The identity element is a list of zeroes, but one must look at 
+%     the set of generators to figure out how many.
+%     \begin{tcl}
+      1 {
+         set res {}
+         foreach x [{*}$base elements] {lappend res 0}
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{*}
+%     The product of a collection of lists is their pointwise sum.
+%     \begin{tcl}
+      * {
+         if {![llength $args]} then {
+            return [power_product_monoid_1.3 $base 1]
+         }
+         set res [lindex $args 0]
+         foreach factor [lrange $args 1 end] {
+            set nres {}
+            foreach x $res y $factor {lappend nres [expr {$x+$y}]}
+            set res $nres
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{^}
+%     The power operation is similarly a pointwise multiplication by 
+%     scalar.
+%     \begin{tcl}
+      ^ {
+         set res {}
+         foreach item [lindex $args 0] {
+            lappend res [expr {$item * [lindex $args 1]}]
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{*^}
+%     The product-of-powers operation combines pointwise sum and 
+%     multiplication by scalar.
+%     \begin{tcl}
+      * {
+         if {![llength $args]} then {
+            return [power_product_monoid_1.3 $base 1]
+         }
+         set res {}
+         foreach item [lindex $args 0] {
+            lappend res [expr {$item * [lindex $args 1]}]
+         }
+         foreach {factor exp} [lrange $args 2 end] {
+            set nres {}
+            foreach x $res y $factor {lappend nres [expr {$x+$y*$exp}]}
+            set res $nres
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{canonise}
+%     Canonisation means canonise each list element and rebuild the 
+%     list with canonical representation.
+%     \begin{tcl}
+      canonise {
+         set res [list]
+         foreach item [lindex $args 0] {
+            lappend res [format %d $item]
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{named}
+%     Elements of the base structure are accepted as names for 
+%     element with exponent $1$ for that generator and $0$ for all 
+%     others.
+%     \begin{tcl}
+      named {
+         set res {}
+         foreach name [{*}$base elements] {
+            lappend res [::tcl::mathfunc::bool [
+               {*}$base = $name [lindex $args 0]
+            ]]
+         }
+         return $res
+      }
+%     \end{tcl}
+%     It wouldn't be correct to merely |lsearch| for the wanted 
+%     argument, as the set of generators is not required to be 
+%     |onlycanonical|.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{namestructure}
+%     The base structure is made available via the |namestructure| 
+%     method.
+%     \begin{tcl}
+      namestructure {uplevel 1 $base $args}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{* decomposition}
+%     The element decomposition is straightforward.
+%     \begin{tcl}
+      {* decomposition} {
+         set res {}
+         foreach name [{*}$base elements] exp [lindex $args 0] {
+            lappend res $name $exp
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   ---
+%   
+%   \begin{procmethod}{export}
+%     Exporting is pretty straightforward: just form the product of 
+%     the exports of each element separately. This may serve as an 
+%     example of how to handle the paths.
+%     \begin{tcl}
+      export {
+         error "This hasn't been implemented yet (sorry)"
+         
+         lassign $args L path optD
+         set childL [list]
+         set bpath [linsert $path end namestructure]
+         foreach factor $L {
+            lappend childL [{*}$base export $factor $bpath $optD]
+         }
+         if {[llength $childL]} then {
+            return [list assop [
+               dict create  mtmtcl-path [linsert $path end *]
+            ] $childL]
+         } else {
+            return [list #text 1]
+         }
+      }
+%     \end{tcl}
+%     In a free monoid with power operation, it might be more 
+%     appropriate to use powers as much as possible when expressing 
+%     the element.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     The base structure API is only queried when the |API| method is 
+%     called. The adapter denounces support for everything unless the 
+%     base structure at least supports \APIref*{finite set}{1.1}.
+%     \begin{tcl}
+      API {
+         set D [dict create]
+         if {[{*}$base API "finite set" 1.1]} then {
+            dict lappend D equality 1.0 
+            dict lappend D semigroup 1.3 
+            dict lappend D monoid 1.3
+            dict lappend D "named element" 1.0
+            dict lappend D "* decomposition" 1.0
+         }
+         if {[{*}$base API canonise 1.0]} then {
+            dict set D canonise 1.0 
+         }
+         if {[{*}$base API export 1.0]} then {
+            # dict set D export 1.0 
+         }
+         ::APIutil::API $D {*}$args
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   It doesn't hurt to give an informative error message.
+%   \begin{tcl}
+      default {
+         return -code error "Unknown method \"$method\""
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{proc}{variadic_product}
+%   The |variadic_product| procedure implements a variadic product on 
+%   top of (mostly) a binary product. The call syntax is
+%   \begin{displaysyntax}
+%     |variadic_product| \word{binary command} \word{use unary} 
+%     \word{unary command} \word{nullary command}
+%     \word{factor}\regstar
+%   \end{displaysyntax}
+%   where the \word{binary command}, \word{unary command}, and 
+%   \word{nullary command} are command prefixes taking $2$, $1$, and 
+%   $0$ arguments respectively and which compute the product of that 
+%   many arguments. The \word{unary command} is typically empty or a 
+%   |canonise| command.
+%   
+%   If the \word{nullary command} is empty then the $0$ factor form 
+%   is not allowed. The \word{use unary} is a boolean; if it is false 
+%   then the $1$ factor form simply returns that factor. If it is 
+%   true and \word{unary command} is nonempty then that is used. If 
+%   \word{use unary} is true and \word{unary command} is empty but 
+%   \word{nullary command} is nonempty then the result is computed 
+%   using \word{binary command} and \word{nullary command}. Otherwise 
+%   the $1$ factor form is not allowed either.
+%   \begin{tcl}
+proc ::mtmtcl::groups::variadic_product {bincmd use1 uncmd nullcmd args} {
+   if {[llength $args] == 2} then {
+      return [eval $bincmd $args]
+   } elseif {[llength $args] > 2} then {
+      set res [lindex $args 0]
+      foreach factor [lrange $args 1 end] {
+         set res [eval $bincmd [list $res $factor]]
+      }
+      return $res
+   } elseif {[llength $args] == 0} then {
+      if {[llength $nullcmd]} then {
+         return [eval $nullcmd]
+      } else {
+         return -code error "Nullary form not supported"
+      }
+   } else {
+      if {!$use1} then {
+         return [lindex $args 0]
+      } elseif {[llength $uncmd]} then {
+         return [eval $uncmd $args]
+      } elseif {[llength $nullcmd]} then {
+         return [eval $bincmd [list [eval $nullcmd]] $args]
+      } else {
+         return -code error "Unary form not supported"
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{squaring_power}
+%   The |squaring_power| procedure implements integer powers on top of 
+%   (mostly) a binary product, by taking squares. The call syntax is
+%   \begin{displaysyntax}
+%     |squaring_power| \word{binary command} \word{use unary} 
+%     \word{unary command} \word{identity command}
+%     \word{inverse command} \word{base} \word{exponent}
+%   \end{displaysyntax}
+%   where \word{exponent} is an integer and \word{base} is something 
+%   that can be multiplied. The \word{binary command}, \word{inverse 
+%   command}, \word{unary command}, and \word{nullary command} are 
+%   command prefixes taking $2$, $1$, $1$, and $0$ arguments 
+%   respectively and which compute the product of two factors, the 
+%   inverse of one factor, the product of one factor, or the product 
+%   of no factors. If any one of these is an empty string, then that 
+%   operation is considered to be unavailable; the procedure will try 
+%   to work around the situation, but must in some cases fail.
+%   
+%   What complicates the syntax is that it is desirable to preserve 
+%   automatic canonisation of elements although that will not always 
+%   come automatically, so there are a couple of edge cases for low 
+%   exponents and structures without unit or inverse. The 
+%   implementation tries to do \emph{something} in these cases; the 
+%   rationale for this is that these are probably not the hard cases 
+%   anyway.
+%   
+%   If the \word{nullary command} is empty then the $0$ factor form 
+%   is not allowed. The \word{use unary} is a boolean; if it is false 
+%   then the $1$ factor form simply returns that factor. If it is 
+%   true and \word{unary command} is nonempty then that is used. If 
+%   \word{use unary} is true and \word{unary command} is empty but 
+%   \word{nullary command} is nonempty then the result is computed 
+%   using \word{binary command} and \word{nullary command}. Otherwise 
+%   the $1$ factor form is not allowed either.
+%   \begin{tcl}
+proc ::mtmtcl::groups::squaring_power {bincmd use1 uncmd idcmd invcmd\
+  base exp} {
+   if {$exp < 0} then {
+%   \end{tcl}
+%   Negative exponents are straightforward: an inverse is needed. 
+%   After inverting \word{base}, the exponent can be negated.
+%   \begin{tcl}
+      if {[llength $invcmd]} then {
+         set base [eval $invcmd [list $base]]
+         if {$exp == -1} then {return $base}
+         set exp [expr {-$exp}]
+      } else {
+         return -code error "Inverses not supported"
+      }
+   } elseif {$exp == 0} then {
+%   \end{tcl}
+%   Zero exponents have two possible implementations: use explicit 
+%   identity element (preferred), or try the expression $b b^{-1}$.
+%   \begin{tcl}
+      if {[llength $idcmd]} then {
+         return [eval $idcmd]
+      } elseif {[llength $invcmd]} then {
+         return [{*}$bincmd $base [{*}$invcmd $base]]
+      } else {
+         return -code error "0th power not supported"
+      }
+   }
+%   \end{tcl}
+%   In the case of \word{exponent} $1$, things get even messier. The 
+%   easiest implementation is that we can just return the 
+%   \word{base}, so there is a separate argument \word{use unary} to 
+%   signal when this is not OK.
+%   \begin{tcl}
+   if {$exp == 1} then {
+      if {!$use1} then {
+         return $base
+      } elseif {[llength $uncmd]} then {
+         return [eval $uncmd [list $base]]
+      } elseif {[llength $idcmd] || [llength $invcmd]} then {
+         if {[llength $idcmd]} then {
+            set id [eval $idcmd]
+         } else {
+            set id [eval\
+              $bincmd [list $base [eval $invcmd [list $base]]]]
+         }
+         return [eval $bincmd [list $base $id]]
+      } else {
+         return -code error "1st power not supported"
+      }
+   }
+%   \end{tcl}
+%   The actual algorithm computes $b^e$ as $\prod_{k \in E} b^{2^k}$ 
+%   where \(E \subset \mathbb{N}\) is such that \(e = 
+%   \sum_{k \in E} 2^k\), i.e., $E$ is the set of positions of $1$s 
+%   in the base $2$ representation of the integer $e$.
+%   \begin{tcl}
+   set power $base
+   for {} {!($exp & 1)} {set exp [expr {$exp/2}]} {
+      set power [eval $bincmd [list $power $power]]
+   }
+   set res $power
+   while {$exp>=2} {
+      set power [eval $bincmd [list $power $power]]
+      set exp [expr {$exp/2}]
+      if {$exp & 1} then {
+         set res [eval $bincmd [list $res $power]]
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+%   It is known that this algorithm is not optimal for all exponents 
+%   (see e.g.~\cite{Knuth:TAOCP}), but it has the right complexity.
+% \end{proc}
+% 
+% \begin{proc}{power_product}
+%   This command has the syntax
+%   \begin{displaysyntax}
+%     |power_product| \word{product-command} \word{power-command} 
+%     \begin{regblock}[\regstar] \word{base} \word{exponent} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   It uses the \word{power-command}\Ldash which has the syntax
+%   \begin{quote}
+%     \word{power-command} \word{base} \word{exponent}
+%   \end{quote}
+%   \Dash to compute $a^n$ for each \word{base} $a$ and \word{exponent} 
+%   $n$, and then the \word{product-command}\Ldash which has the 
+%   syntax
+%   \begin{quote}
+%     \word{product-command} \word{factor}\regstar
+%   \end{quote}
+%   \Dash to multiply these powers. The return value is that product.
+%   \begin{tcl}
+proc ::mtmtcl::groups::power_product {prodcmd powcmd args} {
+   set call [list $prodcmd]
+   foreach {base exponent} $args {
+      lappend call [eval $powcmd [list $base $exponent]]
+   }
+   return [eval $call]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{group_1.3_upgrade}
+%   The |group_1.3_upgrade| procedure is an adaptor which creates 
+%   a \texttt{group} v\,1.3 from a \texttt{group} v\,1.0 or later. The 
+%   call syntax is
+%   \begin{displaysyntax}
+%     |group_1.3_upgrade| \word{name} \meta{prefix}
+%   \end{displaysyntax}
+%   where \word{name} is the name of the new command to create and 
+%   \meta{prefix} is the command prefix of the group inside.
+%   
+%   The interfaces the new structure may support in addition to 
+%   |group|~1.3 are |equality|~1.0, |canonise|~1.0 (if \meta{prefix} 
+%   does), and |autocanonical|~1.0 (if \meta{prefix} does).
+%   
+%   The implementation uses the |APIutil::ensemble| command.
+%   \begin{tcl}
+proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
+   if {![eval $args [list API group 1.0]]} then {
+      error "Base structure is not a: group 1.0"
+   }
+   ::APIutil::adaptation $name $args uplevel 1 same {
+      equality 1.0 {=}
+      canonise 1.0 {canonise}
+      autocanonical 1.0 {}
+   } push {
+      1 {# {Non-autocanonical power}
+         #nswc squaring_power #{ #*0 * #} 0 {}
+         #{ #*0 identity #} #{ #*0 inverse #}
+      }
+   } method {
+      * {group 1.1} {#*0 *}
+      * {autocanonical 1.0 canonise 1.0} {
+         #nswc variadic_product #{ #*0 * #} 1 #{ #*0 canonise #}
+         #{ #*0 identity #}
+      }
+      * {autocanonical 1.0} {
+         #nswc variadic_product #{ #*0 * #} 1 {} #{ #*0 identity #}
+      }
+      * {} {
+         #nswc variadic_product #{ #*0 * #} 0 {} #{ #*0 identity #}
+      }
+      identity {} {#*0 identity}
+      inverse {} {#*0 inverse}
+      ^ {group 1.2} {#*0 ^}
+      ^ {autocanonical 1.0 canonise 1.0} {
+         #nswc squaring_power #{ #*0 * #} 1 #{ #*0 canonise #}
+         #{ #*0 identity #} #{ #*0 inverse #}
+      }
+      ^ {autocanonical 1.0} {
+         #nswc squaring_power #{ #*0 * #} 1 {}
+         #{ #*0 identity #} #{ #*0 inverse #}
+      }
+      ^ {} {#*1}
+   } pushmethod {
+      2 *
+   } method {
+      *^ {group 1.3} {#*0 *^}
+      *^ {group 1.2} {
+         #nswc power_product #{ #*0 * #} #{ #*0 ^ #}
+      }
+      *^ {group 1.1} {
+         #nswc power_product #{ #*0 * #} #1
+      }
+      *^ {} {
+         #nswc power_product #2 #1
+      }
+   } interface {
+      group 1.3 {}
+      monoid 1.3 {}
+      semigroup 1.3 {}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{APIspec}{additive group}{1.1}
+%   Version 1.1 of \texttt{additive group} extends the syntaxes of 
+%   addition to be variadic and the syntax of |-| to provide 
+%   subtraction as well as negation.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{+}
+%       \word{element}\regstar
+%     \end{APImethod}
+%       The general identity for the variadic form is that the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$G$ + [$G$ + \meta{$L_a$}] [$G$ + \meta{$L_b$}]]
+%         \par
+%         [$G$ + \meta{$L_a$} \meta{$L_b$}]
+%       \end{displaysyntax}
+%       are |=|-equal for any two lists of elements $L_a$ and $L_b$. 
+%       In particular this implies that \texttt{[$G$ +]} returns 
+%       the identity element and that $a$ is |=|-equal to 
+%       \texttt{[$G$ + $a$]} for every element $a$.
+%       
+%     \begin{APImethod}{-}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The binary form of |-| is has as defining property that the two 
+%       expressions.
+%       \begin{displaysyntax}
+%         [$G$ - $a$ $b$]\par
+%         [$G$ + $a$ [$G$ - $b$]]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$ and $b$.
+%       
+%     \begin{APImethod}{iszero}
+%       \word{element}
+%     \end{APImethod}
+%       This method is a shorthand for testing equality to zero, i.e., 
+%       the two expressions
+%       \begin{displaysyntax}
+%         [$G$ iszero $a$]\par
+%         [$G$ = [$G$ 0] $a$]
+%       \end{displaysyntax}
+%       are equal as booleans for all elements $a$ of the 
+%       \meta{group}~$G$.
+%   \end{APIdescription}
+%   All methods are congruent. 
+% \end{APIspec}
+% 
+% \begin{APIspec}{additive group}{1.2}
+%   Version 1.2 of \texttt{additive group} parallels version 1.2 of 
+%   \texttt{group} by adding an integer multiple method.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{integer.}
+%       \word{integer} \word{element} 
+%     \end{APImethod}
+%       The value of \texttt{[\meta{group} integer. $n$ $a$]} is 
+%       $\sum_{i=1}^n a$.
+%       
+%       The notation is chosen to on one hand make it easy to turn an 
+%       additive group into a $\mathbb{Z}$-module, but on the other 
+%       hand stay distinct so that it does not conflict with the scalar 
+%       multiple of modules of other rings.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% \begin{APIspec}{additive group}{1.3}
+%   Version 1.3 of \texttt{additive group} improves on v\,1.2 by adding 
+%   a linear combination extension of the integer multiple method.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{+integer.}
+%       \begin{regblock}[\regstar] \word{integer} \word{element} 
+%       \end{regblock}
+%     \end{APImethod}
+%       The value of
+%       \begin{displaysyntax}
+%         [\meta{group} *\^{} $n_1$ $a_1$ $\dots$ $n_k$ $a_k$]
+%       \end{displaysyntax}
+%       is $\sum_{i=1}^k n_1 a_1$, i.e., on one hand
+%       \begin{displaysyntax}
+%         [$G$ +integer. $a$ $n$]\par
+%         [$G$ integer. $a$ $n$]
+%       \end{displaysyntax}
+%       are |=|-equal for every element $a$ and integer $n$, and on the 
+%       other,
+%       \begin{displaysyntax}
+%         [$G$ +integer. \meta{$L_a$} \meta{$L_b$}]\par
+%         [$G$ + [$G$ +integer. \meta{$L_a$}] 
+%           [$G$ +integer. \meta{$L_b$}]]
+%       \end{displaysyntax}
+%       for all lists $L_a$ and $L_b$ with the structure
+%       \begin{quote}
+%         \begin{regblock}[\regstar] \word{integer} \word{element} 
+%         \end{regblock}
+%       \end{quote}
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% 
+% 
+% 
+% 
+% \begin{proc}{make_group_additive}
+%   
+% \end{proc}
+% 
+% \section{Related interfaces}
+% 
+% 
+% \begin{APIspec}{division}{1.0}
+%   The |division| interface specifies the existence of a binary 
+%   division operation |/| that is an inverse of |*|. The quotient 
+%   need not be defined for all pairs of elements. It probably makes 
+%   more sense if |*| is at least associative, but is perfectly 
+%   possible to define even in other situations.
+%   \begin{APIdescription}{magma}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method must satisfy \texttt{equality} v\,1.0.
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method returns an element.
+%     \begin{APImethod}{/}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method may throw an error, but if
+%       \begin{displaysyntax}
+%         [$M$ / $a$ $b$]
+%       \end{displaysyntax}
+%       for elements $a$ and $b$ of a \meta{magma} $M$ returns $x$ 
+%       then that $x$ must be an element such that the two expressions
+%       \begin{displaysyntax}
+%         [$M$ * $b$ $x$]\par
+%         $a$
+%       \end{displaysyntax}
+%       are |=|-equal.
+%       
+%       \begin{remark}
+%         In terms of an multiplicative inverse, this defines $a/b$ 
+%         to be $b^{-1}a$, i.e., it is a \emph{left} division. This 
+%         may seem unintuitive, but it makes it possible to have 
+%         \(a/(bc) = (a/b)/c\). Right division would have \(a/(bc) = 
+%         (a/c)/b\).
+%       \end{remark}
+%       
+%       If this method throws an error, then it should set the 
+%       |-errorcode| to one of the following lists:
+%       \begin{displaysyntax}
+%         API division nosolution\par
+%         API division unimplemented
+%       \end{displaysyntax}
+%       Use of the |nosolution| form signals that there really isn't 
+%       any solution $x$ to \(bx=a\). Use of the |unimplemented| form 
+%       merely means that division has not been implemented for these 
+%       arguments (e.g.~a ring of polynomials might have division 
+%       implemented only for monomial denominators), in which case 
+%       the error does not imply nonexistence of a solution.
+%   \end{APIdescription}
+%   
+%   Note that |/| is not required to be congruent. This is 
+%   because the \texttt{division} interface does not require the 
+%   equation \(bx=a\) to have a unique solution, and 
+%   ensuring that the choice of solution is independent of 
+%   argument representation could well be unreasonably expensive. 
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{generated group}{1.0}
+%   If a group is generated by a known subset of elements, then it 
+%   can be useful to have an operation which produces an expression 
+%   in terms of those generators for arbitrary elements of the group. 
+%   This is what this interface specifies.
+%   
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{1}
+%     \end{APImethod}
+%     \begin{APImethod}{inverse}
+%       \word{element}
+%     \end{APImethod}
+%       First of all, the |group| interface version~1.0 must be 
+%       satisfied. Denote by $G$ the upgrade of \meta{group} to 
+%       version~1.3 of this interface.
+%       
+%     \begin{APImethod}{named}
+%       \word{name}
+%     \end{APImethod}
+%       Second, the |named element| interface version~1.0 must also 
+%       be satisfied.
+%       
+%     \begin{APImethod}{* decomposition}
+%       \word{element}
+%     \end{APImethod}
+%       This method returns a list
+%       \begin{displaysyntax}
+%         \begin{regblock}[\regstar] \word{name} \word{integer} 
+%         \end{regblock}
+%       \end{displaysyntax}
+%       such that if the returned value is $s_1$ $n_1$ $\dots$ $s_k$ 
+%       $n_k$ then the return value of
+%       \begin{displaysyntax}
+%         [$G$ |*^| [$G$ named $s_1$] $n_1$ $\dots$ 
+%         [$G$ named $s_k$] $n_k$]
+%       \end{displaysyntax}
+%       is |=|-equal to the \word{element}.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{generated additive group}{1.0}
+%   If a group is generated by a known subset of elements, then it 
+%   can be useful to have an operation which produces an expression 
+%   in terms of those generators for arbitrary elements of the group. 
+%   This is what this interface specifies.
+%   
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%     \begin{APImethod}{-}
+%       \word{element}
+%     \end{APImethod}
+%       First of all, the |additive group| interface version~1.0 must 
+%       be satisfied. Denote by $G$ the upgrade of \meta{group} to 
+%       version~1.3 of this interface.
+%       
+%     \begin{APImethod}{named}
+%       \word{name}
+%     \end{APImethod}
+%       Second, the |named element| interface version~1.0 must also 
+%       be satisfied.
+%       
+%     \begin{APImethod}{+ decomposition}
+%       \word{element}
+%     \end{APImethod}
+%       This method returns a list
+%       \begin{displaysyntax}
+%         \begin{regblock}[\regstar] \word{name} \word{integer} 
+%         \end{regblock}
+%       \end{displaysyntax}
+%       such that if the returned value is $s_1$ $n_1$ $\dots$ $s_k$ 
+%       $n_k$ then the return value of
+%       \begin{displaysyntax}
+%         [$G$ +integer. $n_1$ [$G$ named $s_1$] $\dots$ $n_k$ 
+%         [$G$ named $s_k$]]
+%       \end{displaysyntax}
+%       is |=|-equal to the \word{element}.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% 
+% 
+% 
+% 
+\endinput

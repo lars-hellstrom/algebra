@@ -1,0 +1,569 @@
+\documentclass{mtmtcl}
+
+\newcommand{\cs}[1]{\texttt{\PrintChar{92}#1}}
+
+\theoremstyle{plain}
+\newtheorem{policy}{Policy}
+
+\theoremstyle{remark}
+\newtheorem*{example}{Example}
+
+% 
+% \usepackage{amsmath,amsfonts,amssymb}
+% \usepackage{amsthm}
+% 
+% \usepackage{longtable}
+% 
+% \theoremstyle{definition}
+% \newtheorem*{definition}{Definition}
+% \theoremstyle{remark}
+% \newtheorem*{remark}{Remark}
+% 
+% 
+% \makeatletter
+% \NewDescribeCommand{\defining}{%
+%    \XD@grab@oarg\XD@grab@sarg{*}\XD@grab@oarg\XD@grab@marg
+% }{4}{%
+%    \IndexEntry{%
+%       \ifx \NoValue#1%
+%          \LevelSame{\ifx\NoValue#3#4\else#3\fi}%
+%       \else
+%          \LevelSorted{#1}{\ifx\NoValue#3#4\else#3\fi}%
+%       \fi
+%    }{main}{\thepage}%
+%    \textbf{#4}%
+%    \@gobble % Eats \ignorespaces
+% }
+% \makeatother
+% 
+% \PageIndex
+% \CodelineNumbered
+% \setcounter{IndexColumns}{2}
+% 
+% \newenvironment{procmethod}{%
+%    \tclsubcommand{method}{submethod}%
+% }{\endtclsubcommand}
+% 
+% 
+% % \newcommand{\Z}{\ensuremath{\mathbb{Z}}}
+% \newcommand{\Z}{\texttt{Z}}
+% 
+% \newcommand*{\mw}[1]{\word{$#1$}}
+% 
+% \newcommand{\mtl}{\texttt{mathematcl}}
+% \newcommand{\Tcl}{\Tcllogo}
+% \newcommand{\TclObj}{\Tcllogo\_Obj}
+% \newcommand{\TclObjs}{\TclObj s}
+% 
+% \providecommand{\Ldash}{---}
+% \providecommand{\Rdash}{---}
+% \providecommand{\Dash}{---}
+
+\begin{document}
+
+\title{\mtl~interfaces}
+\author{Lars Hellstr\"om}
+\date{2006-06-21--}
+\maketitle
+
+
+\begin{abstract}
+  A key part in the \mtl\ system is the use of \emph{interfaces} 
+  for structures as a way of making them work together. This 
+  document is the primary collection of specifications of these 
+  interfaces.
+\end{abstract}
+
+\tableofcontents
+
+
+\section{Introduction}
+
+The \mtl\ system for algebraic computations is designed to meet the 
+following goals:
+\begin{itemize}
+  \item
+    It should be reasonably easy to program. 
+    \iffalse
+    and in particular not 
+    constantly burden the mathematician's mind with issues of how 
+    data is being stored.
+    \fi
+  \item
+    It should be open to new concepts and new implementations\Dash 
+    built-in operations should not recieve preferential treatment or 
+    display behaviour that is otherwise unattainable.
+  \item
+    It should be able to manage the many levels of abstraction that 
+    occur in algebraic constructions.
+  \item
+    The system should be portable.
+  \item
+    \dots
+\end{itemize}
+To meet these goals, the following design decisions have been made:
+
+\begin{policy} \label{Pol:Strukturer}
+  Focus is on mathematical \emph{structures} and the \emph{interfaces} 
+  these support. Generic algorithms should be expressed not in terms 
+  of concrete implementations, but in terms of abstract structures 
+  provided as parameters. Structures expose their capabilities and 
+  useful properties by declaring support for particular interfaces.
+\end{policy}
+
+Basic examples of interfaces are `ring', `group', `lattice', and so 
+on. Examples of structures are $\mathbb{Z}$~(ring, additive group, 
+lattice under $\max$ and $\min$), $\mathbb{C}$~(field, ring, additive 
+group), $\mathbb{N}$~(semiring, additive monoid, multiplicative 
+monoid, divisor lattice, max/min lattice), $\mathbb{Z}[x]$~(ring etc.), 
+$\mathbb{Z}[x]\big/ \langle x^2 - 2\rangle$~(ditto), $\mathbb{Z} + 
+i\mathbb{Z}$~(Gaussian integers, ring etc.), 
+$\mathrm{M}_n(\mathbb{R}$)$~(real $n \times n$ matrices, ring etc.), 
+$\mathrm{GL}_n(\mathbb{R}$)~(invertible real $n \times n$ matrices, a 
+group), and so on. What should be apparent from these examples is 
+that many structures naturally support more than one interface; it is 
+seldom useful to ask for a name describing all that a structure is, 
+but generally quite sufficient to pick an interface and ask whether 
+the structure supports it. The case of the natural numbers should 
+also make clear that there are sometimes more than one way in which 
+a set can often be turned into a structure supporting a particular 
+interface; the ways in which one can reinterpret the basic 
+mathematical structure are surprisingly many.
+
+What this means in practice is that in order to multiply two 
+elements $a$ and $b$ of some algebra $\mathcal{A}$ one does not 
+write `$a$ times $b$', but rather `$\mathcal{A}$-multiply $a$ and 
+$b$'; cf.~the notation \(a \cdot_{\mathcal{A}} b\) that is 
+sometimes used when one needs to clarify that this is the 
+multiplication operation of~$\mathcal{A}$. Provided that (references 
+to) structures such as this `$\mathcal{A}$' can be passed around as 
+easily as elements of structures\Ldash which is essentially the 
+`provided as parameters' in the policy statment, and explained in 
+more detail below\Rdash this is a cheap and effective way of 
+explaining to the computer what operation is desired. Equally 
+important is the fact that it scales well: that it can handle 
+hundreds of structures as easily as one. Both are necessary to meet 
+the goal of handling multiple levels of abstraction, since a level 
+$n$ structure is usually constructed from one or several level $n-1$ 
+structures, which in turn are constructed from level $n-2$ 
+structures, and so on; the implementation of a basic operation in 
+a high level structure can easily exercise dozens of operations in 
+lower level structures.
+
+\begin{example}
+  The field of rational numbers $\mathbb{Q}$ is typically implemented 
+  as the field of fractions of the ring of integers $\mathbb{Z}$. 
+  This means every rational number is a pair of integers. Even for 
+  such an ``easy'' operation as addition in $\mathbb{Q}$, it is 
+  necessary to compute a common multiple of the denominators of the 
+  terms and extend all the fractions accordingly, which requires at 
+  least multiplication in $\mathbb{Z}$. One furthermore typically 
+  wants to use as small numbers as possible in these calculations, 
+  and then it is also necessary to compute quotients and GCDs in 
+  $\mathbb{Z}$.
+  
+  Consider next the ring of $n \times n$ matrices over $\mathbb{Q}$. 
+  Addition in this ring is repeated addition in $\mathbb{Q}$. 
+  Multiplication in this ring requires both the multiplication and 
+  addition operations in $\mathbb{Q}$. Going further, one can 
+  consider the subgroup $\mathrm{SO}_n(\mathbb{Q})$, and even the 
+  corresponding group algebra $\mathbb{Q}\bigl[ 
+  \mathrm{SO}_n(\mathbb{Q}) \bigr]$.
+\end{example}
+
+In ordinary mathematical writing this 
+is usually omitted\Ldash e.g.~when each particular argument only 
+involves one multiplication operation anyway\Rdash but in higher 
+algebra the normal state of affairs is rather than there are 
+several multiplication operations that have to be distinguished. 
+A system for algebraic computation must deal with e.g.~the fact 
+that the multiplication in a semigroup algebra is defined in 
+terms of the multiplications of the underlying semigroup and 
+coefficient ring.
+
+\begin{policy}
+  There are no ``blessed'' structures, only standard implementations 
+  provided for convenience, and anyone is free to provide 
+  alternatives. Constructions should not rely on details of a 
+  structure that are not publicly declared through an interface.
+\end{policy}
+
+This is part of the \emph{openness} goal. Policy~\ref{Pol:Strukturer} 
+relates more to the goal of managing many levels of abstraction, 
+since 
+
+
+\begin{policy}
+  The main computing environment shall be a \Tcl~(Tool Command 
+  Language) interpreter.
+\end{policy}
+
+The \emph{main computing environment} is merely that in which 
+independent pieces of code is combined. While this environment has 
+many advantages (as described below), it is also perfectly possible 
+to do the bulk of one's work within some other computing 
+environment(s).
+
+
+    
+\begin{itemize}
+    
+  \item
+    
+    
+    
+    
+    ---
+    
+    
+    
+  \item
+    The system should \emph{not} employ a type system to interpret 
+    operations. Instead, it is required that every operation is fully 
+    identified independently of the data it is to operate on.
+    
+    The main use for type systems in computer languages has been to 
+    reserve memory for data storage, but modern high level languages 
+    generally allocate memory dynamically when needed, freeing the 
+    programmer from having to manage allocation explicitly. 
+    A secondary use for a type system that has grown more common in 
+    the last decades is to resolve overloaded (polymorphic) 
+    operations, where the same symbol is used for several operations 
+    and the language environment picks one whose type-labelling 
+    matches that of the operands. It is primarily the latter practice 
+    that this decision rejects.
+    
+    The runtime rationale for this decision is that type-controlled 
+    polymorphism inserts an impractical detour into the very heart of 
+    the computing environment. The programmer implementing an 
+    algorithm always knows \emph{exactly} (up to parameters defining 
+    the context for the computation) which operation is intended at 
+    every point in the program, and this is also what the computer 
+    needs to know to execute the program. 
+    Relying upon type-controlled polymorphism when instructing the 
+    computer will however mean that a lot of this information is 
+    omitted or provided only indirectly, which requires constant 
+    detours into type-matching to resolve the ambiguity created by 
+    the overloading.
+    
+    The coding time rationale is that the system becomes much simpler 
+    if the administrative overhead of assigning formalised types to 
+    everything can be dropped. There is however also a coding time 
+    cost in that polymorphism is often exploited to produce more 
+    compact source code; the explicit identification of operations 
+    must not become tedious.
+\end{itemize}
+
+\Tcl\ is both syntactically and semantically an extremely simple 
+language\Ldash yet expressive and highly flexible\Rdash which makes 
+it easy to learn. Unlike the majority of contemporary programming 
+languages, the syntax of \Tcl\ is not descendant from that of 
+traditional mathematical formulae (hence it will probably seem 
+unfamiliar the first time it is encountered), but when it comes to 
+programming this is mostly an improvement; the syntax of mathematical 
+formulae is actually very complicated and it is often a matter of 
+convention rather than grammar how a nontrivial formula like $\sin 
+2x$ or $\sin 2\ln x$ should be understood. In addition to this 
+simplicity, the \Tcl\ syntax also provides an elegant solution to 
+the problem of distinguishing between several similarly-named 
+operations that can be a major headache when describing complex 
+algebraic constructions.
+
+
+\subsection{A \Tcl\ primer}
+
+A \Tcl\ program (or \emph{script}) is syntactically a sequence of 
+\emph{command sentences} and comments, separated by newlines. Each 
+sentence is a sequence of \emph{words}, separated by whitespace 
+(typically one or several spaces, but tabs are fine too). Words can 
+be arbitrary strings. Semantically, the first word of each sentence 
+is interpreted as the name of the command to execute, whereas the 
+other words are passed to that command as arguments to interpret 
+and process in whatever way it sees fit. Each command produces 
+a result, and the result of the last command it the result of the 
+script as a whole.
+
+What makes this a Turing-complete programming language is that there 
+are commands for all the usual elementary operations\Dash in 
+particular there are commands for the basic control structures. 
+Unbounded repetition can for example be achieved through the |while| 
+command, which has the syntax
+\begin{displaysyntax}
+  while \word{expression} \word{script}
+\end{displaysyntax}
+When this command is executed\Ldash or \emph{evaluated}, as is the 
+official term in \Tcl\Rdash the \word{expression} and \word{script} 
+are alternatingly evaluated, with the command completing as soon as 
+the \word{expression} value is not boolean true. Other control 
+structures available as core commands include |if|~(if--then--else 
+choice), |for|~(loop with control variable), |foreach|~(loop over 
+list elements), |switch|~(multiway choice), |break|~(loop abortion), 
+and |proc|~(subroutine creation).
+For such \word{script} arguments to be interesting, it must however 
+be possible to embed newlines and spaces in it (since otherwise the 
+\word{script} above would only be a single sentence of one word). 
+To that end, there are three mechanisms which change the words of a 
+command sentence en route from script-string to sequence of words: 
+quoting, substitution, and expansion.
+
+Quoting collects a piece of text into one word, overriding characters 
+which would otherwise force a word or sentence boundary. The most 
+important form of quoting is brace-quoting, which happens for words 
+where the first character is `|{|' (left brace), the last character 
+is `|}|', and the material between them is balanced with respect to 
+braces;\footnote{
+  Braces preceeded by a backslash don't count when balancing however, 
+  so you can get an unmatched brace if you need to. Even though the 
+  technical details are quite different, the net effect is 
+  very similar to that in \TeX\ where \cs{\{} and \cs{\}} don't 
+  count as braces that have to be balanced.
+} in this case the command argument becomes exactly the string 
+of characters between the outermost braces. This is the main 
+mechanism for nesting ``blocks'' of \Tcl\ code, since it inhibits 
+substitution in ``inner'' commands.
+
+Substitution replaces a piece of text\Ldash often, but not always, an 
+entire word\Rdash by something else. There are three types of 
+substitution, which differ in where they get the replacement text 
+from and which character triggers them.
+\begin{description}
+  \item[Command substitution]
+    uses the return value of a script. It is triggered by a left 
+    bracket |[| and the script to evaluate is terminated by the 
+    matching right bracket |]|. This mechanism corresponds to 
+    function calls in most other languages, although the syntax is 
+    not the conventional
+    \begin{equation}
+      f(x_1,x_2,x_3,\dotsc,x_n)
+    \end{equation}
+    but rather
+    \begin{displaysyntax}
+      [f $x_1$ $x_2$ $x_3$ $\dots$ $x_n$]
+    \end{displaysyntax}
+    (Putting the ``function name'' inside the bracket with the 
+    arguments may seem odd, but we shall see that it is rather 
+    useful.) An extreme application of command substitution is the 
+    one-liner
+    \begin{quote}
+      |puts [join [lsort [split [read stdin] \n]] \n]|
+    \end{quote}
+    which works similarly to the Unix standard utility |sort|: |read|s 
+    standard in, |split|s it into a list of lines, sorts this list 
+    (|lsort|), |join|s the list back into a string, and out|puts| the 
+    result to standard out.
+    
+  \item[Backslash substitution]
+    is triggered by a backslash `|\|' and functions very much as in 
+    strings in the C~language: as a mechanism for escaping special 
+    interpretations of characters, and as a mechanism for expressing 
+    arbitrary characters using only those found in ``visible ASCII''. 
+    The |\n| above will thus be seen as a linefeed character by 
+    |join| and |split|, whereas any character with special syntactic 
+    meaning in \Tcl\ (backslash `|\|', dollar `|$|', braces `|{|' and 
+    `|}|', brackets `|[|' and `|]|', number sign `|#|', semicolon 
+    `|;|', and the various forms of whitespace\Dash \emph{that's the 
+    entire list!}) can be escaped into an ordinary character by 
+    prepending a backslash. The combination backslash--newline is a 
+    special case in that it counts as an unescaped space rather than 
+    as a newline character, but this makes it convenient to express 
+    sentences with too many words to fit on one line: 
+    
+    ---
+  
+  \item[Variable substitution]
+    uses the value of a variable. It is triggered by the |$| 
+    character, which is followed by the name of the variable to 
+    substitute.
+    
+\end{description}
+It should be observed that replacement text ``inserted'' by a 
+substitution will be passed on verbatim to the command; it will in 
+particular not be subjected to another round of substitution, even if 
+it contains backslashes, dollars, or brackets. Nor does whitespace in 
+substituted material count as word or sentence separators; if 
+something looks as one word before substitution, then it will 
+count as one word in the command sentence no matter what is 
+substituted.
+
+
+
+
+
+---
+
+
+\section{Basic notions}
+
+A structure is supposed to be more or less the kind of things that 
+universal algebra are about, although the need to make it work in 
+practice rather than just in theory means some classical tricks to 
+simplify the theoretical framework cannot be used. As a particular 
+example, modules are in universal algebra often regarded as an 
+algebra with one unary operation for every element of the thing 
+acting on the module, which leads to huge (often infinite) axiom 
+systems but makes it possible to keep the theory single-sorted. A 
+more pragmatic approach will have to face up with the fact that many 
+algebraic structures have several sorts of elements.\footnote{\relax
+  Even though it is sometimes possible to ``hide'' all but the main 
+  set of elements in ``helper'' structures.
+} Another example is that in theoretical constructions it is often 
+sufficient to know equality (or congruence, depending on how one 
+looks at it) as an implicit relation (give me two elements and I can 
+tell you whether they are equal), but in practice it may be much 
+more useful to provide a function that computes a canonical form 
+for every element is given.
+
+
+\subsection{Types and encodings}
+
+\Tcl\ has the basic principle that any value is 
+\emph{formally} a string of (Unicode) characters\Ldash which from a 
+foundational mathematical point of view is very sound, as it admits 
+direct translation to several fundamental models for computation\Dash 
+although internally the usual assortment of implementation tricks 
+(such as machine-native number representations where possible) are 
+employed to speed up processing (and in some cases reduce memory use). 
+A consequence of this principle is that \Tcl\ is mostly a typeless 
+language (or if you prefer, language with exactly one type). This may 
+seem strange if one is used to classical programming languages, but 
+one should keep in mind that the main reason variables are typed in 
+languages such as Fortran, Pascal, and C is that different types of 
+data require different amounts of memory. More modern, higher level 
+programming languages such as Tcl manage memory allocation implicitly 
+and dynamically, so there is no need for the programmer to bother 
+with the minutae of this.
+
+Another, more conceptual application of types in many modern 
+programming languages is for selecting definition of a polymorphic 
+operation; practically the same token is used as name of several 
+different operations, and the types (which in some cases are 
+compile-time properties of variables and in other runtime properties 
+of values) of the operation arguments are used to select an exact 
+definition. This idea was probably taken from ordinary mathematical 
+notation, where it is common that the intended interpretation of an 
+operation symbol (or lack thereof, as in $xy$) depends on what the 
+operands happen to denote; $G-u$ means one thing if $G$ and $u$ are 
+numbers, another thing if they are vectors, and something very 
+different if $G$ is a graph and $u$ is a vertex in $G$. While this 
+is absolutely standard, one should nonetheless observe that it really 
+is a shorthand notation; the standard formalisation of mathematics in 
+mathematical logic requires that operation with different definitions 
+are given distinct names. In particular the distinction between 
+`element' and `set' used to justify shorthands such as $f(S)$ for 
+$\left\{ f(x) \bigm\vert x \in S\right\}$ when $S$ is a set break 
+down when it is taken into account that mathematics is constructed on 
+top of set theory, since \emph{everything} is a set\footnote{Or in 
+some axiomatisations: a class; the same argument applies for all 
+kinds of collections.} in standard set theory. 
+
+---
+
+
+; the closest equivalent of `type' that one finds is 
+`set of values (strings) which are valid in a particular circumstance 
+(for example, constitute valid input to a particular command)', and 
+as it happens that is very much the case also in mathematics.
+
+Ultimately, what one deals with is always \emph{encodings} in computer 
+memory of mathematical elements rather than the elements 
+themselves. 
+
+
+\begin{definition}
+  A structure is said to be \defining{single-sorted} if it has one sort 
+  of elements (all elements are syntactically equivalent) and 
+  \defining{multiple-sorted} otherwise. A structure is 
+  \defining{principal} if it is single-sorted or multiple-sorted but 
+  comes with a distinguished sort of element (the \defining{principal} 
+  sort). The \defining{principal set of elements} of a structure is 
+  the set of elements of the principal sort.
+\end{definition}
+
+
+
+\subsection{Adapting structures to interfaces}
+
+It seems useful to make a distinction between \emph{adapters} (for 
+run-time adaptation, sitting between the caller and the actual 
+implementation) and \emph{adaptors} (for define-time adaptation, 
+defining a new command which does not itself call the adaptor).
+
+
+\subsection{Combining interfaces}
+
+It often feels natural to say things like ``if this structure 
+satisfies interface $Y$ in addition to interface $X$ then it must 
+also be the case that \dots'' The problem with this is that it would 
+then not be safe to declare that a structure satisfies interface $Y$ 
+(for example as a consequence of an adaptation) unless one can vouch 
+also for all possible combination implications of that interface 
+with other interfaces on that structure, the set of which can grow 
+after the adaptor gets implemented. The implication would thus be 
+that an adaptor has to throw away all interfaces it doesn't know 
+about, which would be somewhat counterproductive.
+
+Therefore the rule is that properties of an interface may not be 
+conditionalised on other interfaces; each interface makes its claims 
+on its own. Interfaces may extend other interfaces, but then there is 
+a direct implication. If the natural combination of two interfaces is 
+slightly stronger than the logical conjunction of the two (e.g.~field 
+and totally ordered set), then that should be handled by making the 
+combination a third interface (e.g.~ordered field) which implies the 
+first two.
+
+
+---
+
+\DocInclude{support}
+\DocInclude{groups}
+\DocInclude{rings}
+
+\PrintIndex
+
+\end{document}
+
+
+\part{Rings}
+
+
+\endinput
+
+---
+
+
+As a particular example, one may consider polynomials. The standard 
+library naturally contains a construction of polynomials over 
+(i.e., with coefficients from) an arbitrary ring $\mathcal{R}$; the 
+result of that construction being the polynomial ring $\mathcal{R}[X]$. 
+However, a semiring enthu
+
+
+This makes 
+\mtl\ different from many computer algebra systems, where the things 
+built in tend to be special (e.g.~$2+2$ is always $4$, never $1$ as in 
+$\mathbb{Z}_3$). Integers are certainly fun, but there is nothing 
+about 
+
+
+---
+
+
+A construction of polynomials over something at least requires the 
+underlying structure of scalars to be a ring,\footnote{Semiring 
+enthusiasts may at this point object that a semiring, such as for 
+example the natural numbers $\mathbb{N}$, is sufficient, and this is 
+true. However it is not practically possible to always offer the most 
+general construction of everything, so in reality there will likely be 
+a standard ``polynomial over'' construction that starts with a ring 
+$\mathcal{R}$ and produces some ring $\mathcal{R}[X]$. There is no 
+restriction or disadvantage in this, as long as anyone can also 
+implement and use an alternative semiring-aware construction of 
+polynomials.}  and 
+
+The only 
+thing common to all structure objects is the way in which they can be 
+queried which interfaces they support.
+
+
+---
+

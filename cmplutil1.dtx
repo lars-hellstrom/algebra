@@ -1,0 +1,3268 @@
+% 
+% \iffalse (driver)
+%<*driver>
+\documentclass[a4paper]{tclldoc}[2007/04/01]
+\usepackage{longtable}
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+
+\newtheorem{lemma}{Lemma}[section]
+\theoremstyle{definition}
+\newtheorem{definition}[lemma]{Definition}
+\newtheorem{example}[lemma]{Example}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+\newtheorem*{algsketch}{Algorithm sketch}
+
+\PageIndex
+\CodelineNumbered
+\setcounter{IndexColumns}{2}
+
+\newenvironment{ttdescription}{%
+  \description
+  \def\makelabel##1{\hspace\labelsep\normalfont\ttfamily ##1}%
+}{\enddescription}
+
+
+\makeatletter
+\DeclareRobustCommand\SMC{%
+  \ifx\@currsize\normalsize\small\else
+   \ifx\@currsize\small\footnotesize\else
+    \ifx\@currsize\footnotesize\scriptsize\else
+     \ifx\@currsize\large\normalsize\else
+      \ifx\@currsize\Large\large\else
+       \ifx\@currsize\LARGE\Large\else
+        \ifx\@currsize\scriptsize\tiny\else
+         \ifx\@currsize\tiny\tiny\else
+          \ifx\@currsize\huge\LARGE\else
+           \ifx\@currsize\Huge\huge\else
+            \small\SMC@unknown@warning
+ \fi\fi\fi\fi\fi\fi\fi\fi\fi\fi
+}
+\newcommand{\SMC@unknown@warning}{\TBWarning{\string\SMC: unrecognised
+    text font size command -- using \string\small}}
+\makeatother
+
+\newcommand{\PROP}{{\SMC PROP}}
+\newcommand{\PROPs}{{\SMC PROP}s}
+\newcommand{\PRO}{{\SMC PRO}}
+\newcommand{\ISBN}{{\SMC ISBN}}
+\newcommand{\ISBNX}{{\SMC X}}
+\providecommand*{\Dash}{%
+   \hspace*{0.166667em}\textemdash\hspace{0.166667em}%
+}
+\providecommand*{\Ldash}{%
+   \hspace{0.166667em}\textemdash\hspace*{0.166667em}%
+}
+\providecommand*{\dash}{\textendash\hspace{0pt}}
+
+\newcommand{\package}[1]{\textsf{#1}}
+
+\newcommand{\Tcl}{\Tcllogo}
+\newcommand*{\DefOrd}[2][]{\textbf{#2}}
+\newcommand*{\emDefOrd}[2][]{\emph{#2}}
+
+\newcommand{\mc}{\mathcal}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Zp}{\mathbb{Z}_{>0}}
+\newcommand{\Fpil}{\longrightarrow}
+\newcommand{\cross}[2]{{}^{#1}\mathsf{X}^{#2}}
+\newcommand{\same}[1]{\mathsf{I}^{#1}}
+
+\newcommand{\arity}{\mathrm{ar}}
+\newcommand{\coarity}{\mathrm{ca}}
+\newcommand{\id}{\mathrm{id}}
+
+\newcommand{\GV}{\mathrm{V}}
+\newcommand{\GE}{\mathrm{E}}
+
+\makeatletter
+\newcommand*{\setOf}[3][\@gobble]{%
+   \left\{ \, #2 \,\,\vrule\relax#1.\,\, #3 \, \right\}%
+}
+\newcommand*{\card}[2][\@gobble]{\left|#1. #2 \right|}
+\makeatother
+
+\newcommand*{\pin}[1]{%
+   \mathchoice{%
+      \mathrel{\mathrm{in}}%
+   }{%
+      \mathrel{\mathrm{in}}%
+   }{%
+      \mathop{\mathrm{in}}%
+   }{%
+      \mathop{\mathrm{in}}%
+   }#1%
+}
+\newcommand{\restr}[2]{#1_{\lvert #2}}
+
+
+\begin{document}
+\DocInput{cmplutil1.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% \title{Completing a set of \PROP py identities}
+% \author{Lars Hellstr\"om}
+% \maketitle
+% 
+% \begin{abstract}
+%   This is a simple utility for completing sets of \PROP\ 
+%   identities, utilising the \textsf{network} package version 2. 
+%   Hopf algebra identities are provided as examples.
+% \end{abstract}
+% 
+% \tableofcontents
+% 
+% 
+% \section{A completion utility}
+% \label{Sec:Tillslutning}
+% 
+% This section contains the implementation of a small utility for 
+% computing the completion of a system of substitution rules. In 
+% preparation for expected developments, the rules are lists
+% \begin{quote}
+%   \word{left hand side (wfb)} \word{left hand side (rich)}\
+%   \word{right hand side} \word{derivation}\regopt
+% \end{quote}
+% where the first left hand side is in the form of a network with 
+% feedback\Ldash that determines the sort of the entire rule\Dash and 
+% the second left hand side is the same as a rich network. The 
+% \word{right hand side} is going to be a linear combination of 
+% networks, but currently it defaults to being a pair
+% \begin{quote}
+%   \word{canonical} \word{rich}
+% \end{quote}
+% where \word{canonical} is the canonical form of the right hand 
+% side network and \word{rich} is a corresponding rich network. The 
+% utility can thus only handle the special case that every element 
+% considered has one coefficient equal to $1$ and all other 
+% coefficients equal to $0$.
+% 
+% If included, the \word{derivation} is a recording of the steps in 
+% which this rule was derived (rules given as axioms don't have 
+% derivations). The format of a derivation is as a list
+% \begin{quote}
+%   \begin{regblock}[\regstar]\word{rule spec}
+%   \word{rich network}\end{regblock}
+% \end{quote}
+% where each \word{rich network} is a step in the derivation; the 
+% last one is the \word{right hand side (rich)} whereas the 
+% \word{left hand side (rich)} is omitted since it is readily 
+% available elsewhere.\footnote{For more serious work, it might 
+% actually be better to record only the pure networks, but right now 
+% rich networks are easier.} A \word{rule spec} is one of
+% \begin{quote}
+%   |backward| \word{rule no.}\\
+%   |forward| \word{rule no.}
+% \end{quote}
+% where |backward| items mean that the right hand side of the rule 
+% is being replaced by the left hand side, and |forward| items is the 
+% normal way around. It is all |backward| until one reaches the site 
+% of the ambiguity, and after that it is all |forward|.
+% 
+% \setnamespace{}
+% \begin{tcl}
+%<*util1>
+package require Tk
+package require network 2
+% \end{tcl}
+% 
+% The following deals with a problem in the Aqua versions of Tk: 
+% short curves drawn as many small line segments become horribly 
+% jagged.
+% \begin{tcl}
+namespace eval tk::mac {variable CGAntialiasLimit 1}
+% \end{tcl}
+% 
+% 
+% \subsection{User interface}
+% 
+% The previous incarnation of this completion procedure was only meant 
+% to be semi-automatic, so user interaction was an important part of 
+% the program. This incarnation should do much better, but it still 
+% retains all the GUI elements of the predecessor.
+% 
+% 
+% \begin{proc}{new_ambiguity_window}
+%   The |new_ambiguity_window| procedure creates a new window in which 
+%   one can show an ambiguity and its resolution. There syntax is
+%   \begin{quote}
+%     |new_ambiguity_window| \word{title}\regopt
+%   \end{quote}
+%   where \word{title} is a title for the window. The return value is 
+%   the name of the |toplevel| created.
+%   
+%   \begin{variable}{last_ambiguity_window}
+%     The |last_ambiguity_window| variable is a number that was used in 
+%     the name of the last ambiguity window. It is incremented with 
+%     every creation of an ambiguity resolution window.
+%     \begin{tcl}
+set last_ambiguity_window 0
+%     \end{tcl}
+%   \end{variable}
+%   The layout of the window created is roughly
+%   \begin{center}
+%     \begin{tabular}{ccc}
+%       \textbf{Left}& \textbf{Top}& \textbf{Right}\\
+%       \framebox[0.25\linewidth]{Network $1$\vrule width 0pt
+%         height 10ex depth 9ex}&
+%         \framebox[0.25\linewidth]{Network $0$\vrule width 0pt 
+%         height 10ex depth 9ex}&
+%         \framebox[0.25\linewidth]{Network $2$\vrule width 0pt 
+%         height 10ex depth 9ex}\\
+%       \meta{button}& \meta{message}&\meta{button}
+%     \end{tabular}
+%   \end{center}
+%   where the middle network $0$ is the ambiguity and the flank networks 
+%   $1$ and $2$ are things to which it can be reduced. The buttons are 
+%   for choosing which of the two that will be made the left hand side 
+%   of a new rule.
+%   
+%   This procedure also creates a ``middle button'' |bm| which is 
+%   used for cases where neither the left nor the right button would 
+%   do the right thing. This button is initially unmapped, but so 
+%   anyone wanting to make it visible should supply the relevant 
+%   |grid| command.
+%   \begin{tcl}
+proc new_ambiguity_window {{title {}}} {
+   variable last_ambiguity_window
+   incr last_ambiguity_window
+   set t [toplevel .ambiguity$last_ambiguity_window]
+   if {![string length $title]} then {
+      set title "Ambiguity $last_ambiguity_window"
+   }
+   wm title $t $title
+   bindtags $t [linsert [bindtags $t] 1 Ambiguity]
+   label $t.hl -text "Left"
+   label $t.hm -text "Top"
+   label $t.hr -text "Right"
+   grid $t.hl -row 0 -column 0 -sticky s
+   grid $t.hm -row 0 -column 1 -sticky s
+   grid $t.hr -row 0 -column 2 -sticky s
+   foreach c [list $t.cl $t.cm $t.cr] {
+      canvas $c -width 200 -height 400 -relief solid -borderwidth 1\
+        -xscrollincrement 1 -yscrollincrement 1
+   }
+   grid $t.cl -row 1 -column 0 -sticky nswe
+   grid $t.cm -row 1 -column 1 -sticky nswe
+   grid $t.cr -row 1 -column 2 -sticky nswe
+   button $t.bl -text "Reduce" -state disabled
+   button $t.bm -text "Change this text"
+   button $t.br -text "Reduce" -state disabled
+   grid $t.bl -row 2 -column 0 -sticky n
+   grid $t.br -row 2 -column 2 -sticky n
+   label $t.lm -justify center -text {}
+   grid $t.lm -row 2 -column 1 -sticky nwe
+   grid rowconfigure $t 1 -weight 1
+   grid columnconfigure $t 0 -weight 1
+   grid columnconfigure $t 1 -weight 1
+   grid columnconfigure $t 2 -weight 1
+   foreach c [list $t.cl $t.cm $t.cr] {
+      bindtags $c [linsert [bindtags $c] 1 Network]
+   }
+%<*test3>
+   bind $t <FocusIn> [list puts stdout "$t got focus."]
+   bind $t <FocusOut> [list puts stdout "$t lost focus."]
+%</test3>
+   return $t
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% The \describestring[bindtag]{Network}|Network| bindtag is used for 
+% all canvases displaying networks. It offers bindings for grabbing the 
+% network with the mouse and moving it around. The |-cursor| 
+% man\oe uvres are meant to isolate this use of the mouse from that 
+% of clicking hyperlinks, which is supported by the rule browser.
+% \begin{tcl}
+bind Network <ButtonPress-1> {
+   if {[%W cget -cursor] eq ""} then {
+      %W configure -cursor fleur
+      %W scan mark %x %y
+   }
+}
+bind Network <B1-Motion> {
+   if {[%W cget -cursor] eq "fleur"} then {%W scan dragto %x %y 1}
+}
+bind Network <ButtonRelease-1> {
+   if {[%W cget -cursor] eq "fleur"} then {
+      %W configure -cursor ""
+   }
+}
+bind Network <B1-Leave> {%W configure -cursor ""}
+% \end{tcl}
+% 
+% \begin{proc}{center_network}
+%   This procedure scrolls a canvas so that the contents appear in 
+%   the center of the visible region. The call syntax is
+%   \begin{quote}
+%     |center_network| \word{canvas} \word{itemOrId}\regopt
+%   \end{quote}
+%   where \word{itemOrId} selects the items to center. If not 
+%   specified, then this defaults to |all|.
+%   \begin{tcl}
+proc center_network {c {id all}} {
+   foreach {left top right bottom} {0 0 0 0} break
+   foreach {left top right bottom} [$c bbox $id] break
+%<debug>   puts "In $c center $id:($left,$top,$right,$bottom)"
+   $c scan mark [expr {($right+$left)/2}] [expr {($bottom+$top)/2}]
+   set w [winfo width $c]
+   if {$w < 10} then {set w [winfo reqwidth $c]}
+   set h [winfo height $c]
+   if {$h < 10} then {set h [winfo reqheight $c]}
+   $c scan dragto [
+      expr {round([$c canvasx [expr {$w/2}]])}
+   ] [
+      expr {round([$c canvasy [expr {$h/2}]])}
+   ] 1
+%<debug>   puts "TopLeft is ([$c canvasx 0],[$c canvasy 0])."
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayvar}{after_id}
+%   The |after_id| array is used for storing |after| identifiers which 
+%   are related to a particular ambiguity. Every index should have the 
+%   name of the toplevel window to which they belong as prefix. It is 
+%   recommended that further qualifications use widget names as far as 
+%   these are able to distinguish matters, and then use |'| as 
+%   delimiter for further separation.
+%   
+%   See |idle_reschedule| for an example of a procedure that uses 
+%   this array.
+% \end{arrayvar}
+% 
+% \begin{proc}{ambiguity_cancel}
+%   The |ambiguity_cancel| procedure cancels the |after| script(s) for a 
+%   toplevel, if there are any. The syntax is
+%   \begin{quote}
+%     |ambiguity_cancel| \word{toplevel}
+%   \end{quote}
+%   It is meant to be called from an envent binding, e.g.~|FocusOut|.
+%   \changes{2}{2007/02/14}{Modified to handle the case that a 
+%      toplevel name is a prefix of another toplevel name. (LH)}
+%   \begin{tcl}
+proc ambiguity_cancel {t} {
+   global after_id
+   foreach i [
+     concat [list $t] [array names after_id "${t}.*"]\
+       [array names after_id "${t}'*"]
+   ] {
+      after cancel $after_id($i)
+      unset after_id($i)
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% The \describestring[bindtag]{Ambiguity}|Ambiguity| bindtag is used for 
+% toplevels displaying ambiguities. It is used for controlling which 
+% ambiguity is being processed. An ambiguity whose window loses focus 
+% should seize all processing.
+% \begin{tcl}
+bind Ambiguity <FocusOut> {ambiguity_cancel %W}
+% \end{tcl}
+% It seems toplevels have a tendency to wander off the screen, so the 
+% ambiguity windows can do with a |<Configure>| binding to correct that.
+% \begin{tcl}
+bind Ambiguity <Configure> {ensure_on_screen %W}
+% \end{tcl}
+% 
+% \begin{proc}{ensure_on_screen}
+%   This procedure moves a toplevel to ensure that it is completely on 
+%   its screen. The argument is the name of the toplevel.
+%   \begin{tcl}
+proc ensure_on_screen {w} {
+   if {$w ne [winfo toplevel $w]} then {return}
+   set extra_width\
+     [expr {[winfo vrootwidth $w] - [winfo reqwidth $w]}]
+   set extra_height\
+     [expr {[winfo vrootheight $w] - [winfo reqheight $w]}]
+   set x [winfo rootx $w]
+   set y [winfo rooty $w]
+   set moved 0
+   if {$extra_width > 0 && $x > $extra_width} then {
+      set x [expr {$x - $extra_width}]
+      set moved 1
+   }
+   if {$extra_height > 0 && $y > $extra_height} then {
+      set y [expr {$y - $extra_height}]
+      set moved 1
+   }
+   if {$moved} then {
+      wm geometry $w +${x}+${y}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{create_controller}
+%   The |create_controller| procedure creates a controller window, for 
+%   controlling how the processing of ambiguities are run. The syntax is
+%   \begin{quote}
+%     |create_controller| \word{major-var} \word{minor-var}
+%   \end{quote}
+%   where \word{major-var} and \word{minor-var} are names of two global 
+%   variables which are linked to |entry| widgets.
+%   \begin{tcl}
+proc create_controller {major_var minor_var} {
+   set t [toplevel .controller]
+   label $t.ll -text "Left rule:"
+   label $t.lr -text "Right rule:"
+   entry $t.el -textvariable $minor_var
+   entry $t.er -textvariable $major_var
+   foreach c [list $t.cl $t.cr] {
+      canvas $c -width 200 -height 400 -relief solid -borderwidth 1
+      bindtags $c [linsert [bindtags $c] 1 Network]
+   }
+   grid $t.cl - -row 0 -column 0 -sticky nsew
+   grid $t.cr - -row 0 -column 2 -sticky nsew
+   grid rowconfigure $t 0 -weight 1
+   grid $t.ll -row 1 -column 0 -sticky e
+   grid $t.el -row 1 -column 1 -sticky w
+   grid $t.lr -row 1 -column 2 -sticky e
+   grid $t.er -row 1 -column 3 -sticky w
+   foreach i {0 1 2 3} {grid columnconfigure $t $i -weight 1}
+   button $t.b_go -text Go
+   grid $t.b_go -row 2 -column 3
+   button $t.b_next -text Next
+   grid $t.b_next -row 2 -column 0
+   checkbutton $t.check_auto -text "Auto Next Go"\
+     -variable $t.check_auto
+   grid $t.check_auto - -row 2 -column 1 -sticky e
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{variable}{.controller.check_auto}
+%   This is the value variable of the \textsf{Auto Next Go} 
+%   checkbutton.
+% \end{variable}
+% 
+% \begin{arrayvar}{Network}
+%   The |Network| array is used for storing networks directly associated 
+%   with some widget. The indices are widget names (paths). The entries 
+%   are rich networks.
+% \end{arrayvar}
+% 
+% \begin{variable}{vertex_appearances}
+% \begin{variable}{vertex_sizes}
+%   The |vertex_appearances| variable holds the dictionary of 
+%   appearances for the vertex types currently occuring in the rule 
+%   networks. It is used by those procedures that draw or 
+%   redraw networks. The |vertex_sizes| variable is a list patterns 
+%   and vertex sizes for use with |make_level-layout-Tk|.
+%   \begin{tcl}
+set vertex_sizes {* {20 20}}
+%   \end{tcl}
+% \end{variable}\end{variable}
+% 
+% 
+% \subsection{Reduction}
+% 
+% \begin{variable}{rulesL}
+%   The |rulesL| variable contains the current list of reduction rules. 
+%   New rules are appended at the end. Rules are never removed.
+% \end{variable}
+% 
+% \begin{variable}{reduce_stats}
+%   For the purpose of speeding up the reduction process, the normal 
+%   reduction procedure requires an auxilliary table of how often the 
+%   various rules have been used just after another rule. This table is 
+%   implemented as a list with one elment per rule, where each list 
+%   element is a list with the structure
+%   \begin{quote}
+%     \word{rule no.} \word{after $0$} \word{after $1$} \word{after $2$} 
+%     \dots
+%   \end{quote}
+%   where each \word{after $i$} is the number of times this rule could be 
+%   applied following an application of rule $i$. These numbers would be 
+%   updated whenever a reduction was made.
+%   
+%   The table is stored in the variable |reduce_stats|.
+% \end{variable}
+% 
+% \begin{proc}{repair_reduce_stats}
+%   When importing a dumped set of rules, the |reduce_stats| and 
+%   |rulesL| variables can get out of sync. This procedure extends 
+%   |reduce_stats| to be consistent with |rulesL|. There are no 
+%   variables, nor any particular return value.
+%   \changes{2.1}{2007/12/19}{Procedure added. (LH)}
+%   \begin{tcl}
+proc repair_reduce_stats {} {
+   global reduce_stats rulesL
+   set newL {}
+   foreach line $reduce_stats {
+      set Seen([lindex $line 0]) ""
+      while {[llength $line] <= [llength $rulesL]} {lappend line 0}
+      lappend newL $line
+   }
+   for {set n 0} {$n < [llength $rulesL]} {incr n} {
+      if {[info exists Seen($n)]} then {continue}
+      set line [list $n]
+      while {[llength $line] <= [llength $rulesL]} {lappend line 0}
+      lappend newL $line
+   }
+   set reduce_stats $newL
+   return
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{add_rule}
+%   The |add_rule| procedure adds a rule to the list of rules and 
+%   extends the table of reduction statistics accordingly. The syntax 
+%   is
+%   \begin{displaysyntax}
+%     |add_rule| \word{feedbacks} 
+%     \begin{regblock}|pure|\regalt|rich|\end{regblock}
+%     \word{left hand side}
+%     \begin{regblock}|pure|\regalt|rich|\end{regblock}
+%     \word{right hand side}
+%   \end{displaysyntax}
+%   where the \word{left hand side} and \word{right hand side} are 
+%   pure or rich networks, according to the indication in the 
+%   preceeding argument. \word{feedbacks} is the list of feedbacks 
+%   for this rule. The return value is the number of the new rule.
+%   \begin{tcl}
+proc add_rule {feedbackL type_left left type_right right} {
+   global rulesL rule_queue reduce_stats vertex_appearances\
+     vertex_sizes
+   switch -- $type_left "pure" {
+      set NW1(pure) $left
+   } "rich" {
+      array set NW1 $left
+   } default {
+      error "type must be 'pure' or 'rich'"
+   }
+   if {![info exists NW1(vpos-Tk)] || ![info exists NW1(ecurve-Tk-tt)]}\
+   then {
+      if {![info exists NW1(level-layout-Tk)]} then {
+         network::rich::make_level-layout-Tk $vertex_sizes -var NW1
+      }
+      if {![info exists NW1(vpos-Tk)]} then {
+         network::rich::vpos-Tk_by_level -var NW1
+      }
+      if {![info exists NW1(ecurve-Tk-tt)]} then {
+         network::rich::ecurve-Tk-tt_by_level $vertex_appearances\
+           -var NW1
+      }
+   }
+   if {![info exists NW1(canonical)]} then {
+      set NW1(canonical) [network::pure::canonise $NW1(pure)]
+   }
+   switch -- $type_right "pure" {
+      set NW2(pure) $right
+   } "rich" {
+      array set NW2 $right
+   } default {
+      error "type must be 'pure' or 'rich'"
+   }
+   if {![info exists NW2(vpos-Tk)] || ![info exists NW2(ecurve-Tk-tt)]}\
+   then {
+      if {![info exists NW2(level-layout-Tk)]} then {
+         network::rich::make_level-layout-Tk $vertex_sizes -var NW2
+      }
+      if {![info exists NW2(vpos-Tk)]} then {
+         network::rich::vpos-Tk_by_level -var NW2
+      }
+      if {![info exists NW2(ecurve-Tk-tt)]} then {
+         network::rich::ecurve-Tk-tt_by_level $vertex_appearances\
+           -var NW2
+      }
+   }
+   if {![info exists NW2(canonical)]} then {
+      set NW2(canonical) [network::pure::canonise $NW2(pure)]
+   }
+   cull_rules [list $NW1(pure) $feedbackL]
+   set index [llength $rulesL]
+   lappend rulesL [list [
+      list $NW1(pure) $feedbackL
+   ] [
+      array get NW1
+   ] [
+      list $NW2(canonical) [array get NW2]
+   ]]
+   set new_stats {}
+   foreach row $reduce_stats {
+      lappend row 0
+      lappend new_stats $row
+   }
+   lappend new_stats\
+     [linsert [string repeat " 0" [llength $rulesL]] 0 $index]
+   set reduce_stats $new_stats
+   lappend rule_queue [list $index [llength [lindex $NW1(pure) 0]]]
+   return $index
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{make_rule_derivation}
+%   This procedure constructs a \word{derivation} section to for a 
+%   rule, but doesn't modify the |rulesL|. The call syntax is
+%   \begin{quote}
+%     |make_rule_derivation| \word{backwards} \word{top} 
+%     \word{forwards}
+%   \end{quote}
+%   where the \word{backwards} argument are the steps in the 
+%   derivation which will be |backward|s, the \word{top} is the rich 
+%   network that serves as turning point, and the \word{forwards} 
+%   is the list of |forward| steps in the derivation.
+%   \begin{tcl}
+proc make_rule_derivation {bwL top fwL} {
+   set res {}
+   for {set n [llength $bwL]} {$n>0} {} {
+      set step [lindex $bwL [incr n -1]]
+      set rule [lindex $bwL [incr n -1]]
+      lappend res $step [list backward $rule]
+   }
+   lappend res $top
+   foreach {rule step} $fwL {
+      lappend res [list forward $rule] $step
+   }
+   return [lrange $res 1 end]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{add_rule_derivation}
+%   This procedure adds a \word{derivation} section to an existing 
+%   rule. The call syntax is
+%   \begin{quote}
+%     |add_rule_derivation| \word{to-no.} \word{backwards} \word{top} 
+%     \word{forwards}
+%   \end{quote}
+%   where \word{to-no.} is the number of the rule to modify. This 
+%   number is also the return value. The \word{backwards} argument 
+%   are the steps in the derivation which will be |backward|s, the 
+%   \word{top} is the rich network that serves as turning point, and 
+%   the \word{forwards} is the list of |forward| steps in the 
+%   derivation.
+%   \begin{tcl}
+proc add_rule_derivation {target bwL top fwL} {
+   global rulesL
+   set L [lrange [lindex $rulesL $target] 0 2]
+   lappend L [make_rule_derivation $bwL $top $fwL]
+   lset rulesL $target $L
+   return $target
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{unmake_rule_derivation}
+%   This procedure does the opposite of |make_rule_derivation|, i.e., 
+%   it reconstructs the
+%   \begin{quote}
+%     \word{backwards} \word{top} \word{forwards}
+%   \end{quote}
+%   from a rule with derivation. The call syntax is
+%   \begin{quote}
+%     |unmake_rule_derivation| \word{rule}
+%   \end{quote}
+%   and the return value is the three element list shown above.
+%   \begin{tcl}
+proc unmake_rule_derivation {rule} {
+   set res {}
+   set fwL {}
+   set n -1
+   foreach {rel step} [lindex $rule 3] {
+      if {[lindex $rel 0] eq "backward"} then {incr n 2} else {
+         lappend fwL [lindex $rel 1] $step
+      }
+   }
+   set bwL {}
+   for {} {$n>0} {incr n -2} {
+      lappend bwL [lindex $rule 3 $n] [lindex $rule 3 [expr {$n-1}] 1]
+   }
+   lappend bwL [lindex $rule 1]
+   return [list [lrange $bwL 1 end] [lindex $bwL 0] $fwL]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{variable}{equalitiesL}
+%   This variable has the same structure as |rulesL|, although it is 
+%   for equalities that could not be turned into rules. The choice of 
+%   what to label as the ``left'' or ``right'' hand side is arbitrary.
+% \end{variable}
+% 
+% \begin{proc}{add_equality}
+%   This procedure adds an entry to |equalitiesL|. The call syntax is
+%   \begin{quote}
+%     |add_equality| \word{feedbacks} \word{backwards} \word{top}
+%     \word{forwards}
+%   \end{quote}
+%   The \word{feedbacks} is the feedback type for this equality. 
+%   The \word{backwards} argument are the steps in the derivation 
+%   which will be |backward|s, the \word{top} is the rich network that 
+%   serves as turning point, and the \word{forwards} is the list of 
+%   |forward| steps in the derivation.
+%   \begin{tcl}
+proc add_equality {feedbackL bwL top fwL} {
+   array set NW1 [lindex $bwL end]
+   set eq [list [list $NW1(pure) $feedbackL] [lindex $bwL end]]
+   array set NW2 [lindex $fwL end]
+   lappend eq [list [network::pure::canonise $NW2(pure)]\
+     [lindex $fwL end]]
+   lappend eq [make_rule_derivation $bwL $top $fwL]
+   global equalitiesL
+   lappend equalitiesL $eq
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{clear_rules}
+%   The |clear_rules| procedure clears the lists of rules and statistics 
+%   of rules. It takes no arguments.
+%   \begin{tcl}
+proc clear_rules {} {
+   global rulesL reduce_stats rule_base rule_queue equalitiesL\
+     browser_fwL browser_bwL
+   set rulesL [list]
+   set reduce_stats [list]
+   set rule_base [list]
+   set rule_queue [list]
+   set equalitiesL {}
+   set browser_fwL {}
+   set browser_bwL {}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{cull_rules}
+%   The |cull_rules| procedure searches through |reduce_stats| for rules 
+%   that are should be removed from active use because their principal 
+%   parts can be reduced by another rule. The syntax is
+%   \begin{quote}
+%     |cull_rules| \word{network with feedback}
+%   \end{quote}
+%   \begin{tcl}
+proc cull_rules {NW} {
+   global reduce_stats rulesL
+   set new_statsL [list]
+   foreach row $reduce_stats {
+      if {[llength [
+         network::wfb::instances [lindex $rulesL [lindex $row 0] 0] $NW
+      ]]} then {
+%<stdout>         puts stdout "Dropped rule [lindex $row 0]."
+      } else {
+         lappend new_statsL $row
+      }
+   }
+   set reduce_stats $new_statsL
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayvar}{Steps}
+%   This array records the reduction steps that have been carried out 
+%   in a |Network| canvas. The index is the name of the canvas, 
+%   whereas an entry is a list
+%   \begin{quote}
+%     \begin{regblock}[\regstar]\word{rule no.} 
+%     \word{rich network}\end{regblock}
+%   \end{quote}
+%   where the \word{rich network} is what appeared in the canvas 
+%   after applying the corresponding rule. Later results are appended 
+%   to the end of this list.
+% \end{arrayvar}
+% 
+% 
+% \begin{proc}{graphic_reduce}
+%   The |graphic_reduce| procedure reduces a network one step, if 
+%   possible, while updating its graphical appearance on a canvas. The 
+%   syntax is
+%   \begin{quote}
+%     |graphic_reduce| \word{network-var} \word{feedbacks}
+%     \word{canvas} \word{last rule}
+%   \end{quote}
+%   where \word{network-var} is the name of a variable in the local 
+%   context of the caller. The \word{network-var} is assumed to contain 
+%   a rich network (as a dict, not unrolled into an array) whose 
+%   feedbacks are \word{feedbacks}, which is currently drawn on the 
+%   specified \word{canvas}. The procedure will try to reduce the 
+%   network, starting with the assumption that \word{last rule} is the 
+%   number of the most recently applied rule, and if it succeeds update 
+%   the |reduce_stats| variable. In the case of success it will also 
+%   replace the network on the canvas by the reduced form.
+%   
+%   The return value is the number of the rule that was applied, or |-1| 
+%   if no rule could be applied. The \word{last rule} upon calling may 
+%   be |-1|.
+%   
+%   \begin{tcl}
+proc graphic_reduce {NWvar fbL canvas last} {
+   global rulesL reduce_stats vertex_appearances vertex_sizes Steps
+   array set NW [uplevel 1 [list ::set $NWvar]]
+   set reduce_stats\
+     [lsort -index [expr {$last+1}] -decreasing -integer $reduce_stats]
+   set sites {}
+   set i -1; foreach t $reduce_stats {incr i
+      set n [lindex $t 0]
+      set sites [
+         network::wfb::instances [list $NW(pure) $fbL]\
+           [lindex $rulesL $n 0] 1
+      ]
+      if {[llength $sites]} then {break}
+   }
+   if {![llength $sites]} then {return -1}
+   if {$last>=0} then {
+      lset reduce_stats $i [expr {$last+1}]\
+        [expr {[lindex $reduce_stats $i [expr {$last+1}]] +1}]
+   }
+   set NW(pure) [network::pure::replace $NW(pure) [lindex $sites 0]\
+     [lindex $rulesL $n 2 0]]
+   network::rich::make_level-layout-Tk $vertex_sizes -var NW
+   network::rich::vpos-Tk_by_level -var NW
+   network::rich::ecurve-Tk-tt_by_level $vertex_appearances -var NW
+   $canvas delete all
+   network::rich::drawit $canvas $vertex_appearances {} -var NW
+   center_network $canvas
+   lappend Steps($canvas) $n [array get NW]
+   uplevel 1 [list ::set $NWvar [lindex $Steps($canvas) end]]
+   return $n
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayvar}{lastrule}
+%   The |lastrule| array stores the number of the last reduction rule 
+%   that was applied to the network in a particular canvas. The index 
+%   is the canvas name (widget path).
+% \end{arrayvar}
+% 
+% \begin{arrayvar}{feedbacks}
+%   The |feedbacks| array stores the sorts (feedbacks-lists) of 
+%   networks that appear in windows. The index is the name of a 
+%   toplevel.
+% \end{arrayvar}
+% 
+% \begin{proc}{draw_network_feedbacks}
+%   This procedure draws the feedbacks for a network and optionally 
+%   recenters it in its canvas. The call syntax is
+%   \begin{quote}
+%     |draw_network_feedbacks| \word{canvas} \word{feedback-list} 
+%     \word{rich network} \word{center?} 
+%     \begin{regblock}[\regstar]\word{option} 
+%     \word{value}\end{regblock}
+%   \end{quote}
+%   where \word{center?} is a boolean for whether to center while the 
+%   options and values are passed on to 
+%   |network::rich::draw_feedbacks|. As a special case, the |-tags| 
+%   option is interpreted here (as it is a separate argument to the 
+%   underlying procedure).
+%   
+%   \begin{tcl}
+proc draw_network_feedbacks {c fbL NWval center args} {
+   array set NW $NWval
+   set inL {}
+   foreach item [lindex $NW(level-layout-Tk) 0 end-2] {
+      if {[lindex $item 0] eq "edge"} then {
+         lappend inL [lindex $item 2]
+      }
+   }
+   set outL {}
+   foreach item [lindex $NW(level-layout-Tk) 0 0] {
+      if {[lindex $item 0] eq "edge"} then {
+         lappend outL [lindex $item 2]
+      }
+   }
+   set Opt(-tags) ""
+   array set Opt $args
+   eval [list network::rich::draw_feedbacks $c $Opt(-tags) $fbL\
+     -inx $inL -outx $outL -bbox [lindex $NW(level-layout-Tk) 1]]\
+     $args
+   if {$center} then {center_network $c}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{variable}{count_down}
+%   The |count_down| variable is used for counting down to zero, in the 
+%   delay before automatically closing an ambiguity window.
+% \end{variable}
+% 
+% \begin{proc}{run_reduction}
+%   The |run_reduction| procedure runs the step-wise reduction of an 
+%   ambiguity, and is meant to be run as an |after| script. The syntax is
+%   \begin{quote}
+%     |run_reduction| \word{toplevel} \word{mode}
+%   \end{quote}
+%   where \word{toplevel} is the name of the toplevel window of the 
+%   ambiguity. \word{mode} is one of:
+%   \begin{enumerate}
+%     \item[\texttt{cl}]
+%       Reduce network in the left canvas.
+%     \item[\texttt{cr}]
+%       Reduce network in the right canvas.
+%     \item[\texttt{equal}]
+%       The left and right networks have been reduced to equal networks. 
+%       When |count_down| reaches $0$, the toplevel will be destroyed.
+%     \item[\texttt{autoleft}]
+%       The left and right networks have been fully reduced, but are not 
+%       equal. When |count_down| reaches zero, the left network will be 
+%       chosen as the principal part of the new rule manufactured from 
+%       this ambiguity.
+%     \item[\texttt{autoright}]
+%       The left and right networks have been fully reduced, but are not 
+%       equal. When |count_down| reaches zero, the right network will be 
+%       chosen as the principal part of the new rule manufactured from 
+%       this ambiguity.
+%     \item[\texttt{incomparable}]
+%       The left and right networks have been fully reduced, but for 
+%       some reason it was not possible to compare them (currently, this 
+%       happens if there are disconnected components). In this case the 
+%       user is given three options: reduce left network, reduce right 
+%       network, or consider networks as equal.
+%       \changes{alpha}{2005/10/29}{Added \texttt{incomparable} mode. 
+%         (LH)}
+%   \end{enumerate}
+%   
+%   \begin{tcl}
+proc run_reduction {t mode} {
+   global after_id lastrule feedbacks Network count_down
+   if {$mode eq "cl"} then {
+      set c $t.cl
+      if {![info exists Network($c)]} then {
+         puts "Expected network for $c, but found none (hickup?)."
+         return
+      }
+      set rule [
+         graphic_reduce Network($c) $feedbacks($t) $c $lastrule($c)
+      ]
+      if {$rule >= 0} then {
+         set lastrule($c) $rule
+         set after_id($t) [after 1000 [list run_reduction $t cl]]
+         return
+      }
+      set mode "cr"
+      draw_network_feedbacks $c $feedbacks($t) $Network($c) 1
+   }
+   if {$mode eq "cr"} then {
+      set c $t.cr
+      if {![info exists Network($c)]} then {
+         puts "Expected network for $c, but found none (hickup?)."
+         return
+      }
+      set rule [
+         graphic_reduce Network($c) $feedbacks($t) $c $lastrule($c)
+      ]
+      if {$rule >= 0} then {
+         set lastrule($c) $rule
+         set after_id($t) [after 1000 [list run_reduction $t cr]]
+         return
+      }
+      set mode "compare"
+      draw_network_feedbacks $c $feedbacks($t) $Network($c) 1
+   }
+   if {$mode eq "compare"} then {
+%   \end{tcl}
+%   The networks have now reached their final form, so it ``only'' 
+%   remains to compare them. The first test is for equality (the 
+%   least troublesome possibility).
+%   \begin{tcl}
+      array set NW1 $Network($t.cl)
+      array set NW2 $Network($t.cr)
+      set NW1(canonical) [network::pure::canonise $NW1(pure)]
+      set NW2(canonical) [network::pure::canonise $NW2(pure)]
+      if {$NW1(canonical) eq $NW2(canonical)} then {
+         set mode "equal"
+         set count_down 2
+      } else {
+         $t.bl configure -state normal
+         $t.br configure -state normal
+         set cmp [compare_networks $NW1(canonical) $NW2(canonical)]
+         switch -- $cmp "<" {
+            set count_down 5
+            set mode "autoright"
+         } ">" {
+            set count_down 5
+            set mode "autoleft"
+         } "=" {
+            $t.bm configure -text "Equal" -state normal
+            grid remove $t.lm
+            grid configure $t.bm -row 2 -column 1 -sticky n
+            bell -displayof $t
+            return
+         } default {
+            grid remove $t.bl $t.br
+            grid configure $t.lm -row 2 -column 0 -sticky n
+            grid configure $t.bm -row 2 -column 1 -sticky n
+            $t.bm configure -text $cmp
+            set count_down 5
+            set mode "automiddle"
+         }
+      }
+   }
+   switch -- $mode "equal" {
+      $t.lm configure -text "Equal! $count_down"
+      if {$count_down <= 0} then {
+         rule_ambiguity $t equal
+         return
+      }
+   } "autoleft" {
+      $t.lm configure -text "<- in $count_down"
+      if {$count_down <= 0} then {
+         $t.bl invoke
+         return
+      }
+   } "autoright" {
+      $t.lm configure -text "-> in $count_down"
+      if {$count_down <= 0} then {
+         $t.br invoke
+         return
+      }
+   } "automiddle" {
+      $t.lm configure -text "-> in $count_down"
+      if {$count_down <= 0} then {
+         $t.bm invoke
+         return
+      }
+   } default {
+      error "This shouldn't happen!"
+   }
+   incr count_down -1
+   set after_id($t) [after 1000 [list run_reduction $t $mode]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{compare_networks}
+%   The |compare_networks| command has the call syntax
+%   \begin{quote}
+%     |compare_networks| \word{left} \word{right}
+%   \end{quote}
+%   where \word{left} and \word{right} are pure networks. It should 
+%   return |<| if the left is less than the right, |>| if the left is 
+%   greater than the right, and something else otherwise. The 
+%   following definition is a placeholder that should be overridden 
+%   for particular problems, if an ordering is known.
+%   \begin{tcl}
+proc compare_networks {left right} {return "don't know"}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{check_rule_compatibility}
+%   This procedure goes through all rules in |rulesL| and checks that 
+%   they are comparable with the order implemented in 
+%   |compare_networks|. The call syntax is
+%   \begin{quote}
+%     |check_rule_compatibility| 
+%     \begin{regblock}[\regstar]\word{option} 
+%     \word{value}\end{regblock}
+%   \end{quote}
+%   where the currently supported \word{option}s are:
+%   \begin{ttdescription}
+%     \item[-print]
+%       The \word{value} is a channel opened for writing. Supplying 
+%       this value causes information about incompatible rules to be 
+%       written to this channel.
+%   \end{ttdescription}
+%   The return value is the list of numbers of rules which are not 
+%   compatible.
+%   \begin{tcl}
+proc check_rule_compatibility {args} {
+   global rulesL
+   array set Opt $args
+   set res {}
+   set n -1; foreach rule $rulesL {incr n
+      set cmp [compare_networks [lindex $rule 0 0] [lindex $rule 2 0]]
+      if {$cmp ne ">"} then {
+         lappend res $n
+         if {[info exists Opt(-print)]} then {
+            puts $Opt(-print) "Rule $n is incompatible ($cmp)!"
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{try_comparison_order}
+%   This procedure goes through all elements of |rulesL| and 
+%   |equalitiesL| to compare them according to a particular 
+%   comparison order. The call syntax is
+%   \begin{quote}
+%     |try_comparison_order| 
+%     \begin{regblock}[\regstar]\word{option} 
+%     \word{value}\end{regblock}
+%   \end{quote}
+%   where the currently supported \word{option}s are:
+%   \begin{ttdescription}
+%     \item[-keycmd]
+%       A command to generate a comparison key for each network. Keys 
+%       are then compared using |network::pure::grouplex_compare|.
+%     \item[-cmpcmd]
+%       A command to directly compare two networks. Is overridden by 
+%       |-keycmd|. Defaults to |compare_networks|.
+%     \item[-print]
+%       The \word{value} is a channel opened for writing. Supplying 
+%       this value causes information about incompatible rules to be 
+%       written to this channel.
+%   \end{ttdescription}
+%   The return value is the list of numbers of rules which are not 
+%   compatible.
+%   \begin{tcl}
+proc try_comparison_order {args} {
+   array set Opt {-cmpcmd compare_networks}
+   array set Opt $args
+   if {[info exists Opt(-keycmd)]} then {
+      set comparecmd [list network::pure::grouplex_compare\
+        $Opt(-keycmd)]
+   } else {
+      set comparecmd $Opt(-cmpcmd)
+   }
+   set res {}
+   foreach {var trim expect format} {
+      ::rulesL "" > %d  
+      ::equalitiesL <> "" e%d
+   } {
+      set n -1; foreach rule [set $var] {incr n
+         set call $comparecmd
+         lappend call [lindex $rule 0 0] [lindex $rule 2 0]
+         set cmp [eval $call]
+         if {$cmp ne $expect} then {
+            if {[string trim $cmp $trim] ne $expect} then {
+               lappend res [format $format $n]
+            }
+            if {[info exists Opt(-print)]} then {
+               puts $Opt(-print) [format "$format is %s" $n $cmp]
+            }
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{idle_reschedule}
+%   The |idle_reschedule| procedure schedules a command for being 
+%   executed later, after an |after 0| and |after idle| loop. The 
+%   syntax is
+%   \begin{quote}
+%     |idle_reschedule| \word{index} \word{script}
+%   \end{quote}
+%   where \word{script} is the script to execute and \word{index} is 
+%   the entry in the |after_id| array where the relevant |after| 
+%   identifiers will be kept.
+%   \begin{tcl}
+proc idle_reschedule {index script} {
+   global after_id
+   set after_id($index) [after 0 "[list set after_id($index)]\
+     \[[list after idle $script]\]"]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \subsection{Ambiguities}
+% 
+% \begin{proc}{make_ambiguities}
+%   The |make_ambiguities| procedure computes all ambiguities for a 
+%   pair of rules and creates windows displaying these and their two 
+%   main descendants. The syntax is
+%   \begin{quote}
+%     |make_ambiguities| \word{rule no.~$1$} \word{rule no.~$2$} 
+%     \word{base window}
+%   \end{quote}
+%   where the two \emph{rule} arguments are rule numbers. The 
+%   \word{base window} is used in positioning the new windows.
+%   The return value is the list of names of toplevels that were created.
+%   
+%   The way that the \word{base window}, which should better be visible 
+%   when this procedure is called, is used is the following: a 
+%   displacement is computed by taking the maximal of the vertical and 
+%   horizontal differences between the |winfo root|[|xy|] and the |wm\
+%   geometry| coordinates of that \word{base window}. Then the 
+%   geometries of the new windows are positioned some multiple of that 
+%   displacement from the geometry of the \word{base window}.
+%   \begin{tcl}
+proc make_ambiguities {rule1 rule2 base_w} {
+   global rulesL Network feedbacks lastrule vertex_appearances\
+     vertex_sizes Steps
+   upvar #0 $vertex_appearances TA
+   foreach {wm_wh wm_x wm_y} [split [wm geometry $base_w] +] {break}
+   set delta_x [expr {abs( [winfo rootx $base_w] - $wm_x )}]
+   set delta_y [expr {abs( [winfo rooty $base_w] - $wm_y )}]
+   set delta [expr {$delta_x>$delta_y ? $delta_x : $delta_y}]
+   set res [list]
+   foreach ambiguity [
+      network::wfb::groomed_ambiguities [lindex $rulesL $rule1 0]\
+        [lindex $rulesL $rule2 0]
+   ] {
+%   \end{tcl}
+%   Skip the trivial ambiguity of a rule against itself. (The 
+%   |ambiguities| procedure cannot do that, since it cannot tell 
+%   whether the right hand sides are equal.)
+%   \begin{tcl}
+      if {$rule1==$rule2 && 
+         [lindex $ambiguity 1 1] eq [lindex $ambiguity 2 1] &&
+         [lindex $ambiguity 1 2] eq [lindex $ambiguity 2 2] &&
+         [lsort -integer [lindex $ambiguity 1 0]] eq\
+           [lsort -integer [lindex $ambiguity 2 0]]
+      } then {continue}
+      set t [new_ambiguity_window]
+      set wm_x [expr {$wm_x + $delta}]
+      set wm_y [expr {$wm_y + $delta}]
+      wm geometry $t +${wm_x}+${wm_y}
+      set Network($t.cm) [lindex $ambiguity 0 0]
+      set feedbacks($t) [lindex $ambiguity 0 1]
+      set Network($t.cl) [
+         network::pure::replace [lindex $ambiguity 0 0]\
+           [lindex $ambiguity 1] [lindex $rulesL $rule1 2 0]
+      ]
+      set lastrule($t.cl) $rule1
+      set Network($t.cr) [
+         network::pure::replace [lindex $ambiguity 0 0]\
+           [lindex $ambiguity 2] [lindex $rulesL $rule2 2 0]
+      ]
+      set lastrule($t.cr) $rule2
+      foreach c [list $t.cm $t.cl $t.cr] {
+         set NW(pure) $Network($c)
+         network::rich::make_level-layout-Tk $vertex_sizes -var NW
+         network::rich::vpos-Tk_by_level -var NW
+         network::rich::ecurve-Tk-tt_by_level $vertex_appearances\
+           -var NW
+         network::rich::drawit $c $vertex_appearances {} -var NW
+         center_network $c
+         set Network($c) [array get NW]
+         array unset NW
+      }
+      draw_network_feedbacks $t.cm $feedbacks($t) $Network($t.cm) 1
+      set Steps($t.cl) [list $rule1 $Network($t.cl)]
+      set Steps($t.cr) [list $rule2 $Network($t.cr)]
+      $t.bl configure -command [list rule_ambiguity $t left]
+      $t.br configure -command [list rule_ambiguity $t right]
+      $t.bm configure -command [list rule_ambiguity $t neither]
+      lappend res $t
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% The processing to resolve an ambiguity is initiated by a |<FocusIn>| 
+% binding for the \describestring[bindtag]{Ambiguity}|Ambiguity| 
+% bindtag. This has the effect that the processing for a network begins 
+% anew whenever one switches to an ambiguity window. The delay is 
+% needed to allow observing the initial state of the window.
+% \begin{tcl}
+bind Ambiguity <FocusIn> {
+   set after_id(%W) [after 1000 {run_reduction %W cl}]
+}
+% \end{tcl}
+% 
+% 
+% 
+% \begin{proc}{rule_ambiguity}
+%   This procedure is called to end an ambiguity by turning it into a 
+%   new rule or equality. The syntax is
+%   \begin{quote}
+%     |rule_ambiguity| \word{toplevel} \word{choice}
+%   \end{quote}
+%   where \word{toplevel} is the toplevel of the ambiguity and 
+%   \word{choice} is |left|, |right|, or |neither| depending on which 
+%   network was chosen for the principal part in the rule. The procedure 
+%   |destroy|s the ambiguity toplevel.
+%   
+%   \begin{tcl}
+proc rule_ambiguity {t choice} {
+   global Network feedbacks rule_queue Steps
+   if {$choice eq "left"} then {
+%<stdout>      puts stdout "Added rule [
+      add_rule_derivation [
+         add_rule $feedbacks($t) rich $Network($t.cl)\
+           rich $Network($t.cr)
+      ] $Steps($t.cl) $Network($t.cm) $Steps($t.cr)
+%<stdout>      ] (left)"
+   } elseif {$choice eq "right"} then {
+%<stdout>      puts stdout "Added rule [
+      add_rule_derivation [
+         add_rule $feedbacks($t) rich $Network($t.cr)\
+           rich $Network($t.cl)
+      ] $Steps($t.cr) $Network($t.cm) $Steps($t.cl)
+%<stdout>      ] (right)"
+   } elseif {$choice eq "neither"} {
+%<*stdout>
+      puts stdout "Added equality [llength $::equalitiesL]\
+        ([$t.bm cget -text])."
+%</stdout>
+      add_equality $feedbacks($t) $Steps($t.cl) $Network($t.cm)\
+        $Steps($t.cr)
+   }
+   ambiguity_cancel $t
+%<*showcalc>
+   show_calculation $feedbacks($t) $Steps($t.cl) $Network($t.cm)\
+     $Steps($t.cr)
+%</showcalc>
+   array unset Network $t.c\[lmr\]
+   array unset Steps $t.c\[lr\]
+   array unset feedbacks $t
+   destroy $t
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{show_calculation}
+%   This is a debugging utility procedure which displays a 
+%   calculation in the rule browser window, if there is one. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     |show_calculation| word{feedbacks} \word{steps left} 
+%     \word{middle network} \word{steps right}
+%   \end{displaysyntax}
+%   and there is no particular return value.
+%   \begin{tcl}
+proc show_calculation {fbL left middle right} {
+   if {![winfo exists .rulebrowser]} then {return}
+   array set NW1 [lindex $left end]
+   array set NW2 [lindex $right end]
+   set rule [list [list $NW1(pure) $fbL] [lindex $left end]\
+     [list $NW2(pure) [lindex $right end]]\
+       [make_rule_derivation $left $middle $right]]
+   display_rule .rulebrowser $rule
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{variable}{rule_queue}
+% \begin{variable}{rule_base}
+%   The |rule_queue| and |rule_base| are two lists of rule numbers that 
+%   are used to select which ambiguities to process next. When rules 
+%   are added to the |rulesL|, also an element
+%   \begin{quote}
+%     \word{rule number} \word{sort key}
+%   \end{quote}
+%   is appended to the |rule_queue|. When all ambiguities that can be 
+%   formed from the rules in the |rule_base| have been examined, the 
+%   rule in |rule_queue| that has the smallest \word{sort key} is 
+%   removed and that \word{rule number} is instead appended to the 
+%   |rule_base|. The remaining ambiguities are then those which have 
+%   the new rule on one side and one of the elements in the |rule_base| 
+%   on the other.
+% \end{variable}\end{variable}
+% 
+% 
+% \begin{variable}{minor_index}
+%   The |minor_index| variable stores the index in |rule_base| of the 
+%   next rule to form ambiguities by.
+% \end{variable}
+% 
+% 
+% \begin{proc}{run_ambiguities}
+%   The |run_ambiguities| procedure is the body of an interation in 
+%   which the |minor_index| variable is incremented until it reaches the 
+%   length of the |rule_base| and then stops, while simultaneously 
+%   computing all ambiguities for the current pair of these. The 
+%   increment part happens in |minor_step_ambiguities|. What happens here 
+%   is that the ambiguity windows (if any) are created and another call 
+%   to |minor_step_ambiguity| is arranged for (either via a binding or as 
+%   a direct call).
+%   \begin{tcl}
+proc run_ambiguities {} {
+   global rule_base minor_index
+   if {[llength [
+      make_ambiguities [lindex $rule_base $minor_index]\
+        [lindex $rule_base end] .controller
+   ]]} then {
+      bind .controller <FocusIn> {minor_step_ambiguity}
+   } else {
+      minor_step_ambiguity
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{minor_step_ambiguity}
+%   The |minor_step_ambiguity| procedure increments the |minor_rule| 
+%   variable, updates the left network in the controller window, and 
+%   arranges for |run_ambiguities| to be called a second later. There 
+%   are no arguments, nor any particular return value.
+%   \begin{tcl}
+proc minor_step_ambiguity {} {
+   global minor_index rule_base rulesL minor_rule_no Network\
+     vertex_appearances
+   bind .controller <FocusIn> {}
+   if {[incr minor_index] >= [llength $rule_base]} then {
+      after 1000 {
+         if {${.controller.check_auto}} then {
+            .controller.b_next invoke
+         }
+      }
+      return
+   }
+   set minor_rule_no [lindex $rule_base $minor_index]
+   set Network(.controller.cl) [lindex $rulesL $minor_rule_no 1]
+   .controller.cl delete all
+   network::rich::drawit .controller.cl $vertex_appearances {}\
+     -val $Network(.controller.cl)
+   center_network .controller.cl
+   after 1000 {run_ambiguities}
+}
+%   \end{tcl}
+%   This procedure should perhaps be rewritten to not have variables 
+%   and widgets hardwired, but on the other hand the |rulesL| is such 
+%   a heavily entrenched piece of global state anyway, so it probably 
+%   isn't worth it.
+% \end{proc}
+% 
+% \begin{proc}{inclusion_ambiguity}
+%   This procedure creates an ambiguity window for a given instance 
+%   of the left hand side of one rule in the left hand side of 
+%   another. The call syntax is
+%   \begin{quote}
+%     |inclusion_ambiguity| \word{outer rule no.} 
+%       \word{inner rule no.} \word{region}
+%   \end{quote}
+%   where the \word{region} is for the left hand side of the inner 
+%   rules within the left hand side of the outer rule. The return 
+%   value is the name of the toplevel created for the ambiguity.
+%   
+%   \begin{tcl}
+proc inclusion_ambiguity {rule1 rule2 region} {
+   global feedbacks Network lastrule rulesL vertex_appearances\
+     vertex_sizes Steps
+   set t [new_ambiguity_window]
+   set feedbacks($t) [lindex $rulesL $rule1 0 1]
+   set Network($t.cm) [lindex $rulesL $rule1 1]
+   network::rich::drawit $t.cm $vertex_appearances {}\
+     -val $Network($t.cm)
+   draw_network_feedbacks $t.cm $feedbacks($t) $Network($t.cm) 1
+   set Network($t.cl) [lindex $rulesL $rule1 2 1]
+   set lastrule($t.cl) $rule1
+   network::rich::drawit $t.cl $vertex_appearances {}\
+     -val $Network($t.cl)
+   center_network $t.cl
+   set NW(pure) [
+      network::pure::replace [lindex $rulesL $rule1 0 0] $region\
+        [lindex $rulesL $rule2 2 0]
+   ]
+   network::rich::make_level-layout-Tk $vertex_sizes -var NW
+   network::rich::vpos-Tk_by_level -var NW
+   network::rich::ecurve-Tk-tt_by_level $vertex_appearances\
+     -var NW
+   network::rich::drawit $t.cr $vertex_appearances {} -var NW
+   center_network $t.cr
+   set Network($t.cr) [array get NW]
+   set lastrule($t.cr) $rule2
+   set Steps($t.cl) [list $rule1 $Network($t.cl)]
+   set Steps($t.cr) [list $rule2 $Network($t.cr)]
+   $t.bl configure -command [list rule_ambiguity $t left]
+   $t.br configure -command [list rule_ambiguity $t right]
+   $t.bm configure -command [list rule_ambiguity $t neither]
+   return $t
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{major_step_ambiguity}
+%   The |major_step_ambiguity| procedure moves one rule from the 
+%   |rule_queue| to the |rule_base|, and then resets the |minor_index|. 
+%   As part of this, the other rules in the base and queue are checked 
+%   for whether their principal parts contain the new rule, and if they 
+%   do then they are dropped from these lists and corresponding 
+%   ambiguities are prepared to be checked.
+%   
+%   There are no arguments, nor any particular return value.
+%   \begin{tcl}
+proc major_step_ambiguity {base_w} {
+   global minor_index rule_base rule_queue rulesL Network lastrule\
+     vertex_appearances minor_rule_no major_rule_no feedbacks
+   if {![llength $rule_queue]} then {return}
+   set rule_queue [lsort -dictionary -index 1 $rule_queue]
+   set new [lindex $rule_queue 0 0]
+   foreach {wm_wh wm_x wm_y} [split [wm geometry $base_w] +] {break}
+   set delta_x [expr {abs( [winfo rootx $base_w] - $wm_x )}]
+   set delta_y [expr {abs( [winfo rooty $base_w] - $wm_y )}]
+   set delta [expr {$delta_x>$delta_y ? $delta_x : $delta_y}]
+% \smallskip
+   set new_base [list]
+   set lost_focus 0
+   foreach n $rule_base {
+      set L [network::wfb::instances [lindex $rulesL $n 0]\
+        [lindex $rulesL $new 0] 1]
+      if {[llength $L]} then {
+         set wm_x [expr {$wm_x + $delta}]
+         set wm_y [expr {$wm_y + $delta}]
+         wm geometry [
+            inclusion_ambiguity $n $new [lindex $L 0]
+         ] +${wm_x}+${wm_y}
+%<stdout>         puts stdout "Removed rule $n from base."
+         set lost_focus 1
+      } else {
+         lappend new_base $n
+      }
+   }
+   set rule_base $new_base
+   lappend rule_base $new
+% \smallskip
+   set new_queue [list]
+   foreach pair [lrange $rule_queue 1 end] {
+      set n [lindex $pair 0]
+      set L [network::wfb::instances [lindex $rulesL $n 0]\
+        [lindex $rulesL $new 0] 1]
+      if {[llength $L]} then {
+         set wm_x [expr {$wm_x + $delta}]
+         set wm_y [expr {$wm_y + $delta}]
+         wm geometry [
+            inclusion_ambiguity $n $new [lindex $L 0]
+         ] +${wm_x}+${wm_y}
+%<stdout>         puts stdout "Removed rule $n from base."
+         set lost_focus 1
+      } else {
+         lappend new_queue $pair
+      }
+   }
+   set rule_queue $new_queue
+% \smallskip
+   set minor_index 0
+   set minor_rule_no [lindex $rule_base 0]
+   $base_w.cl delete all
+   network::rich::drawit $base_w.cl $vertex_appearances {} -val [
+      set Network($base_w.cl) [lindex $rulesL $minor_rule_no 1]
+   ]
+   center_network $base_w.cl
+   set major_rule_no [lindex $rule_base end]
+   $base_w.cr delete all
+   network::rich::drawit $base_w.cr $vertex_appearances {} -val [
+      set Network($base_w.cr) [lindex $rulesL $major_rule_no 1]
+   ]
+   center_network $base_w.cr
+   if {[set ::$base_w.check_auto]} then {
+      if {$lost_focus} then {
+         bind .controller <FocusIn> {
+            bind .controller <FocusIn> {}
+            .controller.b_go invoke
+         }
+      } else {
+         after 1000 {.controller.b_go invoke}
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{variable}{major_rule_no}
+% \begin{variable}{minor_rule_no}
+%   These two variables are displayed in the two entry widgets in the 
+%   controller window. They should be set when the networks displayed 
+%   there change.
+%   \begin{tcl}
+create_controller major_rule_no minor_rule_no
+%   \end{tcl}
+% \end{variable}\end{variable}
+% 
+% 
+% Any pending |run_ambiguities| script is cancelled when the controller 
+% window loses focus.
+% \begin{tcl}
+bind .controller <FocusOut> {after cancel {run_ambiguities}}
+% \end{tcl}
+% 
+% Pressing the \textsf{Next} button performs a 
+% |major_step_ambiguity|, whereas pressing the \textsf{Go} button 
+% performs a |run_ambiguities|.
+% \begin{tcl}
+.controller.b_next configure -command {
+   major_step_ambiguity .controller
+}
+.controller.b_go configure -command {run_ambiguities}
+% \end{tcl}
+% 
+% 
+% \subsection{A rule browser}
+% 
+% The following implements a window that allows one to browse the list 
+% of rules.
+% 
+% \changes{2}{2007/03/17}{Redesigning rule browser layout. (LH)}
+% 
+% \begin{proc}{rule_browser_layout}
+%   This procedure creates a window for the rule browser and sets up 
+%   the widgets that should reside in it. At the top there is bar of 
+%   controls, below that is a pair of canvases displaying the left 
+%   and right hand sides of the rule, and below that is a canvas 
+%   displaying the rule derivation.
+%   All canvases have vertical and horizontal scroll bars. 
+%   
+%   The control bar has fixed height, but the heights of the other 
+%   parts is under the control of a |panedwindow| widget. Each of the 
+%   three parts of the window are found inside frames called 
+%   |.rulebrowser.fbar|, |.rulebrowser.frule|, and 
+%   |.rulebrowser.fproof| respectively.
+%   \begin{tcl}
+proc rule_browser_layout {} {
+   set t [toplevel .rulebrowser]
+   wm title $t "Rule browser"
+   pack [
+      frame $t.fbar -background grey90
+   ] -expand true -fill x -side top
+   pack [
+      panedwindow $t.panes -orient vertical -borderwidth 0
+   ] -expand true -fill both
+   frame $t.frule
+   frame $t.fproof
+%   \end{tcl}
+%   The two frames will eventually be made panes of the 
+%   |panedwindow|, but delaying adding them until the grids inside 
+%   them are complete makes it less likely to run into Tk 
+%   bug~\#1714535. 
+%   The order of widget creations here is important, as the frames 
+%   need to be above the panedwindow in the stacking order.
+%   
+%   Creating the network canvases and their associated scrollbars 
+%   is a highly uniform task, so all three of them are handled by the 
+%   same loop. The widget names all have the form 
+%   \meta{toplevel}|.|\meta{midpart}\meta{suffix} where \meta{suffix} 
+%   is |c|, |h|, or |v| depending on whether this is a 
+%   \texttt{c}anvas, \texttt{h}orizontal scrollbar, or 
+%   \texttt{v}ertical scrollbar, but the \meta{midpart} is 
+%   syntactically different in the rule and derivation parts: in the 
+%   former case it is |frule.left_| or |frule.right_|, but in the 
+%   latter it is |fproof.|.
+%   \begin{tcl}
+   foreach c_ [list $t.frule.left_ $t.frule.right_ $t.fproof.] {
+      scrollbar ${c_}h -orient horiz -command [list ${c_}c xview]
+      scrollbar ${c_}v -command [list ${c_}c yview]
+      canvas ${c_}c -width 200 -height 300 -relief solid -borderwidth 1\
+        -xscrollcommand [list ${c_}h set]\
+        -yscrollcommand [list ${c_}v set]
+      bindtags ${c_}c [linsert [bindtags ${c_}c] 1 Network]
+   }
+%   \end{tcl}
+%   
+%   Geometry inside the the |frule| and |fproof| frames is |grid|ded, 
+%   since this automatically leaves a square of the right size in the 
+%   corner. The |fproof| arrangement is slightly simpler, but the 
+%   |frule| is mostly just a repetition.
+%   \begin{tcl}
+   grid $t.fproof.c -row 0 -column 0 -sticky nsew
+   grid $t.fproof.v -row 0 -column 1 -sticky ns
+   grid $t.fproof.h -row 1 -column 0 -sticky ew
+   grid rowconfigure $t.fproof 0 -weight 1
+   grid columnconfigure $t.fproof 0 -weight 1
+%
+   grid $t.frule.left_c  -row 0 -column 0 -sticky nsew
+   grid $t.frule.left_v  -row 0 -column 1 -sticky ns
+   grid $t.frule.left_h  -row 1 -column 0 -sticky ew
+   grid $t.frule.right_c -row 0 -column 3 -sticky nsew
+   grid $t.frule.right_v -row 0 -column 4 -sticky ns
+   grid $t.frule.right_h -row 1 -column 3 -sticky ew
+   grid rowconfigure $t.frule 0 -weight 1
+   grid columnconfigure $t.frule 0 -weight 1
+   grid columnconfigure $t.frule 3 -weight 1
+%   \end{tcl}
+%   Column 2 is reserved for a canvas with an arrow pointing right.
+%   \begin{tcl}
+   canvas $t.frule.arrow_c -width 20 -height 20
+   $t.frule.arrow_c create line {0 10 20 10} -arrow last -width 2
+   grid $t.frule.arrow_c -row 0 -column 2
+%   \end{tcl}
+%   Now the frame contents are complete, so they are added as panes.
+%   \begin{tcl}
+   $t.panes add $t.frule -sticky nsew -minsize 50
+   $t.panes add $t.fproof -sticky nsew -minsize 50
+%   \end{tcl}
+%   The control bar |fbar| is filled in by a separate procedure, 
+%   since the details of these controls are closely associated with 
+%   the actions that they will perform. Similarly with the bindings 
+%   for hyperlinks.
+%   \begin{tcl}
+   rule_browser_fbar $t
+   hyper_references $t.fproof.c
+   return $t
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{proc}{display_rule}
+%   The |display_rule| procedure updates the rule browser window to 
+%   show the specified rule or equality. The syntax is
+%   \begin{quote}
+%     |display_rule| \word{toplevel} \word{rule}
+%   \end{quote}
+%   where \word{toplevel} is the name of the browser window and 
+%   \word{rule} is the actual rule (element of |rulesL|, not 
+%   just an index into it) to display.
+%   
+%   \begin{tcl}
+proc display_rule {t rule} {
+   global Network vertex_appearances
+%
+   set tr $t.frule
+   $tr.left_c delete all
+   network::rich::drawit $tr.left_c $vertex_appearances {} -val [
+      set Network($tr.left_c) [lindex $rule 1]
+   ]
+   draw_network_feedbacks $tr.left_c [lindex $rule 0 1]\
+     [lindex $rule 1] 1
+   $tr.left_c configure -scrollregion [$tr.left_c bbox all]
+%
+   $tr.right_c delete all
+   network::rich::drawit $tr.right_c $vertex_appearances {} -val [
+      set Network($tr.right_c) [lindex $rule 2 1]
+   ]
+   center_network $tr.right_c
+   $tr.right_c configure -scrollregion [$tr.right_c bbox all]
+%   \end{tcl}
+%   The tricky part is to display the proof. The first step is a bit 
+%   of a special case, since it includes brackets.
+%   \begin{tcl}
+   $t.fproof.c delete all
+   display_rule_proof $t.fproof.c $rule
+   $t.fproof.c configure -scrollregion [$t.fproof.c bbox all]
+   center_network $t.fproof.c
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{flatten_bboxes}
+%   This procedure has the call syntax
+%   \begin{quote}
+%     |flatten_bboxes| \word{bbox}\regplus
+%   \end{quote}
+%   where each \word{bbox} is a list of an even number (typically 
+%   four or zero) of real numbers. It returns the bounding box
+%   \begin{quote}
+%     \word{left} \word{top} \word{right} \word{bottom}
+%   \end{quote}
+%   for the total of the coordinates in these arguments.
+%   \begin{tcl}
+proc flatten_bboxes {args} {
+   set xL {}; set yL {}
+   foreach box $args {
+      foreach {x y} $box {
+         lappend xL $x; lappend yL $y
+      }
+   }
+   set xL [lsort -real $xL]
+   set yL [lsort -real $yL]
+   return [list [lindex $xL 0] [lindex $yL 0]\
+     [lindex $xL end] [lindex $yL end]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{display_rule_proof}
+%   This procedure displays the proof of a rule in a |canvas| (or 
+%   approximation thereof; only the |create| subcommand is needed). 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |display_rule_proof| \word{canvas-cmd} \word{rule} 
+%     \begin{regblock}[\regstar] \word{option} \word{value}
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{rule} is the actual rule data, i.e., a list with the 
+%   structure
+%   \begin{displaysyntax}
+%     \word{left hand side (wfb)} \word{left hand side (rich)} 
+%     \word{right hand side} \word{derivation}\regopt
+%   \end{displaysyntax}
+%   The return value is the bounding box of all the things drawn, or 
+%   an empty list if there wasn't a \word{derivation} (in which case 
+%   nothing is drawn).
+%   
+%   The \word{option}s are\dots
+%   
+%   \begin{tcl}
+proc display_rule_proof {prefix rule args} {
+   if {[llength $rule] < 4} then {return}
+   array set Opt {
+      -tags "" 
+      -eqtext "="
+      -eqfont {Times 24}
+      -eqwidth 36
+      -eqhalfheight 12
+      -reffont {Courier 10 underline}
+      -refcolour blue
+   }
+   array set Opt $args
+   global vertex_appearances
+%   \end{tcl}
+%   The first step is to draw the left hand side, which is the only 
+%   network for which feedbacks are drawn.
+%   \begin{tcl}
+   array set NW [lindex $rule 1]
+   set stepTagsL [linsert $Opt(-tags) end step0]
+   network::rich::drawit $prefix $vertex_appearances $stepTagsL -var NW
+   set inL {}
+   foreach item [lindex $NW(level-layout-Tk) 0 end-2] {
+      if {[lindex $item 0] eq "edge"} then {
+         lappend inL [lindex $item 2]
+      }
+   }
+   set outL {}
+   foreach item [lindex $NW(level-layout-Tk) 0 0] {
+      if {[lindex $item 0] eq "edge"} then {
+         lappend outL [lindex $item 2]
+      }
+   }
+   set call [list flatten_bboxes]
+   foreach {component bbox} $NW(level-layout-Tk) {lappend call $bbox}
+   lappend call [
+      network::rich::draw_feedbacks $prefix $stepTagsL\
+        [lindex $rule 0 1] -inx $inL -outx $outL\
+        -bbox [lindex $NW(level-layout-Tk) 1]
+   ]
+   set bbox [
+      network::rich::draw_brackets $prefix $stepTagsL -bbox [eval $call]
+   ]
+   set yeq [expr {0.5*([lindex $bbox 1] + [lindex $bbox 3])}]
+%   \end{tcl}
+%   Remaining steps are drawn in a loop over the \word{derivation}.
+%   \begin{tcl}
+   set stepno 1
+   foreach {rspec RNW} [lindex $rule 3] {
+      set stepTagsL [linsert $Opt(-tags) end step${stepno}]
+      set xeq [expr {[lindex $bbox 2] + 0.5*$Opt(-eqwidth)}]
+      eval [linsert $prefix end create text $xeq $yeq -anchor center\
+        -text $Opt(-eqtext) -font $Opt(-eqfont) -tags $Opt(-tags)]
+      eval [linsert $prefix end create text\
+        $xeq [expr {$yeq-$Opt(-eqhalfheight)}]\
+        -anchor s -font $Opt(-reffont) -fill $Opt(-refcolour)\
+        -tags [linsert $stepTagsL end reference] -text [
+           switch -- [lindex $rspec 0] "forward" {
+              format "(%d)>" [lindex $rspec 1]
+           } "backward" {
+              format "<(%d)" [lindex $rspec 1]
+           }
+        ]]
+      array unset NW
+      array set NW $RNW
+      set call [list flatten_bboxes]
+      foreach {component bbox2} $NW(level-layout-Tk) {
+         lappend call $bbox2
+      }
+      set bbox2 [eval $call]
+      set w [network::rich::draw_brackets $prefix {} -bbox $bbox2\
+        -operation width]
+      set xyofs [list [expr {[lindex $bbox 2] + $Opt(-eqwidth) + $w}]\
+        [expr {$yeq - 0.5*([lindex $bbox2 1]+[lindex $bbox2 3])}]]
+      network::rich::drawit $prefix $vertex_appearances $stepTagsL\
+        -var NW -origin $xyofs
+      set bbox2 {}
+      foreach x [eval $call] dx [concat $xyofs $xyofs] {
+         lappend bbox2 [expr {$x+$dx}]
+      }
+      lappend call [
+         network::rich::draw_brackets $prefix $stepTagsL -bbox $bbox2
+      ] $bbox
+      set bbox [eval $call]
+      incr stepno
+   }
+   return $bbox
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{variable}{browser_bwL}
+% \begin{variable}{browser_fwL}
+%   The browser backward and forward lists are lists of rule numbers, 
+%   serving as backward and forward stacks. Moving backward means the 
+%   top (last) element is popped off |browser_bwL| and pushed onto 
+%   |browser_fwL|, and vice versa. The top (last) element of 
+%   |browser_fwL| is the current rule.
+%   
+%   The format of a rule number is either an integer or 
+%   |e|\meta{integer}, where the latter refers to an equality.
+% \end{variable}\end{variable}
+% 
+% \begin{proc}{parse_ruleno}
+%   The |parse_ruleno| procedure splits a rule number into a pair
+%   \begin{quote}
+%     \word{variable} \word{index}
+%   \end{quote}
+%   where \word{variable} is the name of the variable in which the 
+%   rule is kept and \word{index} is the index into the list that 
+%   this variable should be of the rule in question. The call syntax 
+%   is
+%   \begin{quote}
+%     |parse_ruleno| \word{ruleno} \word{bad-script}
+%   \end{quote}
+%   where the \word{bad-script} is evaluated in the calling context 
+%   if the \word{ruleno} could not be parsed. Its return code and 
+%   value will then be the return code and value of |parse_ruleno|.
+%   \begin{tcl}
+proc parse_ruleno {ruleno script} {
+   switch -regexp -- $ruleno {^\d+$} {
+      scan $ruleno %d num
+      return [list rulesL $num]
+   } {^[eE]\d+$} {
+      scan $ruleno e%d num
+      return [list equalitiesL $num]
+   }
+   return -code [catch {uplevel 1 $script} res] $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{unparse_ruleno}
+%   This procedure those the opposite of |parse_ruleno|. Its call 
+%   syntax is
+%   \begin{quote}
+%     |unparse_ruleno| \word{variable} \word{index}
+%   \end{quote}
+%   \begin{tcl}
+proc unparse_ruleno {var num} {
+   switch -- $var "rulesL" {
+      format %d $num
+   } "equalitiesL" {
+      format e%d $num
+   } default {
+      error "Bad variable name"
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{go_to_rule}
+%   The |go_to_rule| procedure is the high level handler of going 
+%   from one rule to another. It changes what is displayed in the 
+%   browser window canvases, the rule number displayed in the control 
+%   bar, and updates the backwards\slash forwards lists accordingly. 
+%   The call syntaxes are
+%   \begin{displaysyntax}
+%     |go_to_rule| absolute \word{rule number}\par
+%     |go_to_rule| relative \word{offset}\par
+%     |go_to_rule| backward\par
+%     |go_to_rule| forward
+%   \end{displaysyntax}
+%   where \word{rule number} is the number of the item in |rulesL| to 
+%   display, and \word{style} is the style of movement this is. 
+%   |forward| or |backward| as \word{style} means this is navigation 
+%   using the forward and backward buttons, whereas |normal| means 
+%   this is a normal move.
+%   
+%   \begin{tcl}
+proc go_to_rule {style {data ""}} {
+   global browser_fwL browser_bwL rule_number_var
+   switch -- $style "absolute" {
+      foreach {var num} [
+         parse_ruleno $data {bell; return}
+      ] break
+   } "relative" {
+      foreach {var num} [
+         parse_ruleno [lindex $browser_fwL end] {bell; return}
+      ] break
+      incr num $data
+   } "backward" {
+      if {![llength $browser_bwL]} then {bell; return}
+      foreach {var num} [
+         parse_ruleno [lindex $browser_bwL end] {bell; return}
+      ] break
+   } "forward" {
+      if {[llength $browser_fwL]<2} then {bell; return}
+      foreach {var num} [
+         parse_ruleno [lindex $browser_fwL end-1] {bell; return}
+      ] break
+   }
+   upvar #0 $var rulesL
+   if {$num >= [llength $rulesL]} then {bell; return}
+   display_rule .rulebrowser [lindex $rulesL $num]
+   set rule_number_var [unparse_ruleno $var $num]
+   switch -- $style "backward" {
+      lappend browser_fwL $rule_number_var
+      set browser_bwL [lreplace $browser_bwL\
+        [set browser_bwL end] end]
+   } "forward" {
+      lappend browser_bwL [lindex $browser_fwL end]
+      set browser_fwL [lreplace $browser_fwL\
+        [set browser_fwL end] end]
+   } default {
+      if {[llength $browser_fwL]} then {
+         lappend browser_bwL [lindex $browser_fwL end]
+      }
+      set browser_fwL [list $rule_number_var]
+   }
+   .rulebrowser.fbar.back configure -state [lindex {disabled normal}\
+     [expr {[llength $browser_bwL]>0}]]
+   .rulebrowser.fbar.forward configure -state [lindex {disabled normal}\
+     [expr {[llength $browser_fwL]>1}]]
+   .rulebrowser.fbar.next configure -state [lindex {disabled normal}\
+     [expr {$num+1 < [llength $rulesL]}]]
+   .rulebrowser.fbar.prev configure -state [lindex {disabled normal}\
+     [expr {$num>0}]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{hyper_references}
+%   This procedure makes bindings in a canvas so that all items 
+%   tagged |reference| become hyperlinks. The call syntax is
+%   \begin{quote}
+%     |hyper_references| \word{canvas}
+%   \end{quote}
+%   \begin{tcl}
+proc hyper_references {c} {
+   $c bind reference <Enter> [list $c configure -cursor hand2]
+   $c bind reference <Leave> [list $c configure -cursor {}]
+   $c bind reference <ButtonPress-1> [list\
+     $c itemconfigure current -fill red]
+   $c bind reference <B1-Leave> "
+      [list $c configure -cursor {}]
+      [list $c itemconfigure current -fill blue]
+   "
+   $c bind reference <ButtonRelease-1> [list hyper_jump $c red]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{hyper_jump}
+%   This procedure does the jumping associated with clicking on a 
+%   hyperlink. The call syntax is
+%   \begin{quote}
+%     |hyper_jump| \word{canvas} \word{hot fill}
+%   \end{quote}
+%   It only does anything if the |-fill| of the item is equal to 
+%   \word{hot fill}, since a different value of |-fill| would indicate 
+%   that the mouse was moved in over the hyperlink while being pressed, 
+%   which should not count as clicking the hyperlink.
+%   \begin{tcl}
+proc hyper_jump {c hot} {
+   if {[$c itemcget current -fill] ne $hot} then {return}
+%   \end{tcl}
+%   The number of the rule to jump to is parsed from the text of the 
+%   link.
+%   \begin{tcl}
+   regsub -all -- {[<>()]} [$c itemcget current -text] {} ruleno
+   go_to_rule absolute $ruleno
+}
+%   \end{tcl}
+% \end{proc}
+%
+% 
+% \begin{proc}{rule_browser_fbar}
+%   This procedure fills in the |fbar| child of a specified toplevel 
+%   with the controls for a rule browser window. The call syntax is
+%   \begin{quote}
+%     |rule_browser_fbar| \word{toplevel}
+%   \end{quote}
+%   There is no particular return value.
+%   
+%   ---
+%   
+%   The control bar is a frame, into which the individual controls are 
+%   packed. Its background has a colour.
+%   \begin{tcl}
+proc rule_browser_fbar {t} {
+   set tf $t.fbar
+   set bg [$tf cget -background]
+   pack [
+      button $tf.back -text "Back" -highlightbackground $bg\
+        -command {go_to_rule backward}
+   ] -side left
+   pack [
+      button $tf.forward -text "Forward" -highlightbackground $bg\
+        -command {go_to_rule forward}
+   ] -side left
+   
+   pack [
+      button $tf.go -text "Go" -highlightbackground $bg -command {
+         go_to_rule absolute $rule_number_var
+      }
+   ] -side right
+   pack [
+      entry $tf.go_e -width 4 -textvariable rule_number_var
+   ] -side right
+   bind $tf.go_e <Return> [list $tf.go invoke]
+   pack [label $tf.go_l -text "Rule" -background $bg] -side right
+   pack [
+      button $tf.next -text "+1" -highlightbackground $bg\
+        -command {go_to_rule relative 1}
+   ] -side right
+   pack [
+      button $tf.prev -text "-1" -highlightbackground $bg\
+        -command {go_to_rule relative -1}
+   ] -side right
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Dumping results as PDF}
+% 
+% The following code dumps the rules and equalities, as well as 
+% their derivations, to a PDF file. There is one rule per page. The 
+% page dimensions are determined by the rules.
+% 
+% \begin{proc}{shipout_rule}
+%   This procedure does most of the work. It outputs one rule, 
+%   producing one page and adding one entry to the document outline. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |shipout_rule| \word{file} \word{rule} \word{title}
+%   \end{displaysyntax}
+%   and the return value is the label given to the page object.
+%   
+%   \begin{tcl}
+proc shipout_rule {F rule title} {
+   global vertex_appearances
+   set label [pdf::auto_label $F $title]
+%
+   set c [pdf::begin_scanvas_xobject $F "$label LHS" -anchor e]
+   network::rich::drawit $c $vertex_appearances {}\
+     -val [lindex $rule 1]
+   draw_network_feedbacks $c [lindex $rule 0 1] [lindex $rule 1] 0
+   set rect [pdf::scanvas_bbox $F]
+   network::rich::draw_brackets $c {} -bbox\
+     [list [lindex $rect 0] [expr {-[lindex $rect 1]}]\
+       [lindex $rect 2] [expr {-[lindex $rect 3]}]]
+   set rect_l [pdf::inset_rect [pdf::end_scanvas_xobject $F] -5 mm]
+%
+   set c [pdf::begin_scanvas_xobject $F "$label RHS" -anchor w]
+   network::rich::drawit $c $vertex_appearances {}\
+     -val [lindex $rule 2 1]
+   draw_network_feedbacks $c [lindex $rule 0 1] [lindex $rule 2 1] 0
+   set rect [pdf::scanvas_bbox $F]
+   network::rich::draw_brackets $c {} -bbox\
+     [list [lindex $rect 0] [expr {-[lindex $rect 1]}]\
+       [lindex $rect 2] [expr {-[lindex $rect 3]}]]
+   set rect_r [pdf::inset_rect [pdf::end_scanvas_xobject $F] -5 mm]
+%
+   if {[llength $rule] > 3} then {
+      set c [pdf::begin_scanvas_xobject $F "$label proof" -anchor s]
+      display_rule_proof $c $rule
+      set rect_p [pdf::end_scanvas_xobject $F]
+   } else {
+      set rect_p {0 0 0 0}
+   }
+%
+   pdf::begin_contents "" $F "$label contents"
+%
+   if {[llength $rule] > 3} then {
+      pdf::name_resource X1 $F XObject\
+        [pdf::obj_ref $F "$label proof"]
+      pdf::printf $F {q 1 0 0 1 %l2 cm %o Do Q} 0 cm 1 cm $X1
+      pdf::printf $F {%r 0 m %r 0 l S} [lindex $rect_p 0]\
+        [lindex $rect_p 2]
+   }
+%
+   set rect_lr [pdf::covering_rect [pdf::offset_rect $rect_l -1 0 cm]\
+     [pdf::offset_rect $rect_r 1 0 cm]]
+   set yofs [expr {[pdf::length_obj -1 cm] - [lindex $rect_lr 1]}]
+   pdf::printf $F {1 0 0 1 0 %r cm} $yofs
+   pdf::name_resource X2 $F XObject [pdf::obj_ref $F "$label LHS"]
+   pdf::printf $F {q 1 0 0 1 %l 0 cm %o Do Q} -1 cm $X2
+   pdf::name_resource X3 $F XObject [pdf::obj_ref $F "$label RHS"]
+   pdf::printf $F {q 1 0 0 1 %l 0 cm %o Do Q} 1 cm $X3
+   puts $F {-15 -2 m -15 2 l 9 2 l 9 6 l 15 0 l 9 -6 l 9 -2 l f}
+%
+   pdf::end_contents Res $F
+   set rect [pdf::covering_rect [pdf::offset_rect $rect_lr 0 $yofs]\
+     [pdf::offset_rect $rect_p 0 1 cm]]
+   pdf::shipout $F $label /Contents [pdf::obj_ref $F "$label contents"]\
+     /Resources [pdf::resource_dict_obj Res]\
+     /MediaBox [pdf::rect_obj [pdf::inset_rect $rect -2 cm]]
+   pdf::outline_heading $F 1 $title /Dest\
+     [pdf::array_obj [pdf::obj_ref $F $label] /FitB]
+   return $label
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{dump_to_PDF}
+%   This procedure dumps a list of rules or equalities to a PDF 
+%   file. The call syntax is
+%   \begin{quote}
+%     |dump_to_PDF| \word{file name} \begin{regblock}[\regstar] 
+%     \word{heading} \word{rule-list} \end{regblock}
+%   \end{quote}
+%   and there is no particular return value. Any previous file with 
+%   the name \word{file name} will be overwritten. 
+%   
+%   Each \word{heading} is made a top-level (level $0$) heading with 
+%   one subheading for each element in the list of rules following 
+%   it. Not specifying any heading or list is equivalent to
+%   \begin{quote}
+%     |Rules| \word{\$rulesL} |Equalities| \word{\$equalitiesL}
+%   \end{quote}
+%   \begin{tcl}
+proc dump_to_PDF {fname args} {
+   package require pdf
+   set F [pdf::rewrite_pdf $fname]
+   pdf::begin_pages $F "Pages"
+   pdf::begin_outline $F "Headings"
+   if {![llength $args]} then {
+      set args [list Rules $::rulesL Equalities $::equalitiesL]
+   }
+   foreach {heading itemL} $args {
+      if {![llength $itemL]} then {continue}
+      pdf::outline_heading $F 0 $heading /Dest\
+        [pdf::obj_ref $F [set label [pdf::auto_label $F]]]
+      set page [shipout_rule $F [lindex $itemL 0] 0]
+      pdf::put_obj $F $label [pdf::array_obj\
+        [pdf::obj_ref $F $page] /Fit]
+      set n 0; foreach item [lrange $itemL 1 end] {incr n
+         shipout_rule $F $item $n
+      }
+   }
+   pdf::put_obj $F "Catalog" [pdf::dict_obj \
+     /Type /Catalog \
+     /Pages [pdf::obj_ref $F [pdf::end_pages $F]] \
+     /Outlines [pdf::obj_ref $F [pdf::end_outline $F]]]
+   pdf::close_pdf $F "Catalog"
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{tcl}
+%</util1>
+% \end{tcl}
+% 
+% 
+% 
+% \section{Hopf algebra}
+% 
+% The following is part research, part test of the utility. It sets 
+% up the rules for a Hopf algebra.
+% 
+% \subsection{Ordinary Hopf algebras}
+% 
+% \begin{tcl}
+%<*Hopf>
+clear_rules
+set vertex_types {
+  Delta {1 2}  epsilon {1 0}  S {1 1}  m {2 1}  unit {0 1}
+%<twist>  twist {2 2}
+}
+set vertex_appearances {
+   m {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   unit {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {}
+   }
+   Delta {
+      {oval {square 8} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{0 -8}}
+   }
+   epsilon {
+      {oval {square 8} {}}
+      {}
+      {{0 -8}}
+   }
+   S {
+      {rectangle {square 8} {}} 
+      {{0 8}}
+      {{0 -8}}
+   }
+   twist {
+      {oval {square 8} {}  line {square 5.657} {} \
+        line {offsets {5.657 -5.657} {-5.657 5.657}} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+}
+% \end{tcl}
+% First comes the rules for an algebra.
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit . \r m}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {. unit \r m}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {. m \r m}
+] pure [
+   network::pure::construct $vertex_types {m . \r m}
+]
+% \end{tcl}
+% The rules for a coalgebra.
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \r epsilon .}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \r . epsilon}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+%<*!rightCoass>
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \r . Delta}
+] pure [
+   network::pure::construct $vertex_types {Delta \r Delta .}
+]
+%</!rightCoass>
+%<*rightCoass>
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \r Delta .}
+] pure [
+   network::pure::construct $vertex_types {Delta \r . Delta}
+]
+%</rightCoass>
+% \end{tcl}
+% The additional rules for a bialgebra.
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit \r Delta}
+] pure [
+   network::pure::construct $vertex_types {unit unit}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit \r epsilon}
+] pure [
+   network::pure::construct $vertex_types {}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {m \r epsilon}
+] pure [
+   network::pure::construct $vertex_types {epsilon epsilon}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {m \r Delta}
+] pure [
+   network::pure::construct $vertex_types {
+%<!twist>      Delta Delta \r . X . \r m m
+%<twist>      Delta Delta \r . twist . \r m m
+   }
+]
+% \end{tcl}
+% And finally the rules for the antipode.
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \r . S \r m}
+] pure [
+   network::pure::construct $vertex_types {epsilon unit}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \r S . \r m}
+] pure [
+   network::pure::construct $vertex_types {epsilon unit}
+]
+%</Hopf>
+% \end{tcl}
+% 
+% As a variant, one can add the rule that the antipode has order $2$ 
+% or $4$.
+% \begin{tcl}
+%<*Hopf2>
+add_rule {} pure [
+   network::pure::construct $vertex_types {S \r S}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+%</Hopf2>
+%<*Hopf4>
+add_rule {} pure [
+   network::pure::construct $vertex_types {S \r S \r S \r S}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+%</Hopf4>
+% \end{tcl}
+% 
+% \begin{proc}{Hopf_comparison_key}
+%   The trickiest part of running a completion on the rules above is to 
+%   conceive of a well-founded ordering which is compatible with the 
+%   rules. Particular stumbling blocks are:
+%   \begin{enumerate}
+%     \item
+%       The rule turning $\Delta \circ m$ into \(m \otimes m \circ 
+%       (2\:3) \circ \Delta \otimes \Delta\) \emph{increases} the 
+%       number of vertices in the network.
+%     \item
+%       The associativity and coassociativity rules makes some paths 
+%       longer.
+%     \item
+%       The rules (which will be derived after a while) that the 
+%       antipode is an antihomomorphism have the property of exchanging 
+%       left and right branches of products and coproducts, which 
+%       severely complicates ordering associativity by minimising the 
+%       number of right-branches on paths. The natural direction of 
+%       these rules also increases the number of vertices (there is a 
+%       separate antipode for each branch).
+%   \end{enumerate}
+%   Strange as it sounds, these problems are actually clues to the 
+%   solution. It is a very corny solution, but nonetheless it works:
+%   \begin{enumerate}
+%     \item
+%       Compare the number of paths connecting each pair of input and 
+%       output leg: more paths means the network is larger.
+%     \item
+%       If that is the same, then compare the number of antipodes on 
+%       the paths: more antipodes means the network is larger.
+%     \item
+%       If that is also the same, then compare the total number of 
+%       vertices: more vertices means the network is \emph{smaller!}
+%     \item
+%       If there is still no difference, then compare the number of 
+%       times each path takes a right branch in or out of a vertex.
+%   \end{enumerate}
+%   A noticeable feature of the above is that there is no lexicographic 
+%   ordering at work, even though many rules certainly suggest using 
+%   a path-lexicographic order. The catch which prevents that is that 
+%   associativity can increase path length, which seriously messes up 
+%   compatibility with composition (pure lexicographic order in the 
+%   free monoid is not compatibile with composition\Dash it is 
+%   necessary to first ensure that items compared are of equal length).
+%   
+%   The |Hopf_comparison_key| procedure takes a pure network as 
+%   argument and returns a corresponding comparison key, as a list of 
+%   comparison groups. The call syntax is thus
+%   \begin{quote}
+%     |Hopf_comparison_key| \word{network}
+%   \end{quote}
+%   and the comparison groups will be
+%   \begin{quote}
+%     \word{\#paths through} \word{\#paths ending} \word{\#inner paths} 
+%     \word{\#antipodes per path} \word{$-$\#vertices} 
+%     \word{\#right-turns per path}
+%   \end{quote}
+%   Notes on why things are done this way are given throughout the 
+%   implementation.
+%   \begin{tcl}
+%<*Hopf>
+proc Hopf_comparison_key {NW} {
+   set pathMat [network::pure::list_paths_turning $NW]
+%   \end{tcl}
+%   The first comparison group only counts paths between an input 
+%   and an output. The reason for this is that the axioms for the 
+%   antipode turn two paths between input and output into two paths 
+%   with an internal end. If both types of paths were part of the 
+%   same comparison groups, the left and right hand sides of these 
+%   rules would be incomparable.
+%   
+%   Counting paths with one end in an internal vertex orients the 
+%   defining indentities of units and counits. Counting paths with 
+%   both ends in an internal vertex orients the unit--counit 
+%   compatibility identity.
+%   \begin{tcl}
+   set L1 {}; set L2 {}; set L3 {}
+   foreach row $pathMat eo [lindex $NW 0 0 2] {
+      foreach cell $row ei [lindex $NW 0 1 1] {
+         lappend L[
+            expr {1 + ($eo eq "") + ($ei eq "")}
+         ] [llength $cell]
+      }
+   }
+   set res [list $L1 $L2 $L3]
+%   \end{tcl}
+%   Counting antipodes is not directly needed for any of the standard 
+%   axioms, but it is needed if one adds an axiom about the order of 
+%   the antipode. It is also used by the derived identities on how 
+%   the antipode interacts with the unit and counit. It is not 
+%   necessary to distinguish between classes of paths because of the 
+%   kinds of ends they have in this case, so all cells in the path 
+%   matrix are treated the same, but the comparison is carried out on 
+%   a per-cell basis.
+%   \begin{tcl}
+   set L1 {}
+   foreach row $pathMat {
+      foreach cell $row {
+         set L2 {}
+         foreach path $cell {
+            set S 0
+            foreach {s a g} $path {
+               if {$a eq "S"} then {incr S}
+            }
+            lappend L2 $S
+         }
+         eval [list lappend L1] [lsort -decreasing -integer $L2]
+      }
+   }
+   lappend res $L1
+%   \end{tcl}
+%   Straightforwardly counting the number of vertices is easy, and it 
+%   doesn't matter whether the input and output vertices are included 
+%   or not (since it's the same for all networks), but the number is 
+%   more natural if they are not included in the count. This takes 
+%   care of the coproduct--product compatibility axiom and the 
+%   antipode--coproduct\slash product compatibility identities.
+%   \begin{tcl}
+   lappend res [expr {2-[llength [lindex $NW 0]]}]
+%   \end{tcl}
+%   Counting vertices can be generalised, if necessary, by making the 
+%   weight of a vertex depend on its annotation. This turned out to 
+%   not be necessary here, however (even though it is a close shave 
+%   for the unit--coproduct and product--counit compatibility axioms).
+%   
+%   Counting right-brances is primarily a need for the associativity 
+%   and coassociativity relations, but it turns out to take care of 
+%   the unit--coproduct and product--counit compatibility axioms as 
+%   well.
+%   \begin{tcl}
+   set L1 {}
+   foreach row $pathMat {
+      foreach cell $row {
+         set L2 {}
+         foreach path $cell {
+            set r 0
+            foreach {s a g} $path {
+               if {$s > 0} then {incr r $s}
+               if {$g > 0} then {incr r $g}
+            }
+            lappend L2 $r
+         }
+         eval [list lappend L1] [lsort -decreasing -integer $L2]
+      }
+   }
+   lappend res $L1
+}
+proc Hopf_comparison_key {NW} {
+   set key [network::pure::compkey_paths-wdeg-lex weight {
+      S 1
+   } weight {
+      m {0 0 {0 1}}  
+%<!rightCoass>      Delta {0 {0 1} 0}
+%<rightCoass>      Delta {0 {1 0} 0}
+   } $NW]
+   linsert $key 2 [list [expr {-[llength [lindex $NW 0]]}]]
+}
+%   \end{tcl}
+%   The difficult thing about the ordering obtained from doing a 
+%   group-lexicographic comparison of the keys this procedure returns 
+%   is to prove that it satisfies the descending chain condition. The 
+%   tricky part is \word{$-$\#vertices}, since this is not obviously 
+%   bounded from below. It turns out, however, that the parts that go 
+%   before really give an upper bound on the number of vertices in 
+%   the network and thus on how low this quantity can become.
+%   
+%   The key property to use is that the number of paths in the 
+%   network is known (although an upper bound on the number would 
+%   suffice). For starters, every vertex with arity zero must be an 
+%   endpoint of a path, and no two such vertices can be endpoints of 
+%   the same path, hence the total number of paths is an upper bound 
+%   on the number of arity zero vertices. By symmetry, the total 
+%   number of paths is also an upper bound on the number of vertices 
+%   with coarity zero.
+%   
+%   When bounding the number of vertices with arity greater than two, 
+%   it is useful to first view the network as a DAG rooted on the 
+%   output side (i.e., ignore the meaning of tail indices) and then 
+%   consider the forest obtained by unsharing common subgraphs of 
+%   this DAG. In that forest, every path begins in a unique leaf 
+%   (most of them are probably images of the input vertex |1|, but 
+%   that is irrelevant here) and every vertex with arity greater than 
+%   one is the root of a subtree with a strictly larger number of 
+%   leafs than either child has on its own. Hence the number of 
+%   vertices with arity greater than one is also bounded by the 
+%   number of paths, and by symmetry the same holds for the number of 
+%   vertices with coarity greater than one.
+%   
+%   All that remains to bound is thus the number of vertices with 
+%   arity and coarity equal to one. These vertices are all antipodes, 
+%   and therefore an upper bound for their number is known from the 
+%   per-path numbers of antipodes. Hence there are only finitely many 
+%   values possible for \word{$-$\#vertices} given values for earlier 
+%   comparison keys and a grouplex comparison using 
+%   |Hopf_comparison_key| is DCC.
+% \end{proc}
+% 
+% 
+% \subsection{Abstract twists}
+% 
+% For Hopf algebras without abstract twist, the above procedure can 
+% be used straight off.
+% \begin{tcl}
+%<*!twist>
+interp alias {} compare_networks {} network::pure::grouplex_compare\
+  Hopf_comparison_key
+%</!twist>
+% \end{tcl}
+% However, when there is a |twist| vertex, the above doesn't work 
+% because there are more paths through \(m \otimes m \circ \id 
+% \otimes T \otimes \id \circ \Delta \circ \Delta\) than there are 
+% through \(\Delta \circ m\). A first stab at a way around that is 
+% to first do a comparison such as above for the network where 
+% crossings have been substituted for all twists, and then refine 
+% this by additional comparisons (e.g.~of the total number of twists).
+% \begin{tcl}
+proc Hopf_twist_comparison_key {NW} {
+   set NWX [
+      network::pure::substitute $NW {
+         twist {{{{} {} {1 0}} {{} {0 1} {}}} {{0 1 1 0} {0 0 1 1}}}
+      }
+   ]
+   set key [Hopf_comparison_key $NWX]
+   lappend key [list [llength [lindex $NW 0]]]
+   return $key
+}
+% \end{tcl}
+% Unfortunately this turns out to get stuck on the 
+% (co)associativity-resolving comparison group in many cases, as 
+% there are identities which can exchange a right-branching 
+% product--twist--product sequence on one path with a similar 
+% sequence on another path. This need not be disastrous, however, as 
+% the comparisons for resolving (co)associativity can always be 
+% placed in the final group; everything is still OK if one can find 
+% some other criterion distinguishing the two networks.
+% 
+% One such criterion seems to be the orientation of the twist part in 
+% the above sequence: on one branch it goes `$/$', on the other it 
+% goes `$\backslash$'. The latter seems preferable, but it should be 
+% the other way around for coproducts. The way to achieve that would 
+% be to could product-right and coproduct-right separately, with 
+% `$\backslash$' cancelling one product-right and `$/$' cancelling 
+% one coproduct-right.
+% 
+% An even trickier identity is
+% \[
+%   \id \otimes m \circ
+%   T \otimes \id \circ
+%   \id \otimes m \otimes \id \circ
+%   \id \otimes \id \otimes T \circ 
+%   \id \otimes \Delta \otimes \id =
+%   m \otimes \id \circ
+%   \id \otimes T \circ
+%   \id \otimes m \otimes \id \circ
+%   T \otimes \id \otimes \id \circ
+%   \id \otimes m \otimes \id
+% \]
+% A way to resolve this turns out to be to give different weights to 
+% the slash- and backslash routes through a twist, since there on one 
+% side is a path that has two slash passages and on the other side a 
+% path that has two backslash passages.
+% 
+% \begin{tcl}
+proc Hopf_twist_comparison_key {NW} {
+   set NWX [
+      network::pure::substitute $NW {
+         twist {
+            {{{} {} {3 2}} {{} {0 1} {}} {slash 3 1} {backslash 2 0}} 
+            {{3 0 1 0} {2 0 1 1} {0 1 3 0} {0 0 2 0}}
+         }
+      }
+   ]
+   set key [network::pure::compkey_paths-wdeg-lex weight {
+      S 1
+   } weight {
+      m {0 0 {0 1}}  Delta {0 {0 1} 0}
+   } weight {
+      slash 1  backslash -1
+   } $NWX]
+   linsert $key 2 [list [
+      expr {-2*[llength [lindex $NW 0]] + [llength [lindex $NWX 0]]}
+   ]] [list [llength [lindex $NWX 0]]]
+}
+% \end{tcl}
+% 
+% 2007-05-29: The above is not perfect, but not bad either. 
+% Could use a run from the axioms.
+% 
+% 2007-12-19: It turns out the above also exhibits the strange ``rule 
+% reversal when one adds a coproduct to an output leg'' as seems to 
+% plauge the older |compare_networks| found below. However, at least 
+% one case would rather be consistent if the first inserted item 
+% above was dropped---and even if it was inserted as element 3 
+% instead! The reason to insert as element 2 seems to be a desire to 
+% make \(S(ab) > S(b)S(a)\) (the more antipodes, the smaller), but 
+% it is not necessary to look at all vertex types to make that happen.
+% 
+% Thus we're at\dots
+% \begin{tcl}
+proc Hopf_twist_comparison_key2 {NW} {
+   set NWX [
+      network::pure::substitute $NW {
+         twist {
+            {{{} {} {3 2}} {{} {0 1} {}} {slash 3 1} {backslash 2 0}} 
+            {{3 0 1 0} {2 0 1 1} {0 1 3 0} {0 0 2 0}}
+         }
+      }
+   ]
+   set key [network::pure::compkey_paths-wdeg-lex weight {
+      S 1
+   } weight {
+      m {0 0 {0 1}}  Delta {0 {0 1} 0}
+   } weight {
+      slash 1  backslash -1
+   } $NWX]
+   array set C {m 0 unit 0 Delta 0 epsilon 0 S 0 twist 0 "" 0}
+   foreach v [lindex $NW 0] {incr C([lindex $v 0])}
+% \end{tcl}
+% This cannot appear earlier, because then $S^n$ gets smaller as $n$ 
+% increases. Nor can it appear later, if $S$ is some sort of 
+% antihomomorphism.
+% \begin{tcl}
+   set key [linsert $key 2 [list [expr {-$C(S)}]]]
+% \end{tcl}
+% The main reason for the next criterion is to order the $\Delta 
+% \circ m$ rule.
+% \begin{tcl}
+   linsert $key 4 [list [expr {-$C(Delta)-$C(m)}]]\
+     [list [llength [lindex $NWX 0]]]
+}
+% \end{tcl}
+% 
+% 2007-12-20: Experimented with replacing |twist| by something 
+% terminal (units and counits instead of a |slash| and/or 
+% |backslash|) as a way of giving higher priority to twist 
+% restructurings, but without success. The main problem is with the 
+% product--coproduct axiom, since some kinds of path decrease in 
+% number whereas others increase, in total leading to 
+% incomparability. It is looking increasingly likely that this axiom 
+% must be run the other way.
+% 
+% ---
+% 
+% 
+% 
+% \begin{proc}{compare_networks}
+%   The way that networks for a Hopf algebra with abstract twist are 
+%   compared does not seem to fall into the general 
+%   |grouplex_compare| framework, so there has to be an explicit 
+%   |compare_networks| procedure. The first part still follows the 
+%   usual structure, however; the only difference is that the final 
+%   rightness group has been replaced by a count of the total number 
+%   of vertices (meaning fewer twists are preferred to more twists).
+%   \begin{tcl}
+%<*twist>
+proc compare_networks {NW1 NW2} {
+   set key1 [Hopf_comparison_key [
+      network::pure::substitute $NW1 {
+         twist {{{{} {} {1 0}} {{} {0 1} {}}} {{0 1 1 0} {0 0 1 1}}}
+      }
+   ]]
+   lset key1 end [list [llength [lindex $NW1 0]]]
+   set key2 [Hopf_comparison_key [
+      network::pure::substitute $NW2 {
+         twist {{{{} {} {1 0}} {{} {0 1} {}}} {{0 1 1 0} {0 0 1 1}}}
+      }
+   ]]
+   lset key2 end [list [llength [lindex $NW2 0]]]
+   set res [network::pure::grouplex_comparison $key1 $key2]
+   if {$res ne "="} then {return $res}
+%   \end{tcl}
+%   The idea for the orienting |m| associativity is something quite 
+%   different. The basic quantity $q$ being compared is the number of 
+%   subnetworks on the form `product right branch -- some number of 
+%   $/$-part twists -- product', the fewer of which that can be found 
+%   the better. There is however the complication that a prolongation 
+%   may affect different networks differently, so just counting 
+%   occurrences of that subnetwork will not produce a compatible 
+%   order. Instead two networks $\mu$ and $\nu$ are considered to 
+%   satisfy \(\mu \geqslant \nu\) iff, for all prolongations $v$, it 
+%   holds that \(q\bigl( v(\mu) \bigr) \geqslant q\bigl( v(\nu) 
+%   \bigr)\). This may seem difficult to test, but is actually 
+%   manageable.
+%   
+%   The information one needs about a network $\mu$ in order to 
+%   compute $q\bigl(v(\mu)\bigr)$ for arbitrary prolongations $v$ is 
+%   first of all $q(\mu)$ itself, and second information about 
+%   whether the part of the network which is adjacent to a leg looks 
+%   like the beginning or end of a sequence counted by $q$. There is 
+%   also the possibility of such a sequence which passes through the 
+%   network, so there is essentially a matrix of possibilities to 
+%   count. Since the matrix is sparse, it is implemented as an array 
+%   whose entries are strings. A |+| is appended to the entry if 
+%   there is a hit in |NW1| and a |-| if there is a hit in |NW2|. 
+%   Indices are on the form \meta{i}\texttt{,}\meta{j}, where 
+%   \meta{i} and \meta{j} are either output\slash input indices or 
+%   the string |internal|.
+%   \begin{tcl}
+   foreach NW [list $NW1 $NW2] sign {+ -} {
+      set L {}
+      foreach v [lindex $NW 0] {
+         if {[lindex $v 0] eq "m"} then {
+            lappend L [lindex $v 2 1] internal
+         }
+      }
+      foreach e [lindex $NW 0 0 2] {lappend L $e [lindex $NW 1 $e 1]}
+      foreach {e i} $L {
+         while 1 {
+            if {[lindex $NW 1 $e 2] < 2} then {
+               append A($i,[lindex $NW 1 $e 3]) $sign
+            } else {
+               set v [lindex $NW 0 [lindex $NW 1 $e 2]]
+               switch -- [lindex $v 0] "m" {
+                  append A($i,internal) $sign
+               } "twist" {
+                  if {[lindex $NW 1 $e 3]==0} then {
+                     set e [lindex $v 2 1]
+                     continue
+                  }
+               }
+            }
+            break
+         }
+      }
+   }
+%   \end{tcl}
+%   Given this matrix, how can one then make the comparison? By 
+%   computing bounds for $q\bigl(v(\mu)\bigr) - q\bigl(v(\nu)\bigr)$, 
+%   were $\mu$ is |NW1|, $\nu$ is |NW2|, and $v$ ranges over all 
+%   prolongations. Because of the way the subnetworks being counted 
+%   look, there can be at most one matrix entry for each combination 
+%   of leg and network. Furthermore if one network has a ``middle'' 
+%   part connecting an input to an output then the other network 
+%   cannot have a different kind of part at either leg, because 
+%   having a middle part implies that the substituted networks for 
+%   which comparison keys were computed above must agree upon having 
+%   one path between input and output which furthermore must not have 
+%   any branches (or else we wouldn't have gotten this far in this 
+%   procedure). Thus it always possible to choose a prolongation $v$ 
+%   so that a particular set of nonzero matrix elements get counted 
+%   by $q$. This means that the lower bound can be found by counting 
+%   the negative non-internal entries and the upper bound can be 
+%   found by counting the positive non-internal entries!
+%   \begin{tcl}
+   set max 0; set min 0
+   foreach item [array names A] {
+      set sum [expr [string map {+ +1 - -1} $A($item)]]
+      if {$item eq "internal,internal"} then {
+         incr max $sum;  incr min $sum
+      } elseif {$sum>0} then {
+         incr max $sum
+      } elseif {$sum<0} then {
+         incr min $sum
+      }
+   }
+   if {$min<0} then {
+      if {$max>0} then {
+         return "incomparable m"
+      } else {
+         return "<"
+      }
+   } elseif {$max>0} then {
+      return ">"
+   }
+%   \end{tcl}
+%   Then the whole thing has to be done again for the coproducts. 
+%   Combining the two into a loop is quite possible, but perhaps not 
+%   very clear. Note that the input and output indices switch places 
+%   in the array indices.
+%   \begin{tcl}
+   array unset A
+   foreach NW [list $NW1 $NW2] sign {+ -} {
+      set L {}
+      foreach v [lindex $NW 0] {
+         if {[lindex $v 0] eq "Delta"} then {
+            lappend L [lindex $v 1 1] internal
+         }
+      }
+      foreach e [lindex $NW 0 1 1] {lappend L $e [lindex $NW 1 $e 3]}
+      foreach {e i} $L {
+         while 1 {
+            if {[lindex $NW 1 $e 0] < 2} then {
+               append A($i,[lindex $NW 1 $e 1]) $sign
+            } else {
+               set v [lindex $NW 0 [lindex $NW 1 $e 0]]
+               switch -- [lindex $v 0] "Delta" {
+                  append A($i,internal) $sign
+               } "twist" {
+                  if {[lindex $NW 1 $e 1]==0} then {
+                     set e [lindex $v 1 1]
+                     continue
+                  }
+               }
+            }
+            break
+         }
+      }
+   }
+   set max 0; set min 0
+   foreach item [array names A] {
+      set sum [expr [string map {+ +1 - -1} $A($item)]]
+      if {$item eq "internal,internal"} then {
+         incr max $sum;  incr min $sum
+      } elseif {$sum>0} then {
+         incr max $sum
+      } elseif {$sum<0} then {
+         incr min $sum
+      }
+   }
+   if {$min<0} then {
+      if {$max>0} then {
+         return "incomparable Delta"
+      } else {
+         return "<"
+      }
+   } elseif {$max>0} then {
+      return ">"
+   }
+   return "="
+}
+%</twist>
+%   \end{tcl}
+% \end{proc}
+% 
+% 2007-12-19: A reexamination of results 
+% (\texttt{Hopf+twist2.dump-tcl}) that were probably computed using 
+% the above has shown an impractical instability of this comparison 
+% order: the right hand side for one rule becomes the left hand side 
+% for another simply by adding an extra coproduct on a leg. This is 
+% quite odd since said coproduct can be removed again by putting a 
+% counit on either of its outputs. This is not a counterexample to 
+% correlation since one gets a strictly $P$-smaller network by removing 
+% the coproduct and counit as well, but it seems rather close.
+% 
+% \begin{tcl}
+%</Hopf>
+% \end{tcl}
+% 
+% 
+% \section{Hom-algebras}
+% 
+% A \emph{Hom-associative} algebra has a binary multiplication 
+% operation and a unary operation $\alpha$ called ``the homomorphism'' 
+% which satisfy the identity \(\alpha(x) \cdot (y \cdot z) = (x \cdot 
+% y) \cdot \alpha(z)\) for all $x$, $y$, and $z$. This identity has a 
+% tendency to collapse in the presence of a multiplicative identity 
+% however, so it seems best to not assume the existance of that. It 
+% may on the other hand be convenient to sometimes assume the 
+% existence of $\alpha^{-1}$.
+% 
+% \begin{tcl}
+%<*HomAlg>
+clear_rules
+set vertex_types {
+  m {2 1}  alpha {1 1}  alpha^-1 {1 1}
+}
+% \end{tcl}
+% Multiplication is represented as a circle, the homomorphism and its 
+% inverse are represented as squares.
+% \begin{tcl}
+set vertex_appearances {
+   m {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   alpha {
+      {rectangle {square 8} {}} 
+      {{0 8}}
+      {{0 -8}}
+   }
+   alpha^-1 {
+      {rectangle {square 8} {}
+       text {offsets {0 0}} {-text "-"}} 
+      {{0 8}}
+      {{0 -8}}
+   }
+}
+% \end{tcl}
+% There are only four rules in this type of algebra: 
+% hom-associativity, two rules for the unit, and the definition of 
+% |alpha(1)|.
+% \begin{tcl}
+%<*unit>
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit . \r m}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {. unit \r m}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+%</unit>
+add_rule {} pure [
+   network::pure::construct $vertex_types {alpha m \r m}
+] pure [
+   network::pure::construct $vertex_types {m alpha \r m}
+]
+%<*alghom>
+add_rule {} pure [
+   network::pure::construct $vertex_types {m \r alpha}
+] pure [
+   network::pure::construct $vertex_types {alpha alpha \r m}
+]
+%</alghom>
+% \end{tcl}
+% 
+% Most of the work with running a completion on these rules is 
+% about finding a suitable ordering of elements. One that seems 
+% appropriate is to order by the following four criteria:
+% \begin{enumerate}
+%   \item
+%     Number of |alpha| vertices.
+%   \item
+%     Per input, the number of right-turns on the path between there 
+%     an the output.
+%   \item
+%     The number of constant vertices.
+%   \item
+%     The number of right-turns on paths to constant vertices. This 
+%     is compared as a multiset.
+% \end{enumerate}
+% In each case, the larger the number, the larger the network.
+% 
+% \textbf{Unfortunately,} the above doesn't work! It considers \(m 
+% \circ \mathrm{id} \otimes \alpha(1)\) to be strictly smaller than 
+% \(m \circ \alpha(1) \otimes \mathrm{id}\), but they're both 
+% subnetworks of \(m \circ \alpha(1) \otimes \alpha(1)\), which is 
+% invariant if one is replaced by the other!!
+% 
+% \begin{proc}{go_down_count_right}
+%   This procedure counts the number of times it passes through the 
+%   \emph{right} input to a vertex while following a path \emph{down} 
+%   to the network output. The call syntax is
+%   \begin{quote}
+%     |go_down_count_right| \word{network} \word{start}
+%   \end{quote}
+%   where \word{network} is a pure network and \word{start} is the 
+%   label of the edge in which the path starts. The return value is 
+%   the number of rights counted.
+%   \begin{tcl}
+proc go_down_count_right {NW e} {
+   set res 0; set res2 0
+   while {[set v [lindex $NW 1 $e 0]] != 0} {
+      incr res [lindex $NW 1 $e 1]
+      if {[lindex $NW 0 $v 0] ne "m"} then {incr res2}
+      set e [lindex $NW 0 $v 1 0]
+   }
+   return [list $res $res2]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{HomAlg_comparison_key}
+%   The |HomAlg_comparison_key| procedure takes a pure network as 
+%   argument and returns a corresponding comparison key, as a list of 
+%   comparison groups. The call syntax is thus
+%   \begin{quote}
+%     |HomAlg_comparison_key| \word{network}
+%   \end{quote}
+%   
+%   First a loop over all vertices, which counts |alpha|'s, 
+%   constants, and right-turns on paths from constants.
+%   \begin{tcl}
+proc HomAlg_comparison_key {NW} {
+   set no_alpha 0
+   set rightL {}
+   foreach v [lindex $NW 0] {
+      switch -- [lindex $v 0] "alpha" {
+         incr no_alpha
+      } "alpha(1)" - "unit" {
+         lappend rightL [go_down_count_right $NW [lindex $v 1 0]]
+      }
+   }
+%   \end{tcl}
+%   Then a loop over inputs, in which the remaining information is 
+%   computed.
+%   \begin{tcl}
+   set inrL {}
+   set acL {}
+   foreach e [lindex $NW 0 1 1] {
+      foreach {r a} [go_down_count_right $NW $e] break
+      lappend inrL $r
+      lappend acL $a
+   }
+%   \end{tcl}
+%   Finally, the result is constructed.
+%   \begin{tcl}
+   return [concat [list $no_alpha $inrL [llength $rightL]\
+     [lsort -integer -decreasing $rightL]] $acL]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{tcl}
+interp alias {} compare_networks {} network::pure::grouplex_compare\
+  HomAlg_comparison_key
+interp alias {} compare_networks {} network::pure::tree_up_comparison\
+  {m alpha} 0 0
+% \end{tcl}
+% 
+% \begin{tcl}
+%</HomAlg>
+% \end{tcl}
+% 
+% 
+% \section{GWS-example}
+% 
+% This is really about the traditional diamond lemma; an example for 
+% doing completion in class.
+% 
+% \begin{tcl}
+%<*GWS>
+clear_rules
+set vertex_types {
+  a {1 1}  b {1 1}  c {1 1}
+}
+% \end{tcl}
+% All vertex types are squares with a letter inside.
+% \begin{tcl}
+set vertex_appearances {}
+foreach label {a b c} {
+   set L [list \
+     text {offsets {0 0}} [list -text $label -font "Helvetica 24"]]
+   lappend vertex_appearances $label [list $L {{0 16}} {{0 -16}}]
+}
+% \end{tcl}
+% 
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {b \r a}
+] pure [
+   network::pure::construct $vertex_types {c}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {a \r b}
+] pure [
+   network::pure::construct $vertex_types {c \r c}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {a \r c}
+] pure [
+   network::pure::construct $vertex_types {c \r c \r a}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {c \r b}
+] pure [
+   network::pure::construct $vertex_types {b \r c \r c}
+]
+proc compare_networks {NW1 NW2} {
+   if {[llength [lindex $NW1 0]] > [llength [lindex $NW2 0]]} then {
+      return ">"
+   } elseif {[llength [lindex $NW1 0]] < [llength [lindex $NW2 0]]}\
+   then {
+      return "<"
+   } else {
+      return "="
+   }
+}
+%</GWS>
+% \end{tcl}
+
+
+% \section{Sleep deprivation}
+% 
+% When running this application on a larger problem, the screen saver 
+% often activates. This stops the completion process, as it steals 
+% focus from all its windows. A way around that would be to have a 
+% background loop periodically nudging the system so that the timer 
+% for activating the screen saver is reset.
+% 
+% \begin{proc}{nudge_nudge}
+%   Nudging the system requires a system call that \Tcl\ doesn't 
+%   provide, so we need an extension for this. The |nudge_nudge| 
+%   package provides the single command |nudge_nudge| which does this.
+%   \begin{tcl}
+%<*insomnia>
+%<require.nudge>package require nudge_nudge
+%   \end{tcl}
+%   The Cri\Tcl\ implementation of this package is so short that it 
+%   can be given in full here.
+%   \begin{tcl}
+%<*!require.nudge>
+package require critcl 2
+package provide nudge_nudge 1
+% \smallskip
+critcl::ccode {#include <CoreServices/CoreServices.h>}
+critcl::framework CoreServices
+critcl::cproc nudge_nudge {} void {
+    UpdateSystemActivity(OverallAct);
+}
+critcl::cbuild
+%</!require.nudge>
+%   \end{tcl}
+%   Why not do that in-line, you may ask? Well, Cri\Tcl\ is very 
+%   interested in what file its commands are called from, and 
+%   docstripping can confuse it. It's safer to let it see a 
+%   straightforward \texttt{.tcl} file being sourced.
+% \end{proc}
+% 
+% \begin{proc}{zeitgeber}
+%   A \emph{zeitgeber} is, in psycology, an external stimulus 
+%   (e.g.~light) that synchronises the biological clock with the 
+%   day\slash night cycle. The |zeitgeber| procedure plays a similar 
+%   (but more active) role for the screen saver in that it periodically 
+%   provides sufficient stimuli that the system will stay awake and 
+%   never go to sleep. The call syntax is
+%   \begin{quote}
+%     |zeitgeber| \word{variable} \word{period}
+%   \end{quote}
+%   where \word{variable} is the name (in the global context) of the 
+%   variable controlling the zeitgeber and \word{period} is the period 
+%   (in milliseconds) between stimuli.
+%   \begin{tcl}
+proc zeitgeber {varname period} {
+   upvar #0 $varname control
+   if {!$control} then {return}
+   nudge_nudge
+   after $period [list zeitgeber $varname $period]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{create_insomnia}
+%   This procedure creates a toplevel window with a checkbox to control 
+%   |zeitgeber|-induced insomnia. There are no arguments, nor any 
+%   particular return value.
+%   \begin{tcl}
+proc create_insomnia {} {
+   toplevel .insomnia
+   if {0 && [tk windowingsystem] eq "aqua"} then {
+      ::tk::unsupported::MacWindowStyle plain .insomnia closeBox
+   }
+   wm title .insomnia "Sleep control"
+   pack [
+      checkbutton .insomnia.cb -variable insomnia_state -command {
+         if {$insomnia_state} then {
+            zeitgeber insomnia_state 30000
+         } else {
+            after cancel {zeitgeber insomnia_state 30000}
+         }
+      } -text "Insomnia"
+   ]
+   wm resizable .insomnia 0 0
+   bind .insomnia.cb <Destroy> {
+      after cancel {zeitgeber insomnia_state 30000}
+      unset -nocomplain insomnia_state
+   }
+}
+%</insomnia>
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{thebibliography}{8}
+% 
+% \bibitem{Colley}
+%    \textsc{Wesley N. Colley}: 
+%    \textit{Colley’s Bias Free College Football Ranking Method: 
+%    The Colley Matrix Explained} (2003), 23~pp. 
+%    Retrieved 18 November 2006 from \textsc{http:}/\slash
+%    \texttt{www.colleyrankings.com}\slash \texttt{matrate.pdf}.
+%
+% \bibitem{MacLane}
+%    \textsc{S. MacLane}:
+%    Categorical Algebra,
+%    \textit{Bull. Amer. Math. Soc.} \textbf{71} (1965), 40--106.
+%    
+% \bibitem{skiplist}
+%    \textsc{William Pugh}: 
+%    Skip lists: a probabilistic alternative to balanced trees,
+%    \textit{Communications of the ACM}, June 1990, \textbf{33} (6), 
+%    668-676.
+% 
+% \bibitem{Stefanescu}
+%    \textsc{Gheorghe \c{S}tef\u{a}nescu}:
+%    \textit{Network Algebra},
+%    Springer, 2000; \ISBN~1-85233-195-\ISBNX.
+% 
+% \end{thebibliography}
+% 
+% 
+\endinput

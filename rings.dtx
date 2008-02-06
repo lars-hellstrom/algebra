@@ -1,0 +1,1158 @@
+% 
+% \iffalse
+%<*driver>
+\documentclass{mtmtcl}
+\begin{document}
+\DocInput{rings.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% 
+% \section{Rings}
+% 
+% \begin{tcl}
+namespace eval mtmtcl::rings {}
+% \end{tcl}
+% \setnamespace{mtmtcl::rings}
+% 
+% \begin{APIspec}{ring}{1.0}
+%   A |ring| is neither required to be unital nor associative, but it 
+%   is easy to impose such conditions by claiming support for |monoid| 
+%   and |semigroup| respectively.
+%   
+%   \begin{APIdescription}{ring}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies the |equality|~v\,1.0 interface.
+%       
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%     \begin{APImethod}{-}
+%       \word{element}
+%     \end{APImethod}
+%       The |+|, |0|, and |-| methods are as required by the 
+%       \APIref{additive group}{1.0} interface version 1.0, and in 
+%       addition the |+| method must be commutative, i.e., for any 
+%       two elements $a$ and $b$ of a \meta{ring} $R$, the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$R$ + $a$ $b$]\par
+%         [$R$ + $b$ $a$]
+%       \end{displaysyntax}
+%       are |=|-equal.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       Returns the product of the two \word{element}s. The |*| 
+%       operation must be distributive over |+|, i.e., for any three 
+%       elements $a$, $b$, and $c$ of a \meta{ring} $R$ the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$R$ * [$R$ + $a$ $b$] $c$]\par
+%         [$R$ + [$R$ * $a$ $c$] [$R$ * $b$ $c$]]
+%       \end{displaysyntax}
+%       are |=|-equal, as are the two expressions
+%       \begin{displaysyntax}
+%         [$R$ * $a$ [$R$ + $b$ $c$]]\par
+%         [$R$ + [$R$ * $a$ $b$] [$R$ * $a$ $c$]]
+%       \end{displaysyntax}
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% \begin{tclcommand}{ensemble}{integer}
+%   A structure for integers can be implemented directly as an 
+%   ensemble.
+%   \begin{tcl}
+namespace eval ::tcl::mathop {
+   namespace ensemble create -subcommands {
+      API 
+      = 
+      + - 0 iszero integer.
+      * 
+      1 ^ 
+      canonise
+      /
+      export
+      div mod
+   } -map {
+      API {
+         ::APIutil::API {
+            equality 1.1
+            "additive group" 1.2
+            ring 1.0
+            semigroup 1.2  monoid 1.2
+            division 1.0
+            export 1.0
+         }
+      }
+      = ==
+      0 {::mtmtcl::support::constant 0}
+      iszero {== 0}
+      integer. *
+      1 *
+      ^ **
+      canonise +
+%   \end{tcl}
+%   I originally tried to use |::tcl::mathfunc::entier| for 
+%   canonising integers, but it turned out that didn't canonise them, 
+%   whereas |::tcl::mathop::+| did.
+%   \begin{tcl}
+      / ::mtmtcl::rings::integer_divide
+      div /
+      mod %
+      export ::mtmtcl::rings::integer_export
+   } -command ::mtmtcl::rings::integer
+}
+%   \end{tcl}
+%   
+%   \begin{proc}{integer_divide}
+%     This procedure implements strict division for integers.
+%     \begin{tcl}
+proc ::mtmtcl::rings::integer_divide {numer denom} {
+   if {$numer % $denom == 0} then {
+      return [expr {$numer / $denom}]
+   } else {
+      return -code error -errorcode {API division nosolution}\
+        "Does not divide"
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{integer_export}
+%     This procedure implements the \APIref+{export}{1.0} interface 
+%     for integers. The call syntax is
+%     \begin{displaysyntax}
+%       |::mtmtcl::rings::integer_divide| \word{element} 
+%       \word{path} \word{options-dict} \begin{regblock}[\regstar] 
+%       \word{option} \word{value} \end{regblock}
+%     \end{displaysyntax}
+%     but for the moment everything except the \word{element} is 
+%     ignored.
+%     
+%     \begin{tcl}
+proc ::mtmtcl::rings::integer_export {elem path optD args} {
+   list integer [dict create value $elem] {}
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{tclcommand}
+% 
+% \begin{proc}{integer_modulo}
+%   This procedure implements the algebraic structure of `integers 
+%   modulo $n$' (denoted $\mathbb{Z}_n$, $\mathbb{Z}/n$, or 
+%   $\mathbb{Z}/n\mathbb{Z}$) for positive integers $n$. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::rings::integer_modulo| \word{$n$} \word{method} 
+%     \word{argument}\regstar
+%   \end{displaysyntax}
+%   so the actual \meta{ring} is the two word prefix 
+%   |::mtmtcl::rings::integer_modulo \word{$n$}|.
+%   
+%   The canonical representation is as an integer $k$ satisfying \(0 
+%   \leqslant k < n\), but all integers are valid representations for 
+%   their cosets. It is assumed that $1$ is a canonical 
+%   representation for the unit, so it is required that 
+%   \(n \geqslant 2\).
+%   
+%   \begin{tcl}
+proc ::mtmtcl::rings::integer_modulo {n method args} {
+   switch -- $method {
+%   \end{tcl}
+%   
+%   \begin{procmethod}{=}
+%     A variadic |=| seems more bother than it's worth, so the binary 
+%     should do.
+%     \begin{tcl}
+      = {expr {([lindex $args 0] - [lindex $args 1]) % $n == 0}}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{+}
+%     Variadic addition is however pretty straightforward\Dash just a 
+%     |foreach| loop.
+%     \begin{tcl}
+      + {
+         set res 0
+         foreach term $args {set res [expr {($res+$term)%$n}]}
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{0}
+%     The zero method is trivial.
+%     \begin{tcl}
+      0 {return 0}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{-}
+%     The |-| method has the two forms
+%     \begin{displaysyntax}
+%       ::mtmtcl::rings::integer - \word{term}\par
+%       ::mtmtcl::rings::integer - \word{term} \word{term}
+%     \end{displaysyntax}
+%     where the first is negation and the second is subtraction.
+%     \begin{tcl}
+      - {
+         if {[llength $args] == 1} then {
+            expr {(-[lindex $args 0]) % $n}
+         } elseif {[llength $args] == 1} then {
+            expr {([lindex $args 0] - [lindex $args 1]) % $n}
+         } else {
+            return -code error "Wrong # of arguments for -,\
+              must have one or two"
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{*}
+%     Variadic multiplication is just like addition.
+%     \begin{tcl}
+      * {
+         set res 1
+         foreach factor $args {set res [expr {($res*$factor) % $n}]}
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   That completes the set of methods required by the |ring| 
+%   interface.
+%   
+%   \begin{procmethod}{1}
+%     The |1| method has the two forms
+%     \begin{displaysyntax}
+%       ::mtmtcl::rings::integer 1\par
+%       ::mtmtcl::rings::integer 1 \word{integer}
+%     \end{displaysyntax}
+%     where the first is the unit constant required for a |monoid|. 
+%     The second form is the canonical homomorphism of 
+%     unital rings from integers into this ring: the \word{integer}th 
+%     multiple of the ring unit.
+%     \begin{tcl}
+      1 {
+         if {[llength $args]} then {
+            return [expr {[lindex $args 0] % $n}]
+         } else {
+            return 1
+         }
+      }
+%     \end{tcl}
+%      This completes support for the |monoid| interface.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{/}
+%     The |/| method needed to support |division|~(v\,1.0) is the 
+%     only one whose algorithm is nontrivial.
+%     \begin{tcl}
+      / {
+%     \end{tcl}
+%     Division \texttt{/ $a$ $b$} starts with applying Euclid's 
+%     algorithm to the denominator $b$ and the modulo number $n$. 
+%     One starts with \(b_0 = b\) and \(c_0 = n\). Then one 
+%     recursively sets
+%     \begin{align*}
+%       q_k :={}& \lfloor c_{k-1}/b_{k-1}\rfloor \\
+%       b_k :={}& c_{k-1} - q_k b_{k-1}\\
+%       c_k :={}& b_{k-1}
+%     \end{align*}
+%     until \(b_k=0\), at which point \(c_k = \gcd(b_0,c_0)\). This 
+%     is very standard. Slighly less standard is the need to find a 
+%     number $r$ such that \(r b \equiv c_k \pmod{n}\). This is done 
+%     by maintaining $r_k$ and $s_k$ such that \(r_k b \equiv c_k 
+%     \pmod{m}\) and \(s_k b \equiv b_k \pmod{m}\). Clearly \(r_0=0\) 
+%     and \(s_0=1\) satisfy these conditions, as do
+%     \begin{align*}
+%       s_k :={}& r_{k-1} - q_k s_{k-1}\\
+%       r_k :={}& s_{k-1}
+%     \end{align*}
+%     Thus the wanted $r$ is $r_k$ when \(b_k=0\).
+%     \begin{tcl}
+         set b [lindex $args 1]
+         set c $n
+         set r 0
+         set s 1
+         while {$b} {
+            set q [expr {$c / $b}]
+            set b [expr {$c - $q*[set c $b]}]
+            set s [expr {$r - $q*[set r $s]}]
+         }
+%     \end{tcl}
+%     If at this point \(c=c_k \mid a\) then \(x = ra/c = 
+%     r_k a / c_k\), otherwise there was no solution.
+%     \begin{tcl}
+         if {[lindex $args 0] % $c == 0} then {
+            return [expr {$r * [lindex $args 0] / $c % $n}]
+         } else {
+            return -code error -errorcode {API division nosolution}\
+              "No such quotient"
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{integer.}
+%     Another way of importing integers is to form integer 
+%     multiples of existing elements.
+%     \begin{tcl}
+      integer. {
+         expr {([lindex $args 0] * [lindex $args 1]) % $n}
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{iszero}
+%     The final method needed for v\,1.2 of \APIref{additive group} 
+%     is the unary test for being zero.
+%     \begin{tcl}
+      iszero { expr {[lindex $args 0] % $n == 0} }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   Another useful interface to support is \texttt{generated additive 
+%   group}, since that provides a syntactically pure way of 
+%   extracting the integer representing a group element.
+%   
+%   \begin{procmethod}{+ decomposition}
+%     Since the additive group $\mathbb{Z}_n$ is cyclic, it can 
+%     always be expressed as a multiple of one generator. The easiest 
+%     generator is $1$.
+%     \begin{tcl}
+      "+ decomposition" {
+         return [list 1 [expr {[lindex $args 0] % $n}]]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{named}
+%     To satisfy |named element| interface, it is necessary to 
+%     provide translation of |1| (the name) to |1| (the element).
+%     \begin{tcl}
+      named {
+         switch -- [lindex $args 0] "1" {
+            return 1
+         } default {
+            return -code error "\"[lindex $args 0]\" is not an\
+              element name"
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{canonise}
+%     The operations always return canonical representations, but 
+%     adaptors sometimes find it useful to have an explicit 
+%     canonisation method.
+%     \begin{tcl}
+      canonise { expr {[lindex $args 0] % $n} }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     Finally, there is the |API| method, whose implementation is 
+%     mostly an enumeration of all the supported interfaces.
+%     \begin{tcl}
+      API {
+         ::APIutil::API {
+            equality 1.0
+            canonise 1.0
+            autocanonical 1.0
+            semigroup 1.1
+            monoid 1.1
+            "additive group" 1.2
+            ring 1.0
+            division 1.0
+            "generated additive group" 1.0
+            "named element" 1.0
+         } {*}$args
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{tcl}
+      default {
+         return -code error "Unknown method \"$method\";\
+           must be =, +, -, *, /, 0, 1, API, integer.,\
+           + decomposition, or named"
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{APIspec}{ring-module}{1.1}
+%   The |ring-module| interface is for left modules over a ring 
+%   (modules over e.g.~groups are not unheard of).
+%   
+%   \begin{remark}
+%     The reason this interface has version number 1.1 (rather than 
+%     1.0) is that concepts obtained by dropping some of the 
+%     axioms might prove useful on their own.
+%   \end{remark}
+%   
+%   \begin{APIdescription}{module}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies the |equality|~v\,1.0 interface.
+%       
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%     \begin{APImethod}{-}
+%       \word{element}
+%     \end{APImethod}
+%       The |+|, |0|, and |-| methods are as required by the 
+%       \APIref{additive group}{1.0} interface version 1.0. In 
+%       addition the |+| method must be commutative, i.e., for any 
+%       two elements $a$ and $b$ of a \meta{ring} $R$, the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$R$ + $a$ $b$]\par
+%         [$R$ + $b$ $a$]
+%       \end{displaysyntax}
+%       are |=|-equal.
+%     
+%     \begin{APImethod}{scalar}
+%       \word{submethod} \word{argument}\regstar
+%     \end{APImethod}
+%       The |scalar| method accesses a structure which is both a 
+%       |ring|~v\,1.0 and a |monoid|~v\,1.0.
+%       
+%     \begin{APImethod}{.}
+%       \word{scalar} \word{element}
+%     \end{APImethod}
+%       The |.| method is multiplication (on the left) by a scalar, 
+%       i.e.,  the \word{scalar} is an element of the 
+%       \meta{module}| scalar| ring and the \word{element} is an 
+%       element of the \meta{module}, whereas the result is an 
+%       element of the \meta{module}.
+%       
+%       For every element $a$ of a \meta{module} $M$, the expression
+%       \begin{displaysyntax}
+%         [$M$ . [$M$ scalar 1] $a$]
+%       \end{displaysyntax}
+%       is |=|-equal to $a$. Furthermore for all elements $a$ 
+%       and $b$ of $M$ and element $r$ of $M$| scalar|, the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$M$ . $r$ [$M$ + $a$ $b$]]\par
+%         [$M$ + [$M$ . $r$ $a$] [$M$ . $r$ $b$]]
+%       \end{displaysyntax}
+%       are |=|-equal. Finally for every element $a$ of $M$ and 
+%       all elements $r$ and $s$ of $M$| scalar|, the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$M$ . [$M$ scalar + $r$ $s$] $a$]\par
+%         [$M$ + [$M$ . $r$ $a$] [$M$ . $s$ $a$]]
+%       \end{displaysyntax}
+%       are |=|-equal, as are the two expressions
+%       \begin{displaysyntax}
+%         [$M$ . [$M$ scalar * $r$ $s$] $a$]\par
+%         [$M$ . $r$ [$M$ . $s$ $a$]]
+%       \end{displaysyntax}
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% 
+% \begin{APIspec}{free ring-module}{1.1}
+%   A free module over a ring is a module which has a basis. 
+%   Version~1.1 of this interface satisfies version~1.1 of the 
+%   |ring-module| interface.
+%   
+%   \begin{APIdescription}{module}
+%     \begin{APImethod}{basis}
+%       \word{submethod} \word{argument}\regstar
+%     \end{APImethod}
+%       The |basis| method accesses a principal structure which 
+%       constitutes the set of (indices of) basis elements. This 
+%       structure must satisfy v\,1.0 of the |equality| interface. 
+%       \word{index}es below are elements of this structure, and 
+%       need not be equal to their counterparts in the module.
+%       
+%     \begin{APImethod}{basiselement}
+%       \word{index}
+%     \end{APImethod}
+%       Returns the \meta{module} basis element whose index is 
+%       \word{index}. Every element of the \meta{module} must be 
+%       possible to express in exactly one way as a linear 
+%       combination of values of this method.
+%       
+%     \begin{APImethod}{coeff}
+%       \word{index} \word{element}
+%     \end{APImethod}
+%       Returns the coefficient (an element of 
+%       \meta{module}| scalar|) of the \word{index}th basis element 
+%       for the \word{element}, i.e., if $M$ is the \meta{module}, then
+%       \begin{displaysyntax}
+%         $a \mapsto {}$[$M$ coeff $i$ $a$]
+%       \end{displaysyntax}
+%       is the $R$-module homomorphism for which
+%       \begin{displaysyntax}
+%         [$M$ coeff $i$ [$M$ basiselement $j$]]
+%       \end{displaysyntax}
+%       is |=|-equal to |[|$M$| scalar 1]| if $i$ is |basis =|-equal 
+%       to $j$, and |=|-equal to |[|$M$| scalar 0]| otherwise.
+%       
+%     \begin{APImethod}{support}
+%       \word{element}
+%     \end{APImethod}
+%       This method returns the \emph{support} of the \word{element}, 
+%       i.e., a list of those basis indices $i$ such that
+%       \begin{displaysyntax}
+%         [$M$ coeff $i$ \word{element}]
+%       \end{displaysyntax}
+%       is nonzero.
+%   \end{APIdescription}
+%   The |basiselement| and |coeff| methods above are congruent.
+%   
+%   An identity linking the methods defined above is that $a$ is 
+%   |=|-equal to 
+%   \begin{displaysyntax}
+%     $\displaystyle\sum_{i \in \text{[$M$ support $a$]}}$
+%     [$M$ . [$M$ coeff $i$ $a$] [$M$ basiselement $i$]]
+%   \end{displaysyntax}
+%   for every element $a$ of the \meta{module}~$M$. 
+%   That there exist methods satisfying this 
+%   identity is not itself a sufficient condition for the 
+%   \meta{module} to be free (it is in fact a necessary and 
+%   sufficient condition for the \meta{module} to be 
+%   \emph{projective}, which is slightly weaker), but combining it  
+%   with the conditions on |coeff| above produces a sufficient 
+%   condition for freeness.
+% \end{APIspec}
+% 
+% 
+% \begin{proc}{free_rank_n_module}
+%   This procedure implements $R^n$ (the free $R$-module of rank $n$) 
+%   for a given associative ring with unit $R$ and natural number 
+%   $n$. The call syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::rings::free_rank_n_module| \word{$R$} \word{$n$} 
+%     \word{method} \word{argument}\regstar
+%   \end{displaysyntax}
+%   The element representation is as a length $n$ list of elements of 
+%   $R$. Most methods are simply pointwise operations on these lists.
+%   
+%   \begin{tcl}
+proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
+   switch -- $method {
+%   \end{tcl}
+%   
+%   \begin{procmethod}{.}
+%     Multiplication by scalar is in many ways the characteristic 
+%     operation for a module.
+%     \begin{tcl}
+      . {
+         set res [list]
+         set r [lindex $args 0]
+         foreach a [lindex $args 1] {lappend res [{*}$R * $r $a]}
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{=}
+%     Equality is made variadic from the start, since the extra loop 
+%     needed for this is a minor overhead.
+%     \begin{tcl}
+      = {
+         if {[llength $args]<2} then {return 1}
+         set leftL [lindex $args 0]
+         foreach rightL [lrange $args 1 end] {
+            foreach l $leftL r $rightL {
+               if {![{*}$R = $l $r]} then {return 0}
+            }
+         }
+         return 1
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{iszero}
+%     Testing for being zero is not as important in a module as it is 
+%     in a ring, but it is needed to support 
+%     \APIref+{additive group}{1.1}.
+%     \begin{tcl}
+      iszero {
+         if {[{*}$R API "additive group" 1.1]} then {
+            foreach a [lindex $args 0] {
+               if {![{*}$R iszero $a]} then {return 0}
+            }
+         } else {
+            set zero [{*}$R 0]
+            foreach a [lindex $args 0] {
+               if {![{*}$R = $zero $a]} then {return 0}
+            }
+         }
+         return 1
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{+}
+%     Variadic addition is similar, although this simple 
+%     implementation could be considered wasteful if ring addition is 
+%     expensive.
+%     \begin{tcl}
+      + {
+         set res [lrepeat $n [{*}$R 0]]
+         foreach term $args {
+            set res2 [list]
+            foreach l $res r $term {
+               lappend res2 [{*}$R + $l $r]
+            }
+            set res $res2
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{0}
+%     The implementation of |0| is implicit in the above.
+%     \begin{tcl}
+      0 {return [lrepeat $n [{*}$R 0]]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{-}
+%     Subtraction is provided in both unary and binary forms.
+%     \begin{tcl}
+      - {
+         set res [list]
+         if {[llength $args] == 1} then {
+            foreach t [lindex $args 0] {
+               lappend res [{*}$R - $t]
+            }
+         } elseif {[llength $args] == 2} then {
+            foreach t [lindex $args 0] u [lindex $args 1] {
+               lappend res [{*}$R + $t [{*}$R - $u]]
+%     \end{tcl}
+%     It might be faster to use binary subtraction in the ring 
+%     instead, but checking whether that is available isn't free 
+%     either.
+%     \begin{tcl}
+            }
+         } else {
+            return -code error {Wrong # arguments for "-" method}
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{scalar}
+%     The only nontrivial thing about the |scalar| method is that the 
+%     call needs to be |uplevel|ed, in case the structure has some 
+%     method that does an |upvar| or similar.
+%     \begin{tcl}
+      scalar {uplevel 1 $R $args}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   This completes the support for the |ring-module| v\,1.1 
+%   interface. The next part is to support \tclverb*|free ring-module|.
+%   
+%   \begin{procmethod}{basis}
+%     The index set for the basis is taken to be $\{0,\dotsc,n 
+%     -\nobreak 1\}$.
+%     \begin{tcl}
+      basis {::mtmtcl::sets::finite_ordinal $n {*}$args}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{basiselement}
+%     The built-in basis is the standard basis where the $i$th basis 
+%     element has the $i$th coordinate equal to $1$ and all others 
+%     equal to $0$.
+%     \begin{tcl}
+      basiselement {
+         set res [lrepeat $n [{*}$R 0]]
+         lset res [lindex $args 0] [{*}$R 1]
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{support}
+%     Using the standard basis makes it easy to determine the support 
+%     for an element (but this could probably be done more 
+%     efficiently if the ring had an |iszero| method).
+%     \begin{tcl}
+      support {
+         set zero [{*}$R 0]
+         set res [list]
+         set i -1; foreach part [lindex $args 0] {incr i
+            if {[{*}$R = $zero $part]} then {lappend res $i}
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{coord}
+%   \begin{procmethod}{index}
+%     The |coord| mathod of \tclverb*|free ring-module| and the 
+%     |index| method of \tclverb*|direct product| turn out to be the 
+%     same in this case.
+%     \begin{tcl}
+      coord - index {
+         return [lindex [lindex $args 1] [lindex $args 0]]
+      }
+%     \end{tcl}
+%     Thus endeth one interface, and beginneth yet another.
+%   \end{procmethod}\end{procmethod}
+%   
+%   \begin{procmethod}{tuple}
+%     Building a tuple is straightforward as long as one doesn't 
+%     bother to enforce canonicity.
+%     \begin{tcl}
+      tuple {
+         if {[llength $args] != $n} then {
+            return -code error "Wrong \# arguments: must be $n$\
+              elements in tuple"
+         } else {
+            return $args
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{no.components}
+%     The number of components in the direct product is $n$.
+%     \begin{tcl}
+      no.components {return $n}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{component}
+%     Access to components is almost the same as |scalar|, but it has 
+%     an extra argument that needs to be ignored.
+%     \begin{tcl}
+      component {
+         uplevel 1 $R [lrange $args 1 end]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{canonise}
+%     Lacking automatic canonisation, there should at least be a 
+%     manual canonisation operation.
+%     \begin{tcl}
+      canonise {
+         set res [list]
+         foreach part [lindex $args 0] {
+            lappend res [{*}$R canonise $part]
+         }
+         return $res
+      }
+%     \end{tcl}
+%     \textbf{ToDo:} declare support of this when available.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     The support for interfaces is as usual an all-or-nothing 
+%     affair: everything follows if only the base structure is an 
+%     associative unital ring, otherwise we promise nothing.
+%     \begin{tcl}
+      API {
+         if {[{*}$R API ring 1.0] && [{*}$R API monoid 1.0]} then {
+            ::APIutil::API {
+               equality 1.1
+               ring-module 1.1
+               "additive group" 1.1
+               "free ring-module" 1.1
+               "direct product" 1.0
+            } {*}$args
+         } else {
+            ::APIutil::API {} {*}$args
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{tcl}
+      default {
+         return -code error "Unsupported method \"$method\""
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{APIspec}{ring-algebra}{1.0}
+%   An algebra over a ring is a module with a bilinear multiplication 
+%   operation.
+%   
+%   \begin{APIdescription}{algebra}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies the |equality|~v\,1.0 interface.
+%       
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%     \begin{APImethod}{-}
+%       \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{scalar}
+%       \word{submethod} \word{argument}\regstar
+%     \end{APImethod}
+%     \begin{APImethod}{.}
+%       \word{scalar} \word{element}
+%     \end{APImethod}
+%       These methods satisfy the |ring-module| (v\,1.1) interface.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method satisfies the |ring| (v\,1.0) interface. In 
+%       addition, the three expressions
+%       \begin{displaysyntax}
+%         [$R$ * [$R$ scalar . $r$ $a$] $b$]\par
+%         [$R$ * $a$ [$R$ scalar . $r$ $b$]]\par
+%         [$R$ scalar . $r$ [$R$ * $a$ $b$]]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$ and $b$ of the 
+%       \meta{algebra} $R$ and every element $r$ of $R$| scalar|.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% 
+% \begin{proc}{semigroup_algebra}
+%   This procedure implements a semigroup algebra structure, with 
+%   given ring of coefficients. The basic call syntax is
+%   \begin{displaysyntax}
+%     |mtmtcl::rings::semigroup_algebra| \word{coefficient ring} 
+%     \word{semigroup} \word{method} \word{argument}\regstar
+%   \end{displaysyntax}
+%   whereas the return value depends on the \word{method}. The 
+%   \meta{coefficient ring} must support \APIref+{additive 
+%   group}{1.1}, since distinguishing zero coefficients is a very 
+%   common operation.
+%   
+%   The representation format is a dictionary where the keys are 
+%   semigroup elements and the values are coefficients. Values that 
+%   are zero should be dropped. The keys must be on canonical format.
+%   \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra {R S method args} {
+   switch -- $method {
+%   \end{tcl}
+%   
+%   \begin{procmethod}{=}
+%     Equality is tested by comparing entry by entry. It is forgiving 
+%     for entries with an explicit zero coefficient, since the 
+%     overhead of this for canonical representations is at most one 
+%     ring comparison.
+%     \begin{tcl}
+      = {
+         lassign $args lD rD
+         dict for {k v} $lD {
+            if {![dict exists $rD $k]} then {
+               if {![{*}$R iszero $v]} then {return 0}
+            } elseif {[{*}$R = $v [dict get $rD $k]]} then {
+               dict unset rD $k
+            } else {
+               return 0
+            }
+         }
+         dict for {k v} $rD {
+            if {![{*}$R iszero $v]} then {return 0}
+         }
+         return 1
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{+}
+%     Addition is variadic.
+%     \begin{tcl}
+      + {
+         if {![llength $args]} then {return {}}
+         foreach term [lassign $args sum] {
+            dict for {k v} $term {
+               if {[dict exists $sum $k]} then {
+                  dict update sum $k s {
+                     set s [{*}$R + $s $v]
+                     if {[{*}$R iszero $s]} then {unset s}
+                  }
+               } else {
+                  dict set sum $k $v
+               }
+            }
+         }
+         return $sum
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{-}
+%     Subtraction is available as unary and binary operations.
+%     \begin{tcl}
+      - {
+         if {[llength $args] == 1} then {
+            set res [dict create]
+            dict for {k v} [lindex $args 0] {
+               dict set res $k [{*}$R - $v]
+            }
+         } else {
+            lassign $args res term
+            dict for {k v} $term {
+               if {[dict exists $res $k]} then {
+                  dict update res $k s {
+                     set s [{*}$R - $s $v]
+                     if {[{*}$R iszero $s]} then {unset s}
+                  }
+               } else {
+                  dict set res $k [{*}$R - $v]
+               }
+            }
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{0}
+%     The zero value is an empty dictionary.
+%     \begin{tcl}
+      0 {return {}}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{.}
+%     Multiplication by scalar is straightforward.
+%     \begin{tcl}
+      . {
+         lassign $args r a
+         set res [dict create]
+         dict for {k v} $a {
+            set rv [{*}$R * $r $v]
+            if {![{*}$R iszero $rv]} then {dict set res $k $rv}
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{*}
+%     The algebra multiplication operation is conceptually done in 
+%     the trivial way, by expanding both factors:
+%     \begin{equation*}
+%       \biggl( \sum_{\mu \in S_1} a_\mu \mu \biggr)
+%       \biggl( \sum_{\nu \in S_2} b_\nu \nu \biggr) =
+%       \sum_{\mu \in S_1} \sum_{\nu \in S_2} (a_\mu b_\nu) (\mu\nu)
+%       \text{.}
+%     \end{equation*}
+%     Since this gives rise to one nested loop per factor, it would 
+%     be somewhat awkward to make variadic.
+%     \begin{tcl}
+      * {
+         set res [dict create]
+         dict for {lk lv} [lindex $args 0] {
+            dict for {rk rv} [lindex $args 1] {
+               set lrv [{*}$R * $lv $rv]
+               set lrk [{*}$S canonise [{*}$S * $lk $rk]]
+               if {[dict exists $res $lrk]} then {
+                  dict update res $lrk s {
+                     set s [{*}$R + $s $lrv]
+                     if {[{*}$R iszero $s]} then {unset s}
+                  }
+               } elseif {![{*}$R iszero $lrv]} then {
+                  dict set res $lrk $lrv
+               }
+               
+            }
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{1}
+%     The semigroup algebra has a unit iff the semigroup is a monoid. 
+%     When this unit exists, it consists of the coefficient unit 
+%     times the semigroup unit.
+%     \begin{tcl}
+      1 {
+         if {[{*}$S API monoid 1.0]} then {
+            return [
+               dict create [{*}$S canonise [{*}$S 1]] [{*}$R 1]
+            ]
+         } else {
+            return -code error "This is not a unital algebra"
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{scalar}
+%     The |scalar| method gives access to the coefficient ring.
+%     \begin{tcl}
+      scalar {uplevel 1 $R $args}
+%     \end{tcl}
+%     This completes support for \APIref+{ring-module}{1.1}.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{basis}
+%     On to \APIref{free ring-module}{1.1}, where the |basis| method 
+%     naturally provides access to the underlying semigroup.
+%     \begin{tcl}
+      basis {uplevel 1 $S $args}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{support}
+%     The support for an element is a native |dict| subcommand.
+%     \begin{tcl}
+      support {dict keys [lindex $args 0]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{coeff}
+%     The same is almost true for getting coefficients, but zero 
+%     coefficients need to be provided explicitly.
+%     \begin{tcl}
+      coeff {
+         set k [{*}$S canonise [lindex $args 0]]
+         if {[dict exists [lindex $args 1] $k]} then {
+            return [dict get [lindex $args 1] $k]
+         } else {
+            return [{*}$R 0]
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{basiselement}
+%     Converting a semigroup element to the corresponding algebra 
+%     element is a matter of equipping it with a unit coefficient.
+%     \begin{tcl}
+      basiselement {
+         dict create [{*}$S canonise [lindex $args 0]] [{*}$R 1]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{iszero}
+%     The thing missing to satisfy \APIref+{additive group}{1.1} is 
+%     the |iszero| method. This is made tolerant for zero 
+%     coefficients.
+%     \begin{tcl}
+      iszero {
+         dict for {k v} [lindex $args 0] {
+            if {![{*}$R iszero $v]} then {return 0}
+         }
+         return 1
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{export}
+%     The part of the internal representation that this structure 
+%     needs to convert for export is the formal linear combination, 
+%     since that is what is represented. The sum is addition 
+%     throughout, even if the coefficients are negative, since a 
+%     general coefficient ring doesn't have a concept of negative; 
+%     if the minuses are to be extracted, then that should probably 
+%     be done at a later stage. The multiplication by scalar is 
+%     represented using |binop|, since it isn't really an associative 
+%     operation.
+%     \begin{tcl}
+      export {
+         lassign $args elemD path optD
+         set childL [list]
+         set bpath [linsert $path end basis]
+         set cpath [linsert $path end scalar]
+         set mattr [dict create mtmtcl-path [linsert $path end .]]
+         dict for {k v} $elemD {
+            lappend childL [
+               list binop $mattr [list [
+                  {*}$R export $v $cpath $optD
+               ] [
+                  {*}$S export $k $bpath $optD
+               ]]
+            ]
+         }
+         if {[llength $childL]} then {
+            return [list assop [
+               dict create \
+                 symbol + \
+                 mtmtcl-path [linsert $path end +]
+            ] $childL]
+         } else {
+            return [list #text 0]
+         }
+      }
+%     \end{tcl}
+%     
+%     It would probably be a good idea to present the terms in some 
+%     predictable order rather than the hash table order, but again 
+%     it is hard to express this generally. It might be necessary to 
+%     introduce a \tclverb*|totally ordered semigroup| interface to 
+%     get that sorted out (although technically it suffices with a 
+%     total order).
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     \begin{tcl}
+      API {
+         if {![{*}$R API ring 1.0] || ![{*}$R API monoid 1.0] ||\
+           [{*}$R API "additive group" 1.1] ||\
+           [{*}$S API semigroup 1.0]} then {
+            return [::APIutil::API {} {*}$args]
+         }
+         set D {
+            ring-algebra 1.0
+            ring 1.0
+            "additive group" 1.1
+            ring-module 1.1
+            semigroup 1.0
+            "free ring-module" 1.1
+            equality 1.0
+         }
+         if {[{*}$S API monoid 1.0]} then {dict lappend D monoid 1.0}
+         if {[{*}$R API export 1.0] && [{*}$S API export 1.0]} then {
+            dict lappend D export 1.0
+         }
+         return [::APIutil::API $D {*}$args]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{tcl}
+      default {
+         return -code error "Unsupported method \"$method\""
+      }
+%   \end{tcl}
+%   \begin{tcl}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+
+
+
+%
+\endinput
