@@ -10,385 +10,6 @@
 % 
 % 
 % 
-% \section{Data export}
-% 
-% 
-% The basic format for exporting structure elements is as a 
-% data-is-code tree.
-% 
-% The |tdom| package has such a format for XML data, where a node has 
-% one of the two forms
-% \begin{displaysyntax}
-%   \word{tag-name} \word{attributes-dict} \word{child-list}\par
-%   |#text| \word{string}
-% \end{displaysyntax}
-% This seems a good guideline to follow, and many tags from MathML 
-% appear useful. There are however also aspects of MathML which seem 
-% strange or impractical, so I don't want to adopt it as primary export 
-% format; at most it can be expected that the primary export format can 
-% be converted to MathML without too much work.
-% 
-% 
-% \subsection{Basic syntax}
-% 
-% Much of mathematics is stated in terms of binary operations, so it 
-% makes sense to have a \describestring+[tag]{binop} tag for binary 
-% operation nodes. The many binary operations which are associative are 
-% however better served by an $n$-ary operation node 
-% \describestring+[tag]{assop}, as that is the level at which they will 
-% typically be processed. In both cases, the children of a node are its 
-% operands.
-% 
-% Three attributes which seem immediately relevant are:
-% \begin{description}
-%   \renewcommand{\makelabel}[1]{\describestring*+[attribute]{#1}}
-%   \item[symbol]
-%     The symbol used to denote the operation. A suitable default 
-%     could be empty string, to denote invisible multiplication\slash 
-%     juxtaposition.
-%   \item[priority]
-%     The priority (binding strength) associated with the symbol. Could 
-%     default to $3$ for invisible multiplication, $1$ for $+$, and $2$ 
-%     for everything else.
-%   \item[mtmtcl-path]
-%     A list of ``method names'' for accessing the operation 
-%     underlying the node. The intention for this attribute is to 
-%     simplify postprocessing of a raw exported structure, to 
-%     e.g.~change the symbol used for some operation.
-% \end{description}
-% 
-% Another tag that turns out to be useful is 
-% \describestring+[tag]{integer}, which is for encoding integers. It 
-% has no children, and its main attribute is 
-% \describestring+[attribute]{value}, which of course contains the 
-% value. The main reason for introducing this tag is that the 
-% \emph{factors} $1$ and $-1$ should normally be eliminated from 
-% expressions before they are formatted. This would be a lot harder 
-% if these integers were marked up using MathML-tags, since that to 
-% a much greater extent requires parsing text.
-% 
-% \begin{APIspec}{export}{1.0}
-%   This interface is applicable to principal structures. It provides 
-%   a method |export| for converting the internal representation of 
-%   an element to an external format. The syntax for this method is:
-%   \begin{APIdescription}{structure}
-%     \begin{APImethod}{export}
-%       \word{element} \word{path} \word{options-dict}
-%       \begin{regblock}[\regstar] \word{option} \word{value} 
-%       \end{regblock}
-%     \end{APImethod}
-%       where \word{element} is the element to export. The return 
-%       value should have the form of an XML-tree as described above. 
-%       In want of a \mtl-native way of encoding some concept, it is 
-%       recommended that MathML or OpenMath elements are used.
-%       
-%       The \word{path} is a list of strings, typically a list of 
-%       method names. The purpose of this list is to establish a 
-%       system for addressing subordinate structures by mirroring the 
-%       command prefix that would be used to access its methods. If a 
-%       structure $S_1$ makes use of the |export| method of another 
-%       structure $S_2$ and $S_2$ can be accessed using the $s$ 
-%       method of $S_1$, then the \texttt{[$S_2$ export $\dotsb$]} 
-%       call should append $s$ to the \word{path} it was called with.
-%       
-%       The option--value pairs can be used to influence the way in 
-%       which the value gets encoded, as can the \word{options-dict}. 
-%       The keys in this dictionary are \word{path}s, whereas the 
-%       values are option--value dictionaries.
-%   \end{APIdescription}
-%   Note that it is not specified how to merge options specified in 
-%   the \word{option-dict} with options explicit in the call; this 
-%   might well have to vary from case to case. Nor is it specified 
-%   whether the options in the $p$ entry of the \word{options-dict} 
-%   apply only for the structure called with $p$ as \word{path}, or 
-%   e.g.~also for entries whose \word{path} has $p$ as a prefix; 
-%   deciding this requires more experience.
-% \end{APIspec}
-% 
-% 
-% \begin{proc}[mtmtcl::export]{recursive_call}
-%   This procedure provides a transparent implementation of a 
-%   transforming operation on a tag type by applying the operation 
-%   recursively to all children and then recombining the transformed 
-%   children with the original tag and attributes. The call syntax is 
-%   designed for use as a |namespace unknown| command, i.e., it is
-%   \begin{displaysyntax}
-%     |::mtmtcl::export::recursive_call| \word{tag} \word{attributes} 
-%     \word{children} \word{argument}\regstar
-%   \end{displaysyntax}
-%   \begin{tcl}
-namespace eval ::mtmtcl::export {
-   proc recursive_call {tag attr childL args} {
-      set newL [list]
-      foreach child $childL {
-         lappend newL [uplevel 1 $child $args]
-      }
-      return [list $tag $attr $newL]
-   }
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% \begin{proc}[mtmtcl::export]{#text}
-%   This procedure is a complement to |recursive_call| which handles 
-%   the exceptional case of |#text| nodes, since these do not follow 
-%   the general pattern. It simply returns the node.
-%   \begin{tcl}
-proc ::mtmtcl::export::#text {str args} {list #text $str}
-%   \end{tcl}
-% \end{proc}
-% 
-% 
-% \subsection{Expanding minuses}
-% 
-% By convention, integer factors that are $1$ should be silently 
-% omitted, and integer factors that are $-1$ should be converted to a 
-% negation (unary minus), which in turn should be fused with a 
-% preceeding binary plus if there is one. Therefore it seems useful 
-% to introduce a tag \describestring+[tag]{negate} for the negation, 
-% and a corresponding operation which removes these factors.
-% 
-% This operation resides in the |mtmtcl::export::un1| namespace and 
-% has the call syntax
-% \begin{displaysyntax}
-%   \meta{node} \word{option-dict}
-% \end{displaysyntax}
-% where the \word{option-dict} is indexed by \mtl-path and can 
-% contain options directing the processing. It returns a converted 
-% \meta{node}.
-% \setnamespace{mtmtcl::export::un1}
-% \begin{tcl}
-namespace eval ::mtmtcl::export::un1 {
-   namespace unknown ::mtmtcl::export::recursive_call
-}
-% \end{tcl}
-% 
-% \begin{proc}{binop}
-%   Multiplication by an integer factor is typically coded as a 
-%   |binop| node for a |.| or possibly |integer.| operation.
-%   \begin{tcl}
-proc ::mtmtcl::export::un1::binop {attrD childL optD} {
-   if {[lindex $childL 0 0] eq "integer" &&\
-     [dict exists $attrD mtmtcl-path] &&\
-     [lindex [dict get $attrD mtmtcl-path] end] in {. integer.}}\
-   then {
-      set value [dict get [lindex $childL 0 1] value]
-      if {$value == 1} then {
-         return [lindex $childL 1]
-      } elseif {$value == -1} then {
-         return [list negate [
-           dict create mtmtcl-path [lreplace\
-             [dict get $attrD mtmtcl-path] end end -]
-         ] [lrange $childL 1 1]]
-      }
-   }
-   ::mtmtcl::export::recursive_call binop $attrD $childL $optD
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% \begin{proc}{#text}
-%   This exceptional node must be explicitly defined, since the 
-%   unknown handler won't get it right.
-%   \begin{tcl}
-interp alias {} ::mtmtcl::export::un1::#text {} ::mtmtcl::export::#text
-%   \end{tcl}
-% \end{proc}
-% 
-% 
-% \subsection{Fencing}
-% 
-% The tree structure for data make parentheses unnecessary, but 
-% traditional (linear) notation requires parentheses. It is possible to 
-% insert parentheses when generating linear notation, but this gets 
-% rather complicated and it is generally better to have many simple 
-% operations than one complex. Splitting it up requires an explicit 
-% representation for parentheses, and as it happens, MathML has a tag 
-% \describestring+[tag]{mfenced} with precisely this meaning. The 
-% attributes defined for such elements are
-% \begin{description}
-%   \renewcommand{\makelabel}[1]{\describestring*+[attribute]{#1}}
-%   \item[open]
-%     The symbol for the opening delimiter, defaults to `|(|'.
-%   \item[close]
-%     The symbol for the closing delimiter, defaults to `|)|'.
-%   \item[separators]
-%     List of separator characters, defaults to `|,|'. (Separators 
-%     are inserted between children if there are more than one.) 
-%     
-%     This is a standard attribute in MathML, but not relevant here 
-%     at the moment; it is probably safe to ignore it for the moment.
-%   \item[bigsize]
-%     \TeX y |\big|ness step for delimiters. Integer. Defaults to $0$ 
-%     (base size).
-%     
-%     This is not a MathML attribute, but something introduced to 
-%     simplify conversion to \LaTeX: one operation inserts |mfenced| 
-%     nodes, another equips them with suitable values for the 
-%     |bigsize| attribute.
-% \end{description}
-% 
-% 
-% 
-% 
-% 
-% 
-% \subsection{Export to \LaTeX}
-% 
-% The basic idea is to use data-is-code in the namespace 
-% |mtmtcl::export::latex|.
-% \setnamespace{mtmtcl::export::latex}
-% \begin{tcl}
-namespace eval ::mtmtcl::export::latex {}
-% \end{tcl}
-% The syntax of this operation is
-% \begin{displaysyntax}
-%   \meta{node} \word{width} \word{firstofs}
-% \end{displaysyntax}
-% It returns \LaTeX\ code for the \meta{node} (which is assumed to 
-% contain all necessary parentheses and such), as one or several 
-% lines. The line width should not exceed \word{width}, and the 
-% length of the first line should not exceed \(\mathit{width} - 
-% \mathit{firstofs}\) characters.
-% 
-% \begin{tcl}
-namespace eval ::mtmtcl::export::latex {
-% \end{tcl}
-% \begin{proc}{unknown}
-%   The |unknown| procedure redirects to |assop|, which defaults to 
-%   concatenating the children.
-%   \begin{tcl}
-   proc unknown {tag attr childL width ofs} {
-      assop {} $childL $width $ofs
-   }
-%   \end{tcl}
-% \end{proc}
-% By making it the namespace-specific unknown handler, unknown tags 
-% can mostly be handled gracefully.
-% \begin{tcl}
-   namespace unknown unknown
-}
-% \end{tcl}
-% 
-% \begin{proc}{#text}
-%   A very simple treatment of |#text| nodes would be to assume that 
-%   they are atomic \LaTeX\ formulae. The overall syntax is
-%   \begin{displaysyntax}
-%     ::mtmtcl::export::latex::\#text \word{string} \word{method} 
-%     \word{args}\regstar
-%   \end{displaysyntax}
-%   
-%   \begin{tcl}
-proc ::mtmtcl::export::latex::\#text {str width ofs} {
-   if {[string length $str] + $ofs <= $width} then {
-      return $str
-   } else {
-      return "\%\n$str"
-   }
-}
-%   \end{tcl}
-%   Should that be two cases, though? Maybe |#text| items are simply 
-%   beyond wrapping over lines, and it should be left to the caller 
-%   to handle the actual length of the string?
-% \end{proc}
-% 
-% \begin{proc}{integer}
-%   The main task for this procedure is to extract the |value| 
-%   attribute, but it also makes sure the formatting is as a base-10 
-%   number.
-%   \begin{tcl}
-proc ::mtmtcl::export::latex::integer {attrD childL width ofs} {
-   format %d [dict get $attrD value]
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% \begin{proc}{negate}
-%   This procedure inserts a minus in front of the expression.
-%   \begin{tcl}
-proc ::mtmtcl::export::latex::negate {attrD childL width ofs} {
-   return "- [{*}[lindex $childL 0] $width [expr {$ofs+2}]]"
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% \begin{proc}{assop}
-%   First construct a list of unbreakable ``boxes'', then insert 
-%   separators (single space or new line) between the boxes. The 
-%   first box is simply the first child formatted, but subsequent 
-%   boxes consist of symbol and child.
-%   
-%   Attempt to fit first child on first line, subsequent children on 
-%   continuation lines. 
-%   \begin{tcl}
-proc ::mtmtcl::export::latex::assop {attrD childL width ofs} {
-   if {[dict exists $attrD symbol]} then {
-      set op "[dict get $attrD symbol] "
-   } else {set op ""}
-   incr width -2
-   set boxL [list [{*}[lindex $childL 0] $width [expr {$ofs-2}]]]
-%   \end{tcl}
-%   The following is ugly\Dash this procedure is turning into a 
-%   kitchen sink.
-%   \begin{tcl}
-   if {$op eq "+ "} then {
-      foreach child [lrange $childL 1 end] {
-         if {[lindex $child 0] eq "negate"} then {
-            lappend boxL "- [{*}[lindex $child 2 0] $width 2]"
-         } else {
-            lappend boxL "+ [{*}$child $width 2]"
-         }
-      }
-   } else {
-      foreach child [lrange $childL 1 end] {
-         lappend boxL "$op[{*}$child $width [string length $op]]"
-      }
-   }
-   set res ""
-   set left [expr {$width + 2 - $ofs}]
-   set clean 1
-   foreach box $boxL {
-      if {[string first \n $box] >= 0} then {
-         if {!$clean} then {append res "\n  "}
-         append res [string map {\n "\n  "} $box] "\n  "
-         set left $width
-         set clean 1
-      } elseif {$clean} then {
-         append res $box
-         set left [expr {$left - [string length $box] - 1}]
-         set clean 0
-      } elseif {[string length $box] > $left} then {
-         append res "\n  " $box
-         set left [expr {$width - [string length $box] - 1}]
-      } else {
-         append res " " $box
-         set left [expr {$left - [string length $box] - 1}]
-      }
-   }
-   return [string trim $res]
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% \begin{proc}{binop}
-%   It seems possible to make this an alias to |assop|.
-%   \begin{tcl}
-interp alias {} ::mtmtcl::export::latex::binop \
-  {} ::mtmtcl::export::latex::assop
-%   \end{tcl}
-% \end{proc}
-% 
-% 
-% \begin{proc}{mfenced}
-%   \begin{tcl}
-proc ::mtmtcl::export::latex::mfenced {attrD childL width ofs} {
-   error "Unimplemented"
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% 
-% 
 % \section{Auxilliary interfaces}
 % 
 % \begin{tcl}
@@ -401,6 +22,68 @@ namespace eval ::mtmtcl::support {}
 %   This procedure takes one argument and returns it.
 %   \begin{tcl}
 proc ::mtmtcl::support::constant {arg} {return $arg}
+%   \end{tcl}
+%   This is probably not needed; |::return -level 0| does this too.
+% \end{proc}
+% 
+% \begin{proc}{sdAPI}
+%   The |sdAPI| procedure can be used to give a uniform handling of 
+%   static and dynamic API queries. It has the call syntax
+%   \begin{displaysyntax}
+%     ::mtmtcl::support::sdAPI \word{interface-list} 
+%     \word{compute-prefix} \word{parameter count} \meta{parameters} 
+%     \word{API-dict} \word{interface}\regopt\ \word{version}\regopt
+%   \end{displaysyntax}
+%   where the last three items are as for the |::APIutil::API| 
+%   command. A nonempty \word{API-dict} signals that the API is 
+%   precomputed and need only be parsed, but otherwise it is up to 
+%   this command to supervise the computation of the API.
+%   
+%   The idea is that the \word{compute-prefix} should be an 
+%   ensemble-like command prefix with interfaces as subcommands. 
+%   The call syntax for these commands is
+%   \begin{displaysyntax}
+%     \meta{compute-prefix} \word{interface} \meta{parameters}
+%     \word{API-dict} \word{interface}\regopt\ \word{version}\regopt
+%   \end{displaysyntax}
+%   and they return a list of versions that they support for this 
+%   interface. The list would typically be the list of all versions 
+%   supported, but \emph{if} there is an explicit \word{version} and 
+%   it is cheaper to test for only this than to list all supported 
+%   versions, then it is perfectly acceptable to return only this 
+%   version.
+%   
+%   The \word{parameter count} argument is the number of 
+%   elements in the \meta{parameters}, which is needed to identify 
+%   the \word{API-dict} etc.~arguments. The reason for this call 
+%   syntax is that |sdAPI| might be used as implementation of the 
+%   |API| method in an ensemble with parameters.
+%   
+%   \begin{tcl}
+proc ::mtmtcl::support::sdAPI {interfaces prefix paramcount args} {
+   set tail [lrange $args $paramcount end]
+   if {[dict size [lindex $tail 0]]} then {
+      return [::APIutil::API {*}$tail]
+   }
+   if {[llength $tail] > 1} then {
+      set verL [{*}$prefix [lindex $tail 1] {*}$args]
+      if {[llength $tail] == 2} then {
+         return $verL
+      }
+      foreach ver $verL {
+         if {[package vsatisfies $ver [lindex $tail 2]]} then {
+            return 1
+         }
+      }
+      return 0
+   }
+   set res [dict create]
+   foreach interface $interfaces {
+      set verL [{*}$prefix $interface {*}$args]
+      if {[llength $verL]} then {dict set res $interface $verL}
+   }
+   return $res
+}
 %   \end{tcl}
 % \end{proc}
 % 
@@ -739,13 +422,21 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{export}
-%     A first stab at implementation of this is to take the element 
-%     as a |#text| node.
+%     An appropriate implementation of this is to take the element 
+%     as an |OMSTR| node.
 %     \begin{tcl}
       export {
-         return [list \#text [lindex $args 0]]
+         return [list OMSTR [lindex $args 1]\
+           [list [list \#text [lindex $args 0]]]]
       }
 %     \end{tcl}
+%     It is quite likely that this implementation may seem 
+%     inappropriate, and that other outputs (|OMV| nodes, |OMS| 
+%     nodes, either of the above with |OMATTR|) are wanted 
+%     instead. This is not an error, but an opportunity to provide 
+%     alternative methods implementing the |finite set| interface; 
+%     regardless of how one proceeds, it would be necessary to 
+%     provide additional parameters for the structure.
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{API}
@@ -753,7 +444,7 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 %     \begin{tcl}
       API {
          ::APIutil::API {equality 1.0  "finite set" 1.1 \
-            canonise 1.0  onlycanonical 1.0  export 1.0} {*}$args
+            canonise 1.0  onlycanonical 1.0  export 2.0} {*}$args
       }
 %     \end{tcl}
 %   \end{procmethod}
@@ -815,6 +506,185 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 % particular imply that the list is finite, which is closely related to 
 % the property of being finitely generated.
 % 
+% \begin{proc}{variable_set}
+%   This procedure implements a finite set of variables as a 
+%   structure. It improves upon |string_set| in that it offers 
+%   control over the presentation of a variable, and in that it 
+%   supports naming variables. The basic call syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::sets::variable_set| \word{element-list} 
+%     \word{extra-dict} \word{method} \word{argument}\regstar
+%   \end{displaysyntax}
+%   where \word{element-list} is the list of variable names (|name| 
+%   attribute values) and \word{extra-dict} is a dictionary of 
+%   additional information. The primary keys into this dictionary are 
+%   very much like options, whereas element-specific information (if 
+%   any) typically appears under a secondary key. The primary keys 
+%   currently supported are:
+%   \begin{description}
+%     \renewcommand{\makelabel}[1]{\hspace\labelsep
+%        \describeopt*+[mtmtcl::sets]{variable_sep}[proc]{#1}[key]^^A
+%     }
+%     \item[LaTeX_encoding]
+%       This entry is a dictionary, indexed by elements. The value is 
+%       the |LaTeX_encoding| for the element in question.
+%     \item[names]
+%       This entry is a dictionary, indexed by names recognised by 
+%       the |named| method, and the entries are corresponding 
+%       variable names. If for example a variable is technically 
+%       |name|d $\delta$, but one wishes to write |delta| in one's 
+%       code, then one can put
+%       \begin{quote}
+%         |names {delta \u03B4 |\dots| }|
+%       \end{quote}
+%       in one's \word{extra-dict}.
+%     \item[pseudoexpression]
+%       This entry is a dictionary, indexed by elements. The value 
+%       is a near-OpenMath data-tree that is used as the ``content'' 
+%       of the |OMV| node upon export. This can be used to improve 
+%       the presentation of the variable.
+%   \end{description}
+%   
+%   The internal representation of an element of this structure is as 
+%   a string, more precisely as a string which is an element of the 
+%   \word{element-list}.
+%   \begin{tcl}
+proc ::mtmtcl::sets::variable_set {elements extra method args} {
+   switch -- $method {
+%   \end{tcl}
+%   
+%   \begin{procmethod}{elements}
+%     The list of elements is simply the |elements| parameter.
+%     \begin{tcl}
+      elements {return $elements}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{=}
+%     Equality is as strings.
+%     \begin{tcl}
+      = { string equal [lindex $args 0] [lindex $args 1] }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{canonise}
+%     The only valid representations are the canonical ones, but 
+%     it is convenient to provide a canonisation method for users 
+%     that expect one, even if it is trivial.
+%     \begin{tcl}
+      canonise {return [lindex $args 0]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{named}
+%     Names are first looked up in the |names| dictionary, then taken 
+%     as explicit variable |name|s.
+%     \begin{tcl}
+      named {
+         if {[llength $args] != 1} then {
+            return -code error "wrong # arguments, should be:\
+              <variable set> named {name}"
+         }
+         if {[dict exists $extra names [lindex $args 0]]} then {
+            return [dict get $extra names [lindex $args 0]]
+         } elseif {[lindex $args 0] in $elements} then {
+            return [lindex $args 0]
+         } else {
+            return -code error "unknown variable: [lindex $args 0]"
+         }
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{names}
+%     The set of variable names is just the set of elements.
+%     \begin{tcl}
+      names {return $elements}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{export}
+%     This is the most complex method, since no less than two of the 
+%     \word{extra-dict} entries exist to provide data for it. On the 
+%     other hand, it's a pretty straightforward arrangement of 
+%     available data in the requested format.
+%     \begin{tcl}
+      export {
+         if {[llength $args] != 2} then {
+            return -code error "wrong # arguments, should be:\
+              <variable set> export {element} {attributes}"
+         }
+         foreach {var attr} $args break
+         set res {}
+         if {[dict exists $extra pseudoexpression $var]} then {
+            lappend res [dict get $extra pseudoexpression $var]
+         }
+         set res [list OMV [dict replace $attr name $var] $res]
+         if {[dict exists $extra LaTeX_encoding $var]} then {
+            set res [list OMATTR $attr [list [
+               list OMATP {} [list\
+                 {OMS {cd altenc name LaTeX_encoding} {}}\
+                 [list OMSTR {} [dict get $extra LaTeX_encoding $var]]]
+            ] $res]
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{import}
+%     Import is pretty straightforward here; the things that might 
+%     occur at this point are precisely the OpenMath variables. The 
+%     only complication is that they may carry an attribution, but 
+%     that is ignored. Variable |name|s must match exactly.
+%     \begin{tcl}
+      import {
+         if {[llength $args] != 2} then {
+            return -code error "wrong # arguments, should be:\
+              <variable set> import {tree} {path}"
+         }
+         set tree [lindex $args 0]
+         while {[lindex $tree 0] eq "OMATTR"} {
+            set tree [lindex $tree 2 1]
+         }
+         if {[lindex $tree 0] eq "OMV"} then {
+            set var [dict get [lindex $tree 1] name]
+            if {$var in $elements} then {return $var}
+            return -code error\
+              -errorcode [list API import EDOM $path $tree]\
+              "unknown variable: $var"
+         }
+         return -code error\
+           -errorcode [list API import EDOM $path $tree]\
+           "Expected OMV, got [lindex $tree 0]"
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     Finally, the supported interfaces must be listed.
+%     \begin{tcl}
+      API {
+         ::APIutil::API {equality 1.0  "finite set" 1.1 \
+            canonise 1.0  onlycanonical 1.0 "named element" 1.0 \
+            export 2.0  import 1.0} {*}$args
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{tcl}
+      default {
+         return -code error "Unknown subcommand \"$method\",\
+           must be: =, API, canonise, elements, export, import,\
+           or named"
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
 % 
 % \subsection{Understructure access}
 % 
@@ -845,11 +715,6 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 %   component structure elements.
 %   
 %   \begin{APIdescription}{product}
-%     \begin{APImethod}{=}
-%       \word{element} \word{element}
-%     \end{APImethod}
-%       This method satisfies the \texttt{equality} (v\,1.0) interface.
-%       
 %     \begin{APImethod}{no.components}
 %     \end{APImethod}
 %       This method returns the number of factors (components) in the 
@@ -883,10 +748,202 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 %       arguments. This returns the element of the \meta{product} 
 %       structure which consists of the specified \word{component}s.
 %   \end{APIdescription}
-%   
-%   If
 % \end{APIspec}
 % 
+% Direct products are normally required to satisfy a decomposition 
+% axiom\Ldash two tuples are equal iff they have the same 
+% components\Dash but this requires having |equality|.
+% 
+% \begin{APIspec}{direct product}{1.1}
+%   A \texttt{direct product} with equality 
+%   
+%   \begin{APIdescription}{product}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method satisfies the \APIref{equality}{1.0} interface.
+%       
+%     \begin{APImethod}{component}
+%       \word{index} = \word{argument}\regstar
+%     \end{APImethod}
+%       Every component structure also satisfies the 
+%       \APIref{equality}{1.0} interface.
+%   \end{APIdescription}
+%   
+%   Furthermore the |index| and |tuple| methods have to be congruent, 
+%   i.e., if $a$ and $b$ are |=|-equal in the \texttt{direct product} 
+%   $P$, then
+%   \begin{displaysyntax}
+%     [$P$ index $k$ $a$]\par
+%     [$P$ index $k$ $b$]
+%   \end{displaysyntax}
+%   are (\texttt{component}~$k$~|=|)-equal for every $k$, and if 
+%   $a_k$ is (\texttt{component}~$k$~|=|)-equal to $b_k$ for every 
+%   \(0 \leqslant k < n\),then
+%   \begin{displaysyntax}
+%     [$P$ tuple $a_0$ \dots~$a_{n-1}$]\par
+%     [$P$ tuple $b_0$ \dots~$b_{n-1}$]
+%   \end{displaysyntax}
+%   are |=|-equal.
+% \end{APIspec}
+% 
+% 
+% \begin{ensemble}{cartesian_product}
+%   The |cartesian_product| ensemble implements the direct product 
+%   of two structures with equality. The general syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::sets::cartesian_product| \word{substructures} 
+%     \word{API} \word{method} \word{arg}\regstar
+%   \end{displaysyntax}
+%   where the \word{substructures} and \word{API} are parameters that 
+%   would be part of the structure command prefix. The \word{API} may 
+%   be empty, in which case API queries are computed at each call, or 
+%   a dictionary.
+%   
+%   An element of the cartesian structure is a list of elements in 
+%   the substructures; list element $i$ belongs to substructure $i$.
+%   
+%   \begin{tcl}
+namespace eval ::mtmtcl::sets::cartesian_product {
+   namespace ensemble create -prefix 0\
+     -subcommands {API = component index tuple canonise}\
+     -parameters {substructures API-dict}
+%   \end{tcl}
+%   
+%   \begin{ensproc}{API}
+%     The |API| method implementation makes use of a helper ensemble 
+%     also named |API| to compute supported version lists for the 
+%     relevant interfaces (\APIref{direct product}{1.1}, 
+%     \APIref{equality}{1.0}, and \APIref{canonise}{1.0}), but the 
+%     actual |API| method handler is the |::mtmtcl::support::sdAPI| 
+%     command.
+%     \begin{tcl}
+   namespace ensemble create -command [namespace current]::API -map {
+      equality  API,equality
+      canonise  API,canonise
+      "direct product" API,direct_product
+   } -unknown {list apply {args {}}}
+   namespace ensemble configure ::mtmtcl::sets::cartesian_product\
+     -map [dict create API [
+        list ::mtmtcl::support::sdAPI\
+          {"direct product" "equality" "canonise"}\
+          [namespace which API] 1
+   ]]
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{no.components}
+%     The number of components is the number of component structures.
+%     \begin{tcl}
+   proc no.components {substructures API} {llength $substructures}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{component}
+%     Accessing a component structure is mostly a matter of indexing. 
+%     \begin{tcl}
+   proc component {substructures API index args} {
+      tailcall {*}[lindex $substructures $index] {*}$args
+   }
+%     \end{tcl}
+%     Using |tailcall| makes it straightforward for the component 
+%     structure to use |upvar| (an |uplevel| could work too, but 
+%     raises a few issues for impure list command prefixes).
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{index}
+%     Apart from the order of arguments, this just |lindex|.
+%     \begin{tcl}
+   proc index {substructures API index elem} {lindex $elem $index}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{tuple}
+%     And |tuple| is just |list|, on a subset of the arguments.
+%     \begin{tcl}
+   proc tuple {substructures API args} {return $args}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{=}
+%     Two elements are equal iff their components are equal.
+%     \begin{tcl}
+   proc = {substructures API a b} {
+      foreach S $substructures ak $a bk $b {
+         if {![{*}$S = $ak $bk]} then {return 0}
+      }
+      return 1
+   }
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{proc}{API,equality}
+%     Testing for \APIref+{equality}{1.0} thus requires that all 
+%     component structures support it.
+%     \begin{tcl}
+   proc API,equality {substructures args} {
+      foreach S $substructures {
+         if {![{*}S API equality 1.0]} then {return ""}
+      }
+      return [list 1.0]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{API,direct product}
+%     The \APIref{direct product}{1.1} version is 1.1 if the 
+%     structure has \APIref{equality}{1.0}, and 1.0 otherwise.
+%     \begin{tcl}
+   proc {API,direct product} {substructures args} {
+      foreach S $substructures {
+         if {![{*}S API equality 1.0]} then {return [list 1.0]}
+      }
+      return [list 1.1]
+   }
+%     \end{tcl}
+%     One could alternatively make use of |API,equality| here, but it 
+%     is easier to duplicate the test than to parse the result of 
+%     |API,equality|.
+%   \end{proc}
+%   
+%   \begin{ensproc}{canonise}
+%     A pure list will receive its canonical string representation 
+%     when one is requested, so we're fine once the list elements 
+%     have been canonised.
+%     \begin{tcl}
+   proc canonise {substructures API tuple} {
+      set res {}
+      foreach s $substructures t $tuple {
+         lappend res [{*}$s canonise $t]
+      }
+      return $res
+   }
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{proc}{API,canonise}
+%     In order for the product to satisfy \APIref+{canonise}{1.1}, 
+%     all its components need to do that as well, but if some only 
+%     satisfy \APIref+{canonise}{1.0} then that is what it'll have to 
+%     be.
+%     \begin{tcl}
+   proc API,canonise {substructures args} {
+      set minor 1
+      foreach S $substructures {
+         if {$minor==1} then {
+            if {![{*}$S API canonise 1.1]} then {set minor 0}
+         }
+         if {$minor==0} then {
+            if {![{*}$S API canonise 1.0]} then {return ""}
+         }
+      }
+      return [list 1.$minor]
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+% \end{ensemble}
 % 
 % 
 % \subsection{Random structure elements}
@@ -993,6 +1050,10 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 %     a boolean false value.
 %   \end{APIdescription}
 % \end{APIspec}
+% 
+% \begin{tcl}
+%</pkg>
+% \end{tcl}
 % 
 % 
 \endinput

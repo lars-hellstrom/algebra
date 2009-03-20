@@ -1,0 +1,2432 @@
+% 
+% \iffalse driver
+%<*driver>
+\documentclass{mtmtcl}
+\usepackage{amsmath}
+\providecommand*{\mc}[1]{\ensuremath{\mathcal{#1}}}
+\providecommand*{\Fpil}{\longrightarrow}
+\providecommand*{\cross}[2]{{}^{#1}\mathsf{X}^{#2}}
+\providecommand*{\heads}[1]{\ensuremath{{}_{#1}}}
+\providecommand*{\tails}[1]{\ensuremath{{}^{#1}}}
+\providecommand*{\theads}[1]{\heads{\text{#1}}}
+\providecommand*{\ttails}[1]{\tails{\text{#1}}}
+\begin{document}
+\DocInput{props.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% \title{PROPs and matrices}
+% \author{Lars Hellstr\"om}
+% \date{2008/09/23--}
+% \maketitle
+% 
+% 
+% \begin{abstract}
+%   This file collects an interface for PROPs and matrix 
+%   implementations of these.
+% \end{abstract}
+% 
+% 
+% \section{The interface}
+% 
+% \begin{APIspec}{PROP}{1.0}
+%   A \textbf{PROP} is a special case of a symmetric monoidal 
+%   category in which the type of an element is uniquely determined 
+%   by its arity and coarity. PROPs are not assumed to be algebraic, 
+%   so there need not be a linear structure, but implementations are 
+%   welcome to provide one when possible.
+%   
+%   PROPs are single-sorted structures, but elements can be of 
+%   different types, and not all operations are valid for all type 
+%   combinations. PROPs also make heavy use of permutations.
+%   
+%   Following tradition, version~1.0 of this interface only provides 
+%   binary operations and injection of permutations. Higher versions 
+%   provide more user-friendly operations.
+%   \begin{APIdescription}{PROP}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method fulfills the \APIref+{equality}{1.0} interface.
+%       
+%     \begin{APImethod}{arity}
+%       \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{coarity}
+%       \word{element}
+%     \end{APImethod}
+%       Return the arity and coarity respectively of the 
+%       \word{element}. These are nonnegative integers and together 
+%       they determine the type of the element. They are both 
+%       congruent, which conversely means elements of different 
+%       types must never be equal.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This is the composition operation. If $a$ and $b$ are 
+%       elements of a PROP $\mc{P}$ such that \texttt{[$\mc{P}$ arity 
+%       $a$]${}={}$[$\mc{P}$ coarity $b$]} then \texttt{[$\mc{P}$ * 
+%       $a$ $b$]} returns an element with arity \texttt{[$\mc{P}$ arity 
+%       $b$]} and coarity \texttt{[$\mc{P}$ coarity $a$]}, otherwise 
+%       it throws an error with |-errorcode|
+%       \begin{displaysyntax}
+%         API PROP typenomatch
+%       \end{displaysyntax}
+%       See below for the axioms a composition operation must 
+%       satisfy.
+%       
+%     \begin{APImethod}{permutation}
+%       \word{permutation}
+%     \end{APImethod}
+%       Returns the PROP element corresponding to the permutation 
+%       \word{permutation}. The arity and coarity of this element are 
+%       both equal to the list-length of the \word{permutation}.
+%       
+%     \begin{APImethod}{tensor}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This is the tensor product operation, which is defined for 
+%       arbitrary pairs of \word{element}s. The arity and coarity of 
+%       the result is the sum of the arities and coarities 
+%       respectively of the factors.
+%   \end{APIdescription}
+%   
+%   Naturally, these methods satisfy the axioms for a PROP $\mc{P}$, 
+%   namely the following:
+%   \begin{description}
+%     \item[Composition associativity]
+%       For any \(a,b,c \in \mc{P}\), the following are |=|-equal 
+%       if they do not throw an error:
+%       \begin{displaysyntax}
+%         [$\mc{P}$ * [$\mc{P}$ * $a$ $b$] $c$]\par
+%         [$\mc{P}$ * $a$ [$\mc{P}$ * $b$ $c$]]
+%       \end{displaysyntax}
+%     \item[Composition identity]
+%       Let \(a \in \mc{P}\) be arbitrary, let $\sigma$ be the 
+%       identity permutation of length \texttt{[$\mc{P}$ coarity $a$]}, 
+%       and let $\tau$ be the identity permutation of length 
+%       \texttt{[$\mc{P}$ arity $a$]}. Then the following are 
+%       |=|-equal:
+%       \begin{displaysyntax}
+%         [$\mc{P}$ * [$\mc{P}$ permutation $\sigma$] $a$]\par
+%         $a$\par
+%         [$\mc{P}$ * $a$ [$\mc{P}$ permutation $\tau$]]
+%       \end{displaysyntax}
+%     \item[Tensor associativity]
+%       For any \(a,b,c \in \mc{P}\), the following are |=|-equal:
+%       \begin{displaysyntax}
+%         [$\mc{P}$ tensor [$\mc{P}$ tensor $a$ $b$] $c$]\par
+%         [$\mc{P}$ tensor $a$ [$\mc{P}$ tensor $b$ $c$]]
+%       \end{displaysyntax}
+%     \item[Tensor identity]
+%       For any \(a \in \mc{P}\), the following are |=|-equal:
+%       \begin{displaysyntax}
+%         [$\mc{P}$ tensor [$\mc{P}$ permutation \{\}] $a$]\par
+%         $a$\par
+%         [$\mc{P}$ tensor $a$ [$\mc{P}$ permutation \{\}]]
+%       \end{displaysyntax}
+%     \item[Permutation composition]
+%       The following are |=|-equal for all permutations $\sigma$ and 
+%       $\tau$ of equal length:
+%       \begin{displaysyntax}
+%         [$\mc{P}$ permutation $\sigma\tau$]\par
+%         [$\mc{P}$ * [$\mc{P}$ permutation $\sigma$]
+%           [$\mc{P}$ permutation $\tau$]]
+%       \end{displaysyntax}
+%     \item[Permutation tensor]
+%       The following are |=|-equal for all permutations $\sigma$ and 
+%       $\tau$:
+%       \begin{displaysyntax}
+%         [$\mc{P}$ permutation $\sigma \star \tau$]\par
+%         [$\mc{P}$ tensor [$\mc{P}$ permutation $\sigma$]
+%           [$\mc{P}$ permutation $\tau$]]
+%       \end{displaysyntax}
+%       where $\star$ denotes the juxtaposition of two permutations, 
+%       i.e.,
+%       \begin{equation*}
+%         (\sigma \star \tau)(i) = \begin{cases}
+%           \sigma(i)& \text{if \(i<n\),}\\
+%           n + \tau(i-n)& \text{otherwise}
+%         \end{cases}
+%         \qquad\text{where $n$ is the length of $\sigma$.}
+%       \end{equation*}
+%       
+%     \item[Tensor crossing]
+%       For all \(a,b \in \mc{P}\), the following are |=|-equal:
+%       \begin{displaysyntax}
+%         [$\mc{P}$ * [$\mc{P}$ permutation $\cross{k}{m}$]
+%           [$\mc{P}$ tensor $a$ $b$]]\par
+%         [$\mc{P}$ * [$\mc{P}$ tensor $b$ $a$] 
+%           [$\mc{P}$ permutation $\cross{l}{n}$]]
+%       \end{displaysyntax}
+%       where $k$ is the coarity of $a$, $l$ is the arity of $a$, $m$ 
+%       is the coarity of $b$, and $n$ is the arity of $b$. The 
+%       symbol $\cross{m}{n}$ stands for the permutation of $m+n$ 
+%       elements which switches places between an $m$-group and an 
+%       $n$-group, i.e.,
+%       \begin{equation*}
+%         \cross{m}{n}(i) = \begin{cases}
+%           i+n& \text{if \(0 \leqslant i<m\),}\\
+%           i-m& \text{if \(m \leqslant i<m+n\).}
+%         \end{cases}
+%       \end{equation*}
+%       
+%     \item[Tensor--composition compatibility]
+%       For all \(a,b,c,d \in \mc{P}\) such that the arity of $a$ is 
+%       equal to the coarity of $b$ and the arity of $c$ is equal to 
+%       the coarity of $d$, the following are |=|-equal:
+%       \begin{displaysyntax}
+%         [$\mc{P}$ tensor [$\mc{P}$ * $a$ $b$] 
+%           [$\mc{P}$ * $c$ $d$]]\par
+%         [$\mc{P}$ * [$\mc{P}$ tensor $a$ $c$] 
+%           [$\mc{P}$ tensor $b$ $d$]]
+%       \end{displaysyntax}
+%   \end{description}
+% \end{APIspec}
+% 
+% \begin{APIspec}{PROP}{1.1}
+%   Version 1.1 of the |PROP| interface adds methods for the left and 
+%   right actions of permutations on PROP elements, and also for 
+%   taking the tensor product with an identity. These are often 
+%   convenient and can have faster implementations than composition 
+%   with a permutation element.
+%   
+%   \begin{APIdescription}{PROP}
+%     \begin{APImethod}{perm.}
+%       \word{permutation} \word{element}
+%     \end{APImethod}
+%       This method performs the left action of permutation 
+%       operation. It returns a PROP element of the same type as the 
+%       \word{element} if the list-length of the \word{permutation} 
+%       is equal to the coarity of the \word{element}, and throws an 
+%       error with |-errorcode|
+%       \begin{displaysyntax}
+%         API PROP typenomatch
+%       \end{displaysyntax}
+%       otherwise.
+%       
+%     \begin{APImethod}{.perm}
+%       \word{element} \word{permutation}
+%     \end{APImethod}
+%       This method performs the right action of permutation 
+%       operation. It returns a PROP element of the same type as the 
+%       \word{element} if the list-length of the \word{permutation} 
+%       is equal to the arity of the \word{element}, and throws an 
+%       error with |-errorcode|
+%       \begin{displaysyntax}
+%         API PROP typenomatch
+%       \end{displaysyntax}
+%       otherwise.
+%       
+%     \begin{APImethod}{tensorpad}
+%       \word{element} \word{integer}
+%     \end{APImethod}
+%       This method returns the tensor product of the \word{element} 
+%       by the identity of arity and coarity \word{integer}. This can 
+%       often be constructed merely by copying data.
+%   \end{APIdescription}
+%   
+%   For any version 1.1 PROP $\mc{P}$, any element \(a \in \mc{P}\), 
+%   and any two permutations $\sigma$ and $\tau$ which have 
+%   list-lengths equal to the coarity and arity respectively of $a$, 
+%   the two expressions
+%   \begin{displaysyntax}
+%     [$\mc{P}$ perm. $\sigma$ $a$]\par
+%     [$\mc{P}$ * [$\mc{P}$ permutation $\sigma$] $a$]
+%   \end{displaysyntax}
+%   are |=|-equal, as are
+%   \begin{displaysyntax}
+%     [$\mc{P}$ .perm $a$ $\tau$]\par
+%     [$\mc{P}$ * $a$ [$\mc{P}$ permutation $\tau$]]
+%   \end{displaysyntax}
+%   Finally, if $\iota$ is the identity permutation of length $n$ 
+%   then the two expressions
+%   \begin{displaysyntax}
+%     [$\mc{P}$ tensorpad $a$ $n$]\par
+%     [$\mc{P}$ tensor $a$ [$\mc{P}$ permutation $\iota$]]
+%   \end{displaysyntax}
+%   are |=|-equal.
+% \end{APIspec}
+% 
+% \begin{APIspec}{PROP}{2.0}
+%   Version~2 of |PROP| does not obsolete version~1, but rather 
+%   introduces the PROP concept starting from a different fundamental 
+%   operation |fuse|: the kind of products used with numeric style 
+%   tensors, combined with Einstein summation convention contractions 
+%   on repeated indices. This operation can be used to implement tensor 
+%   product (no contraction), composition (contraction on all inputs 
+%   of first factor, which are also the outputs of the second 
+%   factor), and permutations (empty product), but the converse is 
+%   possible too.
+%   
+%   \begin{APIdescription}{PROP}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method fulfills the \APIref+{equality}{1.0} interface.
+%       
+%     \begin{APImethod}{arity}
+%       \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{coarity}
+%       \word{element}
+%     \end{APImethod}
+%       Return the arity and coarity respectively of the 
+%       \word{element}. These are nonnegative integers and together 
+%       they determine the type of the element. They are both 
+%       congruent, which conversely means elements of different 
+%       types must never be equal.
+%       
+%     \begin{APImethod}{fuse}
+%       \word{heads out} \begin{regblock}[\regstar] \word{tails} 
+%       \word{element} \word{heads} \end{regblock} \word{tails in}
+%     \end{APImethod}
+%       This method returns the (numeric tensor style) product of 
+%       the given \word{element}s, contracted on repeated indices 
+%       according to the Einstein summation convention. The 
+%       \word{heads} and \word{tails} are all lists of ``index 
+%       labels'', which can be arbitrary strings.
+%       
+%       For
+%       \begin{displaysyntax}
+%         \(b :={}\)[\meta{PROP} fuse $h_{\mathrm{out}}$ 
+%         $t_1$ $a_1$ $h_1$ $\dots$ $t_n$ $a_n$ $h_n$ 
+%         $t_{\mathrm{in}}$]
+%       \end{displaysyntax}
+%       one has that
+%       \begin{align*}
+%         \texttt{[\meta{PROP} arity $b$]} ={}&
+%           \texttt{[llength $t_{\mathrm{in}}$]} \\
+%         \texttt{[\meta{PROP} coarity $b$]} ={}&
+%           \texttt{[llength $h_{\mathrm{out}}$]}
+%       \end{align*}
+%       and the basic syntactic restrictions on this call are that
+%       \begin{align*}
+%         \texttt{[\meta{PROP} coarity $a_i$]} ={}&
+%           \texttt{[llength $t_i$]} 
+%           && \text{for \(1 \leqslant i \leqslant n\),}\\
+%         \texttt{[\meta{PROP} arity $a_i$]} ={}& 
+%           \texttt{[llength $h_i$]}
+%           && \text{for \(1 \leqslant i \leqslant n\),}\\
+%         h_{\mathrm{out}} \mathbin{\dot{\cup}}
+%         \bigcup_{1 \leqslant i \leqslant n}^\bullet h_i ={}&
+%         t_{\mathrm{in}} \mathbin{\dot{\cup}}
+%         \bigcup_{1 \leqslant i \leqslant n}^\bullet t_i
+%       \end{align*}
+%       where $\dot{\cup}$ denotes disjoint union, i.e., every index 
+%       label occurring anywhere must occur exactly once in a 
+%       heads-list and once in a tails-list. Whenever any of these 
+%       restrictions is violated, this method throws 
+%       an error with |-errorcode|
+%       \begin{displaysyntax}
+%         API PROP typenomatch
+%       \end{displaysyntax}
+%       
+%       There is also a restriction that there must be a partial 
+%       order $P$ on the set of all labels such that if \(e \in t_i\) 
+%       and \(f \in h_i\) for some \(i=1,\dotsc,n\) then \(e < f 
+%       \mathrel{\mathrm{in}} P\). This restriction is necessary for 
+%       the result of the |fuse| method to be expressible in terms of 
+%       the |PROP| version~1.0 operations, but it is not required 
+%       that violations of it throw an error, since some PROPs can 
+%       support contraction of cycles (a.k.a.~``trace map'').
+%   \end{APIdescription}
+%   
+%   In order for a command prefix \mc{P} to satisfy this interface, 
+%   it must fulfill five axioms on equality and |fuse|. 
+%   For any injection $f$, the expressions
+%   \begin{displaysyntax}
+%     [$\mc{P}$ fuse $h_{\mathrm{out}}$ $t_1$ $a_1$ $h_1$ $\dots$ 
+%       $t_n$ $a_n$ $h_n$ $t_{\mathrm{in}}$]\par
+%     [$\mc{P}$ fuse $f(h_{\mathrm{out}})$ $f(t_1)$ $a_1$ $f(h_1)$ 
+%       $\dots$ $f(t_n)$ $a_n$ $f(h_n)$ $f(t_{\mathrm{in}})$]
+%   \end{displaysyntax}
+%   are |=|-equal.
+%   
+%   For any permutation \(\sigma\colon \{1,\dotsc,n\} \Fpil 
+%   \{1,\dotsc,n\}\), the two expressions
+%   \begin{displaysyntax}
+%     [$\mc{P}$ fuse $h_{\mathrm{out}}$ $t_1$ $a_1$ $h_1$ $\dots$ 
+%       $t_n$ $a_n$ $h_n$ $t_{\mathrm{in}}$]\par
+%     [$\mc{P}$ fuse $h_{\mathrm{out}}$ $t_{\sigma(1)}$ $a_{\sigma(1)}$ 
+%       $h_{\sigma(1)}$ $\dots$ $t_{\sigma(n)}$ $a_{\sigma(n)}$ 
+%       $h_{\sigma(n)}$ $t_{\mathrm{in}}$]
+%   \end{displaysyntax}
+%   are |=|-equal.
+%   
+%   For any \(a \in \mc{P}\) and lists $h$ and $t$, the two 
+%   expressions
+%   \begin{displaysyntax}
+%     [$\mc{P}$ fuse $h$ $h$ $a$ $t$ $t$]\par
+%     $a$
+%   \end{displaysyntax}
+%   are |=|-equal whenever the former exists.
+%   
+%   Let \word{left} and \word{right} be lists of the form
+%   \begin{quote}
+%     \begin{regblock}[\regstar] \word{tails} \word{element} 
+%     \word{head} \end{regblock}
+%   \end{quote}
+%   Let $L_i$ and $M_i$ for \(i=0,1,2,3\) be arbitrary lists.
+%   Whenever both of
+%   \begin{displaysyntax}
+%     [\mc{P} fuse $L_0$ \meta{left} \meta{right} $L_2$]\par
+%     [\mc{P} fuse $M_0$ 
+%       $M_0$ [\mc{P} fuse $L_0$ \meta{left} $L_1$] $M_1$ 
+%       \linebreak[1]
+%       $M_1$ [\mc{P} fuse $L_1$ \meta{right} $L_2$] $M_2$ 
+%       $M_2$]
+%   \end{displaysyntax}
+%   are syntactically correct, they are |=|-equal. Similarly whenever 
+%   both of
+%   \begin{displaysyntax}
+%     [\mc{P} fuse [concat $L_0$ $L_1$]
+%       \meta{left} \meta{right} [concat $L_2$ $L_3$]]\par
+%     [\mc{P} fuse [concat $M_0$ $M_1$]
+%       $M_0$ [\mc{P} fuse $L_0$ \meta{left} $L_2$] $M_2$ 
+%       \linebreak[1]
+%       $M_1$ [\mc{P} fuse $L_1$ \meta{right} $L_3$] $M_3$ 
+%       [concat $M_2$ $M_3$]]
+%   \end{displaysyntax}
+%   are syntactically correct, they are |=|-equal.
+%   
+%   \iffalse 
+%   
+%   The expressions
+%   \begin{displaysyntax}
+%     [$\mc{P}$ fuse $h_{\mathrm{out}}$ 
+%       $t_0$ [$\mc{P}$ fuse $\sigma$ $\iota$] $h_0$
+%       $t_1$ $a_1$ $h_1$ $\dots$ 
+%       $t_n$ $a_n$ $h_n$ $t_{\mathrm{in}}$]\par
+%     [$\mc{P}$ fuse $f(h_{\mathrm{out}})$ $f(t_1)$ $a_1$ $f(h_1)$ 
+%       $\dots$ $f(t_n)$ $a_n$ $f(h_n)$ $f(t_{\mathrm{in}})$]
+%   \end{displaysyntax}
+%   are |=|-equal for
+%   \begin{equation*}
+%     f(e) = \begin{cases}
+%       \texttt{[lindex $h_0$ $i$]}& 
+%         \text{if \(e = \texttt{[lindex $t_0$ $\sigma(i)$]}\),}\\
+%       e& \text{otherwise}
+%     \end{cases}
+%   \end{equation*}
+%   where $\sigma$ is a permutation, $\iota$ is an identity 
+%   permutation, and $t_0$, $\sigma$, $\iota$, and $h_0$ all have the 
+%   same list-length.
+%   
+%   \iffalse
+%   For all lists $h_0,\dotsc,h_{n+m}$ and $t_0,\dotsc,t_{n+m}$ such 
+%   that
+%   \begin{equation*}
+%     h_{\mathrm{out}} \mathbin{\dot{\cup}}
+%     \bigcup_{1 \leqslant i \leqslant n+m}^\bullet h_i =
+%     t_{\mathrm{in}} \mathbin{\dot{\cup}}
+%     \bigcup_{1 \leqslant i \leqslant n+m}^\bullet t_i
+%     \text{,}
+%   \end{equation*}
+%   \fi
+%   The two expressions
+%   \begin{displaysyntax}
+%     [$\mc{P}$ fuse $h_{\mathrm{out}}$ $t_1$ $a_1$ $h_1$ $\dots$ 
+%       $t_{n+m}$ $a_{n+m}$ $h_{n+m}$ $t_{\mathrm{in}}$]\par
+%     [$\mc{P}$ fuse $h_{\mathrm{out}}$ 
+%       $h_0$ [$\mc{P}$ fuse $h_0$ $t_1\ a_1\ h_1$ $\dots$ 
+%         $t_n$ $a_n$ $h_n$ $t_0$] $t_0$
+%       $t_{n+1}\ a_{n+1}\ h_{n+1}$ $\dots$ 
+%       $t_{n+m}\ a_{n+m}\ h_{n+m}$
+%       $t_{\mathrm{in}}$]
+%   \end{displaysyntax}
+%   are |=|-equal whenever both exist.
+%   
+%   \fi
+% \end{APIspec}
+% 
+% \begin{APIspec}{PROP}{2.1}
+%   Version~2.1 of |PROP| extends version~2.0 with the methods needed 
+%   to support \APIref+{PROP}{1.1}. (That it always will support also 
+%   that version of the interface is the subject of a theorem below; 
+%   this is just the definition.)
+%   
+%   In order to specify the methods, it is convenient to employ a 
+%   generic list constructor for the labels. To that end, define
+%   \begin{quote}
+%     \MacroFont
+%     |proc E {n args} {|\\
+%     |   set res {}|\\
+%     |   for {set k 0} {$k<$n} {incr k} {|\\
+%     |      lappend res [linsert $args 0 $k]|\\
+%     |   }|\\
+%     |   return $res|\\
+%     |}|
+%   \end{quote}
+%   which however will be ``called'' using mathematical notation, so 
+%   instead of \texttt{[E $n$]}${}={}$`|0 1 |\dots~$n{-}1$' it's 
+%   $E(n)$, and instead of \texttt{[E $m$ 7]}${}={}$`|{0 7} {1 7} |\dots
+%   |{|$m{-}1$| 7}|' it's $E(m,7)$, etc.
+%   Also, the convention is used to write head arguments in a 
+%   subscript position and tail arguments in a superscript 
+%   position\Dash not attached to anything; just not on the standard 
+%   baseline. This helps clarify the structure of expressions.
+%   \begin{APIdescription}{PROP}
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This is the composition operation, defined by the condition 
+%       that
+%       \begin{displaysyntax}
+%         [\meta{PROP} * $a$ $b$]\par
+%         [\meta{PROP} fuse \heads{E(l,1)} 
+%           \tails{E(l,1)} $a$ \heads{E(m,2)} 
+%           \tails{E(m,2)} $b$ \heads{E(n,3)} \tails{E(n,3)}]
+%       \end{displaysyntax}
+%       are |=|-equal when $l$ is the coarity of $a$, $m$ is is the 
+%       arity of $a$ and coarity of $b$, and $n$ is the arity of $b$.
+%       
+%     \begin{APImethod}{permutation}
+%       \word{permutation}
+%     \end{APImethod}
+%       Returns the PROP element corresponding to the permutation 
+%       \word{permutation}, i.e., the two expressions
+%       \begin{displaysyntax}
+%         [\meta{PROP} permutation $\sigma$]\par
+%         [\meta{PROP} fuse \heads{E(n)} \tails{\sigma}]
+%       \end{displaysyntax}
+%       are |=|-equal for every permutation $\sigma$ of list-length 
+%       $n$.
+%       
+%     \begin{APImethod}{tensor}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This is the tensor product operation, which is defined for 
+%       arbitrary pairs of \word{element}s by the condition that
+%       \begin{displaysyntax}
+%         [\meta{PROP} tensor $a$ $b$]\par
+%         [\meta{PROP} fuse [concat $E(k,1)$ $E(m,3)$]
+%           $\tails{E(k,1)}\ a\ \heads{E(l,2)}$ 
+%           $\tails{E(m,3)}\ b\ \heads{E(n,4)}$ 
+%           [concat $E(l,2)$ $E(n,4)$]]
+%       \end{displaysyntax}
+%       are |=|-equal when $k$ is the coarity of $a$, $l$ is is the 
+%       arity of $a$, $m$ is the coarity of $b$, and $n$ is the 
+%       arity of $b$.
+%       
+%   \end{APIdescription}
+%   
+% \end{APIspec}
+% 
+% \begin{theorem}
+%   That a structure $\mc{P}$ satisfies \APIref+{PROP}{2.1} implies 
+%   that it satisfies \APIref+{PROP}{1.1}.
+% \end{theorem}
+% \begin{proof}
+%   This is simply a routine verification that one set of axioms 
+%   follows from the other. In the interest of some brevity, the 
+%   definitions are implicitly combined with the relabelling axiom 
+%   so that the head- and tail-lists need not be exactly the $E(n,k)$ 
+%   in the definition statement.
+%   
+%   Composition associativity follows from the stepwise |=|-equality 
+%   of:
+%   \begin{displaysyntax}
+%     [\mc{P} * [\mc{P} * $a$ $b$] $c$]\par
+%     [\mc{P} * [\mc{P} fuse $E(k,1)$  $E(k,1)$ $a$ $E(l,2)$ 
+%        $E(l,2)$ $b$ $E(m,3)$  $E(m,3)$] $c$]\par
+%     [\mc{P} fuse $E(k,1)$ 
+%       $E(k,1)$ [\mc{P} fuse $E(k,1)$  $E(k,1)$ $a$ $E(l,2)$ 
+%         $E(l,2)$ $b$ $E(m,3)$  $E(m,3)$] $E(m,3)$ 
+%       $E(m,3)$ $c$ $E(n,4)$  $E(n,4)$]\par
+%     [\mc{P} fuse $E(k,1)$ 
+%       $E(k,1)$ $a$ $E(l,2)$ 
+%       $E(l,2)$ $b$ $E(m,3)$ 
+%       $E(m,3)$ $c$ $E(n,4)$  $E(n,4)$]\par
+%     [\mc{P} fuse $E(k,1)$ 
+%       $E(l,2)$ $b$ $E(m,3)$ 
+%       $E(m,3)$ $c$ $E(n,4)$
+%       $E(k,1)$ $a$ $E(l,2)$  $E(n,4)$]\par
+%     [\mc{P} fuse $E(k,1)$ 
+%       $E(l,2)$ [\mc{P} fuse $E(l,2)$  $E(l,2)$ $b$ $E(m,3)$ 
+%         $E(m,3)$ $c$ $E(n,4)$  $E(n,4)$] $E(n,4)$
+%       $E(k,1)$ $a$ $E(l,2)$  $E(n,4)$]\par
+%     [\mc{P} fuse $E(k,1)$ 
+%       $E(l,2)$ [\mc{P} * $b$ $c$] $E(n,4)$
+%       $E(k,1)$ $a$ $E(l,2)$  $E(n,4)$]\par
+%     [\mc{P} fuse $E(k,1)$  $E(k,1)$ $a$ $E(l,2)$ 
+%       $E(l,2)$ [\mc{P} * $b$ $c$] $E(n,4)$  $E(n,4)$]\par
+%     [\mc{P} * $a$ [\mc{P} * $b$ $c$]]
+%   \end{displaysyntax}
+%   Composition identity follows from the stepwise |=|-equalities of
+%   \begin{displaysyntax}
+%     [\mc{P} * $a$ [\mc{P} permutation $E(n)$]]
+%     
+%     [\mc{P} * $a$ [\mc{P} fuse $E(n)$  $E(n)$]]
+%     
+%     [\mc{P} fuse $E(1,m)$  $E(1,m)$ $a$ $E(2,n)$ 
+%       $E(2,n)$ [\mc{P} fuse $E(n)$  $E(n)$] $E(3,n)$  $E(3,n)$]
+%     
+%     [\mc{P} fuse $E(1,m)$  $E(1,m)$ $a$ $E(3,n)$  $E(3,n)$]
+%     
+%     $a$
+%     
+%     [\mc{P} fuse $E(2,m)$  $E(2,m)\ a\ E(3,n)$  $E(3,n)$]
+%     
+%     [\mc{P} fuse $E(1,m)$
+%     $E(1,m)$ [\mc{P} fuse $E(m)$  $E(m)$] $E(2,m)$ 
+%     $E(2,m)\ a\ E(3,n)$  $E(3,n)$]
+%     
+%     [\mc{P} * [\mc{P} fuse $E(m)$  $E(m)$] $a$]
+%     
+%     [\mc{P} * [\mc{P} permutation $E(m)$] $a$]
+%   \end{displaysyntax}
+%   where $m$ and $n$ are the coarity and arity respectively of $a$.
+%   
+%   Tensor-permutation compatibility follows from the stepwise 
+%   |=|-equality of
+%   \begin{displaysyntax}
+%     [\mc{P} * [\mc{P} permutation $\cross{k}{m}$] 
+%       [\mc{P} tensor $a$ $b$]]
+%     
+%     [\mc{P} * 
+%       [\mc{P} permutation $\cross{k}{m}$]
+%       [\mc{P} fuse [concat $E(1,k)$ $E(3,m)$]
+%         $E(1,k)\ a\ E(2,l)$  $E(3,m)\ b\ E(4,n)$ 
+%         [concat $E(2,l)$ $E(4,n)$]]]
+%     
+%     [\mc{P} fuse $E(0,k+m)$
+%       $E(0,k+m)$ [\mc{P} permutation $\cross{k}{m}$] 
+%         [concat $E(1,k)$ $E(3,m)$]
+%       [concat $E(1,k)$ $E(3,m)$] 
+%         [\mc{P} fuse [concat $E(1,k)$ $E(3,m)$]
+%           $E(1,k)\ a\ E(2,l)$  $E(3,m)\ b\ E(4,n)$ 
+%           [concat $E(2,l)$ $E(4,n)$]]
+%         [concat $E(2,l)$ $E(4,n)$]
+%       [concat $E(2,l)$ $E(4,n)$]]
+%      
+%     [\mc{P} fuse $E(0,k+m)$
+%       $E(0,k+m)$ [\mc{P} permutation $\cross{k}{m}$] 
+%         [concat $E(1,k)$ $E(3,m)$]
+%       $E(1,k)\ a\ E(2,l)$
+%       $E(3,m)\ b\ E(4,n)$ 
+%       [concat $E(2,l)$ $E(4,n)$]]
+%      
+%     [\mc{P} fuse $E(0,k+m)$
+%       $E(0,k+m)$ 
+%         [\mc{P} fuse [concat $E(3,m)$ $E(1,k)$] 
+%           [concat $E(1,k)$ $E(3,m)$]] 
+%         [concat $E(1,k)$ $E(3,m)$]
+%       $E(1,k)\ a\ E(2,l)$
+%       $E(3,m)\ b\ E(4,n)$ 
+%       [concat $E(2,l)$ $E(4,n)$]]
+%      
+%     [\mc{P} fuse [concat $E(3,m)$ $E(1,k)$] 
+%       $E(1,k)\ a\ E(2,l)$
+%       $E(3,m)\ b\ E(4,n)$ 
+%       [concat $E(2,l)$ $E(4,n)$]]
+%       
+%     [\mc{P} fuse [concat $E(3,m)$ $E(1,k)$] 
+%       $E(3,m)\ b\ E(4,n)$ 
+%       $E(1,k)\ a\ E(2,l)$
+%       [concat $E(2,l)$ $E(4,n)$]]
+%       
+%     [\mc{P} fuse [concat $E(3,m)$ $E(1,k)$] 
+%       $E(3,m)\ b\ E(6,n)$ 
+%       $E(1,k)\ a\ E(5,l)$
+%       [concat $E(6,n)$ $E(5,l)$]
+%         [\mc{P} fuse [concat $E(4,n)$ $E(2,l)$]
+%           [concat $E(2,l)$ $E(4,n)$]]
+%         [concat $E(2,l)$ $E(4,n)$]
+%       [concat $E(2,l)$ $E(4,n)$]]
+%     
+%     [\mc{P} fuse [concat $E(3,m)$ $E(1,k)$] 
+%       $E(3,m)\ b\ E(6,n)$ 
+%       $E(1,k)\ a\ E(5,l)$
+%       [concat $E(6,n)$ $E(5,l)$]
+%         [\mc{P} permutation $\cross{l}{n}$]
+%         [concat $E(2,l)$ $E(4,n)$]
+%       [concat $E(2,l)$ $E(4,n)$]]
+%     
+%     [\mc{P} fuse [concat $E(3,m)$ $E(1,k)$]
+%       [concat $E(3,m)$ $E(1,k)$] 
+%         [\mc{P} fuse [concat $E(3,m)$ $E(1,k)$]
+%           $E(3,m)\ b\ E(6,n)$ 
+%           $E(1,k)\ a\ E(5,l)$
+%           [concat $E(6,n)$ $E(5,l)$]]
+%         [concat $E(6,n)$ $E(5,l)$]
+%       [concat $E(6,n)$ $E(5,l)$]
+%         [\mc{P} permutation $\cross{l}{n}$]
+%         [concat $E(2,l)$ $E(4,n)$]
+%       [concat $E(2,l)$ $E(4,n)$]]
+%     
+%     [\mc{P} *
+%       [\mc{P} fuse [concat $E(3,m)$ $E(1,k)$]
+%         $E(3,m)\ b\ E(6,n)$ 
+%         $E(1,k)\ a\ E(5,l)$
+%         [concat $E(6,n)$ $E(5,l)$]]
+%       [\mc{P} permutation $\cross{l}{n}$]]
+%     
+%     [\mc{P} *
+%       [\mc{P} tensor $b$ $a$]
+%       [\mc{P} permutation $\cross{l}{n}$]]
+%     
+%   \end{displaysyntax}
+% \end{proof}
+% 
+% 
+% \section{Trivial matrix implementation}
+% 
+% The trivial matrix implementation of |PROP| has the coarity and 
+% arity equal to the number of rows and columns respectively of the 
+% matrix. This is not the algebraic definition (since the tensor 
+% product is not bilinear), but it is a good test case.
+% 
+% \begin{ensemble}[mtmtcl::matprop]{trivial}
+%   This implementation of a |PROP| is as the command prefix
+%   \begin{displaysyntax}
+%     mtmtcl::matprop::trivial any \word{ring}
+%   \end{displaysyntax}
+%   where the base command is an ensemble with two parameters 
+%   \word{shape} (which is ignored) and \word{ring} (which must be 
+%   a \APIref{ring}{1.0} and \APIref{monoid}{1.0}).
+%   \begin{tcl}
+%<*pkg>
+package require Tcl 8.6a3
+if {[namespace which tailcall] eq ""} then {
+   interp alias {} tailcall {} tcl::unsupported::tailcall
+}
+if {[catch {lrepeat 0 x}]} then {
+   rename lrepeat mtmtcl::matprop::_lrepeat
+   proc lrepeat {count args} {
+      if {$count>0} then {mtmtcl::matprop::_lrepeat $count {*}$args}
+   }
+}
+namespace eval mtmtcl::matprop::trivial {
+   namespace ensemble create -parameters {shape ring}
+   namespace export *
+}
+%   \end{tcl}
+%   The purpose of making the ensemble take two parameters when the 
+%   first is anyway ignored is twofold. First, the |homfdpower| PROP 
+%   in Section~\ref{Sec:homfdpower} takes two parameters and can 
+%   share some method implementations with |trivial| if this does it 
+%   too. Second, many command implementations can also be shared with 
+%   a matrix ring, and several of its methods need to know the matrix 
+%   side (or sides), which is then what the \word{shape} parameter 
+%   will tell them.
+%   \changes{0}{2008/12/13}{Added \texttt{shape} parameter. (LH)}
+%   
+%   The data format is as a list of rows, where each row is a list 
+%   of elements of the \word{ring}, just as one might expect. A 
+%   problem with this is that it wouldn't be possible to distinguish 
+%   between different arities for elements of coarity $0$, since any 
+%   element of coarity $0$ is just the empty list. (Arity $0$ is on 
+%   the other hand not such a representation problem, since a matrix 
+%   with $m$ rows and $0$ columns is a list of $m$ empty lists.) 
+%   \textbf{Therefore} this PROP has a unique element with coarity 
+%   and arity $0$, and all other elements have positive arity and 
+%   coarity.
+%   
+%   \begin{ensproc}{arity}
+%     Since the arity is the number of columns, it is measured as the 
+%     length of the first row. This works also in the degenerate $0 
+%     \times 0$ matrix.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::arity {shape ring matrix} {
+   llength [lindex $matrix 0]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{coarity}
+%     The coarity is similar, but easier.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::coarity {shape ring matrix} {
+   llength $matrix
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{=}
+%     Equality testing is to first check that the sides match, and 
+%     then compare the matrices element by element.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::= {shape ring A B} {
+   if {[llength $A] != [llength $B]} then {return 0}
+   if {[llength [lindex $A 0]] != [llength [lindex $B 0]]} then {return 0}
+   foreach arow $A brow $B {
+      foreach a $arow b $brow {
+         if {![{*}$ring = $a $b]} then {return 0}
+      }
+   }
+   return 1
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{*}
+%     Composition in this PROP is ordinary matrix multiplication.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::* {shape ring A B} {
+   if {[llength [lindex $A 0]] != [llength $B]} then {
+      return -code error -errorcode {API PROP typenomatch}\
+        "Left factor arity does not match right factor coarity"
+   }
+   set zerorow [lrepeat [llength [lindex $B 0]] [{*}$ring 0]]
+   set res {}
+   foreach Arow $A {
+      set rrow $zerorow
+      foreach a $Arow Brow $B {
+         set nrow {}
+         foreach sum $rrow b $Brow {
+            lappend nrow [{*}$ring + $sum [{*}$ring * $a $b]]
+         }
+         set rrow $nrow
+      }
+      lappend res $rrow
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{tensor}
+%     The ``tensor product'' just mounts the two factors as blocks on 
+%     the diagonal: \(\left( \begin{smallmatrix} A&0\\0&B 
+%     \end{smallmatrix} \right)\).
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::tensor {shape ring A B} {
+   set res {}
+   set zeroes [lrepeat [llength [lindex $B 0]] [{*}$ring 0]]
+   foreach Arow $A {
+      lappend res [concat $Arow $zeroes]
+   }
+   set zeroes [lrepeat [llength [lindex $A 0]] [{*}$ring 0]]
+   foreach Brow $B {
+      lappend res [concat $zeroes $Brow]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{permutation}
+%     The permutation elements in this PROP are the ordinary 
+%     permutation matrices, which when multiplied by a column vector 
+%     on the right send element $j$ to position $\sigma(j)$. Hence 
+%     the entries that are $1$ are those at $(i,j)$ which have 
+%     \(i=\sigma(j)\).
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::permutation {shape ring sigma} {
+   set one [{*}$ring 1]
+   set zerorow [lrepeat [llength $sigma] [{*}$ring 0]]
+   set res {}
+   foreach i $sigma {
+      set row $zerorow
+      lset row $i $one
+      lappend res $row
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   
+%   \begin{ensproc}{perm.}
+%     The left action of permutations on PROP elements. It amounts to 
+%     taking rows of the original matrix and putting them in the 
+%     positions specified by the permutation.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::perm. {shape ring sigma A} {
+   if {[llength $sigma] != [llength $A]} then {
+      return -code error -errorcode {API PROP typenomatch}\
+        "Permutation length and number of rows do not match"
+   }
+   set res $A
+   foreach row $A i $sigma {
+      lset res $i $row
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{.perm}
+%     The right action of permutations on PROP elements. The 
+%     permutation is here used to select columns from the matrix, and 
+%     since the columns do not exist as explicit values, this 
+%     selection must be repeated for each row of the matrix.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::.perm {shape ring A sigma} {
+   if {[llength $sigma] != [llength [lindex $A 0]]} then {
+      return -code error -errorcode {API PROP typenomatch}\
+        "Permutation length and number of columns do not match"
+   }
+   set res {}
+   foreach Arow $A {
+      set row {}
+      foreach i $sigma {
+         lappend row [lindex $Arow $i]
+      }
+      lappend res $row
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{+}
+%     This is just ordinary matrix addition.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::+ {shape ring A B} {
+   if {[llength $A] != [llength $B] ||\
+       [llength [lindex $A 0]] != [llength [lindex $B 0]]} then {
+      return -code error "Matrix sides do not match"
+   }
+   set res {}
+   foreach Arow $A Brow $B {
+      set row {}
+      foreach a $Arow b $Brow {
+         lappend row [{*}$ring + $a $b]
+      }
+      lappend res $row
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{-}
+%     This is just ordinary matrix subtraction or negation.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::- {shape ring A args} {
+   if {[llength $args]>1} then {
+      return -code error "Too many terms"
+   } elseif {[llength $args]==0} then {
+      set res {}
+      foreach Arow $A {
+         set row {}
+         foreach a $Arow {lappend row [{*}$ring - $a]}
+         lappend res $row
+      }
+      return $res
+   }
+   set B [lindex $args 0]
+   if {[llength $A] != [llength $B] ||\
+       [llength [lindex $A 0]] != [llength [lindex $B 0]]} then {
+      return -code error "Matrix sides do not match"
+   }
+   set res {}
+   foreach Arow $A Brow $B {
+      set row {}
+      foreach a $Arow b $Brow {
+         lappend row [{*}$ring - $a $b]
+      }
+      lappend res $row
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{.}
+%     And this is just multiplication by a scalar.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::. {shape ring s A} {
+   set res {}
+   foreach Arow $A {
+      set row {}
+      foreach a $Arow {lappend row [{*}$ring * $s $a]}
+      lappend res $row
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{scalar}
+%     As in a \APIref{ring-module}{1.1}, the |scalar| method gives 
+%     access to the underlying ring.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::scalar {shape ring args} {
+   tailcall {*}$ring {*}$args
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{0}
+%     A |0| method needed for the \APIref{ring-module}{1.1} interface 
+%     cannot be defined in the PROP, since every nonempty component 
+%     has a separate zero element, but the \word{shape} parameter will 
+%     in a specific matrix ring (or bimodule) provide the necessary 
+%     information.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::0 {shape ring} {
+   set m [lindex $shape 0]
+   set n [lindex $shape end]
+   incr m 0; incr n 0
+   set zero [{*}$ring 0]
+   set row {}
+   for {set j 0} {$j<$n} {incr j} {lappend row $zero}
+   set res {}
+   for {set i 0} {$i<$m} {incr i} {lappend res $row}
+   return $res
+}
+%     \end{tcl}
+%     Even when the \word{shape} is not fixed, it is straightfoward 
+%     to multiply an existing element by the |scalar 0| to produce a 
+%     same-size zero.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{iszero}
+%     Although a |0| method cannot be defined in the PROP in general, 
+%     it is straightforward to test an element for being a zero.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::iszero {shape ring A} {
+   foreach Arow $A {
+      foreach a $Arow {
+         if {![{*}$ring iszero $a]} then {return 0}
+      }
+   }
+   return 1
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{1}
+%     A |1| method needed for the \APIref{ring-module}{1.1} interface 
+%     cannot be defined in the PROP, since every nonempty component 
+%     has a separate zero element, but the \word{shape} parameter will 
+%     in a specific matrix ring (or bimodule) provide the necessary 
+%     information.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::1 {shape ring args} {
+   if {[llength $args] == 1} then {
+      set one [lindex $args 0]
+   } elseif {[llength $args] == 0} then {
+      set one [{*}$ring 1]
+   } else {
+      set cmd [lrange [info level 0] 0 end-[llength $args]]
+      append cmd " ?scalar?"
+      return -code error "Wrong # arguments: $cmd"
+   }
+   set m [lindex $shape 0]
+   set n [lindex $shape end]
+   incr m 0; incr n 0
+   set zero [{*}$ring 0]
+   set res {}
+   for {set i 0} {$i<$m} {incr i} {
+      set row {}
+      for {set j 0} {$j<$n} {incr j} {
+         if {$i==$j} then {lappend row $one} else {lappend row $zero}
+      }
+      lappend res $row
+   }
+   return $res
+}
+%     \end{tcl}
+%     Even when the \word{shape} is not fixed, it is straightfoward 
+%     to multiply an existing element by the |scalar 0| to produce a 
+%     same-size zero.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{export}
+%     The \OMSref{linalg2}{matrix} and \OMSref{linalg2}{matrixrow} 
+%     symbols provide a standard and straightforward encoding for the 
+%     elements of this structure.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::export {shape ring A path} {
+   set spath [linsert $path end scalar]
+   set rowattr [dict create  cd linalg2  name matrixrow \
+     mtmtcl:path $path]
+   set rowsymb [list OMS $rowattr {}]
+   set mat [list [list OMS [dict replace $rowattr name matrix] {}]]
+   foreach Arow $A {
+      set row [list $rowsymb]
+      foreach a $Arow {
+         lappend row [{*}$ring export $a $spath]
+      }
+      lappend mat [list OMA {} $row]
+   }
+   return [list OMA {} $mat]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{fuse}
+%     For the purposes of |fuse|, it is convenient to view every 
+%     label as representing a row of the matrix by which the 
+%     \word{factor} at its head end should be multiplied. Input 
+%     labels start out as rows of the identity matrix, and the output 
+%     labels describe the wanted result. The actual multiplication 
+%     can be delegated to the |*| method, so |fuse| only needs to 
+%     keep track of which rows to combine in which situations.
+%     
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::fuse {shape ring args} {
+   if {[llength $args] % 3 != 2} then {
+      return -code error "wrong # arguments"
+   }
+%     \end{tcl}
+%     The computations are data-driven, where a factor is used as 
+%     soon as it is detected that all rows of the submatrix it is to 
+%     be multiplied by are available. To that end, there is a list 
+%     |ready| of all labels whose values have become available; the 
+%     actual values are stored in the |Row| array which is indexed by 
+%     corresponding label. The |H| array maps labels to the list 
+%     index into |args| of the corresponding \word{factor}, and the 
+%     |Need| array maps such indices to the number of rows that still 
+%     need to be computed before this product can be computed.
+%     \begin{tcl}
+   set ready {}
+   foreach e [lindex $args 0] {
+      if {[info exists H($e)]} then {
+         return -code error "Duplicate head for label: $e"
+      }
+      set H($e) -1
+%     \end{tcl}
+%     The output labels count as having their head at ``factor 
+%     $-1$''.
+%     \begin{tcl}
+   }
+   set Need(-1) [llength [lindex $args 0]]
+%     \end{tcl}
+%     Then it's |H| and |Need| for the various factors.
+%     \begin{tcl}
+   set factors_remaining 0
+   set k -1; foreach {t A h} [lrange $args 1 end-1] {incr k 3
+      foreach e $h {
+         if {[info exists H($e)]} then {
+            return -code error "Duplicate head for label: $e"
+         }
+         set H($e) $k
+      }
+      set Need($k) [llength $h]
+      incr factors_remaining
+      if {[llength $t] != [llength $A]} then {
+         return -code error -errorcode {API PROP typenomatch}\
+           "Number of factor rows do not match tail labels: $t"
+      }
+%<*noneed>
+      if {!$Need($k)} then {
+%     \end{tcl}
+%     In general, it might at this point be the case that a factor 
+%     had arity zero, which would mean labels with their tail at it 
+%     are immediately |ready|. There is no need to check this in the 
+%     |trivial| PROP however, since the only nullary element here is 
+%     also conullary and therefore cannot contribute anything to the 
+%     rest of the calculation.
+%     \begin{tcl}
+         foreach e $t row $A {
+            if {[info exists Row($e)]} then {
+               return -code error "Duplicate tail for label: $e"
+            }
+            set Row($e) $row
+            lappend ready $e
+         }
+         incr factors_remaining -1
+      }
+%</noneed>
+   }
+%     \end{tcl}
+%     Finally the rows for input labels need to be constructed.
+%     \begin{tcl}
+   set zero [{*}$ring 0]
+   set one [{*}$ring 1]
+   set zerorow [lrepeat [llength [lindex $args end]] $zero]
+   set k -1; foreach e [lindex $args end] {incr k
+      if {[info exists Row($e)]} then {
+         return -code error "Duplicate tail for label: $e"
+      }
+      set Row($e) [lreplace $zerorow $k $k $one]
+      lappend ready $e
+   }
+%     \end{tcl}
+%     The main loop treats |ready| as a queue, and from that point of 
+%     view its primary task is to move data from the tail end to the 
+%     head end of a label, which concretely amounts to updating 
+%     |Need| at the head end. Then (almost as a side-effect) a matrix 
+%     multiplication will be performed when the |Need| value reaches 
+%     zero, thus producing a new list of rows which get appended to 
+%     the queue, to be processed in due time.
+%     \begin{tcl}
+   for {set n 0} {$n < [llength $ready]} {incr n} {
+      set e [lindex $ready $n]
+      if {![info exists H($e)]} then {
+         return -code error "Missing head for label: $e"
+      }
+      if {![incr Need($H($e)) -1] && $H($e)>0} then {
+         set B {}
+         foreach f [lindex $args $H($e)+1] {lappend B $Row($f)}
+         foreach row [
+            * $ring [lindex $args $H($e)] $B
+         ] f [lindex $args $H($e)-1] {
+            if {[info exists Row($f)]} then {
+               return -code error "Duplicate tail for label: $f"
+            }
+            set Row($f) $row
+            lappend ready $f
+         }
+         incr factors_remaining -1
+      }
+   }
+   if {$Need(-1) || $factors_remaining} then {
+      return -code error "Dependency cycle among labels"
+   }
+%     \end{tcl}
+%     If |Need(-1)| is not zero then we're missing that many rows 
+%     for the result although there's nothing more than can be done, 
+%     so something must be wrong, and the only thing that can be 
+%     wrong is that there is a dependency cycle which blocks the 
+%     computation. Just checking |Need(-1)| is not sufficient for 
+%     detecting all cycles however; a coarity $1$ arity $2$ factor 
+%     which has the output also as one input would not prevent any 
+%     row from reaching the output, but in other PROPs it could well 
+%     have side-effects that contribute to the correct result.
+%     
+%     But now all possibilities for errors have been caught, and it 
+%     only remains to construct the result.
+%     \begin{tcl}
+   set res {}
+   foreach e [lindex $args 0] {lappend res $Row($e)}
+   return $res
+}
+%     \end{tcl} 
+%   \end{ensproc}
+% 
+% 
+% \end{ensemble}
+% 
+% 
+% \begin{ensemble}{ring}
+%   The procedures above can also be used to implement a ring of 
+%   square matrices. The command prefix for such a ring is
+%   \begin{displaysyntax}
+%     mtmtcl::matprop::ring \word{side} \word{ring}
+%   \end{displaysyntax}
+%   where the \word{side} may be an integer, but primarily is 
+%   interpreted as a list whose first and last elements should be the 
+%   side of the matrix.
+%   
+%   The representation for elements in this ring are as lists of 
+%   lists of elements, where the middle level lists are the rows.
+%   
+%   \begin{tcl}
+namespace eval mtmtcl::matprop::trivial {
+   namespace ensemble create\
+     -command [namespace parent]::ring\
+     -parameters {shape ring}\
+     -subcommands {= * + - . scalar 0 1 export}
+}
+%   \end{tcl}
+% \end{ensemble}
+% 
+% 
+% 
+% \section{Algebraic matrix implementation}
+% \label{Sec:homfdpower}
+% 
+% The more algebraic implementation of |PROP| using matrices is to 
+% view the PROP elements as homomorphisms between tensor powers of 
+% some underlying finite dimensional vector space; $\mc{P}(m,n)$ is 
+% effectively $\hom(V^{\otimes n},V^{\otimes m})$ for some underlying 
+% vector space $V$.
+%  
+% 
+% \begin{ensemble}[mtmtcl::matprop]{homfdpower}
+%   This implementation of a |PROP| is as the command prefix
+%   \begin{displaysyntax}
+%     mtmtcl::matprop::homfdpower \word{dimensions} \word{ring}
+%   \end{displaysyntax}
+%   where the base command is an ensemble with two parameters 
+%   \word{dimensions} (which must be a positive integer) and 
+%   \word{ring}, which must be a \APIref{ring}{1.0} and 
+%   \APIref{monoid}{1.0}.
+%   
+%   \begin{tcl}
+namespace eval mtmtcl::matprop::homfdpower {
+   namespace ensemble create -parameters {d ring}
+   namespace export {[ -^`-~]*}
+   namespace path [list [namespace parent]]
+}
+%   \end{tcl}
+%   Many methods make use of their |trivial| counterparts, so putting 
+%   the |mtmtcl::matprop| namespace in the path will ensure they can 
+%   be called as |trivial::|\meta{name}.
+%   
+%   The data format is, as for the |trivial| implementation, a list 
+%   of rows where each row is a list of elements of the \word{ring}. 
+%   The difference is that there are $d^n$ columns in arity $n$ and 
+%   $d^m$ rows in coarity $m$, so the matrices are a good deal larger 
+%   than in the trivial implementation, but this is necessary for the 
+%   PROP to be linear over the \word{ring}.
+%   
+%   \begin{ensproc}{arity}
+%   \begin{ensproc}{coarity}
+%     The |arity| and |coarity| methods check that the matrix sides 
+%     really are powers of the \word{dimension}.
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::arity {d ring A} {
+   set side [llength [lindex $A 0]]
+   if {!$side} then {
+      return -code error "Not an element in this structure"
+   }
+   set res 0
+   while {$side%$d == 0} {
+      incr res
+      set side [expr {$side/$d}]
+   }
+   if {$side!=1} then {
+      return -code error "Not an element in this structure"
+   }
+   return $res
+}
+proc mtmtcl::matprop::homfdpower::coarity {d ring A} {
+   set side [llength $A]
+   if {!$side} then {
+      return -code error "Not an element in this structure"
+   }
+   set res 0
+   while {$side%$d == 0} {
+      incr res
+      set side [expr {$side/$d}]
+   }
+   if {$side!=1} then {
+      return -code error "Not an element in this structure"
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}
+%   
+%   \begin{ensproc}{tensor}
+%     The tensor product in this PROP is the \emph{Kronecker product} 
+%     of matrices. 
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::tensor {d ring A B} {
+   set res {}
+   foreach Brow $B {
+      foreach Arow $A {
+         set row {}
+         foreach b $Brow {
+            foreach a $Arow {
+               lappend row [{*}$ring * $a $b]
+            }
+         }
+         lappend res $row
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%     As implemented here, the $B$-indices are more significant than 
+%     the $A$-indices. When we get to the permutations, this implies 
+%     that component $0$ has lowest significance, component $1$ 
+%     second lowest etc., so that the matrix index is 
+%     $\sum_{r=0}^{n-1} k_r d^r$ for the element of $V^{\otimes n}$ 
+%     whose component indices are $(k_0,\dotsc,k_{n-1})$.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{=}
+%   \begin{ensproc}{*}
+%     Equality testing is the same as in the |trivial| 
+%     implementation, except that we don't need the \word{dimension}. 
+%     The same is true for the composition operation (matrix 
+%     multiplication).
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::= {d ring A B} {
+   trivial::= "" $ring $A $B
+}
+proc mtmtcl::matprop::homfdpower::* {d ring A B} {
+   trivial::* "" $ring $A $B
+}
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}
+%   
+%   \begin{ensproc}{_flat_permutation}
+%     The first tricky operation is |permutation|, since these 
+%     effectively control how the digits of a base $d$ representation 
+%     of a matrix row or column are being permuted. It seems the most 
+%     practical way to do that is to create an explicit permutation 
+%     of matrix indices and then use the |trivial| implementation of 
+%     operations with this larger permutation, so here we go.
+%     
+%     Given a permutation $\sigma$ of list-length $n$, this procedure 
+%     constructs a permutation of list-length $d^n$ which maps 
+%     $\sum_{r=0}^{n-1} k_r d^r$ to $\sum_{r=0}^{n-1} k_{\sigma(r)} 
+%     d^r$, where \(0 \leqslant k_r < d\) for all $r$. The call 
+%     syntax is
+%     \begin{displaysyntax}
+%       |_flat_permutation| \word{d} \word{$\sigma$}
+%     \end{displaysyntax}
+%     The algorithm idea is to keep the $k_r$ as separate elements in 
+%     an array and increment them as needed, while recomputing 
+%     $\sum_{r=0}^{n-1} k_{\sigma(r)} d^r$ after each increment.
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::_flat_permutation {d sigma} {
+   set r -1; foreach i $sigma {incr r
+      set k($r) 0
+   }
+   set rsigma [lreverse $sigma]
+   set res {}
+   while 1 {
+      set sum 0
+      foreach i $rsigma {
+         set sum [expr {$sum*$d + $k($i)}]
+      }
+      lappend res $sum
+      set r 0; foreach i $sigma {
+         if {[incr k($r)]<$d} then {break}
+         set k($r) 0
+         incr r
+         if {$r >= [llength $sigma]} then {return $res}
+      }
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{permutation}
+%     As explained above, the |permutation| method here consists of 
+%     applying the |trivial| method to a flattened permutation.
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::permutation {d ring sigma} {
+   trivial::permutation "" $ring [_flat_permutation $d $sigma]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{perm.}
+%   \begin{ensproc}{.perm}
+%     The action-of-permutation operations similarly rely on their 
+%     |trivial| counterparts.
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::perm. {d ring sigma A} {
+   trivial::perm. "" $ring [_flat_permutation $d $sigma] $A
+}
+proc mtmtcl::matprop::homfdpower::.perm {d ring A sigma} {
+   trivial::.perm "" $ring $A [_flat_permutation $d $sigma]
+}
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}
+%   
+%   \begin{ensproc}{tensorpad}
+%     Tensor padding is technically the same as the |trivial| tensor 
+%     product, with the matrix $A$ repeated $d^n$ times! The idea 
+%     below is to $n$ times set $A$ to the $d$-fold repetition 
+%     of~$A$.
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::tensorpad {d ring A n} {
+   for {} {$n>0} {incr n -1} {
+      set res {}
+      set zeroes [lrepeat [llength [lindex $A 0]] [{*}$ring 0]]
+      for {set i 0} {$i<$d} {incr i} {
+         foreach Arow $A {
+            set row [list]
+            for {set j 0} {$j<$d} {incr j} {
+               if {$i==$j} then {
+                  lappend row {*}$Arow
+               } else {
+                  lappend row {*}$zeroes
+               }
+            }
+            lappend res $row
+         }
+      }
+      set A $res
+   }
+   return $A
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{fuse}
+%     The idea for the following |fuse| for a graphic PROP 
+%     expression is to generate the elements in the order they 
+%     appear. This implies there is an outer loop over the rows 
+%     (index assignments to output edges), a middle loop over the 
+%     columns (index assignments to input edges), and finally an 
+%     inner loop for the sum within each element (index assignments 
+%     to internal edges). The algorithm is optimal when there is only 
+%     two factors, but will be suboptimal if there are more than two 
+%     (since advantage is not taken of repeated subexpressions). It 
+%     is however reasonable to expect the two factor case to be that 
+%     which is most commonly employed by higher level mechanisms.
+%     
+%     In each of the three loops, the value of the loop variable 
+%     is a list of zero or more integers $i$ such that \(0 \leqslant 
+%     i < d\). These are coupled to row or column indices into the 
+%     factor matrices, which should be incremented or decremented 
+%     accordingly. The latter indices are kept in entries of the 
+%     local array |Pos|, whose indices have the form 
+%     \meta{factor}|,row| or \meta{factor}|,col|, where \word{factor} 
+%     is simply the index of the matrix into the list of factors.
+%     
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::fuse {d ring args} {
+   if {[llength $args] % 3 != 2} then {
+      return -code error "Wrong # arguments"
+   }
+%     \end{tcl}
+%     The idea in the following is to calculate how changes in the 
+%     value of a label affect the indices in its factor. A first step 
+%     is to compute the unit for this value (which need not be the 
+%     same at the head and tail ends), but it is convenient to go one 
+%     step further and construct scripts which perform the exact 
+%     increment or reset. The four arrays |T_incr|, |T_turn|, 
+%     |H_incr|, and |H_turn| also have scripts as entries and labels 
+%     as indices. The scripts in the |_incr| arrays change the 
+%     relevant |Pos| entry according to an increment the label value, 
+%     whereas the scripts in the |_turn| arrays change it according 
+%     to a turnaround of the label value (reset to $0$, which is 
+%     assumed to be the same as a decrement by $d$ times the unit). 
+%     The |H_| arrays are for head ends and the |T_| arrays are for 
+%     tail ends.
+%     
+%     Another thing done at the same time is to verify that the 
+%     number of labels given for a factor matches its dimensions.
+%     \begin{tcl}
+   set factors {}
+   foreach {t A h} [lrange $args 1 end-1] {
+      set Pos([llength $factors],row) 0
+      set Pos([llength $factors],col) 0
+      set unit 1
+      foreach e $t {
+         if {[info exists T_incr($e)]} then {
+            return -code error "Duplicate tail label: $e"
+         }
+         set T_incr($e) [list incr Pos([llength $factors],row) $unit]
+         set unit [expr {$unit*$d}]
+         set T_turn($e)\
+           [list incr Pos([llength $factors],row) [expr {-$unit}]]
+      }
+      if {[llength $A] != $unit} then {
+         return -code error -errorcode {API PROP typenomatch}\
+           "Output mismatch for factor [llength $factors]"
+      }
+      set unit 1
+      foreach e $h {
+         if {[info exists H_incr($e)]} then {
+            return -code error "Duplicate head label: $e"
+         }
+         set H_incr($e) [list incr Pos([llength $factors],col) $unit]
+         set unit [expr {$unit*$d}]
+         set H_turn($e)\
+           [list incr Pos([llength $factors],col) [expr {-$unit}]]
+      }
+      if {[llength [lindex $A 0]] != $unit} then {
+         return -code error -errorcode {API PROP typenomatch}\
+           "Input mismatch for factor [llength $factors]"
+      }
+      lappend factors $A
+   }
+%     \end{tcl}
+%     Next, the information gathered above is wrapped up in a form 
+%     that simplifies the outer loop, whose loop variable is 
+%     |outerL|. This has a companion in the |outer_step| variable, 
+%     which is a list of those scripts (from |T_incr| and |T_turn|) 
+%     which are needed when updating |Pos| to match an increment in 
+%     |outerL|; there are two elements in |outer_step| for every 
+%     element of |outerL|.
+%     \begin{tcl}
+   set outputs [lindex $args 0]
+   set outerL {}
+   set outer_step {}
+   foreach e $outputs {
+      if {[info exists T_incr($e)]} then {
+         lappend outer_step $T_incr($e) $T_turn($e)
+      } else {
+         lappend outer_step {} {}
+      }
+      lappend outerL 0
+      if {[info exists H_incr($e)]} then {
+         return -code error "Duplicate head label: $e"
+      }
+   }
+%     \end{tcl}
+%     After that, it is time to do the same for the middle loop, 
+%     where the loop variable is |middleL| and the increment scripts 
+%     are stored in |middle_step|. There is in this case the 
+%     complication that some labels may appear both as input and as 
+%     output, in which case there is no contributions to the 
+%     corresponding matrix entry unless the value given to the label 
+%     is the same at both ends. The |nomatch| variable is an 
+%     |expr|ession which is true precisely when some label has 
+%     contradicting values.
+%     \begin{tcl}
+   set conditions {}
+   set middle_step {}
+   set middleL {}
+   foreach e [lindex $args end] {
+      if {[info exists H_incr($e)]} then {
+         lappend middle_step $H_incr($e) $H_turn($e)
+      } elseif {0<=[
+         set k [lsearch -exact $outputs $e]
+      ]} then {
+         lappend middle_step {} {}
+         lappend conditions [format\
+           {[lindex $outerL %d]!=[lindex $middleL %d]}\
+           $k [llength $middleL]]
+      } else {
+         return -code error "Label without head: $e"
+      }
+      lappend middleL 0
+      if {[info exists T_incr($e)]} then {
+         return -code error "Duplicate tail label: $e"
+      }
+   }
+   if {[llength $conditions]} then {
+      set nomatch [join $conditions " || "]
+   } else {
+      set nomatch 0
+   }
+%     \end{tcl}
+%     Finally, there is the corresponding data for the inner loop 
+%     (over internal labels), where the variables are |innerL| and 
+%     |inner_step|. The latter has four elements for every element 
+%     of the first, since |Pos| needs to be updated at both ends.
+%     \begin{tcl}
+   set inner_step {}
+   set innerL {}
+   foreach e [array names T_incr] {
+      if {[info exists H_incr($e)]} then {
+         lappend innerL 0
+         lappend inner_step\
+           $T_incr($e) $H_incr($e) $T_turn($e) $H_turn($e)
+      }
+   }
+   if {[array size H_incr] + [array size T_incr] +\
+     2*[llength $conditions] != [llength $outerL] +\
+     [llength $middleL] + 2*[llength $innerL]} then {
+      return -code error "Some label is unmatched"
+   }
+%     \end{tcl}
+%     The condition above checks that every label occurs twice. The 
+%     logic is roughly that the left hand side counts labels in the 
+%     input, whereas the right hand side counts labels being looped 
+%     over.
+%     
+%     Now for the actual loops, which are implemented as |for| loops 
+%     with rather large \word{next} scripts. These contain a 
+%     |foreach| loop over (essentially) elements in the loop variable 
+%     which however is |break|ed as soon as one is found that could 
+%     be incremented without reaching the $d$ limit. This |foreach| 
+%     loop can only run till end when all element of |outerL| turn 
+%     over, and as that is incidentally the end-of-loop condition for 
+%     the |for| loop, this loop will run until the index |k| of the 
+%     |outerL| element to increment is greater than that of any 
+%     actual element in |outerL|.
+%     \begin{tcl}
+   set one [{*}$ring 1]
+   set zero [{*}$ring 0]
+   set res {}
+   for {set k -1} {$k<[llength $outerL]} {
+      set k 0
+      foreach {tincr tturn} $outer_step {
+         set i [lindex $outerL $k]
+         incr i
+         eval $tincr
+         if {$i<$d} then {
+            lset outerL $k $i
+            break
+         }
+         lset outerL $k 0
+         eval $tturn
+         incr k
+      }
+   } {
+%     \end{tcl}
+%     The outer loop body consists mostly of the middle loop, which 
+%     is much like the outer loop. There is no need to reinitialise 
+%     |middleL| when entering this loop since the loop turns it back 
+%     to a list of all zeroes before terminating.
+%     \begin{tcl}
+      set row {}
+      for {set k -1} {$k<[llength $middleL]} {
+         set k 0
+         foreach {hincr hturn} $middle_step {
+            set i [lindex $middleL $k]
+            incr i
+            eval $hincr
+            if {$i<$d} then {
+               lset middleL $k $i
+               break
+            }
+            lset middleL $k 0
+            eval $hturn
+            incr k
+         }
+      } {
+%     \end{tcl}
+%     Similarly, the middle loop body consists mostly of the inner 
+%     loop. A special detail is however the |nomatch| test which 
+%     skips the inner loop for result entries with no contributing 
+%     terms.
+%     \begin{tcl}
+         if $nomatch then {
+            lappend row $zero
+            continue
+         }
+         set sum $zero
+         for {
+            set k -1
+         } {$k<[llength $innerL]} {
+            set k 0
+            foreach {tincr hincr tturn hturn} $inner_step {
+               set i [lindex $innerL $k]
+               incr i
+               eval $tincr; eval $hincr
+               if {$i<$d} then {
+                  lset innerL $k $i
+                  break
+               }
+               lset innerL $k 0
+               eval $tturn; eval $hturn
+               incr k
+            }
+         } {
+%     \end{tcl}
+%     The inner |for| loop body is a more conventional loop over the 
+%     factors, forming a product with one element from each.
+%     \begin{tcl}
+            set prod $one
+            set k -1; foreach A $factors {incr k
+               set prod [{*}$ring * $prod\
+                 [lindex $A $Pos($k,row) $Pos($k,col)]]
+            }
+            set sum [{*}$ring + $sum $prod]
+         }
+         lappend row $sum
+      }
+      lappend res $row
+   }
+   return $res
+}
+%     \end{tcl}
+%     This is definitely a procedure that would benefit from 
+%     tangling, but hopefully it is readable anyway.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{+}
+%   \begin{ensproc}{-}
+%     The addition and subtraction operations are again equal to 
+%     their |trivial| counterparts.
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::+ {d ring args} {
+   trivial::+ "" $ring {*}$args
+}
+proc mtmtcl::matprop::homfdpower::- {d ring args} {
+   trivial::- "" $ring {*}$args
+}
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}
+%   
+%   \begin{ensproc}{export}
+%     The \OMSref{linalg2}{matrix} and \OMSref{linalg2}{matrixrow} 
+%     symbols provide a standard and straightforward encoding for the 
+%     elements of this structure.
+%     \begin{tcl}
+proc mtmtcl::matprop::homfdpower::export {d ring A attr} {
+   set sattr $attr
+   dict lappend sattr mtmtcl:path scalar
+   set rowsymb [list OMS\
+     [dict replace $attr  cd linalg2  name matrixrow] {}]
+   set mat [list [list OMS\
+     [dict replace $attr  cd linalg2  name matrix] {}]]
+   foreach Arow $A {
+      set row [list $rowsymb]
+      foreach a $Arow {
+         lappend row [{*}$ring export $a $sattr]
+      }
+      lappend mat [list OMA {} $row]
+   }
+   return [list OMA {} $mat]
+}
+%     \end{tcl}
+%     It could be useful to also encode $d$ (or rather the multilevel 
+%     block-decompositions it gives rise to) into this result, but 
+%     that requires a standard for encoding this information.
+%   \end{ensproc}
+%   
+% \end{ensemble}
+% 
+% 
+% \section{The affine PROP}
+% 
+% The |affine| PROP is a relative of the |trivial| PROP, which 
+% however extends it in a way similar to that in which the affine 
+% transformations extend the set of linear transformations. Indeed, 
+% the set of elements in the affine PROP includes the set of affine 
+% transformations, but it also contains a somewhat curious set of 
+% ``coaffine'' transformation for which I currently don't have a 
+% geometrical interpretation.
+% 
+% There is however a graph-theoretical interpretation of the elements 
+% in this PROP, as keeping track of the number of paths in an acyclic 
+% disemigraph. There are generally four kinds of path in a 
+% disemigraph, namely \emph{closed} (termintated at both ends), 
+% \emph{ended} (terminated at head end but not tail end), 
+% \emph{started} (terminated at tail end but not head end), and 
+% \emph{open} (open in both ends). Counting paths in such detail that 
+% one can predict the outcome of a semigraph composition requires 
+% keeping track of each kind separately, and also keeping track of 
+% which leg(s) a particular non-closed path is incident with. Hence 
+% the numbers of open paths are given by a matrix $A$, the numbers of 
+% started paths are given by a vector $\mathbf{b}$, the numbers of 
+% ended paths are given by a (co)vector $\mathbf{c}$, and only the 
+% number of closed paths can be summarised in a scalar $d$. For a 
+% semigraph $3$ composed from semigraphs $1$ and $2$, these 
+% quantities are computed as follows:
+% \begin{align*}
+%   A_3 ={}& A_1 A_2 &
+%     \mathbf{b}_3 ={}& \mathbf{b}_1 + A_1 \mathbf{b}_2 \\
+%   \mathbf{c}_3 ={}& \mathbf{c}_1 A_2 + \mathbf{c}_2 &
+%     d_3 ={}& d_1 + \mathbf{c}_1\mathbf{b}_2 + d_2
+% \end{align*}
+% This is also the composition law for the affine PROP.
+% 
+% Like ordinary affine transformations, composition of affine PROP 
+% elements can be expressed as ordinary multiplication of larger 
+% matrices into which the affine parts have been suitably embedded, 
+% like so:
+% \begin{equation}
+%   \begin{pmatrix}
+%     1 & d & \mathbf{c} \\
+%     0 & 1 & 0 \\
+%     0 & \mathbf{b} & A
+%   \end{pmatrix}
+% \end{equation}
+% Two nice corollaries to this observation are that the associativity 
+% and unitarity of composition. It does not reduce the affine PROP 
+% to a subset of the |trivial| PROP however, as the tensor product 
+% and permutation embeddings act differently on the non-matrix parts. 
+% Instead choosing the more compact block matrix encoding
+% \begin{equation*}
+%   \begin{bmatrix}
+%     d & \mathbf{c} \\
+%     \mathbf{b} & A
+%   \end{bmatrix}
+% \end{equation*}
+% for an element of the affine PROP, its operations can be summarised 
+% as
+% \begin{align}
+%   \begin{bmatrix}
+%     d_1 & \mathbf{c}_1 \\
+%     \mathbf{b}_1 & A_1
+%   \end{bmatrix}
+%   \otimes
+%   \begin{bmatrix}
+%     d_2 & \mathbf{c}_2 \\
+%     \mathbf{b}_2 & A_2
+%   \end{bmatrix}
+%   :={}&
+%   \begin{bmatrix}
+%     d_1+d_2 & \mathbf{c}_1 & \mathbf{c}_2 \\
+%     \mathbf{b}_1 & A_1 & 0 \\
+%     \mathbf{b}_2 & 0 & A_2
+%   \end{bmatrix}
+%   \\
+%   \begin{bmatrix}
+%     d_1 & \mathbf{c}_1 \\
+%     \mathbf{b}_1 & A_1
+%   \end{bmatrix}
+%   \circ
+%   \begin{bmatrix}
+%     d_2 & \mathbf{c}_2 \\
+%     \mathbf{b}_2 & A_2
+%   \end{bmatrix}
+%   :={}&
+%   \begin{bmatrix}
+%     d_1 + \mathbf{c}_1\mathbf{b}_2 + d_2 &
+%       \mathbf{c}_1A_2 + \mathbf{c}_2 \\
+%     \mathbf{b}_1 + A_1\mathbf{b}_2 & A_1A_2
+%   \end{bmatrix} \\
+%   \texttt{[\dots~permutation $\sigma$]} :={}&
+%   \begin{bmatrix}
+%     0 & 0 \\
+%     0 & \sigma \cdot I
+%   \end{bmatrix}
+% \end{align}
+% where $\sigma \cdot I$ denotes the |trivial| action of the 
+% permutation $\sigma$ on the identity matrix.
+% 
+% \begin{ensemble}[mtmtcl::matprop]{affine}
+%   This implementation of a |PROP| is as the command prefix
+%   \begin{displaysyntax}
+%     mtmtcl::matprop::affine \word{ring}
+%   \end{displaysyntax}
+%   where the base command is an ensemble with one parameter 
+%   \word{ring} (which must be a \APIref{ring}{1.0} and 
+%   \APIref{monoid}{1.0}).
+%   
+%   A possible generalisation could be to allow inputs and outputs to 
+%   carry vector spaces of some fixed dimension greater than $1$, and 
+%   a further generalisation could be to also let the ``scalar'' be a 
+%   vector (turning $d$ into a matrix), but so far I don't have a 
+%   use-case for that.
+%   
+%   \begin{tcl}
+namespace eval mtmtcl::matprop::affine {
+   namespace ensemble create -parameters {ring}
+   namespace export {[ -^`-~]*}
+   namespace path [list [namespace parent]]
+}
+%   \end{tcl}
+%   
+%   The data format is a four element list
+%   \begin{displaysyntax}
+%     \word{$d$} \word{$\mathbf{b}$} \word{$\mathbf{c}$} \word{$A$}
+%   \end{displaysyntax}
+%   where the matrix $A$ is a list of lists of \word{ring} elements 
+%   as in the |trivial| PROP, the vectors $\mathbf{b}$ and 
+%   $\mathbf{c}$ are lists of \word{ring} elements (no distinction, 
+%   even though $\mathbf{b}$ is a column vector and $\mathbf{c}$ is a 
+%   row vector), and $d$ is a \word{ring} element.
+%   
+%   In the case that the arity or coarity is $0$, the matrix $A$ 
+%   must always be an empty string (ditto list). A consequence of 
+%   this is that its list length dimensions need not match the 
+%   element arity and coarity, which is sometimes a complication in 
+%   actual calculations.
+%   
+%   \begin{ensproc}{arity}
+%     The arity is measured as the length of the \word{end} part.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::arity {ring element} {
+   llength [lindex $element 2]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{coarity}
+%     The coarity is measured as the length of the \word{begin} part.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::coarity {ring element} {
+   llength [lindex $element 1]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{part}
+%     The |part| method provides an abstract interface for accessing 
+%     specific parts of a PROP element. The call syntax is
+%     \begin{displaysyntax}
+%       \meta{PROP} part \begin{regblock} open \regalt begin \regalt 
+%       end \regalt closed \end{regblock} \word{element}
+%     \end{displaysyntax}
+%     and it returns the specified part of the \word{element}.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::part {ring part element} {
+   switch -- $part "open" {
+      lindex $element 3
+   } "begin" {
+      lindex $element 1
+   } "end" {
+      lindex $element 2
+   } "closed" {
+      lindex $element 0
+   } default {
+      return -code error "Unknown part name \"$part\";
+        must be begin, close, end, or open"
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{fromparts}
+%     This is the converse of |part|: an |affine| PROP element 
+%     constructor. It has the call syntax
+%     \begin{displaysyntax}
+%       \meta{PROP} fromparts \word{closed} \word{begin} \word{end} 
+%       \word{open} 
+%     \end{displaysyntax}
+%     and checks that the list lengths match.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::fromparts {ring closed begin end open} {
+   if {[llength $open] ? 
+       [llength $begin] != [llength $open] ||\
+       [llength $end] != [llength [lindex $open 0]]
+     :
+       [llength $begin]!=0 && [llength $end]!=0
+   } then {return -code error "Part shapes do not match"}
+   list $closed $begin $end $open
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{=}
+%     Equality testing is just about checking all elements, and 
+%     |return 0| if finding anything that doesn't match.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::= {ring L R} {
+   if {[llength [lindex $L 1]] != [llength [lindex $R 1]] ||\
+      [llength [lindex $L 2]] != [llength [lindex $R 2]]}\
+   then {return 0}
+   if {![{*}$ring = [lindex $L 0] [lindex $R 0]} then {return 0}
+   foreach l [lindex $L 2] r [lindex $R 2] {
+      if {![{*}$ring = $l $r} then {return 0}
+   }
+   foreach l [lindex $L 1] r [lindex $R 1] {
+      if {![{*}$ring = $l $r} then {return 0}
+   }
+   foreach ll [lindex $L 3] rr [lindex $R 3] {
+      foreach l $ll r $rr {
+         if {![{*}$ring = $l $r} then {return 0}
+      }
+   }
+   return 1
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{*}
+%     The composition calculation has several pieces which depend 
+%     on whether a particular factor is null(co)ary or not, so in 
+%     principle there could be \(2^3=8\) different cases in this 
+%     procedure, but it is clearer to for each part test the 
+%     conditions which are relevant there.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::* {ring L R} {
+   if {[llength [lindex $L 2]] != [llength [lindex $R 1]]} then {
+      return -code error -errorcode {API PROP typenomatch}\
+        "Left factor arity does not match right factor coarity"
+   }
+   set res {}
+%     \end{tcl}
+%     First there is the closed part, where not explicit test is 
+%     needed.
+%     \begin{tcl}
+   set sum [{*}$ring + [lindex $L 0] [lindex $R 0]]
+   foreach c [lindex $L 2] b [lindex $R 1] {
+      set sum [{*}$ring + $sum [{*}$ring * $c $b]] 
+   }
+   lappend res $sum
+%     \end{tcl}
+%     The begin part has a matrix--vector product if the left factor 
+%     has positive arity and coarity. Matrix--vector product plus 
+%     vector is a convenient operation, since the second vector can 
+%     be used as initial values for the sum variable in the product.
+%     \begin{tcl}
+   if {![llength [lindex $L 2]] || ![llength [lindex $L 1]]} then {
+      lappend res [lindex $L 1]
+   } else {
+      set bb {}
+      foreach sum [lindex $L 1] row [lindex $L 3] {
+         foreach a $row b [lindex $R 1] {
+            set sum [{*}$ring + $sum [{*}$ring * $a $b]]
+         }
+         lappend bb $sum
+      }
+      lappend res $bb
+   }
+%     \end{tcl}
+%     The end part is analagous, but the implementation comes out 
+%     differently due to the assymetry of rows and columns in the 
+%     matrix part; rather than computing one element of the result at 
+%     a time, they are all computed in parallel.
+%     \begin{tcl}
+   set cc [lindex $R 2]
+   if {[llength $cc]} then {
+      foreach c [lindex $L 2] row [lindex $R 3] {
+         set newcc {}
+         foreach sum $cc a $row {
+            lappend newcc [{*}$ring + $sum [{*}$ring * $c $a]]
+         }
+         set cc $newcc
+      }
+   }
+   lappend res $cc
+%     \end{tcl}
+%     The open part, finally, need only be computed if all arities 
+%     and coarities are positive.
+%     \begin{tcl}
+   if {[llength [lindex $L 1]] && [llength [lindex $L 2]] &&\
+     [llength [lindex $R 2]]} then {
+      lappend res [trivial::* "" $ring [lindex $L 3] [lindex $R 3]]
+   } else {
+      lappend res {}
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{tensor}
+%     The only tricky thing about the tensor product operation is 
+%     remembering that it is the vector parts that determine how much 
+%     the matrix part should be padded.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::tensor {ring args} {
+   set d [{*}$ring 0]
+   set rowparts {}
+   set cc {}
+   foreach factor $args {
+      set seg {}
+      foreach c [lindex $factor 2] {
+         lappend cc $c
+         lappend seg $d
+      }
+      lappend rowparts $seg
+   }
+%     \end{tcl}
+%     |cc| is now the finished list for the result, whereas 
+%     |rowparts| is a list of zero vectors to use when padding in the 
+%     matrix part.
+%     \begin{tcl}
+   set A {}
+   set bb {}
+   set i -1; foreach factor $args {incr i
+      foreach row [lindex $factor 3] b [lindex $factor 1] {
+%     \end{tcl}
+%     In general, it is the list for |b| that determines how many 
+%     iterations this loop may have. If the list for |row| is shorter 
+%     than that then it is empty and each row becomes an empty 
+%     string, which is correct since the corresponding element of 
+%     |rowparts| must be empty too (if a factor has empty open-part 
+%     matrix but positive arity then the coarity must be zero).
+%     \begin{tcl}
+         set Arow {}
+         set j -1; foreach seg $rowparts {incr j
+            if {$i==$j} then {
+               lappend Arow {*}$row
+            } else {
+               lappend Arow {*}$seg
+            }
+         }
+         lappend A $Arow
+         lappend bb $b
+      }
+      set d [{*}$ring + $d [lindex $factor 3]]
+   }
+   if {![llength $cc] || ![llength $bb]} then {set A {}}
+   return [list $d $bb $cc $A]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{permutation}
+%     The easiest way to implement this is to use the |trivial| 
+%     counterpart.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::permutation {ring sigma} {
+   set zero [{*}$ring 0]
+   set zerolist [lrepeat [llength $sigma] $zero]
+   list $zero $zerolist $zerolist\
+     [trivial::permutation "" $ring $sigma]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   
+%   \begin{ensproc}{fuse}
+%     The |fuse| procedure here is basically the same as in the 
+%     |trivial| PROP, but with the extra parts of an |affine| PROP 
+%     element. Thus every label represents a row of the open part 
+%     matrix (stored in the |Row| array) and an element in the begin 
+%     part vector (stored in the |Begin| array). The |end| and 
+%     |closed| parts are on the other hand not tied to any particular 
+%     label, so these are kept in scalar variables. Compositions are 
+%     delegated to the |*| method and take a \word{factor} on the 
+%     left and the relevant subset of rows on the right.
+%     
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::fuse {ring args} {
+   if {[llength $args] % 3 != 2} then {
+      return -code error "wrong # arguments"
+   }
+%     \end{tcl}
+%     The computations are data-driven, where a factor is used as 
+%     soon as it is detected that all rows of the submatrix it is to 
+%     be multiplied by are available. To that end, there is a list 
+%     |ready| of all labels whose values have become available; the 
+%     actual values are stored in the |Row| and |Begin| arrays which 
+%     are indexed by corresponding label. The |H| array maps labels 
+%     to the list index into |args| of the corresponding \word{factor}, 
+%     and the |Need| array maps such indices to the number of rows 
+%     that still need to be computed before this product can be 
+%     computed.
+%     \begin{tcl}
+   set zero [{*}$ring 0]
+   set one [{*}$ring 1]
+   set closed $zero
+   set ready {}
+   foreach e [lindex $args 0] {
+      if {[info exists H($e)]} then {
+         return -code error "Duplicate head for label: $e"
+      }
+      set H($e) -1
+%     \end{tcl}
+%     The output labels count as having their head at ``factor 
+%     $-1$''.
+%     \begin{tcl}
+   }
+   set Need(-1) [llength [lindex $args 0]]
+%     \end{tcl}
+%     Then it's |H| and |Need| for the various factors.
+%     \begin{tcl}
+   set zerorow [lrepeat [llength [lindex $args end]] $zero]
+   set factors_remaining 0
+   set k -1; foreach {t factor h} [lrange $args 1 end-1] {incr k 3
+      foreach e $h {
+         if {[info exists H($e)]} then {
+            return -code error "Duplicate head for label: $e"
+         }
+         set H($e) $k
+      }
+      set Need($k) [llength $h]
+      incr factors_remaining
+      if {[llength $t] != [llength [lindex $factor 1]]} then {
+         return -code error -errorcode {API PROP typenomatch}\
+           "Number of factor rows do not match tail labels: $t"
+      }
+%     \end{tcl}
+%     Unlike the case in the |trivial| PROP, arity zero elements 
+%     which contribute to the calculation are allowed here. Since 
+%     the arity is $0$, the only calculations that might be needed 
+%     are for the closed part of the factor.
+%     \begin{tcl}
+      if {!$Need($k)} then {
+         foreach e $t b [lindex $factor 1] {
+            if {[info exists Row($e)]} then {
+               return -code error "Duplicate tail for label: $e"
+            }
+            set Begin($e) $b
+            set Row($e) $zerorow
+            set closed [{*}$ring + $closed [lindex $factor 0]]
+            lappend ready $e
+         }
+         incr factors_remaining -1
+      }
+   }
+%     \end{tcl}
+%     Finally the rows for input labels need to be constructed.
+%     \begin{tcl}
+   set k -1; foreach e [lindex $args end] {incr k
+      if {[info exists Row($e)]} then {
+         return -code error "Duplicate tail for label: $e"
+      }
+      set Row($e) [lreplace $zerorow $k $k $one]
+      set Begin($e) $zero
+      lappend ready $e
+   }
+   set end $zerorow
+%     \end{tcl}
+%     The main loop treats |ready| as a queue, and from that point of 
+%     view its primary task is to move data from the tail end to the 
+%     head end of a label, which concretely amounts to updating 
+%     |Need| at the head end. Then (almost as a side-effect) an 
+%     |affine| composition will be performed when the |Need| value 
+%     reaches zero, thus producing a new list of rows which get 
+%     appended to the queue, to be processed in due time.
+%     \begin{tcl}
+   for {set n 0} {$n < [llength $ready]} {incr n} {
+      set e [lindex $ready $n]
+      if {![info exists H($e)]} then {
+         return -code error "Missing head for label: $e"
+      }
+      if {![incr Need($H($e)) -1] && $H($e)>0} then {
+         set open {}
+         set begin {}
+         foreach f [lindex $args $H($e)+1] {
+            lappend open $Row($f)
+            lappend begin $Begin($f)
+         }
+         if {![llength $end]} then {set open {}}
+         lassign [
+            * $ring [lindex $args $H($e)]\
+              [list $closed $begin $end $open]
+         ] closed begin end open
+         foreach f [lindex $args $H($e)-1] row $open b $begin {
+            if {[info exists Row($f)]} then {
+               return -code error "Duplicate tail for label: $f"
+            }
+            set Row($f) $row
+            set Begin($f) $b
+            lappend ready $f
+         }
+         incr factors_remaining -1
+      }
+   }
+   if {$Need(-1) || $factors_remaining} then {
+      return -code error "Dependency cycle among labels"
+   }
+%     \end{tcl}
+%     If |Need(-1)| is not zero then we're missing that many rows 
+%     for the result although there's nothing more than can be done, 
+%     so something must be wrong, and the only thing that can be 
+%     wrong is that there is a dependency cycle which blocks the 
+%     computation. Just checking |Need(-1)| is not sufficient for 
+%     detecting all cycles however; an unprocessed factor with 
+%     coarity $0$ would also contribute to the result.
+%     
+%     But now all possibilities for errors have been caught, and it 
+%     only remains to construct the result.
+%     \begin{tcl}
+   set open {}
+   set begin {}
+   foreach e [lindex $args 0] {
+      lappend open $Row($e)
+      lappend begin $Begin($e)
+   }
+   if {![llength $end]} then {set open {}}
+   return [list $closed $begin $end $open]
+}
+%     \end{tcl} 
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{+}
+%   \begin{ensproc}{-}
+%   \begin{ensproc}{.}
+%     Element-wise addition, subtraction, and scalar multiple of the 
+%     PROP elements make sense, but note that composition isn't 
+%     distributive or linear.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::+ {ring L R} {
+   if {[llength [lindex $L 1]] != [llength [lindex $R 1]] ||\
+     [llength [lindex $L 2]] != [llength [lindex $R 2]]} then {
+      return -code error "The two terms do not have the same shape"
+   }
+   set res {}
+   foreach depth {0 1 1 2} l $L r $R {
+      switch -- $depth 0 {
+         lappend res [{*}$ring + $l $r]
+      } 1 {
+         set subres {}
+         foreach a $l b $r {
+            lappend subres [{*}$ring + $a $b]
+         }
+         lappend res $subres
+      } 2 {
+         lappend res [trivial::+ "" $ring $l $r]
+      }
+   }
+   return $res
+}
+% \medskip
+proc mtmtcl::matprop::affine::- {ring L R} {
+   if {[llength [lindex $L 1]] != [llength [lindex $R 1]] ||\
+     [llength [lindex $L 2]] != [llength [lindex $R 2]]} then {
+      return -code error "The two terms do not have the same shape"
+   }
+   set res {}
+   foreach depth {0 1 1 2} l $L r $R {
+      switch -- $depth 0 {
+         lappend res [{*}$ring - $l $r]
+      } 1 {
+         set subres {}
+         foreach a $l b $r {
+            lappend subres [{*}$ring - $a $b]
+         }
+         lappend res $subres
+      } 2 {
+         lappend res [trivial::- "" $ring $l $r]
+      }
+   }
+   return $res
+}
+% \medskip
+proc mtmtcl::matprop::affine::. {ring scalar element} {
+   set res {}
+   foreach depth {0 1 1 2} part $element {
+      switch -- $depth 0 {
+         lappend res [{*}$ring * $scalar $part]
+      } 1 {
+         set subres {}
+         foreach p $part {
+            lappend subres [{*}$ring * $scalar $p]
+         }
+         lappend res $subres
+      } 2 {
+         lappend res [trivial::. "" $ring $scalar $part]
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}\end{ensproc}
+% 
+%   \begin{ensproc}{export}
+%     The question of how to express an element \(\left[ 
+%     \begin{smallmatrix} d & \mathbf{c} \\ \mathbf{b} & A 
+%     \end{smallmatrix} \right]\) of this PROP is not entirely 
+%     obvious, since there are several possbilities to choose from. 
+%     One approach would be a bra-ket notation, which is as the sum
+%     \begin{equation*}
+%       d + 
+%       \left\lvert \begin{matrix} b_1 \\ b_2 \end{matrix} 
+%         \right\rangle + 
+%       \begin{vmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} 
+%         \end{vmatrix} + 
+%       \left\langle \begin{matrix} c_1 & c_2 \end{matrix} 
+%         \right\rvert
+%     \end{equation*}
+%     if \(A = \left( \begin{smallmatrix} a_{11} & a_{12} \\ 
+%     a_{21} & a_{22} \end{smallmatrix} \right)\), \(\mathbf{b} = 
+%     \left( \begin{smallmatrix} b_1 \\ b_2 \end{smallmatrix} 
+%     \right)\), and \(\mathbf{b} = \left( \begin{smallmatrix} 
+%     c_1 & c_2 \end{smallmatrix} \right)\), but this is rather 
+%     difficult to encode.
+%     
+%     Another approach would be as a matrix with block separators, 
+%     like
+%     \begin{equation*}
+%       \left( \begin{array}{c\string|cc}
+%         d & c_1 & c_2 \\
+%         \hline
+%         b_1 & a_{11} & a_{12} \\
+%         b_2 & a_{21} & a_{22}
+%       \end{array} \right)
+%     \end{equation*}
+%     This is workable, but avaits some way of encoding the 
+%     partitions of rows and columns.
+%     
+%     Nested matrices would be yet another possibility, but that 
+%     which seems preferable here is the padded form
+%     \begin{equation*}
+%       \begin{pmatrix}
+%         1 & d & c_1 & c_2 \\
+%         0 & 1 & 0   & 0 \\
+%         0 & b_1 & a_{11} & a_{12} \\
+%         0 & b_2 & a_{21} & a_{22}
+%       \end{pmatrix}
+%     \end{equation*}
+%     where the $0$s and $1$s are \OMSref{alg1}{zero} and 
+%     \OMSref{alg1}{one} respectively.
+%     \begin{tcl}
+proc mtmtcl::matprop::affine::export {ring elem attr} {
+   set sattr $attr
+   dict lappend sattr mtmtcl:path scalar
+   set rowsymb [list OMS\
+     [dict replace $attr  cd linalg2  name matrixrow] {}]
+   set mat [list [list OMS\
+     [dict replace $attr  cd linalg2  name matrix] {}]]
+   set zero {OMS {cd alg1 name zero} {}}
+   set one {OMS {cd alg1 name one} {}}
+   set row [list $rowsymb $one]
+   lappend row [{*}$ring export [lindex $elem 0] $sattr]
+   set row2 [list $rowsymb $zero $one]
+   foreach a [lindex $elem 2] {
+      lappend row [{*}$ring export $a $sattr]
+      lappend row2 $zero
+   }
+   lappend mat [list OMA {} $row] [list OMA {} $row2]
+   foreach b [lindex $elem 1] Arow [lindex $elem 3] {
+      set row [list $rowsymb $zero]
+      lappend row [{*}$ring export $b $sattr]
+      foreach a $Arow {
+         lappend row [{*}$ring export $a $sattr]
+      }
+      lappend mat [list OMA {} $row]
+   }
+   return [list OMA {} $mat]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+% \end{ensemble}
+% 
+% 
+% \begin{tcl}
+%</pkg>
+% \end{tcl}
+% 
+% 
+\endinput

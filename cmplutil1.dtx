@@ -459,6 +459,39 @@ set vertex_sizes {* {20 20}}
 % \end{variable}\end{variable}
 % 
 % 
+% \begin{proc}{show_sparsest_cut}
+%   This procedure exists to examine the capabilities of the 
+%   |network::pure::sparsest_cut| procedure. The call syntax is
+%   \begin{quote}
+%     |show_sparsest_cut| \word{canvas}
+%   \end{quote}
+%   and this does the following: (i)~look up the network shown in the 
+%   \word{canvas}, (ii)~compute its sparsest cut region, (iii)~update 
+%   the display of the network with this region, and (iv)~report the 
+%   time taken to |stdout|. Nothing is done if the \word{canvas} does 
+%   not have a |Network| entry.
+%   \begin{tcl}
+proc show_sparsest_cut {c} {
+   global Network vertex_appearances
+   if {![info exists Network($c)]} then {return}
+   array set NW $Network($c)
+   set time [time {set region [
+      network::pure::sparsest_cut $NW(pure)
+   ]}]
+   if {[llength $region]} then {
+      network::rich::drawit $c $vertex_appearances {} -update 1\
+        -var NW -region $region
+   }
+   puts [format {Vertices: %d/%d. Boundary: %d. %s}\
+     [llength [lindex $region 0]] [llength [lindex $NW(pure) 0]]\
+       [llength [concat [lindex $region 1] [lindex $region 2]]] $time]
+}
+%<showcut>bind Network <Command-ButtonPress-1> {show_sparsest_cut %W}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
 % \subsection{Reduction}
 % 
 % \begin{variable}{rulesL}
@@ -520,13 +553,19 @@ proc repair_reduce_stats {} {
 %     \word{left hand side}
 %     \begin{regblock}|pure|\regalt|rich|\end{regblock}
 %     \word{right hand side}
+%     \word{target-var}\regopt
 %   \end{displaysyntax}
 %   where the \word{left hand side} and \word{right hand side} are 
 %   pure or rich networks, according to the indication in the 
 %   preceeding argument. \word{feedbacks} is the list of feedbacks 
 %   for this rule. The return value is the number of the new rule.
+%   
+%   If a \word{target-var} is given, then it is the name in the 
+%   calling context of a variable to which the rule will be 
+%   |lappend|ed instead of |rulesL|. In this case, the reduction 
+%   statistics tables are left alone.
 %   \begin{tcl}
-proc add_rule {feedbackL type_left left type_right right} {
+proc add_rule {feedbackL type_left left type_right right {tovar ""}} {
    global rulesL rule_queue reduce_stats vertex_appearances\
      vertex_sizes
    switch -- $type_left "pure" {
@@ -575,15 +614,22 @@ proc add_rule {feedbackL type_left left type_right right} {
    if {![info exists NW2(canonical)]} then {
       set NW2(canonical) [network::pure::canonise $NW2(pure)]
    }
-   cull_rules [list $NW1(pure) $feedbackL]
-   set index [llength $rulesL]
-   lappend rulesL [list [
+   set rule [list [
       list $NW1(pure) $feedbackL
    ] [
       array get NW1
    ] [
       list $NW2(canonical) [array get NW2]
    ]]
+   if {$tovar ne ""} then {
+      upvar 1 $tovar toL
+      set index [llength $toL]
+      lappend toL $rule
+      return $index
+   }
+   cull_rules [list $NW1(pure) $feedbackL]
+   set index [llength $rulesL]
+   lappend rulesL $rule
    set new_stats {}
    foreach row $reduce_stats {
       lappend row 0
@@ -592,9 +638,23 @@ proc add_rule {feedbackL type_left left type_right right} {
    lappend new_stats\
      [linsert [string repeat " 0" [llength $rulesL]] 0 $index]
    set reduce_stats $new_stats
-   lappend rule_queue [list $index [llength [lindex $NW1(pure) 0]]]
+   lappend rule_queue [list $index\
+     [score_network $NW1(pure) $feedbackL]]
    return $index
 }
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{score_network}
+%   This procedure computes the sort key used in the |rule_queue|. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |score_network| \word{network} \word{feedbacks}
+%   \end{displaysyntax}
+%   The default definition just returns the number of vertices, but 
+%   it can be overridden for specific problems.
+%   \begin{tcl}
+proc score_network {NW fbL} {llength [lindex $NW 0]}
 %   \end{tcl}
 % \end{proc}
 % 
@@ -689,31 +749,130 @@ proc unmake_rule_derivation {rule} {
 %   what to label as the ``left'' or ``right'' hand side is arbitrary.
 % \end{variable}
 % 
+% \begin{arrayvar}{equality_side}
+%   A problem with the equalities is that there are usually several 
+%   ways to derive them, so if one simply adds everything derived 
+%   that cannot be turned into a rule to |equalitiesL| then there 
+%   will be duplicate entries. The |equality_side| array maps sides 
+%   of an equality to the location in |equalitiesL| where they occur, 
+%   so that such rederivation can be detected. The indices are lists 
+%   with the structure
+%   \begin{quote}
+%     \word{canonical pure network} \word{feedback-list}
+%   \end{quote}
+%   where the \word{canonical pure network} is what it says it is, 
+%   and the \word{feedback-list} is the |lsort -dictionary| sorted 
+%   list of feedbacks. The entries are lists, where each element is a 
+%   pair
+%   \begin{quote}
+%     \word{equality number} \word{side}
+%   \end{quote}
+%   where the \word{side} is |0| for the left hand side and |1| for 
+%   the right hand side. The reason the entries are lists is the 
+%   chance that more than two networks can be found equal.
+% \end{arrayvar}
+% 
+% \begin{variable}{remaining_equalities}
+%   Since |equality_side| maps networks to equality numbers, the 
+%   equality numbers should be fixed, and hence it is not possible to 
+%   remove elements from |equalitiesL|. Since equalities may still be 
+%   dropped if a new rule applies to them, the |remaining_equalities| 
+%   list stores the numbers of those equalities which remain to 
+%   resolve.
+% \end{variable}
+% 
 % \begin{proc}{add_equality}
 %   This procedure adds an entry to |equalitiesL|. The call syntax is
 %   \begin{quote}
 %     |add_equality| \word{feedbacks} \word{backwards} \word{top}
-%     \word{forwards}
+%     \word{forwards} \word{reason}
 %   \end{quote}
 %   The \word{feedbacks} is the feedback type for this equality. 
 %   The \word{backwards} argument are the steps in the derivation 
 %   which will be |backward|s, the \word{top} is the rich network that 
 %   serves as turning point, and the \word{forwards} is the list of 
-%   |forward| steps in the derivation.
+%   |forward| steps in the derivation. The \word{reason} is the 
+%   reason this was turned into an equality, typically the result of 
+%   comparing the two sides of it.
+%   \changes{2.2}{2009/02/10}{Modified to notice duplicate 
+%     equalities. Moved \texttt{stdout} messages here. (LH)}
 %   \begin{tcl}
-proc add_equality {feedbackL bwL top fwL} {
+proc add_equality {feedbackL bwL top fwL reason} {
+   global equalitiesL equality_side remaining_equalities
    array set NW1 [lindex $bwL end]
-   set eq [list [list $NW1(pure) $feedbackL] [lindex $bwL end]]
    array set NW2 [lindex $fwL end]
-   lappend eq [list [network::pure::canonise $NW2(pure)]\
-     [lindex $fwL end]]
+   set NW1c [network::pure::canonise $NW1(pure)]
+   set NW2c [network::pure::canonise $NW2(pure)]
+   set feedbackLc [lsort -dictionary $feedbackL]
+   set idx1 [list $NW1c $feedbackLc]
+   set idx2 [list $NW2c $feedbackLc]
+   if {[info exists equality_side($idx1)] &&\
+     [info exists equality_side($idx2)]} then {
+      foreach pair $equality_side($idx1) {
+         set S([lindex $pair 0]) [lindex $pair 1]
+      }
+      foreach pair $equality_side($idx2) {
+         if {[info exists S([lindex $pair 0])]} then {
+%<*stdout>
+            puts stdout "Rediscovered equality [lindex $pair 0]."
+%</stdout>
+            return
+         }
+      }
+   }
+   set num [llength $equalitiesL]
+   lappend equality_side($idx1) [list $num 0]
+   lappend equality_side($idx2) [list $num 1]
+   set eq [list [list $NW1(pure) $feedbackL] [lindex $bwL end]]
+   lappend eq [list $NW2c [lindex $fwL end]]
    lappend eq [make_rule_derivation $bwL $top $fwL]
-   global equalitiesL
    lappend equalitiesL $eq
+   lappend remaining_equalities $num
+%<*stdout>
+   puts stdout "Added equality $num ($reason)."
+%</stdout>
+   return $num
 }
 %   \end{tcl}
 % \end{proc}
 % 
+% \begin{proc}{rule_children}
+%   This procedure lists the numbers and equalities that are direct 
+%   children of a specified rule, i.e., the given rule was one of 
+%   those that gave rise to the underlying ambiguity. The call syntax 
+%   is
+%   \begin{displaysyntax}
+%     |rule_children| \word{rule number}
+%   \end{displaysyntax}
+%   and the result is a string, with one line per child.
+%   \begin{tcl}
+proc rule_children {parent} {
+   global rulesL equalitiesL
+   set res {}
+   foreach list [list $rulesL $equalitiesL] prefix {"" e} {
+      set n -1; foreach rule $list {incr n
+         set line $prefix$n
+         set bwL {}; set fwL {}
+         foreach {spec NW} [lindex $rule 3] {
+            switch -- [lindex $spec 0] "forward" {
+               lappend fwL [lindex $spec 1]
+            } "backward" {
+               lappend bwL [lindex $spec 1]
+            }
+         }
+         if {[lindex $fwL 0] == $parent} then {
+            append line " with [lindex $bwL end]"
+            lappend res $line
+         } elseif {[lindex $bwL end] == $parent} then {
+            append line " with [lindex $fwL 0]"
+            lappend res $line
+         }
+      }
+   }
+   return [join $res \n]
+}
+%   \end{tcl}
+% \end{proc}
 % 
 % \begin{proc}{clear_rules}
 %   The |clear_rules| procedure clears the lists of rules and statistics 
@@ -721,12 +880,13 @@ proc add_equality {feedbackL bwL top fwL} {
 %   \begin{tcl}
 proc clear_rules {} {
    global rulesL reduce_stats rule_base rule_queue equalitiesL\
-     browser_fwL browser_bwL
+     remaining_equalities browser_fwL browser_bwL
    set rulesL [list]
    set reduce_stats [list]
    set rule_base [list]
    set rule_queue [list]
    set equalitiesL {}
+   set remaining_equalities {}
    set browser_fwL {}
    set browser_bwL {}
 }
@@ -913,14 +1073,13 @@ proc draw_network_feedbacks {c fbL NWval center args} {
 %       equal. When |count_down| reaches zero, the right network will be 
 %       chosen as the principal part of the new rule manufactured from 
 %       this ambiguity.
-%     \item[\texttt{incomparable}]
-%       The left and right networks have been fully reduced, but for 
-%       some reason it was not possible to compare them (currently, this 
-%       happens if there are disconnected components). In this case the 
-%       user is given three options: reduce left network, reduce right 
-%       network, or consider networks as equal.
-%       \changes{alpha}{2005/10/29}{Added \texttt{incomparable} mode. 
-%         (LH)}
+%     \item[\texttt{automiddle}]
+%       The left and right networks have been fully reduced, but 
+%       turned out to be incomparable. In this case, there will be a 
+%       middle button which manufactures an equality from the left 
+%       and right hand sides.
+%       Previously, this case was called \texttt{incomparable} and 
+%       asked the user to select one of three buttons.
 %   \end{enumerate}
 %   
 %   \begin{tcl}
@@ -983,12 +1142,14 @@ proc run_reduction {t mode} {
          } ">" {
             set count_down 5
             set mode "autoleft"
+%<*manualequal>
          } "=" {
             $t.bm configure -text "Equal" -state normal
             grid remove $t.lm
             grid configure $t.bm -row 2 -column 1 -sticky n
             bell -displayof $t
             return
+%</manualequal>
          } default {
             grid remove $t.bl $t.br
             grid configure $t.lm -row 2 -column 0 -sticky n
@@ -1291,12 +1452,8 @@ proc rule_ambiguity {t choice} {
       ] $Steps($t.cr) $Network($t.cm) $Steps($t.cl)
 %<stdout>      ] (right)"
    } elseif {$choice eq "neither"} {
-%<*stdout>
-      puts stdout "Added equality [llength $::equalitiesL]\
-        ([$t.bm cget -text])."
-%</stdout>
       add_equality $feedbacks($t) $Steps($t.cl) $Network($t.cm)\
-        $Steps($t.cr)
+        $Steps($t.cr) [$t.bm cget -text]
    }
    ambiguity_cancel $t
 %<*showcalc>
@@ -1463,19 +1620,71 @@ proc inclusion_ambiguity {rule1 rule2 region} {
 %   \end{tcl}
 % \end{proc}
 % 
+% \begin{proc}{equality_ambiguity}
+%   This procedure creates an ambiguity window which will resume 
+%   reduction of an equality. The call syntax is
+%   \begin{quote}
+%     |equality_ambiguity| \word{equality}
+%   \end{quote}
+%   where the \word{equality} is an |equalitiesL| element. 
+%   The return value is the name of the toplevel created for the 
+%   ambiguity.
+%   
+%   \begin{tcl}
+proc equality_ambiguity {equality} {
+   global feedbacks Network lastrule vertex_appearances\
+     vertex_sizes Steps
+   set t [new_ambiguity_window]
+   set feedbacks($t) [lindex $equality 0 1]
+   set bwL [list [lindex $equality 1]]
+   set fwL {}
+   foreach {spec NW} [lindex $equality 3] {
+      switch -- [lindex $spec 0] "backward" {
+         lappend bwL [lindex $spec 1] $NW
+      } "forward" {
+         lappend fwL [lindex $spec 1] $NW
+      }
+   }
+   set Network($t.cm) [lindex $bwL end]
+   network::rich::drawit $t.cm $vertex_appearances {}\
+     -val $Network($t.cm)
+   draw_network_feedbacks $t.cm $feedbacks($t) $Network($t.cm) 1
+   set Network($t.cl) [lindex $bwL 0]
+   set lastrule($t.cl) [lindex $bwL 1]
+   network::rich::drawit $t.cl $vertex_appearances {}\
+     -val $Network($t.cl)
+   center_network $t.cl
+   set Network($t.cr) [lindex $fwL end]
+   set lastrule($t.cr) [lindex $fwL end-1]
+   network::rich::drawit $t.cr $vertex_appearances {}\
+     -val $Network($t.cr)
+   center_network $t.cr
+   set Steps($t.cl) [lreverse [lrange $bwL 0 end-1]]
+   set Steps($t.cr) $fwL
+   $t.bl configure -command [list rule_ambiguity $t left]
+   $t.br configure -command [list rule_ambiguity $t right]
+   $t.bm configure -command [list rule_ambiguity $t neither]
+   return $t
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % \begin{proc}{major_step_ambiguity}
 %   The |major_step_ambiguity| procedure moves one rule from the 
 %   |rule_queue| to the |rule_base|, and then resets the |minor_index|. 
-%   As part of this, the other rules in the base and queue are checked 
-%   for whether their principal parts contain the new rule, and if they 
+%   As part of this, the other rules in the base and queue, and 
+%   undirected equalities in the |equalitiesL|, are checked for whether 
+%   their principal parts contain the new rule, and if they 
 %   do then they are dropped from these lists and corresponding 
 %   ambiguities are prepared to be checked.
+%   \changes{2.2}{2008/12/5}{Checking and reopening equalities. (LH)}
 %   
 %   There are no arguments, nor any particular return value.
 %   \begin{tcl}
 proc major_step_ambiguity {base_w} {
    global minor_index rule_base rule_queue rulesL Network lastrule\
-     vertex_appearances minor_rule_no major_rule_no feedbacks
+     vertex_appearances minor_rule_no major_rule_no feedbacks\
+     equalitiesL remaining_equalities
    if {![llength $rule_queue]} then {return}
    set rule_queue [lsort -dictionary -index 1 $rule_queue]
    set new [lindex $rule_queue 0 0]
@@ -1522,6 +1731,30 @@ proc major_step_ambiguity {base_w} {
       }
    }
    set rule_queue $new_queue
+% \smallskip
+   set new_equalities [list]
+   foreach num $remaining_equalities {
+      set rule [lindex $equalitiesL $num]
+      if {[llength [
+         network::wfb::instances [lindex $rule 0]\
+           [lindex $rulesL $new 0] 1
+      ]] || [llength [
+         network::wfb::instances\
+           [list [lindex $rule 2 0] [lindex $rule 0 1]]\
+           [lindex $rulesL $new 0] 1
+      ]]} then {
+         set wm_x [expr {$wm_x + $delta}]
+         set wm_y [expr {$wm_y + $delta}]
+         wm geometry [
+            equality_ambiguity $rule
+         ] +${wm_x}+${wm_y}
+%<stdout>         puts stdout "Reopened equality $num."
+         set lost_focus 1
+      } else {
+         lappend new_equalities $num
+      }
+   }
+   set remaining_equalities $new_equalities
 % \smallskip
    set minor_index 0
    set minor_rule_no [lindex $rule_base 0]
@@ -2092,6 +2325,12 @@ proc rule_browser_fbar {t} {
 %   \end{tcl}
 % \end{proc}
 % 
+% Now that this code is completed, it is fitting to also create the 
+% corresponding window.
+% \begin{tcl}
+rule_browser_layout
+% \end{tcl}
+% 
 % 
 % \subsection{Dumping results as PDF}
 % 
@@ -2232,7 +2471,7 @@ proc dump_to_PDF {fname args} {
 % The following is part research, part test of the utility. It sets 
 % up the rules for a Hopf algebra.
 % 
-% \subsection{Ordinary Hopf algebras}
+% \subsection{Generators and rules}
 % 
 % \begin{tcl}
 %<*Hopf>
@@ -2275,7 +2514,104 @@ set vertex_appearances {
    }
 }
 % \end{tcl}
-% First comes the rules for an algebra.
+% 
+% 
+% \begin{proc}{score_network}
+%   The basic scoring method has a tendency to spend a lot of time 
+%   with rules that on first sight don't seem all that interesting: 
+%   containing only products, coproducts, and twists, in one of a 
+%   gazillion combinations. Hence this customised scoring procedure 
+%   tries to encourage the use of ``productive'' (meaning involved in 
+%   the derivation of interesting identities) rules and discourage 
+%   the use of ``disruptive'' (producing lots of ambiguities, but very 
+%   little of interest) rules.
+%   
+%   The basic score is again the number of vertices, but times $10$ 
+%   to allow a ``decimal''.
+%   \begin{tcl}
+proc score_network {NW feedbacks} {
+   set res [expr {10*[llength [lindex $NW 0]]}]
+%   \end{tcl}
+%   Adjustments to the basic figure are made according to the types 
+%   of vertices found.
+%   \begin{tcl}
+   foreach v [lindex $NW 0] {
+      switch -- [lindex $v 0] {
+%   \end{tcl}
+%   Antipodes are considered interesting, so they are only ``half as 
+%   bad'' as a normal vertex.
+%   \begin{tcl}
+         "S" {incr res -5}
+%   \end{tcl}
+%   Products and coproducts with both the left and right terminal 
+%   external to the network are highly disruptive, as they form 
+%   ambiguities with almost everything, which only rarely lead to 
+%   anything interesting. Hence networks with this feature are 
+%   heavily penalised.
+%   \begin{tcl}
+         "m" {
+            set ext 0
+            foreach e [lindex $v 2] {
+               if {[lindex $NW 1 $e 2]==1} then {incr ext}
+            }
+            if {$ext>1} then {incr res 40}
+         }
+         "Delta" {
+            set ext 0
+            foreach e [lindex $v 1] {
+               if {[lindex $NW 1 $e 0]==0} then {incr ext}
+            }
+            if {$ext>1} then {incr res 40}
+         }
+%   \end{tcl}
+%   Twists are on the other hand usually buried deep in the networks, 
+%   so rules that expose them are interesting.
+%   \begin{tcl}
+         "twist" {
+            foreach e [lindex $v 1] {
+               if {[lindex $NW 1 $e 0]==0} then {incr res -2}
+            }
+            foreach e [lindex $v 2] {
+               if {[lindex $NW 1 $e 2]==1} then {incr res -2}
+            }
+         }
+      }
+   }
+%   \end{tcl}
+%   Another thing that warrants interest are networks with 
+%   ``cavities''---a pair of neighbouring vertices between which an 
+%   unrelated network may be inserted---since these figure 
+%   prominently in almost all basic derivations. In this case, it is 
+%   the feedbacks that are important.
+%   \begin{tcl}
+   foreach fb $feedbacks {
+      set e0 [lindex $NW 0 0 2 [lindex $fb 0]]
+      set e1 [lindex $NW 0 1 1 [lindex $fb 1]]
+      set v0 [lindex $NW 1 $e0 2]; if {$v0 < 2} then {continue}
+      set v1 [lindex $NW 1 $e1 0]; if {$v1 < 2} then {continue}
+      set L0 [lindex $NW 0 $v0 1]
+      set L1 [lindex $NW 0 $v1 2]
+      if {[llength [lsort -integer -unique [concat $L0 $L1]]] <\
+        [llength $L0] + [llength $L1]} then {incr res -20}
+   }
+%   \end{tcl}
+%   Well, that's it for now.
+%   \begin{tcl}
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% The following is a bialgebra rule, but putting it first may help 
+% avoid creating stray edges.
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit \r epsilon}
+] pure [
+   network::pure::construct $vertex_types {}
+]
+% \end{tcl}
+% Then comes the rules for an algebra.
 % \begin{tcl}
 add_rule {} pure [
    network::pure::construct $vertex_types {unit . \r m}
@@ -2328,11 +2664,6 @@ add_rule {} pure [
    network::pure::construct $vertex_types {unit unit}
 ]
 add_rule {} pure [
-   network::pure::construct $vertex_types {unit \r epsilon}
-] pure [
-   network::pure::construct $vertex_types {}
-]
-add_rule {} pure [
    network::pure::construct $vertex_types {m \r epsilon}
 ] pure [
    network::pure::construct $vertex_types {epsilon epsilon}
@@ -2380,51 +2711,331 @@ add_rule {} pure [
 %</Hopf4>
 % \end{tcl}
 % 
-% \begin{proc}{Hopf_comparison_key}
-%   The trickiest part of running a completion on the rules above is to 
-%   conceive of a well-founded ordering which is compatible with the 
-%   rules. Particular stumbling blocks are:
-%   \begin{enumerate}
-%     \item
-%       The rule turning $\Delta \circ m$ into \(m \otimes m \circ 
-%       (2\:3) \circ \Delta \otimes \Delta\) \emph{increases} the 
-%       number of vertices in the network.
-%     \item
-%       The associativity and coassociativity rules makes some paths 
-%       longer.
-%     \item
-%       The rules (which will be derived after a while) that the 
-%       antipode is an antihomomorphism have the property of exchanging 
-%       left and right branches of products and coproducts, which 
-%       severely complicates ordering associativity by minimising the 
-%       number of right-branches on paths. The natural direction of 
-%       these rules also increases the number of vertices (there is a 
-%       separate antipode for each branch).
-%   \end{enumerate}
-%   Strange as it sounds, these problems are actually clues to the 
-%   solution. It is a very corny solution, but nonetheless it works:
-%   \begin{enumerate}
-%     \item
-%       Compare the number of paths connecting each pair of input and 
-%       output leg: more paths means the network is larger.
-%     \item
-%       If that is the same, then compare the number of antipodes on 
-%       the paths: more antipodes means the network is larger.
-%     \item
-%       If that is also the same, then compare the total number of 
-%       vertices: more vertices means the network is \emph{smaller!}
-%     \item
-%       If there is still no difference, then compare the number of 
-%       times each path takes a right branch in or out of a vertex.
-%   \end{enumerate}
-%   A noticeable feature of the above is that there is no lexicographic 
-%   ordering at work, even though many rules certainly suggest using 
-%   a path-lexicographic order. The catch which prevents that is that 
-%   associativity can increase path length, which seriously messes up 
-%   compatibility with composition (pure lexicographic order in the 
-%   free monoid is not compatibile with composition\Dash it is 
-%   necessary to first ensure that items compared are of equal length).
+% 
+% \subsection{\PROP-based ordering}
+% 
+% The trickiest part of running a completion on the rules above is to 
+% conceive of a well-founded ordering which is compatible with the 
+% rules. Particular stumbling blocks are:
+% \begin{enumerate}
+%   \item
+%     The rule turning $\Delta \circ m$ into \(m \otimes m \circ 
+%     (2\:3) \circ \Delta \otimes \Delta\) \emph{increases} the 
+%     number of vertices in the network.
+%   \item
+%     The associativity and coassociativity rules makes some paths 
+%     longer.
+%   \item
+%     The rules (which will be derived after a while) that the 
+%     antipode is an antihomomorphism have the property of exchanging 
+%     left and right branches of products and coproducts, which 
+%     severely complicates ordering associativity by minimising the 
+%     number of right-branches on paths. The natural direction of 
+%     these rules also increases the number of vertices (there is a 
+%     separate antipode for each branch).
+% \end{enumerate}
+% Strange as it sounds, these problems are actually clues to the 
+% solution. The first solution found was \emph{very} corny, but 
+% nonetheless worked:
+% \begin{enumerate}
+%   \item
+%     Compare the number of paths connecting each pair of input and 
+%     output leg: more paths means the network is larger.
+%   \item
+%     If that is the same, then compare the number of antipodes on 
+%     the paths: more antipodes means the network is larger.
+%   \item
+%     If that is also the same, then compare the total number of 
+%     vertices: more vertices means the network is \emph{smaller!}
+%   \item
+%     If there is still no difference, then compare the number of 
+%     times each path takes a right branch in or out of a vertex.
+% \end{enumerate}
+% A noticeable feature of the above is that there is no lexicographic 
+% ordering at work, even though many rules certainly suggest using 
+% a path-lexicographic order. The catch which prevents that is that 
+% associativity can increase path length, which seriously messes up 
+% compatibility with composition (pure lexicographic order in the 
+% free monoid is not compatibile with composition\Dash it is 
+% necessary to first ensure that items compared are of equal length).
+% 
+% Late 2008, I had advanced other parts of the theory enough that I 
+% could device a more orderly solution to the problem, namely that of 
+% importing an order from the affine \PROP\ over the natural numbers. 
+% This is still fairly close to being a path-counting order, but 
+% avoids some of the technical difficulties inherent in proving that 
+% the above is DCC.
+% 
+% \begin{proc}{compare_networks}
+%   The form of |compare_networks| that will be used for comparing 
+%   networks in the Hopf setting is a lexicographic composition of 
+%   orders obtained by mapping the networks to a specific ordered 
+%   \PROP\ and comparing them there. The target \PROP, the array of 
+%   elements to map the original value to, and the command to use for 
+%   comparing them, are all provided as lists.
 %   
+%   For reference, the call syntax is
+%   \begin{quote}
+%     |compare_networks| \word{left} \word{right}
+%   \end{quote}
+%   as this is not immediately visible from the implementation.
+%   \begin{tcl}
+%<*Hopf>
+proc compare_networks {args} {
+   foreach PROP {
+      integer_affine_PROP 
+      integer_affine_PROP
+%<*twist>
+      realmatrix_affine_PROP
+      integer_affine_PROP
+%</twist>
+   } array {
+      ::Hopf_value_1
+      ::Hopf_value_2
+%<*twist>
+      ::Hopf_value_3
+      ::Hopf_value_4
+%</twist>
+   } cmpcmd {
+      integer_affine_PROP_cmp
+      integer_affine_PROP_cmp
+%<*twist>
+      realmatrix_PROP_cmp
+      integer_affine_PROP_cmp
+%</twist>
+   } {
+      foreach NW $args {
+         set call $PROP
+         lappend call fuse [lindex $NW 0 0 2]
+         foreach v [lrange [lindex $NW 0] 2 end] {
+            lappend call [lindex $v 1]\
+              [set ${array}([lindex $v 0])] [lindex $v 2]
+         }
+         lappend call [lindex $NW 0 1 1]
+         lappend cmpcmd [eval $call]
+      }
+      set res [eval $cmpcmd]
+      if {$res ne "="} then {return $res}
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tclcommand}{alias}{integer_affine_PROP}
+%   The primary ordered \PROP\ used is the affine \PROP\ over the 
+%   integers (primarily the natural numbers, to ensure DCC).
+%   \begin{tcl}
+interp alias {} integer_affine_PROP {}\
+  mtmtcl::matprop::affine ::mtmtcl::rings::integer
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% \begin{proc}{integer_affine_PROP_cmp}
+%   The natural order to use in an affine \PROP\ is the partial order 
+%   of element-wise comparisons.
+%   \begin{tcl}
+proc integer_affine_PROP_cmp {left right} {
+   set diffL {}
+   lappend diffL [expr {[integer_affine_PROP part closed $left] -\
+     [integer_affine_PROP part closed $right]}]
+   foreach l [integer_affine_PROP part begin $left]\
+           r [integer_affine_PROP part begin $right] {
+      lappend diffL [expr {$l-$r}]
+   }
+   foreach l [integer_affine_PROP part end $left]\
+           r [integer_affine_PROP part end $right] {
+      lappend diffL [expr {$l-$r}]
+   }
+   foreach L [integer_affine_PROP part open $left]\
+           R [integer_affine_PROP part open $right] {
+      foreach l $L r $R {lappend diffL [expr {$l-$r}]}
+   }
+   if {[lsearch -glob $diffL {-*}] >= 0} then {
+      if {[lsearch -glob $diffL {[1-9]*}] >= 0} then {
+         return "incomparable"
+      } else {
+         return "<"
+      }
+   } else {
+      if {[lsearch -glob $diffL {[1-9]*}] >= 0} then {
+         return ">"
+      } else {
+         return "="
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayvar}{Hopf_value_1}
+%   The primary comparison order attains a subtle balance between 
+%   growing and shrinking details in networks. The basic idea in it 
+%   (to the extent that there is one) is to move |m| and |unit| 
+%   towards the output, but |Delta| and |epsilon| towards the input, 
+%   by counting \emph{inversions} where a |Delta| is applied to 
+%   something coming from an |m|. This amounts to putting a positive 
+%   termination weight on the simple side leg of these, while keeping 
+%   the other side at weight $0$.
+%   \begin{tcl}
+set Hopf_value_1(m)\
+  [integer_affine_PROP fromparts 0 1 {0 0} {{1 1}}]
+set Hopf_value_1(unit)\
+  [integer_affine_PROP fromparts 0 1 {} {}]
+set Hopf_value_1(Delta)\
+  [integer_affine_PROP fromparts 0 {0 0} 1 {{1} {1}}]
+set Hopf_value_1(epsilon)\
+  [integer_affine_PROP fromparts 0 {} 1 {}]
+set Hopf_value_1(S)\
+  [integer_affine_PROP fromparts 0 0 0 2]
+set Hopf_value_1(twist)\
+  [integer_affine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
+%   \end{tcl}
+% \end{arrayvar}
+% 
+% \begin{arrayvar}{Hopf_value_2}
+%   The secondary comparison order is similar, but places a positive 
+%   weight on terminating in the right branch of a product or 
+%   coproduct, to distinguish left-branching from right-branching: a 
+%   right--right branch sees $2$ terminations, but a left--right, 
+%   right--left, or singly right branch sees only $1$. The oppositely 
+%   directed midpoint termination also contributes, by $1$ in the 
+%   closed component.
+%   \begin{tcl}
+array set Hopf_value_2 [array get Hopf_value_1]
+set Hopf_value_2(m)     [integer_affine_PROP fromparts 0 1 {0 1} {{1 1}}]
+set Hopf_value_2(Delta) [integer_affine_PROP fromparts 0 {0 1} 1 {{1} {1}}]
+%   \end{tcl}
+% \end{arrayvar}
+% 
+% \begin{tclcommand}{alias}{realmatrix_affine_PROP}
+%   The secondary ordered \PROP\ used is the affine \PROP\ over 
+%   $\mathrm{M}_2(\mathbb{R})$, i.e., over real $2 \times 2$ 
+%   matrices. Rational numbers would work too, but I currently don't 
+%   have an implementation of these.
+%   \begin{tcl}
+interp alias {} realmatrix_affine_PROP {}\
+  mtmtcl::matprop::affine {
+     ::mtmtcl::matprop::ring 2 ::mtmtcl::rings::float
+  }
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% \begin{arrayvar}{Hopf_value_3}
+%   This tertiary comparison order is focused on making it count 
+%   which side of a product or coproduct that a crossing in abstract 
+%   twist happens on.
+%   \begin{tcl}
+set one     {{1.0  0.0} {0.0 1.0 }}
+set zero    {{0.0  0.0} {0.0 0.0 }}
+set quarter {{0.25 0.0} {0.0 0.25}}
+set double  {{2.0  0.0} {0.0 2.0 }}
+set induce  {{0.0  1.0} {0.0 0.0 }}
+set Hopf_value_3(m) [realmatrix_affine_PROP fromparts\
+    $zero [list $zero] [list $zero $zero]\
+    [list [list $double $double]]]
+set Hopf_value_3(unit) [realmatrix_affine_PROP fromparts\
+    $zero [list $one] {} {}]
+set Hopf_value_3(Delta) [realmatrix_affine_PROP fromparts\
+    $zero [list $zero $zero] [list $zero]\
+    [list [list $quarter] [list $quarter]]]
+set Hopf_value_3(epsilon) [realmatrix_affine_PROP fromparts\
+    $zero {} [list $one] {}]
+set Hopf_value_3(S) [realmatrix_affine_PROP fromparts\
+    $zero [list $zero] [list $zero] [list [list $one]]]
+set Hopf_value_3(twist) [realmatrix_affine_PROP fromparts\
+    $zero [list $zero $zero] [list $zero $zero]\
+    [list [list $induce $one] [list $one $induce]]]
+%   \end{tcl}
+% \end{arrayvar}
+% 
+% \begin{proc}{compare_matrix}
+%   This procedure performs an element-wise comparison of two 
+%   $2 \times 2$ matrics, returning |=|, |<|, |>|, or |incomparable| 
+%   accordingly.
+%   \begin{tcl}
+proc compare_matrix {left right} {
+   set greater 0
+   set less 0
+   foreach L $left R $right {
+      foreach l $L r $R {
+         if {$l<$r} then {
+            set less 1
+         } elseif {$l>$r} then {
+            set greater 1
+         }
+      }
+   }
+   if {$less} then {
+      if {$greater} then {return incomparable} else {return <}
+   } else {
+      if {$greater} then {return >} else {return =}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{realmatrix_PROP_cmp}
+%   The natural order to use in an affine \PROP\ is the partial order 
+%   of element-wise comparisons.
+%   \begin{tcl}
+proc realmatrix_PROP_cmp {left right} {
+   array set A {= 0 < 0 > 0 incomparable 0}
+   incr A([compare_matrix\
+     [realmatrix_affine_PROP part closed $left]\
+     [realmatrix_affine_PROP part closed $right]])
+   foreach l [realmatrix_affine_PROP part begin $left]\
+           r [realmatrix_affine_PROP part begin $right] {
+      incr A([compare_matrix $l $r])
+   }
+   foreach l [realmatrix_affine_PROP part end $left]\
+           r [realmatrix_affine_PROP part end $right] {
+      incr A([compare_matrix $l $r])
+   }
+   foreach L [realmatrix_affine_PROP part open $left]\
+           R [realmatrix_affine_PROP part open $right] {
+      foreach l $L r $R {incr A([compare_matrix $l $r])}
+   }
+   if {$A(incomparable)} then {return "incomparable (element)"}
+   if {$A(<)} then {
+      if {$A(>)} then {return incomparable} else {return <}
+   } else {
+      if {$A(>)} then {return >} else {return =}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayvar}{Hopf_value_4}
+%   The fourth comparison level is about ordering the sides of the 
+%   ``Yang--Baxter equation'':
+%   |. twist \n twist . \n . twist| is less than 
+%   |twist . \n . twist \n twist .|. The difference comes out for the 
+%   middle strand in this braid, as it goes first right and then left 
+%   in the former case, but first left and then right in the latter.
+%   \begin{tcl}
+set Hopf_value_4(m)\
+  [integer_affine_PROP fromparts 0 0 {0 0} {{1 1}}]
+set Hopf_value_4(unit)\
+  [integer_affine_PROP fromparts 0 1 {} {}]
+set Hopf_value_4(Delta)\
+  [integer_affine_PROP fromparts 0 {0 0} 0 {{1} {1}}]
+set Hopf_value_4(epsilon)\
+  [integer_affine_PROP fromparts 0 {} 1 {}]
+set Hopf_value_4(S)\
+  [integer_affine_PROP fromparts 0 0 0 1]
+set Hopf_value_4(twist)\
+  [integer_affine_PROP fromparts 0 {0 0} {1 0} {{0 2} {1 0}}]
+%   \end{tcl}
+% \end{arrayvar}
+% 
+% \begin{tcl}
+%</Hopf>
+% \end{tcl}
+% 
+% \subsection{Obsolete ordering schemes}
+%   
+% \begin{proc}{Hopf_comparison_key}
 %   The |Hopf_comparison_key| procedure takes a pure network as 
 %   argument and returns a corresponding comparison key, as a list of 
 %   comparison groups. The call syntax is thus
@@ -2440,7 +3051,7 @@ add_rule {} pure [
 %   Notes on why things are done this way are given throughout the 
 %   implementation.
 %   \begin{tcl}
-%<*Hopf>
+%<*HopfObsolete>
 proc Hopf_comparison_key {NW} {
    set pathMat [network::pure::list_paths_turning $NW]
 %   \end{tcl}
@@ -2915,7 +3526,7 @@ proc compare_networks {NW1 NW2} {
 % the coproduct and counit as well, but it seems rather close.
 % 
 % \begin{tcl}
-%</Hopf>
+%</HopfObsolete>
 % \end{tcl}
 % 
 % 

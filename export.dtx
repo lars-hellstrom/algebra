@@ -1,0 +1,4687 @@
+% 
+% \iffalse driver
+%<*driver>
+\documentclass{mtmtcl}
+\begin{document}
+\DocInput{export.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% 
+% 
+% \section{Data export}
+% 
+% 
+% The basic format for exporting structure elements is as a 
+% data-tree, so that further processing is easy in \Tcl. An important 
+% technique for further processing is data-is-code, meaning the 
+% \word{tag}s in the tree are defined as \Tcl\ commands in some 
+% namespace (each performing a particular operation on \emph{its} 
+% kind of node) and the data-tree is processed through |eval|uation 
+% of it in that particular namespace. Among the operations which can 
+% be implemented this way is conversion to XML, although if 
+% readability of the result is of interest then it is probably better 
+% to let the \textsf{tdom} package do this conversion.
+% 
+% \changes{0}{2008/10/01}{Prioritising OpenMath over MathML. 
+%   Introducing the idea of \emph{temporary} conversions from 
+%   OpenMath node types to specialised node types. (LH)}
+% 
+% The node types (\word{tag}s) used should primarily be those defined 
+% in the OpenMath standard, but there are exceptions (e.g.~|integer|) 
+% in which a more \Tcl-native encoding is preferable. Specific 
+% processing tasks may also benefit if specialised node types are 
+% used instead of the generic |OMA|~(OpenMath function application), 
+% since data-is-code can only do dispatching based on the \word{tag} 
+% of the node. This division is however overcome by providing 
+% operations that transform data-trees between the generic OpenMath 
+% format and more specialised formats; neither form is irreversible, 
+% and the OpenMath one should be considered normal.
+% 
+% For processing to the end of rendering data, it is often 
+% interesting to incorporate presentation-oriented information in the 
+% data-tree. Here it is preferable to use MathML-elements to encode 
+% such information, when there is one which is suitable for the 
+% problem at hand (e.g.~|mfenced| for bracketing subexpressions). 
+% MathML does however seem less useful as a \emph{standard} for the 
+% data.
+% 
+% Conversions to presentation formats should \emph{not} rely on having 
+% a big built-in table of OpenMath symbols and how they are 
+% rendered\Dash the converter should instead expect to find all the 
+% necessary information provided in the data-tree to convert 
+% (e.g.~as attributions attached to the \OMSref{altenc}{LaTeX_encoding} 
+% symbol). Tools should be provided for scanning trees for symbols 
+% without such information and for adding such information to 
+% selected symbols, but it may in many cases be better to have it 
+% supplied already by the original |export| method.
+% 
+% \stringtypeheading{node type}{Data-tree node types:}
+% \stringtypeheading{attribute}{Data-tree attributes:}
+% 
+% 
+% \subsection{Near-OpenMath}
+% 
+% The basic format of data-trees encoding \mtl\ structure elements 
+% is mostly OpenMath, i.e., there are node types:
+% \begin{description}
+%   \item[{\describestring*+[node type]{OMA}}]
+%     for function applications, where the first child is the 
+%     function being applied and subsequent children are its 
+%     arguments;
+%   \item[{\describestring*+[node type]{OMS}}]
+%     for general symbols, precisely identified through 
+%     \describestring+[attribute]{name} and 
+%     \describestring+[attribute]{cd} (Content Dictionary) attributes;
+%   \item[{\describestring*+[node type]{OMV}}]
+%     for variables, distinguished through the
+%     \describestring+[attribute]{name} attribute;
+%   \item[{\describestring*+[node type]{OMF}}]
+%     for floating-point numbers (IEEE |double|s), with the value 
+%     given by a \describestring+[attribute]{dec} or 
+%     \describestring+[attribute]{hex} attribute;
+% \end{description}
+% and others (|OMBIND|, |OMSTR|, etc.), but one that should normally 
+% not be used is \describestring+[node type]{OMI} for integers, since 
+% its general structure
+% \begin{displaysyntax}
+%   OMI |{} {{#text| \word{string}|}}|
+% \end{displaysyntax}
+% is unnecessarily awkward to interpret programmatically in 
+% \Tcl~(partly because the forms allowed in the \word{string} are not 
+% the same as \Tcl\ understands for integers). Instead the 
+% \describestring+[node type]{integer} node type should be used, 
+% which has the format
+% \begin{displaysyntax}
+%   integer |{|value \word{integer}|} {}|
+% \end{displaysyntax}
+% i.e., the value is given as a \describestring+[attribute]{value} 
+% attribute, whose allowed forms are precisely those that \Tcl\ 
+% understands.
+% 
+% The |OMS|, |OMV|, |OMF|, and |OMR| node types cannot have children 
+% in OpenMath, so it is convenient to sometimes\Ldash particularly 
+% during rendering\Dash use the first child of these nodes as 
+% ``contents'' of the node even though they are conceptually atomic.
+% 
+% \setnamespace{mtmtcl::openmath::stricten::helper}
+% \begin{ensemble}{stricten}
+%   \setnamespace{mtmtcl::openmath::stricten}
+%   The |stricten| command transforms a near-OpenMath data-tree to a 
+%   strictly OpenMath data-tree, i.e., nonstandard node types are 
+%   converted to their standard counterparts and nonstandard contents 
+%   of nodes are dropped. The external call syntax is
+%   \begin{displaysyntax}
+%     mtmtcl::openmath::stricten \meta{tree} \word{clean}
+%   \end{displaysyntax}
+%   where the \word{clean} is a boolean which controls whether 
+%   nonstandard attributes should be removed as well (true is yes). 
+%   The return value is the strictened data-tree.
+%   
+%   Instead of dropping nonstandard attributes, one could encode 
+%   them using |OMATTR| nodes, but this can easily be implemented as 
+%   a separate operation. This operation is primarily about getting 
+%   rid of nonstandard nodes (except as children of |OMFOREIGN|).
+%   
+%   The organisation of this namespace and ensemble is as follows:
+%   \begin{itemize}
+%     \item
+%       The |mtmtcl::openmath::stricten| namespace contains 
+%       commands for handling specific node types. All commands in 
+%       this namespace are exported and show up in the ensemble.
+%     \item
+%       The |helper| child of the ensemble namespace contains helpers 
+%       for the various subcommands. One of these is the actual 
+%       ensemble command, which is needed for processing children of 
+%       a node.
+%   \end{itemize}
+%   
+%   \begin{tcl}
+%<*pkg>
+namespace eval mtmtcl::openmath::stricten {
+    namespace export *
+    namespace eval helper {
+       interp alias {} [namespace parent]\
+         {} [namespace current]::stricten
+    }
+    namespace ensemble create -prefix 0\
+      -command [namespace current]::helper::stricten
+}
+%   \end{tcl}
+%   There is no unknown handler, since it is an error to apply this 
+%   operation to an unknown node type.
+%   
+%   \begin{ensproc}{#text}
+%     Text is returned unchanged.
+%     \begin{tcl}
+proc mtmtcl::openmath::stricten::#text {str clean} {list #text $str}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{integer}
+%     Integers are converted to |OMI| nodes.
+%     \begin{tcl}
+proc mtmtcl::openmath::stricten::integer {attr children clean} {
+   list OMI {} [list [
+      list \#text [format %lld [dict get $attr value]]
+   ]]
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% For the next couple of definitions, it's actually easiest to be 
+% within the |mtmtcl::openmath::stricten::helper| namespace, since 
+% that is where the helper procedures will be created, and one 
+% anyway has to pretty much fully qualify the alias names.
+% \begin{tcl}
+namespace eval mtmtcl::openmath::stricten::helper {
+% \end{tcl}
+%   
+% \begin{proc}{truncate}
+%   This procedure can do what is needed for strictening 
+%   several OpenMath node types; it is meant to be useful as an 
+%   alias target. The call syntax is
+%   \begin{displaysyntax}
+%     |helper::truncate| \word{type} \word{attribute-list} 
+%     \word{attributes} \word{children} \word{clean}
+%   \end{displaysyntax}
+%   and the return value is the cleaned-up node of type 
+%   \word{type}, without children. 
+%   \begin{tcl}
+   proc truncate {type attrL attr children clean} {
+      if {!$clean} then {return [list $type $attr {}]}
+      set D [dict create]
+      foreach key $attrL {
+         if {[dict exists $attr $key]} then {
+            dict set D $key [dict get $attr $key]
+         }
+      }
+      return [list $type $D {}]
+   }
+%   \end{tcl}
+% \end{proc}
+%   
+% \begin{ensemble}{stricten}
+%   \setnamespace{mtmtcl::openmath::stricten}
+%   \begin{ensproc}{OMS}
+%   \begin{ensproc}{OMV}
+%   \begin{ensproc}{OMF}
+%   \begin{ensproc}{OMR}
+%     As stated above, |OMS|, |OMV|, |OMF|, and |OMR| nodes should 
+%     not have children in strict OpenMath, so they're the ones that 
+%     |helper::truncate| are for.
+%     
+%     Symbols may carry |name|, |cd|, |cdbase|, and |id| attributes.
+%     \begin{tcl}
+   interp alias {} [namespace parent]::OMS {}\
+     [namespace which truncate] OMS {name cd cdbase id}
+%     \end{tcl}
+%     Floats can carry |id|, |dec|, and |hex| attributes.
+%     \begin{tcl}
+   interp alias {} [namespace parent]::OMF {}\
+     [namespace which truncate] OMF {dec hex id}
+%     \end{tcl}
+%     Variables may carry |name| and |id| attributes.
+%     \begin{tcl}
+   interp alias {} [namespace parent]::OMV {}\
+     [namespace which truncate] OMV {name id}
+%     \end{tcl}
+%     References can carry |id| and |href| attributes.
+%     \begin{tcl}
+   interp alias {} [namespace parent]::OMR {}\
+     [namespace which truncate] OMR {id href}
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}\end{ensproc}\end{ensproc}
+% \end{ensemble}
+% 
+% \begin{proc}{textchild}
+%   Another class of node types, from the strictening point of 
+%   view, are those which can have |#text| children and an |id| 
+%   attribute, so this is what this procedure checks for.
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |helper::textchild| \word{type} \word{attributes} 
+%     \word{children} \word{clean}
+%   \end{displaysyntax}
+%   and the return value is the cleaned-up node of type 
+%   \word{type}.
+%   \begin{tcl}
+   proc textchild {type attr children clean} {
+      foreach child $children {
+         if {[lindex $child 0] ne "#text"} then {
+            error "Type \"[lindex $child 0]\" forbidden as child of\
+              \"$type\""
+         }
+      }
+      if {$clean} then {
+         if {[dict exists $attr id]} then {
+            set attr [dict filter $attr keys id]
+         } else {
+            set attr {}
+         }
+      }
+      return [list $type $attr $children]
+   }
+%   \end{tcl}
+% \end{proc}
+%   
+% \begin{ensemble}{stricten}
+%   \setnamespace{mtmtcl::openmath::stricten}
+%   \begin{ensproc}{OMI}
+%   \begin{ensproc}{OMB}
+%   \begin{ensproc}{OMSTR}
+%     Integers, bytearrays, and strings are node types that can be 
+%     handled by |textchild|.
+%     \begin{tcl}
+   interp alias {} [namespace parent]::OMI {}\
+     [namespace which textchild] OMI
+   interp alias {} [namespace parent]::OMB {}\
+     [namespace which textchild] OMB
+   interp alias {} [namespace parent]::OMSTR {}\
+     [namespace which textchild] OMSTR
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}\end{ensproc}
+% \end{ensemble}
+% 
+% \begin{proc}{recurse}
+%   The final class of node types are those where we actually need 
+%   to recurse over the children (and suspect they can be pretty 
+%   much anything). The helper for this has the call syntax
+%   \begin{displaysyntax}
+%     |helper::recurse| \word{type} \word{attribute-list} 
+%     \word{attributes} \word{children} \word{clean}
+%   \end{displaysyntax}
+%   and the return value is the cleaned-up node of type 
+%   \word{type}.
+%   \begin{tcl}
+   proc recurse {type attrL attr children clean} {
+      set L {}
+      foreach child $children {
+         lappend L [stricten {*}$child $clean]
+      }
+      if {!$clean} then {return [list $type $attr $L]}
+      set D {}
+      foreach key $attrL {
+         if {[dict exists $attr $key]} then {
+            dict set D $key [dict get $attr $key]
+         }
+      }
+      return [list $type $D $L]
+   }
+%   \end{tcl}
+% \end{proc}
+%   
+% \begin{ensemble}{stricten}
+%   \setnamespace{mtmtcl::openmath::stricten}
+%   \begin{ensproc}{OMA}
+%   \begin{ensproc}{OMBIND}
+%   \begin{ensproc}{OMATTR}
+%   \begin{ensproc}{OMATP}
+%     Compound elements can carry |id| and |cdbase| attributes.
+%     \begin{tcl}
+   interp alias {} [namespace parent]::OMA {}\
+     [namespace which recurse] OMA {cdbase id}
+   interp alias {} [namespace parent]::OMBIND {}\
+     [namespace which recurse] OMBIND {cdbase id}
+   interp alias {} [namespace parent]::OMATTR {}\
+     [namespace which recurse] OMATTR {cdbase id}
+   interp alias {} [namespace parent]::OMATP {}\
+     [namespace which recurse] OMATP {cdbase id}
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}\end{ensproc}\end{ensproc}
+%   
+%   \begin{ensproc}{OMBVAR}
+%   \begin{ensproc}{OME}
+%     Bound variables and errors only carry |id| attributes.
+%     \begin{tcl}
+   interp alias {} [namespace parent]::OME {}\
+     [namespace which recurse] OME id
+   interp alias {} [namespace parent]::OMBVAR {}\
+     [namespace which recurse] OMBVAR id
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}
+%   
+%   OK, that's the end of the |mtmtcl::openmath::stricten::helper| 
+%   material.
+%   \begin{tcl}
+}
+%   \end{tcl}
+%   
+%   \begin{ensproc}{OMFOREIGN}
+%     Foreign elements can carry |id| and |encoding| attributes. 
+%     Since the children are pretty arbitrary, there's no point in 
+%     recursing over them.
+%     \begin{tcl}
+proc mtmtcl::openmath::stricten::OMFOREIGN {attr children clean} {
+   if {!$clean} then {
+      return [list OMFOREIGN $attr $children]
+   }
+   set D [dict create]
+   foreach key {id encoding} {
+      if {[dict exists $attr $key]} then {
+         dict set D $key [dict get $attr $key]
+      }
+   }
+   return [list OMFOREIGN $D $children]
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% 
+% 
+% \subsection{The \texttt{export} interface}
+% 
+% The key route from \mtl\ to OpenMath is the |export| interface, 
+% which specifies how structure elements are converted to 
+% near-OpenMath data-trees.
+% 
+% \begin{APIspec}{export}{2.0}
+%   This interface is applicable to principal structures. It provides 
+%   a method |export| for converting the internal representation of 
+%   an element to an external format. The syntax for this method is:
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{export}
+%       \word{element} \word{common attributes}
+%     \end{APImethod}
+%       where \word{element} is the element to export. The return 
+%       value is a data-tree that encodes the \word{element} as 
+%       near-OpenMath.
+%       
+%       The \word{common attributes} is a dictionary of common 
+%       attributes for nodes in the tree. The |export| method is 
+%       however allowed to override part or all of it, so it is 
+%       prefectly acceptable to ignore the \word{common attributes} 
+%       entirely for some sets of nodes. The typical use is that 
+%       the \word{common attributes} are used for |OMA| nodes and 
+%       get |cd| and |name| entries added in |OMS| nodes.
+%       
+%       For |export| methods that call other |export| methods 
+%       recursively, there is however the condition that they must 
+%       update the \describestring+[attribute]{mtmtcl:path} entry in 
+%       the \word{common attributes} dictionary. The value of this 
+%       attribute is a list of strings, typically a list of method 
+%       names. The purpose of this list is to establish a system for 
+%       addressing subordinate structures by mirroring the command 
+%       prefix that would be used to access its methods. If a 
+%       structure $S_1$ makes use of the |export| method of another 
+%       structure $S_2$ and $S_2$ can be accessed using the $s$ 
+%       method of $S_1$, then the |mtmtcl:path| used for the 
+%       \texttt{[$S_2$ export $\dotsb$]} call should have an $s$ 
+%       append to its value from the \texttt{[$S_1$ export $\dotsb$]} 
+%       call.
+%       
+%       The |mtmtcl:path| may be extended with method names also when 
+%       there is no recursive call to the |export| method. This can 
+%       be done e.g.~to clarify which method corresponds to a 
+%       particular operation symbol.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \textbf{Question:} Would it be appropriate to define a 
+% \emph{content dictionary} for abstract operation symbols? In the 
+% long run probably yes, and this would be an appropriate place to do 
+% so.
+% 
+% \medskip
+% 
+% \begin{APIspec}{import}{1.0}
+%   Where there is export, this is usually also import. 
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{import}
+%       \word{path} \word{data-tree} 
+%     \end{APImethod}
+%       returns the element of the \meta{structure} that corresponds 
+%       to the \word{data-tree}, or throws an error if the 
+%       \word{data-tree} couldn't be interpreted as an element of the 
+%       \meta{structure}. The |-errorcode| of such an error should be
+%       \begin{displaysyntax}
+%         API import EDOM \word{who} \word{bad node}
+%       \end{displaysyntax}
+%       where |EDOM| is POSIX for ``domain error'', \word{who} is the 
+%       \word{path} of the party detecting the error, and \word{bad 
+%       node} should be the \word{data-tree} which couldn't be 
+%       interpreted.
+%       
+%       The \word{path} serves two purposes. One is that it may be 
+%       matched against \describestring+[attribute]{mtmtcl:path} 
+%       attributes in the \word{data-tree}, which can aid in 
+%       interpreting abbreviated \word{data-tree}s (for example trees 
+%       where unary addition or multiplication nodes have been 
+%       elided). The other is to identify the substructure that 
+%       has thrown an |EDOM| error. The idea is that it should be 
+%       handled as |mtmtcl:path| by the |export| method, i.e., if the 
+%       |import| method of structure $S_1$ makes use of the |import| 
+%       method of structure $S_2$, and $S_2$ can be accessed using 
+%       the $s$ method of $S_1$, then the \texttt{[$S_2$ import $P_2$ 
+%       $\dotsb$]} call used by the \texttt{[$S_1$ import $P_1$ 
+%       $\dotsb$]} should be such that \(P_2 = P_1 s\) (list append).
+%       
+%       The \word{path} should not be taken into account when 
+%       interpreting a \word{data-tree} without |mtmtcl:path| 
+%       attributes.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \medskip
+% 
+% \noindent Since the above is version~2.0 of |export|, there should 
+% also have been a version~1 that for some reason was abandoned. It 
+% was specified as follows:
+% \begin{quote}
+% \begin{APIspec}{export}{1.0}
+%   This interface is applicable to principal structures. It provides 
+%   a method |export| for converting the internal representation of 
+%   an element to an external format. The syntax for this method is:
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{export}
+%       \word{element} \word{path} \word{options-dict}
+%       \begin{regblock}[\regstar] \word{option} \word{value} 
+%       \end{regblock}
+%     \end{APImethod}
+%       where \word{element} is the element to export. The return 
+%       value should have the form of an XML-tree as described above. 
+%       In want of a \mtl-native way of encoding some concept, it is 
+%       recommended that MathML or OpenMath elements are used.
+%       
+%       The \word{path} is a list of strings, typically a list of 
+%       method names. The purpose of this list is to establish a 
+%       system for addressing subordinate structures by mirroring the 
+%       command prefix that would be used to access its methods. If a 
+%       structure $S_1$ makes use of the |export| method of another 
+%       structure $S_2$ and $S_2$ can be accessed using the $s$ 
+%       method of $S_1$, then the \word{path} used for the 
+%       \texttt{[$S_2$ export $\dotsb$]} call should have an $s$ 
+%       append to the \word{path} given in the \texttt{[$S_1$ export 
+%       $\dotsb$]} call.
+%       
+%       The option--value pairs can be used to influence the way in 
+%       which the value gets encoded, as can the \word{options-dict}. 
+%       The keys in this dictionary are \word{path}s, whereas the 
+%       values are option--value dictionaries.
+%   \end{APIdescription}
+%   Note that it is not specified how to merge options specified in 
+%   the \word{option-dict} with options explicit in the call; this 
+%   might well have to vary from case to case. Nor is it specified 
+%   whether the options in the $p$ entry of the \word{options-dict} 
+%   apply only for the structure called with $p$ as \word{path}, or 
+%   e.g.~also for entries whose \word{path} has $p$ as a prefix; 
+%   deciding this requires more experience.
+% \end{APIspec}
+% \end{quote}
+% The main difference between the two are the (rather heavy) 
+% machinery for options in version~1\Dash options of unclear effect 
+% and without known use-cases! It turned out in all cases I've 
+% considered that it is easier to achieve variations by applying a 
+% transformation to the result of |export| than to have it built into 
+% |export|, and moreover the useful variations are hard to predict 
+% when implementing concrete structures while the overhead of 
+% handling options in every |export| method is quite considerable.
+% 
+% Another piece of old machinery which has become deprecated is the 
+% use of \mtl-specific tags for common operations:
+% \begin{quotation}
+%   Much of mathematics is stated in terms of binary operations, 
+%   so it makes sense to have a \describestring+[tag]{binop} tag 
+%   for binary operation nodes. The many binary operations which 
+%   are associative are however better served by an $n$-ary 
+%   operation node \describestring+[tag]{assop}, as that is the 
+%   level at which they will typically be processed. In both cases, 
+%   the children of a node are its operands.
+% 
+%   Three attributes which seem immediately relevant are:
+%   \begin{description}
+%     \renewcommand{\makelabel}[1]{\hspace{\labelsep}\texttt{#1}}
+%     ^^A Was: \describestring*+[attribute]{#1}
+%     \item[symbol]
+%       The symbol used to denote the operation. A suitable 
+%       default could be empty string, to denote invisible 
+%       multiplication\slash juxtaposition.
+%     \item[priority]
+%       The priority (binding strength) associated with the 
+%       symbol. Could default to $3$ for invisible multiplication, 
+%       $1$ for $+$, and $2$ for everything else.
+%     \item[mtmtcl-path]
+%       A list of ``method names'' for accessing the operation 
+%       underlying the node. The intention for this attribute is to 
+%       simplify postprocessing of a raw exported structure, to 
+%       e.g.~change the symbol used for some operation.
+%   \end{description}
+% \end{quotation}
+% This was motivated by a feeling that MathML\slash OpenMath put the 
+% name of an operation too far from the node containing its operands, 
+% but an attribute is not very much better than an attribute of the 
+% first child, and the |symbol| attribute here is \emph{way} too 
+% presentation-oriented (as is the |priority| attribute, which 
+% belongs fairly far on the way towards a rendering).
+% 
+% The |integer| tag which was introduced at the same time did however 
+% prove useful, as did |mtmtcl-path| (which was renamed to sport an 
+% XML namespace separator). That this was changed from a separate 
+% \word{path} argument to an entry in the \word{common attributes} 
+% argument is a convenience optimisation, but one that conveniently 
+% opens up for e.g.~specifying a |cdbase| attribute.
+% 
+% 
+% \StopEventually{}
+% 
+% 
+% \subsection{Generic helpers}
+% 
+% \setnamespace{mtmtcl::openmath}
+% 
+% \begin{proc}{cdbase}
+%   This procedure revises the |cdbase| attributes of all nodes 
+%   in a data-tree, to make sure an |OMS| node has a |cdbase| 
+%   attribute if and only if the effective |cdbase| value at that 
+%   point is not the default one. The call syntax is
+%   \begin{displaysyntax}
+%     cdbase \word{tree-var} \word{inherited cdbase}\regopt
+%   \end{displaysyntax}
+%   where \word{tree-var} is the name of a variable in the calling 
+%   context in which the tree is stored, and \word{inherited cdbase} 
+%   is the |cdbase| value (`|http://www.openmath.org/cd|') that would 
+%   be inherited from the parent. There is no particular return value.
+%   
+%   In order to ensure this operation is invertible, any existing 
+%   attribute with a name on the form |cdbase|$($|-orig|$)^*$ gets an 
+%   extra |-orig| in the name.
+%   
+%   \begin{tcl}
+proc mtmtcl::openmath::cdbase\
+  {treevar {cdbase http://www.openmath.org/cd}} {
+   upvar 1 $treevar tree
+%   \end{tcl}
+%   The main loop in this procedure is over the nodes in the tree, in 
+%   string order but with list indexing. The |path| variable points 
+%   to the current node, and the last element in |stack| is the 
+%   inherited cdbase value for the current node. Whenever one element 
+%   is popped of the |stack|, two elements are removed from the end 
+%   of the |path|.
+%   \begin{tcl}
+   set stack [list $cdbase]
+   set path {}
+   while 1 {
+%   \end{tcl}
+%   This outer loop is over the nodes. It is terminated by 
+%   |return|ing from the entire procedure.
+%   \begin{tcl}
+      set cdbase [lindex $stack end]
+      set type [lindex [lindex $tree $path] 0]
+      if {$type ne "#text"} then {
+         set apath [linsert $path end 1]
+         set attr [lindex $tree $apath]
+         if {[dict exists $attr cdbase]} then {
+            set cdbase [dict get $attr cdbase]
+         }
+%   \end{tcl}
+%   The following uses |dict filter| to drop |cdbase|$($|-orig|$)^*$ 
+%   elements from the attribute dictionary, while collecting modified 
+%   forms of them in |kvL| that are then put back.
+%   \begin{tcl}
+         set kvL {}
+         set fattr [dict filter $attr script {k v} {
+            switch -regexp -- $k {^cdbase(-orig)*$} {
+               lappend kvL $k-orig $v
+               return -level 0 0
+            } default {
+               return -level 0 1
+            }
+         }]
+         set attr [dict replace $fattr {*}$kvL]
+%   \end{tcl}
+%   The attribute dictionary in the tree is only updated if it 
+%   changes. The main reason for doing this is that the effective 
+%   |cdbase| is not the default one, but a nonempty |kvL| also 
+%   calls for an update.
+%   \begin{tcl}
+         if {$type eq "OMS" &&\
+           $cdbase ne "http://www.openmath.org/cd"} then {
+            dict set attr cdbase $cdbase
+            lset tree $apath $attr
+         } elseif {[llength $kvL]} then {
+            lset tree $apath $attr
+         }
+%   \end{tcl}
+%   This steps the |path| forward into the list of children, if there 
+%   are any. The final path component |-1| will be incremented by the 
+%   next code block before it is used as index into the tree.
+%   \begin{tcl}
+         if {[llength [lindex [lindex $tree $path] 2]]} then {
+            lappend stack $cdbase
+            lappend path 2 -1
+         }
+      }
+%   \end{tcl}
+%   The following loop handles incrementing the |path| to point to 
+%   the next (in string representation order) node in the tree. There 
+%   is one iteration of this loop for every tree level that needs to 
+%   be popped of the |stack|.
+%   \begin{tcl}
+      while 1 {
+         if {![llength $path]} then {return}
+%   \end{tcl}
+%   If the |path| is empty then we're done with the root node and can 
+%   |return|. Otherwise increment the final |path| element, to point 
+%   it at the next sibling of the current node.
+%   \begin{tcl}
+         lset path end [expr {1 + [lindex $path end]}]
+         if {[llength [lindex $tree $path]]} then {break}
+%   \end{tcl}
+%   If we were at the final sibling, then the |path| now points to 
+%   nothing, and the |lindex| returns an empty string. Any proper 
+%   node would have positive list length, so if we don't then it's 
+%   time to return to the parent and consider its next sibling.
+%   \begin{tcl}
+         set path [lreplace $path [set path end-1] end]
+         set stack [lreplace $stack [set stack end] end]
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{cdbase-orig}
+%   This procedure is the inverse of |cdbase|, primarily throwing 
+%   away |cdbase| attributes and removing one |-orig| from the name of 
+%   every |cdbase|$($|-orig|$)^+$ attribute. 
+%   However, it also preserves the effective |cdbase|, so that trees 
+%   which have been modified can be restored to a correct state. The 
+%   call syntax is the same as for |cdbase|, i.e.,
+%   \begin{displaysyntax}
+%     cdbase-orig \word{tree-var} \word{inherited cdbase}\regopt
+%   \end{displaysyntax}
+%   with no particular return value, as the \word{tree-var} in the 
+%   calling context gets modified in place.
+%   
+%   The overall loop structure is the same as in |cdbase|. The main 
+%   difference here is that there are two |cdbase| values: |cdbase| 
+%   which is the one encoded in the input, and |cdbase0| which is the 
+%   one which would be effective for the node if merely an |-orig| 
+%   was removed from all |cdbase|$($|-orig|$)^+$ attributes. When 
+%   these are different for an |OMS| node, then the |cdbase| value 
+%   is taken as value for the |cdbase| attribute.
+%   \begin{tcl}
+proc mtmtcl::openmath::cdbase-orig\
+  {treevar {cdbase http://www.openmath.org/cd}} {
+   upvar 1 $treevar tree
+   set stack [list $cdbase]
+   set path {}
+   while 1 {
+      set cdbase0 [lindex $stack end]
+      set type [lindex [lindex $tree $path] 0]
+      if {$type ne "#text"} then {
+         set apath [linsert $path end 1]
+         set attr [lindex $tree $path]
+         if {[dict exists $attr cdbase-orig]} then {
+            set cdbase0 [dict get $attr cdbase-orig]
+         }
+         if {[dict exists $attr cdbase]} then {
+            set cdbase [dict get $attr cdbase]
+         } else {
+            set cdbase "http://www.openmath.org/cd"
+         }
+         set kvL {}
+         set fattr [dict filter $attr script {k v} {
+            switch -regexp -- $k {
+               {^cdbase(-orig)+$} {
+                  lappend kvL [string range $k 0 end-5] $v
+                  return -level 0 0
+               }
+               {^cdbase$} {return -level 0 0}
+               default {return -level 0 1}
+            }
+         }]
+         if {$type eq "OMS" && $cdbase0 ne $cdbase} then {
+            lappend kvL cdbase $cdbase
+            set cdbase0 $cdbase
+         }
+         if {[llength $kvL]} then {
+            lset tree $apath [dict replace $fattr {*}$kvL]
+         } elseif {[dict size $attr] != [dict size $fattr]} then {
+            lset tree $apath $fattr
+         }
+         if {[llength [lindex [lindex $tree $path] 2]]} then {
+            lappend stack $cdbase0
+            lappend path 2 -1
+         }
+      }
+      while 1 {
+         if {![llength $path]} then {return}
+         lset path end [expr {1 + [lindex $path end]}]
+         if {[llength [lindex $tree $path]]} then {break}
+         set path [lreplace $path [set path end-1] end]
+         set stack [lreplace $stack [set stack end] end]
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{desala}
+%   This procedure searches all nodes in a data-tree for |OMA| or 
+%   |OMBIND| nodes whose first child is a specific |OMS| node, and 
+%   changes these to some arbitrary node type. The call syntax is
+%   \begin{displaysyntax}
+%     desala \word{data-tree} \begin{regblock}[\regstar]
+%     \word{cd} \word{name} \word{type} \word{attributes} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{cd}s and \word{name}s are glob-patterns matched 
+%   against the |cd| and |name| attributes of the |OMS| node. 
+%   \word{type} is the corresponding node type it would be converted 
+%   to and \word{attributes} is a dictionary of extra attributes to 
+%   add to the node. The return value is the converted data-tree.
+%   
+%   Depending on the original type, the modified nodes have one 
+%   attribute \describestring+[attribute]{OMA} or 
+%   \describestring+[attribute]{OMBIND}, and one attribute 
+%   \describestring+[attribute]{OMS}, which contain the attribute 
+%   dictionaries of the original |OMA|\slash |OMBIND| and |OMS| 
+%   nodes. 
+%   If there are attributions (which may be nested) of the symbol, 
+%   then the new node will also have an 
+%   \describestring+[attribute]{OMATP} attribute. The value of this 
+%   is a dictionary which maps attribution symbol URIs to corresponding 
+%   OpenMath objects (as data-trees); it is a flattened form of the 
+%   attribution data. The URIs are constructed as
+%   \begin{quote}
+%     \meta{cdbase}\texttt{/}\meta{cd}\texttt{\#}\meta{name}
+%   \end{quote}
+%   if there is a |cdbase| attribute, and as 
+%   \meta{cd}\texttt{\#}\meta{name} otherwise. Hence the presence 
+%   of an alternative \LaTeX\ encoding for the |OMS| symbol can 
+%   be tested by the command
+%   \begin{displaysyntax}
+%     dict exists \word{attributes} OMATP |altenc#LaTeX_encoding|
+%   \end{displaysyntax}
+%   The |OMA|, |OMBIND|, |OMS|, or |OMATP| attributes generated by 
+%   this procedure will override attributes of those names provided 
+%   in an \word{attributes} argument.
+%   
+%   The implementation is not recursive; instead an explicit |stack| 
+%   of list-index paths to nodes to be converted is maintained. This 
+%   preserves the Tcl\_Objs of subtrees which are unchanged.
+%   \begin{tcl}
+proc mtmtcl::openmath::desala {tree args} {
+   set stack {{}}
+   while {[llength $stack]} {
+      set path [lindex $stack end]
+      set stack [lreplace $stack [set stack end] end]
+      set node [lindex $tree $path]
+%   \end{tcl}
+%   Non-element nodes (|#text| nodes) and |OMFOREIGN| nodes shouldn't 
+%   be processed at all, since they either have no children or don't 
+%   need to adhere to the OpenMath standard.
+%   \begin{tcl}
+      if {[llength $node]<3 || [lindex $node 0] eq "OMFOREIGN"}\
+      then {continue}
+%   \end{tcl}
+%   Due to the possibility of |OMATTR|s, it is rather complicated to 
+%   determine whether a particular |OMA| or |OMBIND| should be 
+%   converted. The condition goes from here \dots
+%   \begin{tcl}
+      if {
+         [lindex $node 0] in {OMA OMBIND} && [
+            set cattr [dict create [lindex $node 0] [lindex $node 1]]
+            set snode [lindex $node 2 0]
+            while {[lindex $snode 0] eq "OMATTR"} {
+               set snode [lindex $snode 2 1]
+            }
+            lindex $snode 0
+         ] eq "OMS" && [
+            dict set cattr OMS [lindex $snode 1]
+            dict exists $cattr OMS cd
+         ] && [dict exists $cattr OMS name] && [
+            set cd [dict get $cattr OMS cd]
+            set name [dict get $cattr OMS name]
+            set match 0
+            foreach {cdp namep type xattr} $args {
+               if {[string match $cdp $cd] &&\
+                 [string match $namep $name]} then {
+                  set match 1
+                  break
+               }
+            }
+            set match
+         ]
+      } then {
+%   \end{tcl}
+%   \dots~to here, and it is has the side-effects of setting the 
+%   |cattr|, |type|, and |xattr| variables.
+%   
+%   Once it has been determined that this |OMA|\slash |OMBIND| will 
+%   be converted, the next step is to construct the |OMATP| entry 
+%   (if there is to be one).
+%   \begin{tcl}
+         for {
+            set snode [lindex $node 2 0]
+         } {[lindex $snode 0] eq "OMATTR"} {
+            set snode [lindex $snode 2 1]
+         } {
+            foreach {key value} [lindex $snode 2 0 2] {
+               if {[lindex $key 0] ne "OMS"} then {continue}
+               set sattr [dict merge {cd {} name {}}\
+                 [lindex $key 1]]
+               if {[dict exists $sattr cdbase]} then {
+                  dict set cattr OMATP [format %s/%s#%s\
+                    [dict get $sattr cdbase]\
+                    [dict get $sattr cd] [dict get $sattr name]]\
+                    $value
+               } else {
+                  dict set cattr OMATP 
+                    [dict get $sattr cd]\#[dict get $sattr name]\
+                    $value
+               }
+            }
+         }
+%   \end{tcl}
+%   Then it is finally time to construct the new node.
+%   \begin{tcl}
+         set node [list $type [dict merge $xattr $cattr]\
+           [lindex $node 2]]
+         lset tree $path $node
+      }
+%   \end{tcl}
+%   Regardless of whether the node was converted or not, it is 
+%   necessary to process also all of its children, by pushing their 
+%   |lindex|-paths on the stack.
+%   \begin{tcl}
+      lappend path 2
+      set i 0
+      foreach child [lindex $node 2] {
+         lappend stack [linsert $path end $i]
+         incr i
+      }
+   }
+   return $tree
+}
+%   \end{tcl}
+%   The original version of this procedure would drop the first child 
+%   of the |OMA| node from the new node, on the grounds that all the 
+%   information in it had been encoded into the attributes, but this 
+%   turned out to lead to inconsistencies elsewhere. Specifically, 
+%   conversions of |OMA| nodes carried out for known symbols would be 
+%   different than conversions carried out for unknown symbols.
+%   
+%   The original version also didn't convert |OMBIND| nodes, but it 
+%   makes sense to support conversion of both. The restriction to a 
+%   particular symbol usually suffices for distinguishing the two.
+% \end{proc}
+% 
+% \begin{proc}{oma}
+%   This procedure implements the inverse of the |desala| operation: 
+%   convert nodes with |OMA| attributes back to |OMA| nodes (having 
+%   only the attributes listed in the |OMA| dictionary) and nodes 
+%   with |OMBIND| attributes back to |OMBIND| nodes. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     oma \word{data-tree} \word{pattern}\regstar
+%   \end{displaysyntax}
+%   where the \word{pattern}s are used to constrain the conversions: 
+%   a node is only converted if it matches one of these patterns.
+%   \begin{tcl}
+proc mtmtcl::openmath::oma {tree args} {
+   set stack {{}}
+   while {[llength $stack]} {
+      set path [lindex $stack end]
+      set stack [lreplace $stack [set stack end] end]
+      set node [lindex $tree $path]
+      if {[llength $node]<3 || [lindex $node 0] eq "OMFOREIGN"}\
+      then {continue}
+      lassign $node type attr children
+      if {[dict exists $attr OMA]} then {
+         foreach pat $args {
+            if {[string match $pat $type]} then {
+               lset tree $path [list OMA [dict get $attr OMA] $children]
+               break
+            }
+         }
+      } elseif {[dict exists $attr OMBIND]} then {
+         foreach pat $args {
+            if {[string match $pat $type]} then {
+               lset tree $path\
+                 [list OMBIND [dict get $attr OMBIND] $children]
+               break
+            }
+         }
+      }
+      lappend path 2
+      set i 0
+      foreach child $children {
+         lappend stack [linsert $path end $i]
+         incr i
+      }
+   }
+   return $tree
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{gettext}
+%   The |gettext| command walks through a data-tree and concatenates 
+%   all the \describestring*+[node type]{#text} nodes found in it. 
+%   This is typically used where a node is only supposed to contain 
+%   text, and one doesn't want to mandate that all of it is in a 
+%   single |#text| child. The call syntax is
+%   \begin{displaysyntax}
+%     gettext \word{tree} \word{join-string}\regopt
+%   \end{displaysyntax}
+%   where the \word{join-string} will be put between each |#text| 
+%   leaf. It defaults to a space.
+%   \begin{tcl}
+proc mtmtcl::openmath::gettext {tree {how " "}} {
+   set res {}
+   set stack [list {}]
+   while {[llength $stack]} {
+      set path [lindex $stack end]
+      set stack [lreplace $stack [set stack end] end]
+      set node [lindex $tree $path]
+      switch -- [lindex $node 0] "#text" {
+         lappend res [lindex $node 1]
+      } default {
+         lappend path 2
+         for {set n [llength [lindex $node 2]]} {$n>0} {} {
+            lappend stack [linsert $path end [incr n -1]]
+         }
+      }
+   }
+   return [join $res $how]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tcl}
+namespace eval mtmtcl::openmath {
+   namespace export *
+}
+% \end{tcl}
+% 
+% 
+% \section{Presenting expressions}
+% 
+% Although the (near-)OpenMath data-trees generated by the |export| 
+% method generally do a very good job of encoding an expression (or 
+% other mathematical object), they're not very readable; some way of 
+% rendering the object as an ordinary formula is definitely needed. 
+% One approach for that would be a conversion chain OpenMath${} 
+% \longrightarrow {}$Content-MathML${}\longrightarrow
+% {}$Presentation-MathML, but this is not an output format I feel 
+% comfortable with; \LaTeX\ is preferable, so that one can use it in 
+% one's papers. MathML furthermore tends to suggest a reliance on 
+% generic XML processors, whereas I'd prefer a pure-\Tcl\ solution.
+% 
+% There's no reason not to borrow ideas from the big-league 
+% toolchain, however. In particular, it is a reasonable first step to 
+% seek a \emph{presentation form} of the data-tree to be rendered, 
+% where additional material has been inserted that clarifies how the 
+% expression should be rendered.
+% \begin{tcl}
+namespace eval mtmtcl::present {
+   namespace path [list [namespace parent]]
+}
+% \end{tcl}
+% \setnamespace{mtmtcl::present}
+% 
+% 
+% \subsection{Typographic preprocessing}
+% 
+% The purpose of typographic preprocessing is to change expressions 
+% to a form that is typographically optimal, even if it is not the 
+% most consistent from a technical point of view. The transformations 
+% that are made include:
+% \begin{enumerate}
+%   \item
+%     Removal of pointless ones and zeroes.
+%   \item
+%     Expansion of numbers (particularly floating-point numbers in 
+%     mantissa--exponent notation). This process is supposed to equip 
+%     every number with a ``first child presentation'', which 
+%     typically includes at least one |mn| node.
+%   \item
+%     Outward migration of minuses.
+% \end{enumerate}
+% Number expansion simplifies fencing for priorities, since it makes 
+% explicit those operations (e.g.~minuses) that are used in the 
+% standard notations for various numbers. The other transformations 
+% are more a matter of cleanup.
+% 
+% 
+% \begin{proc}{typography}
+%   This is a generic simplifier of near-OpenMath objects according 
+%   to typographic rules, which also takes the first steps towards 
+%   generating a presentation by equipping |integer| and |OMF| nodes 
+%   with a content. The call syntax is
+%   \begin{displaysyntax}
+%     typography \word{data-tree}
+%   \end{displaysyntax}
+%   and the return value is the transformed \word{data-tree}.
+%   
+%   Most of the work is carried out by the |tpp| ensemble.
+%   \begin{tcl}
+proc mtmtcl::present::typography {tree} {
+   tpp::tool::tpp {*}[
+      openmath::desala $tree \
+        arith1 times multiply {}  arith1 power power {} \
+        arith1 plus add {}  arith1 unary_minus negate {}
+   ] 0
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% The OpenMath symbols of immediate relevance are:
+% \begin{description}
+%   \item[\OMSref*{arith1}{times}]
+%     Generally multiplication (both associative $n$-ary and scalar 
+%     multiple, which could be a problem).
+%   \item[\OMSref*{arith1}{power}]
+%     Integer power.
+%   \item[\OMSref*{arith1}{unary_minus}]
+%     Negation operation, arising from eliminating a $-1$ factor.
+%   \item[\OMSref*{alg1}{one}]
+%     Multiplicative unit, arising e.g.~from raising something to 
+%     the $0$th power, or from a nullary product.
+%   \item[\OMSref*{arith1}{plus}]
+%     Addition.
+% \end{description}
+% In processing, these are |desala|d into specialised node types:
+% \begin{description}
+%   \renewcommand{\makelabel}[1]{^^A
+%     \hspace{\labelsep}\describestring*+[node type]{#1}^^A
+%   }
+%   \item[multiply]
+%     Generally multiplication, both operations expressed as 
+%     juxtaposition and operations with an infix operation symbol.
+%   \item[power]
+%     General powers.
+%   \item[negate]
+%     Additive negation.
+%   \item[add]
+%     Addition.
+% \end{description}
+% As a rule these |OMA|-normalises themselves upon returning, but 
+% |negate| nodes may remain to denote points of soft negation. 
+% Another type of node that may be created by this operation is 
+% \describestring+[node type]{mn}, which surrounds a raw number. 
+% The content (text) of this node type is a sequence of digits, 
+% possibly including a decimal point. The reason for having such a 
+% wrapper in the first place is that digits are special with respect 
+% to juxtaposition; they may only occur first in a block of 
+% juxtaposed factors. |mn| nodes only occur in the presentation of 
+% an |integer|, |OMF|, or similar node.
+% 
+% 
+% \setnamespace{mtmtcl::present::tpp::tool}
+% \begin{ensemble}{tpp}
+%   To facilitate recursion, the |tpp| ensemble command resides in 
+%   the |tool| child of its actual namespace |mtmtcl::present::tpp|.
+%   \begin{tcl}
+namespace eval mtmtcl::present::tpp {
+   namespace path [list [namespace parent [namespace parent]]]
+   namespace export *
+   namespace ensemble create -command tool::tpp -prefix 0
+%   \end{tcl}
+% \end{ensemble}
+% The general syntax for this ensemble is
+% \begin{displaysyntax}
+%   tool::tpp \meta{node} \word{want negate}
+% \end{displaysyntax}
+% where \word{want negate} is a boolean specifying whether the parent 
+% of the \meta{node} wants it to be a |negate| if that is 
+% mathematically correct.
+% 
+% \begin{proc}{recurse}
+%   Most node types don't require typographic preprocessing, so the 
+%   handling of an unknown node type is to recurse over its children. 
+%   Since |negate|s couldn't pass through such nodes, it follows that 
+%   they don't want any negations from their children.
+%   \begin{tcl}
+   proc tool::recurse {type attr children want} {
+      set res {}
+      foreach child $children {lappend res [tpp {*}$child 0]}
+      list $type $attr $res
+   }
+   namespace ensemble configure tool::tpp -unknown [
+      list ::apply {{target cmd type args} {list $target $type} ::}\
+        [namespace which tool::recurse]
+   ] 
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \setnamespace{mtmtcl::present::tpp::tool}
+% \begin{ensemble}{tpp}
+%   \setnamespace{mtmtcl::present::tpp}
+%   \begin{ensproc}{#text}
+%     As usual, |#text| nodes are exceptional and need an explicit 
+%     definition.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::#text {str want} {list #text $str}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{OMFOREIGN}
+%     There should not be any recursion into foreign material, so 
+%     |OMFOREIGN| also needs an explicit definition.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::OMFOREIGN {attr children want} {
+   list OMFOREIGN $attr $children
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   Similar ``don't go there'' definitions could probably also be 
+%   added for e.g.~|OME| nodes, but it does not seem essential, 
+%   either.
+%   
+%   \begin{ensproc}{OMATTR}
+%     Attributions need a special definition because they should be 
+%     transparent to minus migration\Dash in particular, a |negate| 
+%     should move out of it. A consequence of this is that the 
+%     recursion only visits the nucleus child.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::OMATTR {attr children want} {
+   set nucleus [tool::tpp {*}[lindex $children 1] $want]
+   if {$want && [lindex $nucleus 0] eq "negate"} then {
+      lset nucleus 2 1 [
+         list OMATTR $attr [lreplace $children 1 1\
+           [lindex $nucleus 2 1]]
+      ]
+      return $nucleus
+   } else {
+      return [list OMATTR $attr [lreplace $children 1 1 $nucleus]]
+   }
+}
+%     \end{tcl}
+%     This could in principle be wrong for semantic attributions, but 
+%     so far I haven't encountered any attribution that would be 
+%     ill-affected by it.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{add}
+%     The primary motivator for minus migrations is addition 
+%     operations, or technically the |add| nodes (which take the 
+%     place of |OMA|s). Regardless of outer want, an |add| requests 
+%     minus migration from all operands except the first one.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::add {attr children want} {
+   set res {}
+   foreach child $children {
+      lappend res [
+         tool::tpp {*}$child [expr {$want || [llength $res]>1}]
+      ]
+   }
+   if {[llength $res] == 2} then {
+      return [lindex $res 1]
+   } else {
+      return [list OMA [dict get $attr OMA] $res]
+   }
+}
+%     \end{tcl}
+%     A variation could be to sometimes pass a |negate| on if the 
+%     parent wants it, e.g. if the first term is |negate|d or if a 
+%     majority of the terms are negated, but this will suffice for 
+%     basic processing.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{multiply}
+%     The other main case of an operation which is permeable for 
+%     minus migration is multiplication, which exists in a variety of 
+%     forms. |multiply| nodes are for unital and associative 
+%     multiplication operations, whereas |distributive| nodes avoid 
+%     making this assumption.
+%     
+%     Multiplication is tricky in that it can also serve as motivator 
+%     for minus migration. Concretely, a |multiply| with priority 
+%     $<3$ (the default priority of a unary minus) will not motivate 
+%     migration, but other |multiply|s will. The reason for this is 
+%     purely to avoid fencing. If $(-a)b$ can be rendered as $-ab$ by 
+%     minus migration to $-(ab)$ then this is of course good, but in 
+%     $(-a) \wedge b$ the same migration would lead to the rendering 
+%     $-(a \wedge b)$, whereas the original expression renders as $-a 
+%     \wedge b$. The difference is that $\wedge$ has lower priority 
+%     than unary minus, whereas invisible multiplication has higher 
+%     priority.
+%     
+%     Formally, operations turned into |multiply| nodes have 
+%     to satisfy the following properties:
+%     \begin{itemize}
+%       \item
+%         A negation in any factor can be turned into a negation of 
+%         the expression as a whole.
+%       \item
+%         A unit factor (be it an |integer| $1$ or a 
+%         \OMSref{alg1}{one}) can be dropped.
+%       \item
+%         A unary operation can be elided. A nullary operation is 
+%         a \OMSref{alg1}{one}.
+%       \item
+%         An |OMA| child which has a |multiply| attribute can be 
+%         contracted into the node, i.e., its children (excluding the 
+%         non-operand child) replace the child.
+%     \end{itemize}
+%     The first two properties would mostly follow if one requests 
+%     multilinearity over the integers, but that would also call for 
+%     combining all integer factors. It could be useful to somehow 
+%     preserve the nature of a \OMSref{alg1}{one}, but that's fine 
+%     detail.
+%     
+%     The value of a \describestring+[attribute]{multiply} 
+%     attribute is a list of operations (typically |OMS| nodes or 
+%     decorations thereof), concretely the operations that would have 
+%     appeared between the operands in the raw data-tree. Hence it 
+%     should always have one elements less than the |OMA| node has 
+%     operands. The purpose of this information is to provide other 
+%     processors full information about which operations have come 
+%     together into a multiplication node, in order to select a 
+%     dominant one. |multiply| always keeps its own operation, which 
+%     in a combination of |multiply|s means it is the outermost one 
+%     that wins; while natural from a computer science point of view, 
+%     it is seldom mathematically optimal.
+%     
+%     The first step is to determine whether there is a want for 
+%     negation. External want status is preserved since it will be 
+%     needed later. The default for 
+%     \describestring+[attribute]{priority} here is ``at least $3$''.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::multiply {attr children want} {
+   if {$want} then {
+      set w 1
+   } elseif {[dict exists $attr OMA priority]} then {
+      set w [expr {[dict get $attr OMA priority] >= 3}]
+   } else {
+      set w 1
+   }
+%     \end{tcl}
+%     The operation child is preprocessed just like all the others, 
+%     just in case it has an inner structure (e.g. carries indices). 
+%     The |multiply| list has an extra element at the end when it is 
+%     constructed; that is dropped when putting it in the attribute.
+%     \begin{tcl}
+   set newchildren [list [tool::tpp {*}[lindex $children 0] 0]]
+   set negate 0
+   set multiply {}
+   foreach child [lrange $children 1 end] {
+      set child [tool::tpp {*}$child $w]
+      while {[lindex $child 0] eq "negate"} {
+         set negate [expr {!$negate}]
+         set child [lindex $child 2 1]
+      }
+      switch -- [lindex $child 0] "OMS" {
+         set cattr [lindex $child 1]
+         switch -- [dict get $cattr cd]/[dict get $cattr name] {
+            "alg1/one" {continue}
+         }
+      } "integer" {
+         set value [dict get [lindex $child 1] value]
+         if {$value == 1} then {continue}
+      } "OMA" {
+         set cattr [lindex $child 1]
+         if {[dict exists $cattr multiply]} then {
+            lappend newchildren {*}[lrange [lindex $child 2] 1 end]
+            lappend multiply {*}[dict get $cattr multiply]\
+              [lindex $newchildren 0]
+            continue
+         }
+      }
+      lappend newchildren $child
+      lappend multiply [lindex $newchildren 0]
+   }
+   dict set attr OMA multiply [lrange $multiply 0 end-1]
+   if {[llength $newchildren]>2} then {
+      set res [list OMA [dict get $attr OMA] $newchildren]
+   } elseif {[llength $newchildren] == 2} then {
+      set res [lindex $newchildren 1]
+   } else {
+      set res [list OMS [
+         dict replace $attr  cd alg1  name one
+      ] {}]
+   }
+   if {$negate} then {
+      return [tool::negate $res $want]
+   } else {
+      return $res
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% \begin{proc}{negate}
+%   The |tool::negate| procedure handles the (in minus migration 
+%   common) task of wrapping a node in a |negate| node. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     tool::negate \word{node} \word{soft}
+%   \end{displaysyntax}
+%   where \word{node} is the node to wrap and \word{soft} is a 
+%   boolean; the return value is the wrapped node.
+%   
+%   There are two kinds of negating: hard and soft. Hard negations 
+%   are expected to show up as unary minuses, whereas soft negations 
+%   are expected to be inlined into a sum as a binary minus. These 
+%   are different with respect to priority, since a soft negation 
+%   should have the priority level of the surrounding addition, 
+%   whereas hard negation has the priority of a unary operation. 
+%   Hard negations are encoded in the obvious manner (an |OMA| 
+%   against \OMSref{arith1}{unary_minus}), whereas soft negations 
+%   are encoded using the custom 
+%   \describestring+[node type]{negate} node type. This has the form 
+%   of a |desala|d hard negation, but should have 
+%   |form|${}={}$|function| to ensure the argument is fenced\Ldash 
+%   a fencing purely by priorities could otherwise lead to confusing 
+%   results\Dash although normally it shouldn't get to handle its own 
+%   formatting.
+%   \begin{tcl}
+proc mtmtcl::present::tpp::tool::negate {node soft} {
+   set minus {OMS {cd arith1 name unary_minus} {{#text -}}}
+   set children [list $minus $node]
+   if {$soft} then {
+      list negate {OMA {form function}} $children
+   } else {
+      list OMA {form prefix} $children
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{ensemble}{tpp}
+%   \setnamespace{mtmtcl::present::tpp}
+%   \begin{ensproc}{negate}
+%     Actual |negate| nodes in the input signify a hard negation, but 
+%     these would like to cancel themselves against a soft negation. 
+%     They can also turn into soft negations if the parent |want|s 
+%     them to.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::negate {attr children want} {
+   set nucleus [tool::tpp {*}[lindex $children 1] 1]
+   if {[lindex $nucleus 0] eq "negate"} then {
+      lindex $nucleus 2 1
+   } elseif {$want} then {
+      tool::negate $nucleus 1
+   } else {
+      list OMA [dict get $attr OMA] [lreplace $children 1 1 $nucleus]]
+   }
+}
+%     \end{tcl}
+%     Both branches of the |elseif| could have been handled a single 
+%     |tool::negate|, but doing the hard negation explicitly permits 
+%     preserving more context.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{distributive}
+%     Not all multiplication-style operations fit the |multiply| 
+%     transformation nodes (which more or less presumes the operation 
+%     to be unital and associative). The |distributive| nodes 
+%     only participate in minus migration, and will not force it 
+%     unless they have an explicit 
+%     \describestring+[attribute]{priority} setting exceeding $3$.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::distributive {attr children want} {
+   if {$want} then {
+      set w 1
+   } elseif {[dict exists $attr OMA priority]} then {
+      set w [expr {[dict get $attr OMA priority] > 3}]
+   } else {
+      set w 0
+   }
+   set newchildren [list [tool::tpp {*}[lindex $children 0] 0]]
+   set negate 0
+   foreach child [lrange $children 1 end] {
+      set child [tool::tpp {*}$child $w]
+      while {[lindex $child 0] eq "negate"} {
+         set negate [expr {!$negate}]
+         set child [lindex $child 2 1]
+      }
+      lappend newchildren $child
+   }
+   if {$negate} then {
+      return [tool::negate $res $want]
+   } else {
+      return $res
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{integer}
+%     The main source of minuses is negative numbers, which always 
+%     split in a negation and an unsigned number.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::integer {attr children want} {
+   set value [dict get $attr value]
+   set negate [expr {$value<0}]
+   if {$negate} then {
+      set value [expr {-$value}]
+      dict set attr value $value
+   }
+   set res [list mn {} [list [
+      list #text [format %lld $value]
+   ]]]
+   set res [list integer $attr [list $res]]
+   if {$negate} then {
+      tool::negate $res $want
+   } else {
+      set res
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{OMI}
+%     |OMI| nodes aren't supposed to occur in near-OpenMath, but in 
+%     case they do then this is a suitable place to convert them to 
+%     |integer| nodes.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::OMI {attr children want} {
+   set str [openmath::gettext [list OMI $attr $children]]
+   regsub -all {\s} $str {} str
+   if {[regsub {[Xx]} $str {} str]} then {
+      scan $str %llx value
+   } else {
+      scan $str %lld value
+   }
+   integer [dict replace $attr value $value] {} $want
+}
+%     \end{tcl}
+%     It may be remarked that this does not try (much) to cope with 
+%     malformed integers; if it cannot be scanned then |value| won't 
+%     get defined and an error follows. The |ll| in |scan| format 
+%     specifiers is needed to get large values parsed correctly 
+%     (otherwise it would be arbitrarily reduced to fit in a 
+%     \Ctypeidentifier{long}).
+%   \end{ensproc}
+%   
+%   \begin{variable}{OMF_format}
+%     This variable can hold a |format| specifier string for |OMF| 
+%     values, typically |%g| with some precision. When this variable 
+%     is not set (as is the default) then \Tcl's string 
+%     representation is used instead; this seems to do a slightly 
+%     better job at choosing how many decimals to include.
+%   \end{variable}
+%   
+%   \begin{ensproc}{OMF}
+%     The expansion of a float faces several complications, the first 
+%     of which is to parse the value. It is assumed that \Tcl's 
+%     |double| type is IEEE-compliant, but nothing worse than loss of 
+%     precision should happen if it turns out not to be.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::OMF {attr children want} {
+   if {[dict exists $attr dec]} then {
+      scan [dict get $attr dec] %g val
+   } else {
+%     \end{tcl}
+%     If there is no |dec| key, then there must be a |hex| key. It's 
+%     obvious that the way to parse this value is to |binary format| 
+%     the hex data and then |binary scan| it as an IEEE double. What 
+%     is tricky is working out which endianness to use; the OpenMath 
+%     specification seems to suggest it should be little-endian, but 
+%     the combination which manages to decode the examples in it 
+%     turns out to be big-endian\slash big-endian.
+%     \begin{tcl}
+      binary scan [binary format H* [dict get $attr hex]] Q val
+   }
+%     \end{tcl}
+%     Once we've got the value, it's time to choose between 
+%     mantissa--exponent and mantissa notation. |format %g| does this 
+%     well, so the value is translate into an expression by way of 
+%     the |format|ted value.
+%     \begin{tcl}
+   variable OMF_format
+   set L [split [
+      if {[info exists OMF_format]} then {format $OMF_format $val}\
+        else {set val}
+   ] eE]
+%     \end{tcl}
+%     The mantissa can be separated by |split|ting at |e|, and one 
+%     can use pattern matching to check it for being negative. 
+%     Infinities and not-a-numbers are handled at the same time 
+%     (no |e| in those).
+%     \begin{tcl}
+   switch -glob -- [lindex $L 0] Inf - -Inf {
+      set tree {OMS {cd nums1 name infinity} {}}
+   } NaN* {
+      set tree {OMS {cd nums1 name NaN} {}}
+   } -* {
+      set tree [list mn {} [list [
+         list #text [string range [lindex $L 0] 1 end]
+      ]]]
+   } default {
+      set tree [list mn {} [list [list #text [lindex $L 0]]]]
+   }
+%     \end{tcl}
+%     Hard negation can at this point be applied to the mantissa 
+%     (|tree|), but soft negation must to be delayed until the very 
+%     end, as it needs be applied to the entire |OMF|.
+%     \begin{tcl}
+   set negate 0
+   if {[string match -* [lindex $L 0]]} then {
+      if {$want} then {set negate 1} else {
+         set tree [tool::negate $tree 0]
+      }
+   }
+%     \end{tcl}
+%     Putting on an exponent is slightly roundabout, but this is how 
+%     long it gets in OpenMath. The |form infix| setting tells 
+%     renderers to generate an explicit symbol for this 
+%     multiplication.
+%     \begin{tcl}
+   if {[llength $L]>1} then {
+      set tree [list OMA {form infix} [list [
+         list OMS {cd arith1 name times} {}
+      ] $tree [
+         list OMA {} [list [
+            list OMS {cd arith1 name power} {}
+         ] [
+            integer {value 10} {} 0
+         ] [
+            integer [dict create value [lindex $L 1]] {} 0
+         ]]
+      ]]]
+   }
+%     \end{tcl}
+%     What is tricky about soft negation is that it migrates the 
+%     minus out of the |OMF|, so the numeric value of that node will 
+%     change. The new |OMF| will always have its value specified in 
+%     |dec| form.
+%     \begin{tcl}
+   if {$negate} then {
+      set value [expr {-$value}]
+      return [negate [
+         list OMF [dict replace [dict remove $attr hex] dec $value]\
+           [list $tree]
+      ] 1]
+   } else {
+      return [list OMF $attr [list $tree]]
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{power}
+%     One final node type transformed by this ensemble is |power|. 
+%     The two cases it is supposed to change are that the exponent 
+%     is $0$ or $1$, but it turns out other integers also provides 
+%     useful behaviour.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::power {attr children want} {
+%     \end{tcl}
+%     If there are not two operands, or the second operand is not an 
+%     |integer|, then just |recurse|.
+%     \begin{tcl}
+   if {[llength $children] != 3 ||\
+     [lindex $children 2 0] ne "integer"} then {
+      return [tool::recurse OMA [dict get $attr OMA] $children 0]
+   }
+%     \end{tcl}
+%     The rest depends on the value of that integer.
+%     \begin{tcl}
+   set val [dict get [lindex $children 2 1] value]
+   if {$val == 0} then {
+%     \end{tcl}
+%     $x^0$ is a \OMSref{alg1}{one} |OMS| node, but note that 
+%     attributes of the original \OMSref{arith1}{power} are 
+%     preserved, in particular the |mtmtcl:path|.
+%     \begin{tcl}
+      return [list OMS\
+        [dict replace [dict get $attr OMS] cd alg1 name one] {}]
+%     \end{tcl}
+%     $x^1$ is just $x$; the |power| node disappears.
+%     \begin{tcl}
+   } elseif {$val == 1} then {
+      return [tool::tpp {*}[lindex $children 1] $want]
+   }
+%     \end{tcl}
+%     A third case is $x^{2n}$. Both the base and the exponent need 
+%     to be preserved in this case, but since the power will kill 
+%     all negations in the base, it is useful to want them migrating.
+%     \begin{tcl}
+   set negate 0
+   if {$val % 2 == 0} then {
+      set base [tool::tpp {*}[lindex $children 1] 1]
+      while {[lindex $base 0] eq "negate"} {
+         set base [lindex $base 2 1]
+      }
+%     \end{tcl}
+%     The fourth and final case is $x^{2n+1}$, which minuses can 
+%     migrate through.
+%     \begin{tcl}
+   } else {
+      set base [tool::tpp {*}[lindex $children 1] $want]
+      if {[lindex $base 0] eq "negate"} then {
+         set negate 1
+         set base [lindex $base 2 1]
+      }
+   }
+   set res [list OMA [dict get $attr OMA] [
+      lreplace $children 1 2 $base\
+        [integer [lindex $children 2 1] {} 0]
+   ]]
+   if {$negate} then {
+      return [tool::negate $res 1]
+   } else {
+      return $res
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% 
+% \subsection{Data-tree decoration}
+% 
+% As stated above, knowledge about how various symbols are formatted 
+% should not be built into processors converting to other formats, 
+% but rather provided as part of the input to that processor; this 
+% gives structures employing notation beyond the most common better 
+% chances to control formatting. There is however also a need to 
+% provide default formatting for more usual symbols, as this is 
+% typically what authors would expect. This can (to a large extent) 
+% be achieved by scanning a data-tree for known symbols and 
+% decorating them (or their parents) with the appropriate attributes 
+% or attributions, so that is what the following implements.
+% 
+% The rules for how to decorate when a particular symbol is 
+% encountered can rightly be termed the ``phrasebook'' (at least in 
+% the passive sense) in the \mtl\ rendering system. They are kept in 
+% the form of an array, whose keys are short URIs for symbols and 
+% whose entries are scripts specifying what should be done when that 
+% symbol is encountered. These scripts will typically use only some 
+% specialised commands that expect to be evaluated in a particular 
+% context where they can access the tree being decorated, but they 
+% are proper \Tcl\ scripts and can contain other commands if you need 
+% them to. The only condition is that variable names beginning with 
+% an underscore are reserved for use by the decoration context itself.
+% 
+% \setnamespace{mtmtcl::present}
+% 
+% \begin{proc}{decorate}
+%   The |decorate| procedure is the chief executive in the decoration 
+%   process, and also the top-level command to call. Its syntax is
+%   \begin{displaysyntax}
+%     decorate \word{tree-var} \word{phrasebook-var}
+%   \end{displaysyntax}
+%   where both arguments are names of variables in the calling 
+%   context. The \word{tree-var} stores the data-tree to decorate, 
+%   and will be modified in place. The \word{phrasebook-var} is an 
+%   array which constitutes the phrasebook to use. The return value 
+%   is a report on how the decoration went; it contains the 
+%   |-errorinfo|s of all errors that occurred during the process.
+%   
+%   \begin{tcl}
+proc mtmtcl::present::decorate {treevar phrasevar} {
+   upvar 1 $treevar tree $phrasevar phraseA
+%   \end{tcl}
+%   The particular context for the decoration scripts is an anonymous 
+%   procedure (lambda) in the |mtmtcl::present::decorate| namespace, 
+%   which has |upvar|ed selected local variables from the |decorate| 
+%   procedure.
+%   \begin{tcl}
+   set lambda [list script {
+      upvar 1 tree _tree paths _paths res _res
+      if 1 then $script
+   } [namespace current]::decorate]
+%   \end{tcl}
+%   The |res| variable is a list of messages, which at the end will 
+%   be |join|ed by newlines; the effect is that the result is an 
+%   empty string if there aren't any messages. |paths| is a list of 
+%   paths pointing to nodes in the tree. The current path when 
+%   looping over the tree is kept in the |path| variable, which is 
+%   used as in the |cdbase| procedure, and in the first element of 
+%   the |paths| list.
+%   \begin{tcl}
+   set res {}
+   set path {}
+   set code [catch {while 1 {
+%   \end{tcl}
+%   Errors in the decoration scripts are being caught. Since errors 
+%   in these scripts may also damage the |tree|, the entire main loop 
+%   is caught as well.
+%   \begin{tcl}
+      if {[lindex [lindex $tree $path] 0] eq "OMS"} then {
+         set attr [lindex [lindex $tree $path] 1]
+         set URI ""
+         if {[dict exists $attr cdbase]} then {
+            append URI [dict get $attr cdbase] /
+         }
+         append URI [dict get $attr cd] \# [dict get $attr name]
+         if {[info exists phraseA($URI)]} then {
+%   \end{tcl}
+%   A decoration script exists for this symbol. Run it, and record 
+%   errors in |res|.
+%   \begin{tcl}
+            set paths [list $path]
+            set code [catch {apply $lambda $phraseA($URI)} msg opt]
+            set path [lindex $paths 0]
+            if {$code == 1} then {
+               set msg "Error \"$msg\" at"
+               append msg \n [decorate::nodeheader $path\
+                 [lindex $tree $path]] ":\n  "
+               append msg [string map {\n "\n  "}\
+                 [dict get $opt -errorinfo]]
+               lappend res $msg
+            }
+         }
+      }
+%   \end{tcl}
+%   A |#text| node has no list of children, but it counts as `no 
+%   children' here anyway.
+%   \begin{tcl}
+      if {[llength [lindex [lindex $tree $path] 2]]} then {
+         lappend path 2 -1
+      }
+      while 1 {
+         if {![llength $path]} then {return}
+%   \end{tcl}
+%   This |return| is the normal exit from the main loop. It will be 
+%   caught by the surrounding |catch|.
+%   \begin{tcl}
+         lset path end [expr {1 + [lindex $path end]}]
+         if {[llength [lindex $tree $path]]} then {break}
+         set path [lreplace $path [set path end-1] end]
+      }
+   }} msg opt]
+   if {$code != 2} then {
+%   \end{tcl}
+%   All normal exits from the loop are by |return|, so anything with 
+%   a code other than $2$ is abnormal.
+%   \begin{tcl}
+      lappend res "Abnormal termination.\n\  $path = $path\n  $opt"
+   }
+   return [join $res \n]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tcl}
+namespace eval mtmtcl::present::decorate {}
+% \end{tcl}
+% \setnamespace{mtmtcl::present::decorate}
+% 
+% \begin{proc}{nodeheader}
+%   This procedure constructs a message header giving details about a 
+%   particular node in a tree, so that it is possible to identify the 
+%   node that the following message is about. The call syntax is
+%   \begin{displaysyntax}
+%     nodeheader \word{path} \word{node}
+%   \end{displaysyntax}
+%   where \word{path} is the |lindex| path in the tree of the 
+%   \word{node}.
+%   
+%   \begin{tcl}
+proc mtmtcl::present::decorate::nodeheader {path node} {
+   set res "node "
+   set L {}
+   foreach {two index} $path {lappend L $index}
+   append res \{ [join $L] "\} (" [lrange $node 0 1]
+   if {[lindex $node 0] ne "#text"} then {
+      set len [llength [lindex $node 2]]
+      if {$len == 1} then {
+         append res " \{<1 child>\}"
+      } else {
+         append res " \{<$len children>\}"
+      }
+   }
+   append res )
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% For the specialised tree-decorating commands in the 
+% |mtmtcl::present::decorate| namespace, a very important concept is 
+% that of the \emph{current node}, which by definition is the node 
+% pointed to by the last path in the \describestring+[var.]{_paths} 
+% variable. The current node starts out as the symbol which triggered 
+% a decoration script, but commands can temporarily make some other 
+% node the current node by appending its path to the |_paths| list; 
+% typically such commands take a \word{body} script as argument, and 
+% the current node is restored after that body is complete.
+% 
+% Changing the first path in the |_paths| list would have the effect 
+% of changing the loop variable for the main loop in the 
+% \describestring+[proc][mtmtcl::present]{decorate} procedure. This 
+% should only be done if the corresponding node has moved in the 
+% tree, which incidentally is what the next procedure will do.
+% 
+% 
+% \begin{proc}{treeinsert}
+%   This procedure inserts a node on a branch in the tree, making the 
+%   node previously at the insert position a child of the inserted 
+%   node. The call syntax is
+%   \begin{displaysyntax}
+%     treeinsert \word{path} \word{child-index} \word{node}
+%   \end{displaysyntax}
+%   where \word{path} is an |lindex| path into the tree stored in the 
+%   \describestring+[var.]{_tree} variable in the calling context, 
+%   and specifies the position in the tree where the \word{node} 
+%   should be inserted. The \word{child-index} is the position among 
+%   the children of the \word{node} into which the old node at 
+%   position \word{path} in the tree should be inserted; children at 
+%   this or higher indices will appear after the old node.
+%   
+%   This procedure also updates the \describestring+[var.]{_paths} 
+%   variable in the calling context, so that every element in it 
+%   which has \word{path} as a prefix is updated to point to the same 
+%   node as before the insertion, but accounting for the new position.
+%   \begin{tcl}
+proc mtmtcl::present::decorate::treeinsert {path childindex node} {
+   upvar 1 _tree tree _paths paths
+   set old [lindex $tree $path]
+   lset node 2 [linsert [lindex $node 2] $childindex $old]
+   lset tree $path $node
+   set end [expr {[llength $path] - 1}]
+   set path [lrange $path 0 $end]
+   set newpaths {}
+   foreach p $paths {
+      if {[lrange $p 0 $end] eq $path} then {
+         lappend newpaths [linsert $p [llength $path] 2 $childindex]
+      } else {
+         lappend newpaths $p
+      }
+   }
+   set paths $newpaths
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{OMATTR}
+%   The |OMATTR| procedure inserts an |OMATTR| node as parent of the 
+%   current node in the tree. The call syntax is
+%   \begin{displaysyntax}
+%     OMATTR \begin{regblock}[\regplus] \word{URI} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where each \word{URI} is the URI for an attribution symbol and 
+%   \word{value} is the data-tree of the corresponding value.
+%   \begin{tcl}
+proc mtmtcl::present::decorate::OMATTR {args} {
+   upvar 1 _paths paths
+   set L {}
+   foreach {URI value} $args {
+      regexp {^(?:(.*)/)?([^#]*)#(.*)$} $URI "" cdbase cd name
+      set attr [dict create cd $cd name $name]
+      if {$cdbase ne ""} then {dict set attr cdbase $cdbase}
+      lappend L [list OMS $attr {}] $value
+   }
+   set node [list OMATTR {} [list [list OMATP {} $L]]]
+   uplevel 1 [list [namespace which treeinsert]\
+     [lindex $paths end] 1 $node]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{mtmtcl:path}
+%   This procedure acts effectively as an alias for a |switch| on the 
+%   value of the |mtmtcl:path| attribute of the current node. Like 
+%   |switch|, it has the two syntaxes
+%   \begin{displaysyntax}
+%     mtmtcl:path \begin{regblock}[\regplus] \word{pattern} 
+%     \word{body} \end{regblock}\par
+%     mtmtcl:path \{ \begin{regblock}[\regplus] \word{pattern} 
+%     \word{body} \end{regblock} \}
+%   \end{displaysyntax}
+%   and will evaluate the first \word{body} whose \word{pattern} 
+%   matches the |mtmtcl:path|. The \word{pattern}s are regular 
+%   expressions, and the string they are matched against is the 
+%   result of joining the |mtmtcl:path| with newlines; the |(?w)| 
+%   regexp mode then makes it feasible to constrain against list 
+%   element boundaries using `|^|' and `|$|'.
+%   
+%   No \word{body} will be evaluated if the current node lacks 
+%   |mtmtcl:path| attribute.
+%   \begin{tcl}
+proc mtmtcl::present::decorate::mtmtcl:path {args} {
+   upvar 1 _tree tree _paths paths
+   set attr [lindex [lindex $tree [lindex $paths end]] 1]
+   if {[dict exists $attr mtmtcl:path]} then {
+      uplevel 1 [list ::switch -regexp -- [
+         join [dict get $attr mtmtcl:path] \n
+      ]] $args
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{attrdefault}
+%   This procedure adds ``default'' values for specified keys in the 
+%   attribute dictionary of the current node, but will not change the 
+%   values of keys already present. The call syntax is
+%   \begin{displaysyntax}
+%     attrdefault \begin{regblock}[\regstar] \word{key} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{key}s and \word{value}s define the new entries. 
+%   There is no particular return value.
+%   \begin{tcl}
+proc mtmtcl::present::decorate::attrdefault {args} {
+   upvar 1 _tree tree _paths paths
+   set path [lindex $paths end]
+   lappend path 1
+   set attr [lindex $tree $path]
+   set attr2 [dict merge $args $attr]
+   if {[dict size $attr2] > [dict size $attr]} then {
+      lset tree $path $attr2
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{rootwards}
+%   This procedure temporarily establishes a new current node further 
+%   towards the root and evaluates the given \word{script} with that 
+%   as the current node. The call syntax is
+%   \begin{displaysyntax}
+%     rootwards \begin{regblock}[\regstar] \word{directive} 
+%     \word{pattern} \end{regblock} \word{script}
+%   \end{displaysyntax}
+%   where the \word{directive}s specify how far one should go and 
+%   the \word{pattern}s constitute constraints on the type of the 
+%   parent currently being considered and the child from which the 
+%   procedure descended. The possible \word{directive}s are
+%   \begin{description}
+%     \item[-past]
+%       If the \word{pattern} matches the node currently being 
+%       considered, then don't stop here; instead continue to its 
+%       parent.
+%     \item[-not]
+%       If the \word{pattern} matches the node currently being 
+%       considered, then don't evaluate the \word{script} at all; 
+%       the node we started from wasn't used in the context where it 
+%       would be useful.
+%     \item[-to]
+%       We're done if the \word{pattern} matches the node currently 
+%       being considered, otherwise keep descending.
+%   \end{description}
+%   Directives are considered left to right, and an action (try again 
+%   with parent, evaluate \word{script} here, or finish without 
+%   evaluating \word{script}) is taken as soon as one is found whose 
+%   \word{pattern} matches the node currently under consideration. 
+%   If no |-to| directive is given, then the descent continues as 
+%   long as it goes via nodes matching some |-past| pattern. If a 
+%   |-to| directive is given, then the search behaves as if there was 
+%   an extra |-past| directive with a pattern matching anything last 
+%   in the sequence.
+%   
+%   A \word{pattern} is a list of the form
+%   \begin{displaysyntax}
+%     \word{type-glob} \word{index}\regstar
+%   \end{displaysyntax}
+%   where the \word{type-glob} is a |string match| pattern applied 
+%   against the type of the node currently being considered. The 
+%   \word{index}es are integers which are compared to the child index 
+%   of the previous node. The \word{pattern} matches if the 
+%   \word{type-glob} matches and there either are no \word{index}es 
+%   or at least one \word{index} equal to the child index.
+%   
+%   \begin{tcl}
+proc mtmtcl::present::decorate::rootwards {args} {
+   upvar 1 _tree tree _paths paths
+   set path [lindex $paths end]
+   if {[llength $args] % 2 != 1} then {
+      return -code error\
+        {wrong # args: rootwards ?dir pat ... ...? script}
+   }
+   set script [lindex $args end]
+   set args [lreplace $args end end]
+   set again 1
+   while {$again && [llength $path]} {
+      set again 0
+      set index [lindex $path end]
+      set path [lreplace $path end-1 end]
+      set type [lindex [lindex $tree $path] 0]
+      foreach {dir pat} $args {
+         set match [string match [lindex $pat 0] $type]
+         if {$match && [llength $pat]>1} then {
+            set match 0
+            foreach i [lrange $pat 1 end] {
+               if {$i == $index} then {set match 1; break}
+            }
+         }
+         switch -- $dir -to {
+            if {$match} then {
+               set again 0; break
+            } else {
+               set again 1
+            }
+         } -past {
+            if {$match} then {set again 1}
+         } -not {
+            if {$match} then {return}
+         } default {
+            return -code error "unknown directive: $dir"
+         }
+      }
+   }
+   if {!$again} then {
+      lappend paths $path
+      uplevel 1 [list ::if 1 then $script]
+      set paths [lreplace $paths [set paths end] end]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{OMSTR}
+% \begin{proc}{text}
+%   The |OMSTR| and |text| procedures are helpers for forming |OMSTR| 
+%   and |#text| nodes, respectively.
+%   \begin{tcl}
+proc mtmtcl::present::decorate::text {str} {list \#text $str}
+proc mtmtcl::present::decorate::OMSTR {str} {
+   list OMSTR {} [list [text $str]]
+}
+%   \end{tcl}
+% \end{proc}\end{proc}
+% 
+% 
+% ---
+% 
+% 
+% 
+% 
+% \subsection{Fencing priorities}
+% 
+% Having considered expansion of |mfenced| nodes, it might be 
+% appropriate to consider the process that puts them there in the 
+% first place (or at least \emph{one} such process, as parentheses 
+% are also part of some fixed notations): subexpression fencing for 
+% overriding priorities.
+% The background is well known: tree structures for data make 
+% parentheses unnecessary, but traditional (linear) notation requires 
+% parentheses. It is possible to insert parentheses when generating 
+% linear notation, but this gets rather complicated and it is 
+% generally better to have many simple operations than one complex. 
+% What the fencing means is that each subexpression which requires a 
+% surrounding parenthesis to be interpreted correctly will be made 
+% the only child of an \describestring*+[node type]{mfenced} node, 
+% taking the place of the original node. This |mfenced| will then be 
+% turned into a parenthesis during the metaformula expansion phase.
+% 
+% The model provided here for deciding when to fence is that every 
+% node receives information about its surroundings, should use this 
+% to decide whether to fence, and must then pass on updated 
+% information to its children so that they can decide whether to 
+% fence. The information is split in three parts: left priority, 
+% right priority, and blockages. Most issues are resolved based on 
+% the priorities, but some (e.g.~prevention of multiple superscripts) 
+% are handled by the blockages: certain types of notation may be 
+% blocked by notation further out in the expression, so fencing is 
+% needed in order to reenable it. The two priorities are numerical, 
+% whereas the format of the blockages is yet to be decided.\footnote{
+%   At first I imagined the blockages primarily as a set 
+%   (implemented as the keys in a dictionary), but this didn't fit 
+%   with the expected behaviour, so currently (2008-11-15) I'm more 
+%   leaning towards a finite automaton for this. Even determining 
+%   a suitable set of states for that is however a project in its 
+%   own right.
+%   
+%   At a formal level, the problem is to map an ideal in the free 
+%   monoid: those combinations of affixings that are not correctly 
+%   interpreted. Practically this would have to be done by generating 
+%   longer and longer words not known to be in the ideal, and then 
+%   have a human (me) decide whether they are in or out. A suitable 
+%   assistance in this task would be a program that generates \LaTeX\ 
+%   code for a sample of formulae with the affixment combination 
+%   under consideration, the typeset form of which could then be 
+%   viewed to decide if the combination is readable. Once a decision 
+%   has been reached, it would be recorded (with a comment) in the  
+%   database of the generator program, after which the process is 
+%   repeated with the next generation of word, until one is content.
+%   
+%   The automaton would then be constructed as the smallest automaton 
+%   which gets all the mapped words right. See M\r{a}nsson for an 
+%   algorithm.
+% }
+% 
+% The preliminary approach used here is that the blockages can take 
+% three values: \describestring+[blockage]{none}, 
+% \describestring+[blockage]{exponent}, and 
+% \describestring+[blockage]{all}. Superscripting operations move 
+% from |none| to |exponent|, whereas subscripting operations move 
+% from |none| or |exponent| to |all|. Every other combination calls 
+% for a fencing, which restores |none|. This model only supports 
+% exponents and indices, so it leaves out affixes above ($\hat{f}$, 
+% $\overline{a+b}$), below ($\underbrace{a+b}_n$), and to the left 
+% (${}_1F_2$) of a nucleus, but these still suffice rather far.
+% 
+% A priority is in general a floating-point number (to provide for 
+% priority levels between two established priority levels), and the 
+% negative infinity |-Inf| is used for ``no priority''. Besides that, 
+% the following priority levels seem useful:
+% \begin{enumerate}
+%   \item[$-1$] Logical connectives (if the need ever arises).
+%   \item[$0$] Relations.
+%   \item[$1$] Addition and subtraction.
+%   \item[$2$] 
+%     Other types of multiplication and the like 
+%     (seen by both factors in $a \times b$, $a \circ b$, or 
+%     $a \cup b$). If you consider there to be a priority 
+%     difference between two operations in this class, then use 
+%     decimals to distinguish them.
+%   \item[$3$]
+%     Negation ($-a \sqcap b$ is probably $(-a) \sqcap b$) and 
+%     ``math operators'' such as $\sin$. A case could however be made 
+%     for putting these at $2$ as well, since this could eliminate 
+%     ambiguity.
+%   \item[$4$]
+%     Juxtaposing multiplication (seen by both factors in $ab$).
+%   \item[$5$]
+%     Power (seen by $a$ in $a^b$; the exponent sees $-\infty$), 
+%     function application (seen by $a$ in $a(b)$), and the factorial.
+%   \item[$6$]
+%     Indexing (seen by $a$ in $a_b$).
+% \end{enumerate}
+% In other words, the priority levels are nothing like what have been 
+% suggested for MathML\,3; I don't expect there to be an easy 
+% translation between the two.
+% 
+% Important to notice about the priorities is also that there are 
+% \emph{two} of them: the left (earlier in reading order) priority 
+% and the right (later in reading order) priority. The left priority 
+% represents how strongly the material on the left of this 
+% subexpression wants to bind to it, and the right priority 
+% represents the same for the material on the right of this 
+% subexpression. They are often different, simply because the 
+% operation on the left side of a subexpression is not the same as 
+% the operation on the right side of it. The reason it is 
+% \emph{useful} to keep track of both (as opposed to keeping track of 
+% just the larger of the two) is that left priority doesn't matter 
+% for prefix notations and right priority doesn't matter for 
+% postfix notations; priority isn't needed to parse a nesting of 
+% prefix notations like $-\sin \cos x$ or postfix notations like 
+% $n^2!^2$ since there is only one way that the symbols can bind! 
+% Priority only comes into play when pre- and postfix notations 
+% compete for a subexpression, as in $-n!$. 
+% 
+% Also important is that there is a difference between operation and 
+% notation here. Postfix \emph{operations} are rare in standard 
+% mathematical notation (the factorial being the most obvious 
+% example), but postfix \emph{notation}\Ldash where something is put 
+% to the right of an expression nucleus as a way of making an 
+% operation on that nucleus\Dash is pretty common. The most important 
+% (but also quite surpring) example is function application, where the 
+% function itself is the nucleus and the parenthesisied argument(s) 
+% is the postfix part of the notation. Other examples of postfix 
+% notations are exponents and indices; that these really are postfix 
+% can be seen from the fact that their mixing with function application 
+% and the factorial is unambiguous: $f_3(n)^2!$ may conceptually be the 
+% composition of three functions ($f_3$, squaring, and the factorial) 
+% applied to $n$, but notationally it is rather index $3$, evaluated 
+% in $n$, squaring, and the factorial applied to $f$.
+% 
+% Examples to illustrate the priorities:
+% \begin{enumerate}
+%   \item
+%     The relative priorities of addition, juxtaposing multiplication, 
+%     negation, and other operations have plenty of examples\Dash 
+%     consider \(-ab \otimes c + d \otimes ef\).
+%   \item
+%     Juxtaposing multiplication versus higher priority operations is 
+%     also fairly common: \(ab^c = a(b^c)\), not $(ab)^c$. \(a b(c) = 
+%     a \cdot b(c)\), not $(ab)(c)$ (although one is often defined to 
+%     be the other). \(2n! = 2(n!)\), not \((2n)!\).
+%   \item
+%     The relative priorities of power and indexing reflects the 
+%     fact that $x_1^2$ is considered to be $(x_1)^2$, not $(x^2)_1$. 
+%     (These two can be very different when the index selects an 
+%     element in a matrix; compare $(A_{1,1})^2$ and $(A^2)_{1,1}$.)
+%     In practice that doesn't make much difference however, as both 
+%     are postfix notations for the base and therefore not taking 
+%     note of the right priority.
+% \end{enumerate}
+% 
+% ---
+% 
+% \begin{remark}
+%   Ruling by priority makes sense for infix operations, but what 
+%   if the operations are rather post- or prefix? Some examples:
+%   \begin{enumerate}
+%     \item
+%       $f(x)$, $f(x)^2$, $f^2(x)$. Here it seems the relative 
+%       priorities of power and function application are 
+%       irrelevant; it is clear which comes first since they are 
+%       both effectively postfix.
+%     \item
+%       $(e^x)^2$. Here the parenthesis is mandatory, despite both 
+%       expressions being postfix of the same priority.
+%     \item
+%       $\sin(a+b)$ versus $\sin ab$. This seems to suggest that 
+%       the priority of $\sin$ and friends is strictly less 
+%       than~$3$, and greater than~$1$.
+%     \item
+%       $n!m!$ versus $n!\,m!$; $2f(x)$ versus $2\,f(x)$. There are 
+%       cases in which juxtaposition should not be tight.
+%       
+%       One way to achieve this could be to introduce |mpadded| 
+%       elements and have |juxtaposed| formatters take note of 
+%       this, just like |sumnode| takes note of |negate|. But that 
+%       can wait.
+%     \item
+%       Does $fg$ (|multiply|) need to be fenced in $(fg)(x)$? Some 
+%       say no, which would indicate function application has 
+%       \emph{lower} priority than multiplication. 
+%   \end{enumerate}
+%   The whole thing seems rather messy, even when one does not 
+%   consider the arguably special cases like $\sin^2 x$.
+%   
+%   One conclusion \emph{could} be that there are really two kinds 
+%   of juxtaposition: thight, and with thin space. The tight kind 
+%   has higher priority than the thinspace kind, and the tight kind 
+%   is the default, but some types of factor causes the notation to 
+%   switch. Finding a reliable model for it is however likely to be 
+%   difficult.
+% \end{remark}
+% 
+% 
+% ---
+% 
+% \setnamespace{mtmtcl::present::fence::tool}
+% 
+% \begin{proc}{transparent}
+%   This procedure is a helper for the |fence| ensemble. It has 
+%   the call syntax
+%   \begin{displaysyntax}
+%     tool::transparent \word{arity} \word{index} \word{type}
+%     \word{attributes} \word{children} \word{left priority} 
+%     \word{right priority} \word{blockages}
+%   \end{displaysyntax}
+%   It directly returns the `\word{type} \word{attributes} 
+%   \word{children}' unless the length of \word{children} is exactly 
+%   \word{arity}. If \word{children} has the requested length, then 
+%   child \word{index} is processed recursively, and the result of 
+%   this replaces the original child in the result. If that child 
+%   comes back being |mfenced| then this fencing is moved outside 
+%   the `\word{type} \word{attributes} \word{children}' node.
+%   
+%   The idea is to use this as a handler for nodes that are either 
+%   atomic or have as only child an expression detailing their 
+%   internal structure. 
+%   \begin{tcl}
+namespace eval mtmtcl::present::fence::tool {
+   proc transparent {length index type attr children l r b} {
+      if {[llength $children] != $length} then {
+         return [list $type $attr $children]
+      }
+      set nucleus [fence {*}[lindex $children $index] $l $r $b]
+      if {[lindex $nucleus 0] eq "mfenced"} then {
+         lreplace $nucleus 2 2 [list [
+            list $type $attr [
+               lreplace $children $index $index\
+                 [lindex $nucleus 2 0]
+            ]
+         ]]
+      } else {
+         list $type $attr [
+            lreplace $children $index $index $nucleus
+         ]
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{ensemble}{fence}
+%   \setnamespace{mtmtcl::present::fence}
+%   This ensemble implements the operation of inserting parentheses, 
+%   encoded as |mfenced| elements with one children, into an 
+%   expression where appropriate. The call syntax is
+%   \begin{displaysyntax}
+%     fence \meta{tree} \word{left priority} \word{right priority} 
+%     \word{blockages}
+%   \end{displaysyntax}
+%   and the return value is the fenced version of the \word{tree}.
+%   
+%   The ensemble namespace is |mtmtcl::present::fence|. All commands 
+%   in it are handlers for specific node types, whereas the ensemble 
+%   command itself lives in the |tool| child of this namespace. 
+%   Unknown node types are handled by |tool::transparent| above, in 
+%   length $1$ child $0$ mode.
+%   \begin{tcl}
+namespace eval mtmtcl::present::fence {
+   namespace export *
+   namespace ensemble create -command tool::fence -prefix 0 -unknown [
+      list ::apply {{cmd ensemble type args} {
+         list $cmd 1 0 $type
+      } ::} [namespace which tool::transparent]
+   ]
+}
+%   \end{tcl}
+%   
+%   Some good examples of nodes which are fully taken care of by this 
+%   |-unknown| handler are:
+%   \begin{description}
+%     \renewcommand{\makelabel}[1]{\hspace\labelsep
+%        \texttt{#1}^^A
+%        \IndexEntry{\LevelSorted{#1}{\texttt{#1} (node type)}}^^A
+%          {none}{\thepage}^^A
+%     }
+%     \item[OMF]
+%       While the presentation of a float may be subject to 
+%       interpretation under the guidance of priority, and therefore 
+%       need fencing in order to preserve the context, the expression 
+%       from which this presentation will be generated should have 
+%       been constructed during typograph preprocessing and thus 
+%       appear as the only child of the |OMF| node.
+%     \item[integer]
+%       Similar to |OMF| nodes, although the expressions are 
+%       typically simpler.
+%     \item[OMS]
+%       Symbols are usually atomic, but if they have a composite 
+%       structure then the fencing operation should continues into 
+%       the only child.
+%     \item[OMV]
+%       Ditto.
+%     \item[OMR]
+%       The usefulness of references here could be disputed, but the 
+%       natural way to handle them would be to include a copy of the 
+%       referenced node as only child.
+%     \item[OMSTR]
+%       Strings (and bytearrays) are presumed to don't need any 
+%       fencing because of priority considerations, so they should 
+%       just be returned unchanged. This could lead to processing of 
+%       a |#text| node, but these need a separate definition anyway.
+%   \end{description}
+%   
+%   \begin{ensproc}{#text}
+%     As usual, |#text| nodes require a separate handler, even though 
+%     nothing is ever done for these.
+%     \begin{tcl}
+proc mtmtcl::present::fence::#text {str l r b} {list #text $str}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   
+%   \begin{ensproc}{OMATTR}
+%     Attributions are as a rule invisible when rendered, so 
+%     recursion only continues down the second child. If that child 
+%     comes back being fenced, then that fence is moved outside the 
+%     |OMATTR| node, since a presentation attribution typically 
+%     describes the symbol when the context has lower priority.
+%     \begin{tcl}
+interp alias {} mtmtcl::present::fence::OMATTR  {}\
+  [namespace which mtmtcl::present::fence::tool::transparent] 2 1\
+  OMATTR
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{mn}
+%     Numbers are special, in that they can survive arbitrarily high 
+%     priorities on the right but not juxtaposition on the left ($x2$ 
+%     is typically interpreted as a mistyped $x^2$, $x_2$, or 
+%     $\mathit{x2}$ rather than as $x \cdot 2$). Therefore the 
+%     |priority| is only compared against the left priority.
+%     \begin{tcl}
+proc mtmtcl::present::fence::mn {attr children l r b} {
+   set p [expr {[dict exists $attr priority] ?\
+     [dict get $attr priority] : 3.5}]
+   set res [list mn $attr $children]
+   if {$l >= $p} then {
+      set res [list mfenced {} [list $res]]
+   }
+   return $res
+}
+%     \end{tcl}
+%     The default priority here is $3.5$, since that is less than 
+%     what is common for juxtapositions and larger than what is 
+%     common for prefix operations, but it is also the priority level 
+%     which is most hardwired into the system, so $3.5$ is a rather 
+%     strange number. Perhaps the priority levels should be 
+%     renumbered?
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{negate}
+%     Soft negations are transparent for fencing, as they are 
+%     logically extensions of their parents. Unlike 
+%     |tool::transparent| nodes however, they shouldn't let fences 
+%     of their operand migrate outwards.
+%     \begin{tcl}
+proc mtmtcl::present::fence::negate {attr children l r b} {
+   list negate $attr [lreplace $children 1 1 [
+      tool::fence {*}[lindex $children 1] $l $r $b
+   ]]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   The main player in fencing by priority is instead the |OMA| 
+%   node type, and a lesser extent |OMBIND|, but these are just 
+%   further dispatchers, which redirect to more specialised node 
+%   types based on the \describestring+[attribute]{form} attribute. 
+%   Intuitively this specifies the kind of construction used to 
+%   express this application, but technically it need only describe 
+%   how the construction behaves with respect to priorities, since 
+%   attributions may override the actual formatting.
+%   
+%   The basic |form| values are:
+%   \begin{description}
+%     \renewcommand{\makelabel}[1]{^^A
+%        \hspace\labelsep
+%        \describestring*+[\texttt{form} attribute value]{#1}^^A
+%     }
+%     \item[infix]
+%       Infix operation (between every two neighbouring arguments, 
+%       there is a copy of the operation). Example: $a \oplus b$.
+%     \item[prefix]
+%       Operation appears before the argument. There should be 
+%       exactly two children: operation and argument. 
+%       Example: $-a$.
+%     \item[postfix]
+%       Operation appears after the argument. There should be 
+%       exactly two children: operation and argument.
+%       Example: $a!$.
+%     \item[function]
+%       Operation appaears once before the arguments, which are in 
+%       a parenthesis. Example: $f(a,b)$. This is the default for 
+%       |OMA|.
+%     \item[enclosed]
+%       Whatever the operation is, it completely separates all 
+%       children from their surroundings.
+%     \item[juxtaposed]
+%       The operation does not appear at all. The operands are set 
+%       side to side.
+%       (In MathML, the preferred presentation of this is as an 
+%       |infix| operation with invisible operation, but it is 
+%       convenient to have it as a separate |form|.)
+%     \item[binding]
+%       This is the default for |OMBIND|, and corresponds to a 
+%       presentation such as $\forall x,y \mathpunct{.} z$ for
+%       \begin{quote}
+%         \small
+%         |<OMBIND> <OMS cd="quant1" name="forall"/>|\\
+%         |  <OMBVAR> <OMV name="x"/> <OMV name="y"/> </OMBVAR>|\\
+%         |  <OMV name="z"/>|\\
+%         |</OMBIND>|
+%       \end{quote}
+%     \item[exponent]
+%       Operation expressed by superscripting the second operand on 
+%       the first.
+%     \item[index]
+%       Basic index affixer, presently restricted to the subscript 
+%       position. The first operand is the nucleus, remaining 
+%       operands are indices
+%   \end{description}
+%   
+%   
+%   \begin{ensproc}{OMA}
+%   \begin{ensproc}{OMBIND}
+%     Redispatching goes through the auxilliary ensemble 
+%     |tool::form|, since one could otherwise cause infinite loops by 
+%     specifying |OMA| as |form|. The original attribute dictionary 
+%     is preserved as the value of an |OMA| or |OMBIND| attribute, so 
+%     that the original node type can be restored afterwards.
+%     \begin{tcl}
+proc mtmtcl::present::fence::OMA {attr children left right block} {
+   if {[dict exists $attr form]} then {
+      set form [dict get $attr form]
+   } else {
+      set form function
+   }
+   tool::form $form [dict replace $attr OMA $attr] $children\
+     $left $right $block
+}
+proc mtmtcl::present::fence::OMBIND {attr children left right block} {
+   if {[dict exists $attr form]} then {
+      set form [dict get $attr form]
+   } else {
+      set form binding
+   }
+   tool::form $form [dict replace $attr OMBIND $attr] $children\
+     $left $right $block
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{OMBVAR}
+%     The appropriate treatment of |OMBVAR| nodes depends heavily on 
+%     what the surrounding |OMBIND| comes out as, but usually one 
+%     would put commas between the variables, so a reasonable default 
+%     is to let the first child see the left priority and the last 
+%     child see the right priority and blockages.
+%     \begin{tcl}
+proc mtmtcl::present::fence::OMBVAR {attr children left right block} {
+   set new {}
+   foreach child $children {
+      lappend new [tool::fence {*}$child [
+         expr {[llength $new] ? -Inf : $left}
+      ] {*}[if {[llength $children] - [llength $new] >= 1} then {
+         list -Inf none
+      } else {
+         list $right $block
+      }]]
+   }
+   list OMBVAR $attr $new
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% \begin{proc}{reform}
+%   The |reform| procedure does an |OMA|\slash |OMBIND|-normalisation 
+%   of a node dispatched through the |form| ensemble. The call syntax 
+%   is
+%   \begin{displaysyntax}
+%     tool::reform \word{fallback type} \word{attributes} 
+%     \word{children} \word{fence}
+%   \end{displaysyntax}
+%   where \word{fallback type} is the node type to use if the 
+%   \word{attributes} has neither |OMA| nor |OMBIND| entry. If 
+%   \word{fence} is true then the resulting node is additionally 
+%   wrapped up in an |mfenced|.
+%   \begin{tcl}
+proc mtmtcl::present::fence::tool::reform {type attr children fence} {
+   if {[dict exists $attr OMA]} then {
+      set node [list OMA [dict get $attr OMA] $children]
+   } elseif {[dict exists $attr OMBIND]} then {
+      set node [list OMBIND [dict get $attr OMBIND] $children]
+   } else {
+      set node [list $type $attr $children]
+   }
+   if {$fence} then {
+      return [list mfenced {} [list $node]]
+   } else {
+      return $node
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{ensemble}{form}
+%   \setnamespace{mtmtcl::present::fence}
+%   The |tool::form| ensemble has the same namespace and overall 
+%   syntax as |tool::fence|, but unlike the latter it has an explicit 
+%   set of subcommands.
+%   \begin{tcl}
+namespace eval mtmtcl::present::fence {
+   namespace ensemble create -command tool::form -subcommands {
+      infix prefix postfix function enclosed juxtaposed binding 
+      exponent index
+   } -prefix 0
+}
+%   \end{tcl}
+%   
+%   
+%   \begin{ensproc}{infix}
+%     In the general case (two or more operands), an |infix| 
+%     operation has to overcome priorities both left and right, 
+%     whereas in the degenerate cases there is a fencing just for the 
+%     sake of it. The blockage is passed on to the rightmost operand 
+%     (but normally anything causing blockage has so high priority 
+%     that it forces fencing anyway).
+%     \begin{tcl}
+proc mtmtcl::present::fence::infix {attr children left right block} {
+   if {[dict exists $attr priority]} then {
+      set priority [dict get $attr priority]
+   } else {
+      set priority 2
+   }
+   if {$left>=$priority || $priority<=$right} then {
+      set fence 1
+      set left [set right -Inf]
+      set block none
+   } else {
+      set fence 0
+   }
+%     \end{tcl}
+%     For completeness, the operation child is processed even though 
+%     it will usually be atomic.
+%     \begin{tcl}
+   set new {}
+   foreach child $children {
+      if {[llength $new] != 1} then {
+         set l $priority
+      } else {
+         set l $left
+      }
+      if {[llength $children]-[llength $new] == 1} then {
+         set r $right
+         set b $block
+      } else {
+         set r $priority
+         set b none
+      }
+      lappend new [tool::fence {*}$child $l $r $b]
+   }
+   return [tool::reform infix $attr $new $fence]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{function}
+%     Functions have a built-in fencing of the arguments so those 
+%     experience $-\infty$ at both sides and no blockages, but the 
+%     function itself is another matter. From its point of view, the 
+%     arguments behave like a postfix operation of priority $5$.
+%     \begin{tcl}
+proc mtmtcl::present::fence::function {attr children left right block} {
+   set new [list [
+      tool::fence {*}[lindex $children 0]\
+        [expr {$left<5 ? $left : -Inf}] 5 none
+   ]]
+   foreach child [lrange $children 1 end] {
+      lappend new [tool::fence {*}$child -Inf -Inf none]
+   }
+   return [tool::reform function $attr $new [expr {$left>=5}]]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   
+%   \begin{ensproc}{prefix}
+%     Prefix operation nodes should have exactly two children: the 
+%     operation and the operand; if they don't then we default to 
+%     |function| notation. The |priority| has to overcome the right 
+%     priority, but not the left. The priorities seen by the children 
+%     are the same as for an infix operation of this priority.
+%     \begin{tcl}
+proc mtmtcl::present::fence::prefix {attr children left right block} {
+   if {[llength $children] != 2} then {
+      return [function $attr $children $left $right $block]
+   }
+   if {[dict exists $attr priority]} then {
+      set priority [dict get $attr priority]
+   } else {
+      set priority 3
+   }
+   if {$priority <= $right} then {
+      set fence 1
+      set left [set right -Inf]
+      set block none
+   } else {
+      set fence 0
+   }
+   set new [list [
+      tool::fence {*}[lindex $children 0] $left $priority none
+   ] [
+      tool::fence {*}[lindex $children 1] $priority $right $block
+   ]]
+   return [tool::reform prefix $attr $new $fence]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{postfix}
+%     Postfix operation nodes should have exactly two children: the 
+%     operation and the operand, in that order; if they don't then 
+%     we default to |function| notation. Since the operand is to 
+%     appear before the operation, it sees the left priority and 
+%     operation priority (which defaults to $5$), whereas the 
+%     operation sees the operation priority, the right priority, and 
+%     the blockages.
+%     \begin{tcl}
+proc mtmtcl::present::fence::postfix {attr children left right block} {
+   if {[llength $children] != 2} then {
+      return [function $attr $children $left $right $block]
+   }
+   if {[dict exists $attr priority]} then {
+      set priority [dict get $attr priority]
+   } else {
+      set priority 5
+   }
+   if {$priority <= $left} then {
+      set fence 1
+      set left [set right -Inf]
+      set block none
+   } else {
+      set fence 0
+   }
+   set new [list [
+      tool::fence {*}[lindex $child 0] $priority $right $block
+   ] [
+      tool::fence {*}[lindex $child 1] $left $priority none
+   ]]
+   return [tool::reform postfix $attr $new $fence]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{enclosed}
+%     Enclosed notation completely separates each operand from its 
+%     surroundings. The operation child is processed as well, just 
+%     for the sake of it.
+%     \begin{tcl}
+proc mtmtcl::present::fence::enclosed {attr children left right block} {
+   set new {}
+   foreach child $children {
+      lappend new [tool::fence {*}$child -Inf -Inf none]
+   }
+   return [tool::reform enclosed $attr $new 0]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{juxtaposed}
+%     Juxtaposition is very similar to an infix operation, but the 
+%     default priority is higher.
+%     \begin{tcl}
+proc mtmtcl::present::fence::juxtaposed {attr children left right block} {
+   if {[dict exists $attr priority]} then {
+      set priority [dict get $attr priority]
+   } else {
+      set priority 4
+   }
+   if {$left>=$priority || $priority<=$right} then {
+      set fence 1
+      set left [set right -Inf]
+      set block none
+   } else {
+      set fence 0
+   }
+%     \end{tcl}
+%     For completeness, the operation child is processed even though 
+%     it will usually not be seen in the presentation.
+%     \begin{tcl}
+   set new {}
+   set b none
+   foreach child $children {
+      if {[llength $children]-[llength $new] <= 1} then {
+         set l $priority
+         set r $right
+         set b $block
+      } elseif {[llength $new]!=1} then {
+         set l [set r $priority]
+      } else {
+         set l $left
+         set r $priority
+      }
+      lappend new [tool::fence {*}$child $l $r $b]
+   }
+   return [tool::reform infix $attr $new $fence]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{exponent}
+%     Exponentiating nodes should have three children: the operation 
+%     symbol, the base operand, and the superscript operand. The 
+%     superscript operand doesn't feel any surroundings ($-\infty$ 
+%     priorities, no blockages), but the base operand behaves very 
+%     much as the operand of a postfix operation. In addition, it 
+%     requires the blockages to be |none|.
+%     \begin{tcl}
+proc mtmtcl::present::fence::exponent {attr children l r b} {
+   if {[llength $children] != 3} then {
+      return [function $attr $children $l $r $b]
+   }
+   if {[dict exists $attr priority]} then {
+      set p [dict get $attr priority]
+   } else {
+      set p 5
+   }
+   if {$b ne "none" || $l>=$p} then {
+      set l [set r -Inf]
+      set b none
+      set fence 1
+   } else {
+      set fence 0
+   }
+   set new [lrange $children 0 0]
+   lappend new [tool::fence {*}[lindex $children 1] $l $p exponent]
+   lappend new [tool::fence {*}[lindex $children 2] -Inf -Inf none]
+   tool::reform exponent $attr $new $fence
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{index}
+%     Indexing nodes should have three or more children: the 
+%     operation symbol, the base operand, and one or more subscript 
+%     operands. The subscript operands don't feel any surroundings 
+%     ($-\infty$ priorities, no blockages), but the base operand 
+%     behaves very much as the operand of a postfix operation. In 
+%     addition, it requires the blockages to be |none| or |exponent| 
+%     (i.e., not |all|).
+%     \begin{tcl}
+proc mtmtcl::present::fence::index {attr children l r b} {
+   if {[llength $children] < 3} then {
+      return [function $attr $children $l $r $b]
+   }
+   if {[dict exists $attr priority]} then {
+      set p [dict get $attr priority]
+   } else {
+      set p 6
+   }
+   if {$b eq "all" || $l>=$p} then {
+      set l [set r -Inf]
+      set b none
+      set fence 1
+   } else {
+      set fence 0
+   }
+   set new [lrange $children 0 0]
+   lappend new [tool::fence {*}[lindex $children 1] $l $p exponent]
+   foreach index [lrange $children 2 end] {
+      lappend new [tool::fence {*}$index -Inf -Inf none]
+   }
+   tool::reform index $attr $new $fence
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{binding}
+%     The default |binding| notation has four parts as far as the 
+%     |OMBIND| is concerned: binding symbol (child $0$), variables 
+%     (child $1$), punctuation (not a child), and nucleus (child $2$). 
+%     Visually these decompose as $3+1$, so it is probably best to 
+%     treat it analogously to a |prefix| operation.
+%     \begin{tcl}
+proc mtmtcl::present::fence::binding {attr children left right block} {
+   if {[llength $children] != 3} then {
+      return [function $attr $children $left $right $block]
+   }
+   if {[dict exists $attr priority]} then {
+      set p [dict get $attr priority]
+   } else {
+      set p 3
+   }
+   if {$right>=$p} then {
+      set left [set right -Inf]
+      set block none
+      set fence 1
+   } else {
+      set fence 0
+   }
+   set new {}
+   lappend new [tool::fence {*}[lindex $children 0] $left $p none]
+   lappend new [tool::fence {*}[lindex $children 1] $p -Inf none]
+   lappend new [tool::fence {*}[lindex $children 2] -Inf $right $block]
+   tool::reform binding $attr $new $fence
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% 
+% \section{Conversion to \LaTeX}
+% 
+% 
+% \subsection{Folding \TeX\ formulae}
+% 
+% \begin{tcl}
+namespace eval mtmtcl::latex {}
+% \end{tcl}
+% \setnamespace{mtmtcl::latex}
+% 
+% From the other side of things, the final step of generating code 
+% for \AllTeX\ math formulae is to fold the token sequence to fit 
+% within a sensible linewidth. This is not entirely trivial, as 
+% practical use of formulae within actual papers (as opposed to 
+% throwaway documents for rendering a formula in isolation) usually 
+% requires that the folding respects the mathematical structure of 
+% the original expression\Dash that newlines divide the formula in 
+% logical chunks, and that indentation corresponds to logical nesting 
+% depth. To that end, the input format for the formula folding should 
+% be a data-tree with \AllTeX\ code in the leaves and a nesting 
+% structure corresponding to the logical structure.
+% 
+% The node type used to group subexpressions while allowing 
+% linebreaks between them is \describestring+[node type]{mrow}. Care 
+% is taken to ensure that tokens from separate children are kept 
+% separate, so that |mrow {} {{#text {\Delta}} {#text x}}| never 
+% becomes |\Deltax| but rather |\Delta x|. The default way to achieve 
+% this is to separate children with whitespace (which is never 
+% allowed to grow so large that it gets parsed as a |\par|), but 
+% an |mrow| node with a boolean true 
+% \describestring+[attribute]{tight} attribute will also attempt an 
+% alternative setting in which the entire branch is written without 
+% separating whitespace (unless at places where that would violate 
+% the token restiction).
+% 
+% Unknown node types in this data-tree only recurse over their 
+% children, so the default node type is called 
+% \describestring+[node type]{children}. This primarily means unknown 
+% node types without children are ignored, so they can be used to 
+% include metadata about the formula (e.g.~list packages it makes use 
+% of). Secondarily this means unknown container types cannot hide 
+% leaves in the tree. Just recursing over the children does however 
+% have the incidental effect that linebreaks are not permitted between 
+% subexpressions but might still be permitted in them, so the 
+% |children| node type can in principle be used to join a prefix or 
+% suffix with their base expression.
+% 
+% \begin{proc}{fold}
+%   The |fold| ensemble implements a basic form of code folding, 
+%   satisfying two conditions:
+%   \begin{enumerate}
+%     \item 
+%       When a newline is inserted between two children, it should be 
+%       followed by indentation corresponding to the nesting depth of 
+%       these children.
+%     \item
+%       No node should appear on a line with more indentation that 
+%       the nesting depth of that node.
+%   \end{enumerate}
+%   One way to fulfill these conditions is to put each leaf on a 
+%   separate line and indent it according to how deeply it is nested, 
+%   but that doesn't look very good. It is also the longest possible 
+%   folding of a piece of code, whereas most human authors would 
+%   rather seek a short encoding, so a reasonable approach would be 
+%   to seek the shortest folding which respects these conditions. As 
+%   it turns out, this is a special case of the typographic 
+%   linebreaking problem, so it may be solved through the same 
+%   algorithm as is used in \TeX\ (although we don't need all the 
+%   bells and whistles).
+%   
+%   The actual implementation follows a functional style, passing a 
+%   current state from node to node. This state is the list of 
+%   \emph{active breakpoints}, where each breakpoint in turn is a 
+%   list with the structure
+%   \begin{displaysyntax}
+%     \word{level} \word{demerits} \word{tight-level} 
+%     \word{pre-line}\regstar\ \word{post-line}
+%   \end{displaysyntax}
+%   The \word{level} is the nesting level of the breakpoint. 
+%   The \word{demerits} is the quantity to minimise, i.e., the total 
+%   number of indentation steps made on the best path of linebreaks 
+%   leading up to this breakpoint. This 
+%   path consists of the \word{pre-line}s, which are the actual lines 
+%   of text (with indentation) one gets by following this line. The 
+%   \word{post-line} is the line of text (again with indentation) 
+%   which comes \emph{after} the breakpoint but before the current 
+%   position in the tree. When a new breakpoint is created by 
+%   appending a line to path of a previous breakpoint, the old
+%   \word{post-line} becomes the last \word{pre-line} and a new 
+%   \word{post-line} consisting only of indentation is appended. 
+%   The \word{demerits} is incremented by the level of this 
+%   indentation, plus one for the linebreak.
+%   
+%   The \word{tight-level} signals whether |#text| nodes should have 
+%   tight or default formatting; if it is less than the current level, 
+%   then tight formatting should be attempted. It starts out at 
+%   |infinity|, and should be reset to this when the current level 
+%   drops below the \word{tight-level} (since this means we've left 
+%   the |mrow| that triggered tight formatting).
+%   
+%   The |fold| command is a conveniency wrapper around the ensemble, 
+%   which handles creating and extracting a result from the state 
+%   being passed around. It has the call syntax
+%   \begin{displaysyntax}
+%     fold \word{data-tree} \word{width} \word{level}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc mtmtcl::latex::fold {tree width level} {
+   set best {x infinity}
+   foreach bkp [
+      fold:: {*}$tree [list [list 0 0 infinity {}]] $level $width
+   ] {
+      if {[lindex $bkp 1] <= [lindex $best 1]} then {set best $bkp}
+   }
+   return [join [lrange $best 3 end] \n]
+}
+%   \end{tcl}
+% \end{proc}
+%   
+% 
+% \begin{ensemble}[mtmtcl::latex]{fold::}[fold]
+%   The call syntax for nodes in this ensemble is
+%   \begin{displaysyntax}
+%     "" \meta{data-tree} \word{state} \word{level} \word{width}
+%   \end{displaysyntax}
+%   and it returns an updated \word{state}.
+%   The actual ensemble is the empty string command in the |fold| 
+%   namespace, pointed to by an alias that has the same name as the 
+%   namespace.
+%   \begin{tcl}
+namespace eval mtmtcl::latex::fold {
+   namespace ensemble create -command [namespace current]::\
+     -prefix 0 -unknown [list ::apply\
+       {{target args} {list $target} ::} [namespace current]::children]
+   namespace export ?*
+}
+%   \end{tcl}
+%   
+%   \begin{ensproc}{#text}
+%     Text nodes update the active breakpoints by appending their 
+%     \word{string} and a space to their \word{post-line}. They also 
+%     drop breakpoints which do not fit within the given line 
+%     \word{width} afterwards, but an if that would result in 
+%     dropping all breakpoints then those are kept which attain the 
+%     minimum \word{post-line} width.
+%     
+%     \begin{tcl}
+proc mtmtcl::latex::fold::#text {str bkpL level width} {
+   set sensitive [regexp {^[A-Za-z]} $str]
+   set res {}
+   set overlong {}
+   foreach bkp $bkpL {
+      set line [lindex $bkp end]
+%     \end{tcl}
+%     The main complication in this procedure is the handling of 
+%     |tight| formatting, since this has the effect that a space is 
+%     not added after the \word{string}. A space will instead be added 
+%     before the \word{string} if the latter is sensitive (begins 
+%     with a letter) and the previous material on the line ends with 
+%     a letter-name control sequence.
+%     \begin{tcl}
+      if {$level > [lindex $bkp 2]} then {
+         if {$sensitive &&\
+           [regexp {(^|[^\\])(\\\\)*\\[A-Za-z]*$} $line]} then {
+            append line { }
+         }
+         append line $str
+      } else {
+         append line $str { }
+      }
+      lset bkp end $line
+      if {[string length $line]<=$width} then {
+         lappend res $bkp
+      } else {
+         lappend overlong $bkp
+      }
+   }
+   if {[llength $res]} then {return $res}
+%     \end{tcl}
+%     The second loop is entered when an overfull line is 
+%     unavoidable, and chooses those that are least overfull.
+%     \begin{tcl}
+   set minlen infinity
+   foreach bkp $overlong {
+      set line [lindex $bkp end]
+      if {[string length $line] < $minlen} then {
+         set res {}
+         set minlen [string length $line]
+      }
+      if {[string length $line] <= $minlen} then {lappend res $bkp}
+   }
+   return $res
+}
+%     \end{tcl}
+%     It is assumed that no \word{string} ends with the initial 
+%     backslash of a control sequence, since the results of that 
+%     would be unpredictable no matter how the code folding turns 
+%     out.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{children}
+%     This procedure just lets the state be modified by each of its 
+%     children in turn. The effect is to join them unbreakably.
+%     \begin{tcl}
+proc mtmtcl::latex::fold::children {attrD childL state level width} {
+   foreach child $childL {
+      set state ["" {*}$child $state $level $width]
+   }
+   return $state
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{mrow}
+%     Row nodes construct new breakpoints and remove breakpoints 
+%     at higher levels. For any position between two children, a 
+%     new normal breakpoint is created which minimises the demerits 
+%     on the path to that position. New tight breakpoints are created 
+%     at the beginning of a tight |mrow|: every normal breakpoint 
+%     gets a tight duplicate.
+%     \begin{tcl}
+proc mtmtcl::latex::fold::mrow {attrD childL bkpL level width} {
+   set tight [expr\
+     {[dict exists $attrD tight] && [dict get $attrD tight]}]
+   if {$tight} then {
+      foreach bkp $bkpL {
+         if {[lindex $bkp 2] == "infinity"} then {
+            lappend bkpL [lreplace $bkp 2 2 $level]
+         }
+      }
+      
+   }
+%     \end{tcl}
+%     Row nodes construct new normal breakpoints in front of each 
+%     child. It might seem more natural to construct a new breakpoint 
+%     \emph{after} the child, but since the breakpoint should come at 
+%     the lowest nesting level between two leaves, the logic is easier 
+%     when doing it before. The breakpoint list is kept unchanged if 
+%     the \word{post-line} in the last breakpoint consists entirely 
+%     of whitspace; this covers both the case of a lower level |mrow| 
+%     having created a breakpoint here and the case of an invisible 
+%     child of the present |mrow|.
+%     \begin{tcl}
+   set nextlevel [expr {$level+1}]
+   foreach child $childL {
+      if {[regexp {^\s*$} [lindex $bkpL end end]]} then {
+         set newL $bkpL
+      } else {
+         set newL {}
+         set best {x infinity {}}
+         foreach bkp $bkpL {
+            if {[lindex $bkp 0] <= $level} then {lappend newL $bkp}
+            if {[lindex $bkp 1] <= [lindex $best 1] &&\
+              [lindex $bkp 2]=="infinity"} then {set best $bkp}
+%     \end{tcl}
+%     That the comparison in the previous command is |<=| means the 
+%     last breakpoint attaining the minimal demerits is picked as 
+%     the |best| route to the new breakpoint. This has the effect 
+%     that the last line of a child |mrow| becomes the shortest. That 
+%     only normal breakpoints are considered has the effect that no 
+%     linebreaks are made in tight formatting.
+%     \begin{tcl}
+         }
+%     \end{tcl}
+%     The following line is what determines that one indentation step 
+%     equals two spaces. It could easily be made a parameter, but I 
+%     don't think there is a need for that at the moment.
+%     \begin{tcl}
+         lappend best [string repeat {  } $level]
+         lset best 0 $level
+         lset best 1 [expr {[lindex $best 1] + 1 + $level}]
+         lappend newL $best
+      }
+      set bkpL ["" {*}$child $newL $nextlevel $width]
+   }
+%     \end{tcl}
+%     At the end of a tight |mrow|, it is necessary to switch those 
+%     breakpoints with tight formatting that it gave rise to back to 
+%     ordinary formatting. This requires adding the expected space to 
+%     the end of the last line.
+%     \begin{tcl}
+   if {$tight} then {
+      set newL {}
+      foreach bkp $bkpL {
+         if {[lindex $bkp 2] == $level} then {
+            lset bkp 2 infinity
+            lset bkp end "[lindex $bkp end] "
+         }
+         lappend newL $bkp
+      }
+      set bkpL $newL
+   }
+   return $bkpL
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{expand}
+%     In some cases, syntax forces one to return one data-tree that 
+%     will be made a child of an |mrow|, but one would really want to 
+%     return a sequence of such trees. As far as the folding 
+%     algorithm is concerned however, it is possible to emulate such 
+%     a sequence by returning the intended elements as the children 
+%     of an |expand| node.
+%     \begin{tcl}
+proc mtmtcl::latex::fold::expand {attrD childL state level width} {
+   mrow $attrD $childL $state [expr {$level-1}] $width
+}
+%     \end{tcl}
+%     This works because an |mrow| operates on the state before each 
+%     child, this operator depends only on the |level| value, and it 
+%     is an idempotent.
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% 
+% \subsection{Metaformula expansion}
+% 
+% A \emph{metaformula} is a data-tree node which expresses some 
+% kind of formula construction that is not just the concatenation of 
+% its children, and therefore needs to be ``expanded'' (in the macro 
+% sense) before the folding phase. The most common node type of this 
+% class is the MathML-derived |mfenced|, which expresses the fencing 
+% (bracketing) of its children, but |maybewrap| (wrap contents in a 
+% \TeX\ group if needed) is also useful.
+% 
+% Splitting it up requires an explicit representation for parentheses, 
+% and as it happens, MathML has a tag 
+% with precisely this meaning. MathML attributes defined for such 
+% elements are
+% The attributes that are of interest for 
+% \describestring+[node type]{mfenced} are
+% \begin{description}
+%   \renewcommand{\makelabel}[1]{^^A
+%      \hspace\labelsep
+%      \describestring*+[attribute]{#1}^^A
+%   }
+%   \item[open]
+%     MathML: The symbol for the opening delimiter, defaults to `|(|'.
+%   \item[close]
+%     MathML: The symbol for the closing delimiter, defaults to `|)|'.
+%   \item[separators]
+%     MathML: List of separator characters, defaults to an infinite 
+%     sequence of commas (`|,|'). (Separators are inserted between 
+%     children if there are more than one.) 
+%   \item[expand]
+%     Controls whether the fence should be |expand|ed into a 
+%     surrounding formula (true), or expand to a subformula of its 
+%     own (false; default).
+% \end{description}
+% At the moment, the MathML-attributes are ignored (hardwired to 
+% default values)\Dash in part because it is not entirely obvious 
+% what a ``symbol'' should be in this context. That most faithful 
+% interpretation would be to really make them the relevant Unicode 
+% characters, and charge |mfenced| with translating them to \LaTeX.
+% 
+% \begin{ensemble}{metax::}[metax]
+%   The call syntax for this ensemble is
+%   \begin{displaysyntax}
+%     metax:: \meta{data-tree}
+%   \end{displaysyntax}
+%   and its return value is a list
+%   \begin{displaysyntax}
+%     \word{data-tree} \word{fence-height}
+%   \end{displaysyntax}
+%   
+%   \begin{tcl}
+namespace eval mtmtcl::latex::metax {
+   namespace export ?*
+   namespace ensemble create -unknown {
+%   \end{tcl}
+%   The default action for a node type it entirely straightforward, 
+%   but the way it is implemented may feel uncomfortably abstract. 
+%   First, the unknown handler manufactures a command prefix. What it 
+%   needs for this prefix is the ensemble name and the subcommand 
+%   name (node type); everything else can be ignored as the ensemble 
+%   mechanism will reappend it. Hence the unknown handler is easiest 
+%   done as an explicit lambda.
+%   \begin{tcl}
+      ::apply {{lambda ensname type args} {
+         list ::apply $lambda $ensname $type
+      } ::}\
+%   \end{tcl}
+%   The action that should be taken for unknown node types is that 
+%   for nodes where noting in particular needs to be done, i.e., all 
+%   the children should be processed recursively, a new node with the 
+%   same type and attributes should be created with the returned 
+%   \word{data-tree}s as children, and the \word{fence-height} is the 
+%   maximum of the \word{fence-height}s among the children.
+%   
+%   Due to the fence-height processing, this is a very specific 
+%   operation, so it shouldn't be put outside the |metax| namespace, 
+%   but it is also not the implementation of any specific node type, 
+%   so it's not right to make it a procedure in this namespace 
+%   either. Therefore the prefix is |apply| on another lambda, which 
+%   needs to know the ensemble name to make recursive calls and 
+%   therefore takes it as an argument.
+%   \begin{tcl}
+      {{ensname type attr children} {
+         set height 0
+         set childL {}
+         foreach child $children {
+            lassign [$ensname {*}$child] c h
+            lappend childL $c
+            if {$height<$h} then {set height $h}
+         }
+         list [list $type $attr $childL] $height
+      } ::}
+   } -command [namespace current]:: -prefix 0
+}
+%   \end{tcl}
+%   
+%   \begin{ensproc}{maybewrap}
+%     In some corners of \TeX\ formula syntax, most notably 
+%     subscripts and superscripts, a subformula can appear raw if it 
+%     is only one token\footnote{
+%       Actually a little lie, because it is more about how many 
+%       nodes it contributes to the math list or something like that, 
+%       but counting tokens is usually good enough.
+%     } but must be braced if there are more than one. Some code 
+%     generators always brace in these situations, but for small 
+%     exponents that usually looks awful, so I prefer an approach 
+%     that only brace if necessary and that is what the 
+%     \describestring*+[node type]{maybewrap} node type is about.
+%     \begin{tcl}
+proc mtmtcl::latex::metax::maybewrap {attr children} {
+%     \end{tcl}
+%     First check for the ``no wrap'' case.
+%     \begin{tcl}
+   if {[llength $children] == 1 && [lindex $children 0 0] eq "#text"\
+     && [regexp {(?x) 
+       ^( \\[A-Za-z]+ | \\[^A-Za-z] | [!-\[\]-~] )$
+   } [lindex $children 0 1]]} then {
+      return [list [lindex $children 0] 0]
+   }
+%     \end{tcl}
+%     If that's not it, then put the braces in an |mrow|. In case the 
+%     child already was an |mrow|, then merge it with the new onw.
+%     \begin{tcl}
+   if {[llength $children] == 1 && [lindex $children 0 0] eq "mrow"}\
+   then {
+      set attr [dict merge [lindex $children 0 1] $attr]
+      set children [lindex $children 0 2]
+   }
+   "" mrow $attr [list {{#text} \{} {*}$children {{#text} \}}]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{mfenced}
+%     Expanding |mfenced| nodes is the main task for the |metax| 
+%     operation. Currently it doesn't support the MathML attributes 
+%     \describestring+[attribute]{opening}, 
+%     \describestring+[attribute]{closing}, and 
+%     \describestring+[attribute]{separators} (hardwiring all of them 
+%     to their default values `\texttt{(}', `\texttt{)}', and 
+%     `\texttt{,}' respectively), but this could be changed.
+%     
+%     The first part is the usual recursion over children.
+%     \begin{tcl}
+proc mtmtcl::latex::metax::mfenced {attr children} {
+   set new {}
+   set height 0
+   foreach child $children {
+      lassign ["" {*}$child] c h
+      lappend new $c
+      if {$h>$height} then {set height $h}
+   }
+%     \end{tcl}
+%     Then comes the choice of parenthesis size. This should perhaps 
+%     be factored out.
+%     \begin{tcl}
+   switch -- $height 0 {
+      set left {(}
+      set right {)}
+   } 1 {
+      set left {\bigl(}
+      set right {\bigr)}
+   } 2 {
+      set left {\Bigl(}
+      set right {\Bigr)}
+   } 3 {
+      set left {\biggl(}
+      set right {\biggr)}
+   } default {
+      set left {\Biggl(}
+      set right {\Biggr)}
+   }
+%     \end{tcl}
+%     Finally the thing is put together. There are three basic 
+%     styles: included, independent, and expanded. The included style 
+%     is the default when there is only one child, and that child is 
+%     an |mrow|: it means the left and right delimiters are inserted 
+%     into that |mrow| as the first and final respectively children. 
+%     The independent style is the default for other situations (not 
+%     exactly one child, or the child not a |mrow|) and means another 
+%     |mrow| is created for the delimiters and separators. Finally 
+%     there is the expanded style, which is selected by giving an 
+%     \describestring+[attribute]{expanded} attribute with a boolean 
+%     true value: it is like the independent style, except that the 
+%     node will be an |expanded| rather than an |mrow| and thus 
+%     contribute its elements to a surrounding |mrow|.
+%     
+%     The expanded style is considered appropriate for $f(x)$-type 
+%     constructions.
+%     \begin{tcl}
+   set expand [expr {[dict exists $attr expand] &&\
+     [dict get $attr expand]}]
+   if {!$expand && [llength $new]==1 && [lindex $new 0 0] eq "mrow"}\
+   then {
+      set children [list [list {#text} $left]\
+        {*}[lindex $new 0 2] [list {#text} $right]]
+      set attr [dict merge [lindex $new 0 1] $attr]
+      set node [list mrow $attr $children]
+   } else {
+      set children [list [list {#text} $left] [lindex $new 0]]
+      foreach child [lrange $new 1 end] {
+         lappend children {{#text} ,} $child
+      }
+      lappend children [list {#text} $right]
+      if {$expand} then {
+         set node [list expand $attr $children]
+      } else {
+         set node [list mrow $attr $children]
+      }
+   }
+   if {[string is integer -strict $height]} then {incr height}
+   return [list $node $height]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{#text}
+%     Not to be forgotten: |#text| nodes need special treatment.
+%     \begin{tcl}
+proc mtmtcl::latex::metax::#text {str} {
+   list [list {#text} $str] 0
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+% \end{ensemble}
+% 
+% 
+% \subsection{Making \TeX\ formulae}
+% 
+% The pivotal step in the conversion from (near-)OpenMath data-trees 
+% to \LaTeX\ code is that where all the various symbols are replaced 
+% by their respective \OMSref{altenc}{LaTeX_encoding}s, because this 
+% is where the data-tree starts to shrink. It is not the final step 
+% before code folding, since many aspects of making \LaTeX\ code 
+% need to deal with the structure of the code rather than the 
+% structure of the mathematics expressed, but the ``line of sight'' 
+% is pretty clear.
+% 
+% \setnamespace{mtmtcl::latex::make::tool}
+% \begin{ensemble}{make}
+%   \setnamespace{mtmtcl::latex::make}
+%   As usual, this conversion\Ldash making \LaTeX\ formulae 
+%   (although still in the form of a data-tree)\Dash is primarily 
+%   handled by an ensemble. The namespace of this ensemble is 
+%   |mtmtcl::latex::make|, but the actual |make| ensemble command 
+%   resides in the |tool| child of |mtmtcl::latex::make| rather than 
+%   the |mtmtcl::latex| namespace (as would be the default), since 
+%   the subcommands need to call the ensemble command recursively.
+%   \begin{tcl}
+namespace eval mtmtcl::latex::make {
+   namespace export *
+   namespace ensemble create -command tool::make -prefix 0
+}
+%   \end{tcl}
+%   What this operation has to worry about is loosely the syntactic 
+%   correctness of the code generated. The issues that can 
+%   potentially be thorny are:
+%   \begin{description}
+%     \item[generalised fractions]
+%       (|\over|, |\atop|, etc.): there can only be one of these in 
+%       each \TeX\ math list. However, since we're generating \LaTeX, 
+%       and these are there deprecated in favour of |\frac| etc., 
+%       these shouldn't occur anyway and are therefore not a problem.
+%     \item[growing delimiters]
+%       (|\left|, |\right|, and potentially |\middle|): these need to 
+%       be balanced. Balancing is however something that happens 
+%       automatically, so this should be fine too.
+%     \item[sub- and superscripts]
+%       All atoms in a \TeX\ math list are defined to have three 
+%       fields: nucleus, subscript, and superscript. The |^| and |_| 
+%       operations work by modifying the last atom on the list, 
+%       rather than by adding something to the list, so they are 
+%       dependent on their context.
+%     \item[math type]
+%       \TeX\ inserts glue and penalties between items according to 
+%       their math types: |\mathord|, |\mathbin|, |\mathpunct|, etc. 
+%       Most of the time, the code generated automatically carries 
+%       the correct math type (e.g.~a `|+|' is a |\mathbin|), but in 
+%       some cases it may be good for a generator to get an advice on 
+%       what is expected.
+%   \end{description}
+%   As it stands, it is only uses of sub- and superscripts that 
+%   produce syntactic errors (even though that should be unlikely, 
+%   provided operations are properly fenced), so some control of this 
+%   is called for. The model used here is that the |tool::make| 
+%   command has the general syntax
+%   \begin{displaysyntax}
+%     tool::make \meta{node} \word{subscript?} \word{superscript?} 
+%     \word{expected type}
+%   \end{displaysyntax}
+%   where the \word{subscript?} and \word{superscript?} are booleans 
+%   signalling (when true) that the context in which the \word{node} 
+%   occurs has put a sub- and\slash or superscript on it. The 
+%   \word{expected type} is the corresponding \TeX\ control sequence 
+%   minus the initial |\math|, so: |ord|, |bin|, |rel|, |op|, |open|, 
+%   |close|, |punct|, or |inner|.
+%   
+%   
+%   \begin{ensproc}{#text}
+%     To begin with, naked |#text| nodes are just returned as they 
+%     are. This amounts to presuming that anything expressed in such 
+%     a node will make sense as \LaTeX\ code.
+%     \begin{tcl}
+proc mtmtcl::latex::make::#text {str b p m} {
+   if {$b||$p} then {
+      list maybewrap {} [list [list #text $str]]
+   } else {
+      list #text $str
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{mn}
+%     A number can be several digits without needing a wrap.
+%     \begin{tcl}
+proc mtmtcl::latex::make::mn {attr children b p m} {
+   if {[llength $children]!=1} then {
+      list mrow {} $children
+   } else {
+      lindex $children 0
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{mfenced}
+%     |mfenced| nodes just recurse over the children, with cleared 
+%     sub- and superscript statuses.
+%     \begin{tcl}
+proc mtmtcl::latex::make::mfenced {attr children b p m} {
+   set L {}
+   foreach child $children {
+      lappend L [tool::make {*}$child 0 0 ord]
+   }
+   list mfenced $attr $L
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{OMA}
+%     An |OMA| node may have been turned into something else 
+%     according to its |form| attribute already when fencing 
+%     subexpressions, but it might just as well have been 
+%     \describestring*+[proc][mtmtcl::present::fence::tool]{reform}ed 
+%     into the original |OMA|. Hence there is again a dispatch based 
+%     on \describestring+[attribute]{form}.
+%     \begin{tcl}
+proc mtmtcl::latex::make::OMA {attr children b p m} {
+   if {[dict exists $attr form]} then {
+      tool::form [dict get $attr form] $attr $children $b $p $m
+   } else {
+      tool::form function $attr $children $b $p $m
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% \begin{ensemble}{form}
+%   \setnamespace{mtmtcl::latex::make}
+%   As in the fencing of subexpressions, the dispatch ensemble is 
+%   called |tool::form|, has the same namespace as the main 
+%   ensemble, and an explicitly given list of subcommands.
+%   \begin{tcl}
+namespace eval mtmtcl::latex::make {
+   namespace ensemble create -command tool::form -subcommands {
+      infix prefix postfix function enclosed juxtaposed binding 
+      exponent index
+   } -prefix 0
+}
+%   \end{tcl}
+%   
+%   \begin{ensproc}{infix}
+%     An operation in |infix| notation usually has \(n \geqslant 
+%     2\) arguments, and in that case the symbol is to appear $n-1$ 
+%     times, in each case between two arguments: $a_1 \oplus a_2 
+%     \oplus \dotsb \oplus a_n$. If there is $1$ argument, only that 
+%     argument is shown. If there are no arguments 
+%     (degenerate cases) then it appears as $(\oplus)$.
+%     
+%     \begin{tcl}
+proc mtmtcl::latex::make::infix {attr children b p m} {
+   if {![llength $children]} then {
+      error "Operation missing (0 children)"
+   }
+   set op [tool::make {*}[lindex $children 0] 0 0 bin]
+   if {[llength $children]==1} then {
+      return [list mfenced {} [list $op]]
+   }
+   set res {}
+   foreach arg [lrange $children 1 end-1] {
+      lappend res [tool::make {*}$arg 0 0 ord] $op
+   }
+   lappend res [tool::make {*}[lindex $children end] $b $p ord]
+   return [list mrow {} $res]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{juxtaposed}
+%     A juxtaposed operation is a simplified |infix|, where the 
+%     operation symbol is ignored.
+%     \begin{tcl}
+proc mtmtcl::latex::make::juxtaposed {attr children b p m} {
+   if {[llength $children]<2} then {
+      return [function $attr $children $b $p $m]
+   }
+   set res {}
+   foreach arg [lrange $children 1 end-1] {
+      lappend res [tool::make {*}$arg 0 0 ord]
+   }
+   lappend res [tool::make {*}[lindex $children end] $b $p ord]
+   return [list mrow {} $res]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{function}
+%     Function notation is realised as an |mrow|--|mfenced| 
+%     combination, where the |mfenced| contains the arguments and is 
+%     set to |expand| into the |mrow|.
+%     \begin{tcl}
+proc mtmtcl::latex::make::function {attr children b p m} {
+   if {![llength $children]} then {
+      error "Function missing (0 children)"
+   }
+   set func [tool::make {*}[lindex $children 0] 0 0 ord]
+   set L {}
+   foreach arg [lrange $children 1 end] {
+      lappend L [tool::make {*}$arg 0 0 ord]
+   }
+   list mrow {} [list $func [list mfenced {expand 1} $L]]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{prefix}
+%     Operations in prefix notation, which includes ``operators'' 
+%     such as $\sin$, appear first and their argument second. If 
+%     there is not exactly one argument then we switch to |function| 
+%     notation.
+%     \begin{tcl}
+proc mtmtcl::latex::make::prefix {attr children b p m} {
+   if {[llength $children] != 2} then {
+      function $attr $children $b $p $m
+   } else {
+      list mrow {} [list [
+         tool::make {*}[lindex $children 0] 0 0 op
+      ] [
+         tool::make {*}[lindex $children 1] $b $p ord
+      ]]
+   }
+}
+%     \end{tcl}
+%     The operation could alternatively have an expected mathtype of 
+%     |ord|, but |op| is hopefully closer to what is expected.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{postfix}
+%     Postfix operations are almost the same as |prefix| operations, 
+%     but the operand appears first, so it is to the operation that 
+%     a sub- or superscript might get attached.
+%     \begin{tcl}
+proc mtmtcl::latex::make::postfix {attr children b p m} {
+   if {[llength $children] != 2} then {
+      function $attr $children $b $p $m
+   } else {
+      list mrow {} [list [
+         tool::make {*}[lindex $children 1] 0 0 ord
+      ] [
+         tool::make {*}[lindex $children 0] $b $p punct
+      ]]
+   }
+}
+%     \end{tcl}
+%     Labelling postfix operations a having mathtype |punct| is also 
+%     slightly odd, but is inspired by the factorial.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{exponent}
+%     Exponent nodes should have three children: the 
+%     superscripting operation (not shown), the base, and the 
+%     exponent; otherwise we fall back to |function| formatting. 
+%     If there is another superscript outside the present one then 
+%     this will be wrapped up in a brace group.
+%     \begin{tcl}
+proc mtmtcl::latex::make::exponent {attr children b p m} {
+   if {[llength $children] != 3} then {
+      return [function $attr $children $b $p $m]
+   }
+   set L {}
+   if {$p} then {lappend L {#text \{}}
+   lappend L [tool::make {*}[lindex $children 1] $b 1 ord]
+   lappend L {#text ^}
+   lappend L [list maybewrap {} [list [
+      tool::make {*}[lindex $children 2] 0 0 ord
+   ]]]
+   if {$p} then {lappend L {#text \}}}
+   return [list mrow {tight 1} $L]
+}
+%     \end{tcl}
+%     Exponent nodes get tight formatting if possible, since it is 
+%     uncommon to see a `|^|' with surrounding whitespace.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{index}
+%     Index nodes should have three or more children: the 
+%     indexing operation (not shown), the base, and the indices; 
+%     otherwise we fall back to |function| formatting. 
+%     If there is another subscript outside the present one then 
+%     this will be wrapped up in a brace group.
+%     \begin{tcl}
+proc mtmtcl::latex::make::index {attr children b p m} {
+   if {[llength $children] < 3} then {
+      return [function $attr $children $b $p $m]
+   }
+   set L {}
+   if {$b} then {lappend L {#text \{}}
+   lappend L [tool::make {*}[lindex $children 1] 1 $p ord]
+   lappend L {#text _}
+   if {[llength $children] > 3} then {
+      set L2 [list {#text \{}]
+      foreach child [lrange $children 2 end-1] {
+         lappend L2 [tool::make {*}$child 0 0 ord] {#text ,}
+      }
+      lappend L2 [tool::make {*}[lindex $children end] 0 0 ord]
+      lappend L2 {#text \}}
+      lappend L [list mrow {} $L2]
+   } else {
+      lappend L [list maybewrap {} [list [
+         tool::make {*}[lindex $children 2] 0 0
+      ]]]
+   }
+   if {$b} then {lappend L {#text \}}}
+   return [list mrow {tight 1} $L]
+}
+%     \end{tcl}
+%     Tightness ditto for indices.
+%   \end{ensproc}
+%   
+% \end{ensemble}
+% 
+% 
+% \begin{ensemble}{make}
+%   \setnamespace{mtmtcl::latex::make}
+%   
+%   \begin{ensproc}{OMATTR}
+%     The big point is the attribution node types however, because 
+%     this is where most \LaTeX\ code particles are hiding: in 
+%     \OMSref{altenc}{LaTeX_encoding} attribution nodes. An |OMATTR| 
+%     without one of those is just equivalent to its its nucleus, 
+%     but when there is a |LaTeX_encoding| then this says what 
+%     should happen next.
+%     \begin{tcl}
+proc mtmtcl::latex::make::OMATTR {attr children b p m} {
+   foreach {key value} [lindex $children 0 2] {
+      if {[lindex $key 0] eq "OMS" &&\
+        [dict exists [lindex $key 1] cd] &&\
+        [dict get [lindex $key 1] cd] eq "altenc" &&\
+        [dict exists [lindex $key 1] name] &&\
+        [dict get [lindex $key 1] name] eq "LaTeX_encoding"} then {
+         return [
+            tool::LaTeX_encoding $value [lindex $children 1] $b $p $m
+         ]
+      }
+   }
+   tool::make {*}[lindex $children 1] $b $p $m
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% There are three supported cases for the 
+% \OMSref*{altenc}{LaTeX_encoding} attribution. The established case 
+% (on account of being suggested in the |altenc| content dictionary) 
+% is that the value is an |OMSTR| node. This string is then the exact 
+% \LaTeX\ code for rendering this object, so it will simply be put in 
+% a |#text| node.
+% 
+% The second case is that the |LaTeX_encoding| attribution is an 
+% \describestring*+[node type]{OMFOREIGN} element whose 
+% \describestring*+[attribute]{encoding} attribute is 
+% \describestring+[encoding]{mtmtcl-LaTeX}. The children of this node 
+% are then supposed to constitute the formatting of this node, wrapped 
+% up in an |mrow| node if there is more than one node. This allows 
+% embedded |mfenced| nodes to be taking into account when choosing 
+% parenthesis sizes and also including 
+% \describestring+[node type]{usepackage} nodes.
+% 
+% The third case also uses an \describestring*+[node type]{OMFOREIGN} 
+% element, but has \describestring+[encoding]{Tcl-prefix} as 
+% encoding. The element contents in this case should be a |#text| 
+% element whose string constitutes a \Tcl\ command prefix which gets 
+% to do the actual formatting. It will be called as
+% \begin{displaysyntax}
+%   \meta{prefix} \word{recursion} \word{type} \word{attributes} 
+%   \word{children} \word{subscript?} \word{superscript?} 
+%   \word{mathtype}
+% \end{displaysyntax}
+% and returns the corresponding \mtl-\LaTeX\ data-tree. The 
+% `\word{type} \word{attributes} \word{children}' part is the 
+% node which carries the |LaTeX_encoding| attribution. The 
+% \word{recursion} is a command prefix which can be called as
+% \begin{displaysyntax}
+%   \meta{recursion} \meta{node} \word{subscript?} 
+%   \word{superscript?} \word{mathtype}
+% \end{displaysyntax}
+% to convert some \word{node} (typically one of the \word{children}) 
+% to a \mtl-\LaTeX\ data-tree.
+% 
+% \begin{tclcommand}{interpreter}{safe}
+%   Since |Tcl-prefix|es allow embedding arbitrary code in 
+%   near-OpenMath trees, there is a risk for injection attacks. In 
+%   order to limit the security risks posed by this, the prefixes are 
+%   always evaluated in a separate safe interpreter.
+%   
+%   \begin{tcl}
+namespace eval mtmtcl::latex::make {
+   interp create -safe [namespace current]::tool::safe
+   tool::safe alias make [namespace which tool::make]
+}
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% \begin{proc}[]{sumnode}
+%   One case that is not handled by the generic operations is that of 
+%   plain old sums, since $a + (-b) + c$ is supposed to be rendered 
+%   as $a-b+c$. As this is a very common case, it is better to 
+%   install a procedure for this in the |safe| interpreter than to 
+%   express it as a lambda.
+%   
+%   The syntax of a |Tcl-prefix| based on this command is
+%   \begin{displaysyntax}
+%     sumnode \word{plus} \word{minus} \word{zero}
+%   \end{displaysyntax}
+%   where \word{plus}, \word{minus}, and \word{zero} are \mtl-\LaTeX\ 
+%   data-trees with the material for a plus between terms, a minus 
+%   between terms, and a zero (used when there aren't any terms). 
+%   The typical prefix constructed using this command is thus
+%   \begin{quote}
+%     |sumnode {#text +} {#text -} {#text 0}|
+%   \end{quote}
+%   but a variation that is not entirely uncommon is to want some or 
+%   all of these to be ``bold'' when formatting a sum of vectors.
+%   
+%   What the command does is that it looks at the children (other 
+%   than the first) to see whether they are |negate| nodes, and picks 
+%   \word{plus} or \word{minus} as operation depending on which is 
+%   found. Note that child $0$ is assumed to be the addition 
+%   operation (which is ignored) and child $1$ is the first term 
+%   (where a negation is left in place).
+%   \begin{tcl}
+mtmtcl::latex::make::tool::safe eval {
+   proc sumnode\
+     {plus minus zero rcall type attributes children b p m} {
+      if {[llength $children] < 2} then {return $zero}
+%   \end{tcl}
+%   The \word{zero} case is easy to recognise and handle. After that 
+%   it is known that there is at least one term, and the exceptional 
+%   first term can be handled separately.
+%   \begin{tcl}
+      set res [list [{*}$rcall {*}[lindex $children 1] 0 0 ord]]
+      foreach child [lreplace $children 0 1] {
+         if {[lindex $child 0] ne "negate" ||\
+           [llength [lindex $child 2]] != 2} then {
+            lappend res $plus [{*}$rcall {*}$child 0 0 ord]
+         } else {
+            lappend res $minus\
+              [{*}$rcall {*}[lindex $child 2 1] 0 0 ord]
+         }
+      }
+%   \end{tcl}
+%   If there was more than one term then wrap all of it up in an 
+%   |mrow|, otherwise return the single term.
+%   \begin{tcl}
+      if {[llength $res]>1} then {
+         set res [list mrow {} $res]
+      } else {
+         set res [lindex $res 0]
+      }
+%   \end{tcl}
+%   Under normal priorities, there shouldn't any sub- or superscripts 
+%   directly on a sum (a surrounding |mfence| should have cleared 
+%   them), but if there still are any then fence the sum just to be 
+%   on the safe side.
+%   \begin{tcl}
+      if {$b || $p} then {set res [list mfenced {} [list $res]]}
+      return $res
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}[]{mrowjoin}
+%   This is a generic handler for joining subexpressions, that should 
+%   be sufficient as long as all operands follow the same syntax. The 
+%   syntax of a |Tcl-prefix| based on this command is
+%   \begin{displaysyntax}
+%     mrowjoin \word{begin} \word{end} \word{before} \word{after} 
+%     \word{between}
+%   \end{displaysyntax}
+%   where each argument is a list of \mtl-\LaTeX\ data-trees. The 
+%   items in \word{begin} occur once, at the beginning of the entire 
+%   construction, and the items in \word{end} occur once at the end 
+%   of the entire construction. The items in \word{before} occur 
+%   before each operand and the items in \word{after} occur after 
+%   each operand, whereas the items in \word{between} occur between 
+%   each pair of operands.
+%   
+%   In many cases, it is possible to construct equivalent pieces of 
+%   \LaTeX\ in several ways with this command, e.g. 
+%   `|\binom{|\meta{first}|}{|\meta{second}|}|' can be achieved both 
+%   with
+%   \begin{quote}
+%     |mrowjoin {{#text \\binom}} {} {{#text \{}} {{#text \}}} {}|
+%   \end{quote}
+%   and with
+%   \begin{quote}
+%     |mrowjoin {{#text \\binom\{}} {{#text \}}} {} {} {{#text \}\{}}|
+%   \end{quote}
+%   The difference between these two lies in how the items are 
+%   grouped. \word{begin}, \word{end}, and \word{between} items end 
+%   up as children of the main |mrow|. \word{before} and \word{after} 
+%   items appear in a subordinate |mrow| with the actual operand. The 
+%   two possibilities thus lets you choose between
+%   \begin{equation*}
+%     \left[
+%     \vcenter{\hbox{|\binom|}\hbox{|  {n}|}\hbox{|  {k}|}}
+%     \right]
+%     \quad\text{and}\quad
+%     \left[
+%     \vcenter{
+%       \hbox{|\binom{|}\hbox{|  n|}\hbox{|  }{|}
+%       \hbox{|  k|}\hbox{|  }|}
+%     }
+%     \right]
+%     \text{.}
+%   \end{equation*}
+%   
+%   \begin{tcl}
+mtmtcl::latex::make::tool::safe eval {
+   proc mrowjoin {begin end before after between \
+     rcall type attributes children b p m} {
+      set res $begin
+      set n -1; foreach child $children {incr n
+         if {$n==0} then {continue}
+         if {$n>1} then {lappend res {*}$between}
+         set subres $before
+         lappend subres [{*}$rcall {*}$child 0 0 ord] {*}$after
+         if {[llength $subres]>1} then {
+            lappend res [list mrow {} $subres]
+         } else {
+            lappend res {*}$subres
+         }
+      }
+      lappend res {*}$end
+      if {[llength $res]!=1} then {
+         return [list mrow {} $res]
+      } else {
+         return [lindex $res 0]
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{tclcommand}{command}{gettext}
+%   The |tool::gettext| command is just an import of 
+%   |mtmtcl::openmath::gettext|.
+%   \begin{tcl}
+namespace eval mtmtcl {
+   namespace inscope latex::make::tool {namespace import}\
+      [namespace which openmath::gettext]
+}
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% 
+% \begin{proc}{LaTeX_encoding}
+%   The work for the |tool::LaTeX_encoding| procedure should thus be 
+%   clear. Its call syntax is
+%   \begin{displaysyntax}
+%     |tool::LaTeX_encoding| \word{value} \word{nucleus} 
+%     \word{subscript?} \word{superscript?} \word{mathtype}
+%   \end{displaysyntax}
+%   where the \word{value} is the value of the 
+%   \OMSref{altenc}{LaTeX_encoding} attribution (an OM object) and 
+%   the \word{nucleus} is the node to which it was applied. The 
+%   return value is the \mtl-\LaTeX data-tree.
+%   
+%   If the \word{value} format is not recognised then this defaults 
+%   to formatting the \word{nucleus} instead. The result is not 
+%   explicitly |return|ed, as |switch| and |if| passes it on anyway.
+%   \begin{tcl}
+proc mtmtcl::latex::make::tool::LaTeX_encoding {value nucleus b p m} {
+   switch -- [lindex $value 0] "OMSTR" {
+%   \end{tcl}
+%   The practical work of generating the result data-tree for an 
+%   |OMSTR| is done as if the whole thing was a single |#text| node.
+%   \begin{tcl}
+      make \#text [gettext $value {}] $b $p $m
+   } "OMFOREIGN" {
+%   \end{tcl}
+%   Getting the |encoding| is slightly awkward.
+%   \begin{tcl}
+      switch -- [
+         dict get [dict merge {encoding ""} [lindex $value 1]]\
+           encoding
+      ] "mtmtcl-LaTeX" {
+         if {[llength [lindex $value 2]]==1} then {
+            lindex $value 2 0
+         } else {
+            lreplace $value 0 1 mrow {}
+         }
+      } "Tcl-prefix" {
+%   \end{tcl}
+%   The |make| here is the name of an alias in the |tool::safe| 
+%   interpreter which points back to the |tool::make| ensemble.
+%   \begin{tcl}
+         safe eval [linsert [lindex $value 2 0 1] end make\
+           {*}$nucleus $b $p $m]
+      } default {
+%   \end{tcl}
+%   What remains are the cases of defaulting to the \word{nucleus}.
+%   \begin{tcl}
+         make {*}$nucleus $b $p $m
+      }
+   } default {
+      make {*}$nucleus $b $p $m
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{transparent}
+%   Some node types behave mostly as containers for a child. These 
+%   can be implemented as aliases to |tool::transparent|, whose call 
+%   syntax is
+%   \begin{displaysyntax}
+%     tool::transparent \word{arity} \word{index} \word{node type} 
+%     \word{attributes} \word{children} \word{superscript?} 
+%     \word{subscript?} \word{mathtype}
+%   \end{displaysyntax}
+%   where \word{arity} is the requested number of children and 
+%   \word{index} is the index of the child which will be processed 
+%   further. The \word{node type} is used in error messages (if there 
+%   isn't the specified number of children).
+%   \begin{tcl}
+proc mtmtcl::latex::make::tool::transparent\
+  {arity index type attr children p b m} {
+   if {[llength $children] != $arity} then {
+      error "$type nodes must have $arity child(ren)"
+   }
+   make {*}[lindex $children $index] $p $b $m
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% For other node types, the default is mostly to do the same thing as 
+% MathML would (via the correspondence 
+% OpenMath${}\mapsto{}$Content-MathML${}\mapsto{}$Presentation-MathML). 
+% This frequently involves translating (Unicode) strings to \LaTeX, 
+% so some tools for this are useful.
+% 
+% \begin{variable}{licr_map}
+%   One basic problem is that of characters for which one would 
+%   normally use a control sequence. The relationship between 
+%   character and command are pretty arbitrary, so it is probably 
+%   best done as a |string map|. This |licr_map| variable holds a 
+%   mapping from characters to \LaTeX\ text counterparts.
+%   
+%   At the moment, this only does something for characters in the 
+%   visible ASCII range, but one could consider extending it to 
+%   larger character sets (\texttt{utf8enc.dfu} would be a good 
+%   starting point for data about this mapping).
+%   \begin{tcl}
+namespace eval mtmtcl::latex::make::tool {
+   variable licr_map {
+      { } ~
+%   \end{tcl}
+%   Expressing spaces as |~| is primarily good for ensuring proper 
+%   parsing, particularly avoiding that spaces are lost. It also 
+%   prevents linebreaks, but that is probably enforced by a 
+%   surrounding |\mbox| or |\fbox| anyway.
+%   \begin{tcl}
+      #   {\#}
+      $   {\textdollar }
+      %   {\%}
+      &   {\&}
+%   \end{tcl}
+%   There might be a point in transforming the quotes as well, namely 
+%   to prevent unintended ligatures, but that is not an urgent issue.
+%   \begin{tcl}
+      <   {\textless }
+      >   {\textgreater }
+      \\  {\textbackslash }
+      ^   {\textasciicircum }
+      _   {\textunderscore }
+      \{  {\textbraceleft }
+      |   {\textbar }
+      \}  {\textbraceright }
+      ~   {\textasciitilde }
+   }
+}
+%   \end{tcl}
+%   The map is automatically extended by |str2licr| whenever it 
+%   encounters a character outside the visible ASCII range which the 
+%   map does not cover. This automatic extension takes the form 
+%   `\ensuremath{\langle}U+03a0\ensuremath{\rangle}' for $\Pi$.
+% \end{variable}
+% 
+% \begin{proc}{str2licr}
+%   This command takes an arbitrary string as argument and generate 
+%   \LaTeX\ code for that string in a text context. The call syntax is
+%   \begin{displaysyntax}
+%     str2licr \word{string}
+%   \end{displaysyntax}
+%   and the return value is the \LaTeX\ code.
+%   
+%   \begin{tcl}
+proc mtmtcl::latex::make::tool::str2licr {str} {
+   variable licr_map
+   set conv [string map $licr_map $str]
+   if {![regexp {[^ -~]} $str]} then {return $conv}
+%   \end{tcl}
+%   Since a \LaTeX\ Internal Character Representation only employs 
+%   ASCII characters, we can detect unprocessed characters as those 
+%   outside this character range and return the result early 
+%   otherwise.
+%   
+%   The character parser converts surrogate pairs to simple non-BMP 
+%   codepoints, since this is how those characters presently have to 
+%   be encoded in \Tcl, but it will accept explicit characters beyond 
+%   |\uFFFF| as well if \Tcl\ is extended to support them.
+%   \begin{tcl}
+   regsub -all {[ -~]} $conv "" chars
+   foreach char [lsort -unique [
+      regexp -inline -all\
+        {[^\uD800-\uDFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]} $chars
+   ]] {
+      set latex {\ensuremath{\langle}U+}
+      if {[scan $char %c%c hi lo]==1} then {
+         append latex [format %04x $hi]
+      } else {
+         append latex [format %x [expr\
+           {1024*($hi-0xD800) + ($lo-0xDC00) + 65536}]]
+      }
+      append latex {\ensuremath{\rangle}}
+      lappend licr_map $char $latex
+   }
+   return [string map $licr_map $str]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{variable}{mathchar_map}
+%   This variable holds a |string map| that translates Unicode 
+%   characters to \LaTeX\ math character counterparts, primarily for 
+%   the purpose of rendering variable names. This implies that the 
+%   \LaTeX\ math characters should not get any space around them, so 
+%   characters of |\mathbin|, |\mathop|, |\mathrel|, and |\mathpunct| 
+%   class need to be wrapped up in a brace group.
+%   
+%   The first bunch of characters would be those which map to 
+%   themselves, but since my initial code for initialising this 
+%   variable encountered \Tcl\ bug \#2251175, I've moved that (which 
+%   just does a bunch of |lappend mathchar_map $c $c|) to the end so 
+%   that it gets the side-effect of purifying the list. That way, it 
+%   can be built up by doing |append mathchar_map {|\dots\ instead of 
+%   |lappend mathchar_map {*}{|\dots\ as was originally the case.
+%   \begin{tcl}
+namespace eval mtmtcl::latex::make::tool {
+   variable mathchar_map {
+%   \end{tcl}
+%   ASCII characters missing from this map are space and quotes, 
+%   since they don't have a clear role in mathematics. `|#|'--`|&|' 
+%   can occur, but need to be ``escaped'' since the plain forms have 
+%   syntactic roles in \LaTeX:
+%   \begin{tcl}
+      #  {\#}
+      $  {\$}
+      %  {\%}
+      &  {\&}
+%   \end{tcl}
+%   The apostrophe is another quote. `|*|'--`|-|' need to be 
+%   |\mathord|ed, and the same holds for `|:|'--`|>|':
+%   \begin{tcl}
+      *  {{*}}
+      +  {{+}}
+      ,  {{,}}
+      -  {{-}}
+      :  {{:}}
+      ;  {{;}}
+      <  {{<}}
+      =  {{=}}
+      >  {{>}}
+%   \end{tcl}
+%   The backslash is perhaps not a character one would expect in math 
+%   identifiers, but |\backslash| is an ord character. A circumflex 
+%   can be constructed as |\hat{}|. Underscore is available as |\_|.
+%   \begin{tcl}
+      \\ {\backslash }
+      ^  {\hat{}}
+      _  {\_}
+%   \end{tcl}
+%   The grave accent is yet another quote.
+%   \begin{tcl}
+      \{ {\{}
+      |  {\vert }
+      \} {\}}
+      ~  {\tilde{}}
+   }
+}
+%   \end{tcl}
+%   Now for the latin-1 range. `{`!}' doesn't normally seem to be 
+%   available as a math character, and the same holds for the cent, 
+%   currency, Yen, and broken bar signs.
+%   \begin{tcl}
+append mtmtcl::latex::make::tool::mathchar_map {
+   \u00A3 {\pounds }
+   \u00A7 {\S }
+   \u00A9 {\copyright }
+   \u00AC {\neg }
+%   \end{tcl}
+%   The following is a degree sign.
+%   \begin{tcl}
+   \u00B0 {{}^\circ }
+   \u00B1 {{\pm}}
+%   \end{tcl}
+%   Superscript $2$, superscript $3$, and the micro sign could be 
+%   done (as `$^2$', `$^3$', and $\mu$), but are probably better left 
+%   out. The acute accent is not particularly distinct.
+%   \begin{tcl}
+   \u00B6 {\P }
+   \u00B7 {{\cdot}}
+%   \end{tcl}
+%   Remaining characters in the |\u00B?| range are cedilla, 
+%   superscript $1$, masculine ordinal, right-pointing guillement, 
+%   the $\frac{1}{4}$, $\frac{1}{2}$, and $\frac{3}{4}$ fractions, 
+%   and `\textexclamdown', but none of these make much sense here.
+%   
+%   If accented letters are to be supported, we've got a ton of work 
+%   ahead; it is probably best handled through a dynamic extension 
+%   mechanism (generate decomposed unicode, then translate combining 
+%   characters to math accents).
+%   \begin{tcl}
+   \u00D7 {{\times}}
+   \u00F7 {{\div}}
+}
+%   \end{tcl}
+%   It could well be argued that none of |\neg|, |\pm|, |\cdot|, 
+%   |\times|, and |\div| should be allowed here as they are all 
+%   established as operation symbols, but for now I'll leave them in.
+%   
+%   The next group of any size is the Greek letters.
+%   \begin{tcl}
+append mtmtcl::latex::make::tool::mathchar_map {
+   \u0393 {\Gamma }
+   \u0394 {\Delta }
+   \u0398 {\Theta }
+   \u039B {\Lambda }
+   \u039E {\Xi }
+   \u03A0 {\Pi }
+   \u03A3 {\Sigma }
+   \u03A5 {\Upsilon }
+   \u03A6 {\Phi }
+   \u03A7 {\Chi }
+   \u03A8 {\Psi }
+   \u03A9 {\Omega }
+   \u03B1 {\alpha }
+   \u03B2 {\beta }
+   \u03B3 {\gamma }
+   \u03B4 {\delta }
+   \u03B5 {\varepsilon }
+   \u03B6 {\zeta }
+   \u03B7 {\eta }
+   \u03B8 {\theta }
+   \u03B9 {\iota }
+   \u03BA {\kappa }
+   \u03BB {\lambda }
+   \u03BC {\mu }
+   \u03BD {\nu }
+   \u03BE {\xi }
+%   \end{tcl}
+%   |\u03BF| is omikron, which is classically indistinguishable from 
+%   $o$ anyway.
+%   \begin{tcl}
+   \u03C0 {\pi }
+   \u03C1 {\rho }
+   \u03C2 {\varsigma }
+   \u03C3 {\sigma }
+   \u03C4 {\tau }
+   \u03C5 {\upsilon }
+   \u03C6 {\varphi }
+   \u03C7 {\chi }
+   \u03C8 {\psi }
+   \u03C9 {\omega }
+   \u03D1 {\vartheta }
+   \u03D5 {\phi }
+   \u03D6 {\varpi }
+   \u03F0 {\varkappa }
+   \u03F1 {\varrho }
+   \u03F5 {\epsilon }
+}
+%   \end{tcl}
+%   Fast forward to |\u2???| block.
+%   \begin{tcl}
+append mtmtcl::latex::make::tool::mathchar_map {
+   \u2020 {\dag }
+   \u2021 {\ddag }
+   \u2032 '
+   \u2033 ''
+   \u2034 '''
+%   \end{tcl}
+%   Letterlike symbols group.
+%   \begin{tcl}
+   \u2102 {\mathbb{C}}
+   \u210B {\mathcal{H}}
+   \u210C {\mathfrak{H}}
+   \u210D {\mathbb{H}}
+   \u210F {\hslash }
+   \u2110 {\mathcal{I}}
+   \u2111 {\Im }
+   \u2112 {\mathcal{L}}
+   \u2113 {\ell }
+   \u2115 {\mathbb{N}}
+   \u2118 {\wp }
+   \u2119 {\mathbb{P}}
+   \u211A {\mathbb{Q}}
+   \u211B {\mathcal{R}}
+   \u211C {\Re }
+   \u211D {\mathbb{R}}
+   \u2124 {\mathbb{Z}}
+   \u2127 {\mho }
+   \u2128 {\mathfrak{Z}}
+   \u212C {\mathcal{B}}
+   \u212D {\mathfrak{C}}
+   \u2130 {\mathcal{E}}
+   \u2131 {\mathcal{F}}
+   \u2133 {\mathcal{M}}
+   \u2135 {\aleph }
+   \u2136 {\beth }
+   \u2137 {\gimel }
+   \u2138 {\daleth }
+   \u2141 {\Game }
+}
+%   \end{tcl}
+%   \begin{tcl}
+%   \end{tcl}
+%   Final group of characters: Those that map to themselves.
+%   \begin{tcl}
+apply {{} {
+   variable mathchar_map
+   foreach c {
+      ! ( ) . / 0 1 2 3 4 5 6 7 8 9 ? 
+      @ A B C D E F G H I J K L M N O P Q R S T U V W X Y Z [ ]
+      a b c d e f g h i j k l m n o p q r s t u v w x y z
+   } {lappend mathchar_map $c $c}
+} mtmtcl::latex::make::tool}
+%   \end{tcl}
+% \end{variable}
+% 
+% 
+% \begin{ensemble}{make}
+%   \setnamespace{mtmtcl::latex::make}
+%   \begin{ensproc}{OMS}
+%     Symbols should typically have been given an explicit markup 
+%     (either through some |OMATTR|, or as an embedded 
+%     subexpression), but when there hasn't been any of that then the 
+%     fallback is to render the symbol as a box containing the 
+%     \describestring*+[attribute]{name} and 
+%     \describestring*+[attribute]{cd} attributes.
+%     \begin{tcl}
+proc mtmtcl::latex::make::OMS {attr children b p m} {
+   if {[llength $children]} then {
+      tool::make {*}[lindex $children 0] $b $p $m
+   } else {
+      set text [format {\texttt{%s}@\texttt{%s}}\
+        [tool::str2licr [dict get $attr name]]\
+        [tool::str2licr [dict get $attr cd]]]
+      set text "\\text{\\fbox{\\normalfont $text}}"
+      switch -- $m "bin" - "op" {
+         set text "\\math$m\{$text\}"
+      }
+      list #text $text
+   }
+}
+%     \end{tcl}
+%     The MathML approach in this situation would instead be to 
+%     render the |name| as if it was a variable. This would (mostly) 
+%     do the right thing for symbols such as \OMSref{transc1}{cos}, 
+%     \OMSref{arith1}{gcd}, and \OMSref{veccalc1}{curl}, but would 
+%     perhaps invite to not defining them, which on the whole seems 
+%     worse.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{OMV}
+%     Variables are more faithfully formatted according to MathML 
+%     conventions\Ldash by applying |mathchar_map| to the |name|\Dash 
+%     but often the actual formatting is rather given by an 
+%     attribution or child.
+%     \begin{tcl}
+proc mtmtcl::latex::make::OMV {attr children b p m} {
+   if {[llength $children]} then {
+      tool::make {*}[lindex $children 0] $b $p $m
+   } else {
+      set name [dict get $attr name]
+      regsub -all {[^ -~]} [string map $tool::mathchar_map $name]\
+        {} text
+      if {[string length $name]>1} then {set text "\\mathrm{$text}"}
+      switch -- $m "bin" - "op" {
+         set text "\\math$m{$text}"
+      }
+      list #text $text
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{OMSTR}
+%     Strings are typeset in typewriter font, with roman quotes 
+%     around them.
+%     \begin{tcl}
+proc mtmtcl::latex::make::OMSTR {attr children b p m} {
+   set text [tool::str2licr [
+      tool::gettext [list OMSTR $attr $children] ""
+   ]]
+   set text "\\text{\\normalfont``\\texttt{$text}''}"
+   switch -- $m "bin" - "op" {
+      set text "\\math$m\{$text\}"
+   }
+   list #text $text
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{OMF}
+%   \begin{ensproc}{integer}
+%   \begin{ensproc}{OMR}
+%     Floats, integers, and references are at this stage mere 
+%     containers for their first and only children.
+%     \begin{tcl}
+interp alias {} mtmtcl::latex::make::OMF  {}\
+  [namespace which mtmtcl::latex::make::tool::transparent] 1 0 OMF
+interp alias {} mtmtcl::latex::make::integer  {}\
+  [namespace which mtmtcl::latex::make::tool::transparent] 1 0 integer
+interp alias {} mtmtcl::latex::make::OMR  {}\
+  [namespace which mtmtcl::latex::make::tool::transparent] 1 0 OMR
+%     \end{tcl}
+%   \end{ensproc}\end{ensproc}\end{ensproc}
+%   
+%   \begin{ensproc}{negate}
+%     |negate| nodes generated by the typographic preprocessing are 
+%     aliased to |prefix|.
+%     \begin{tcl}
+interp alias {} mtmtcl::latex::make::negate  {}\
+  [namespace which mtmtcl::latex::make::prefix]
+%     \end{tcl}
+%     An alternative would be to alias them to |OMA|, but that turned 
+%     out to have the disadvantage of putting a seemingly nonsensical 
+%     parenthesis around the first term of a sum when it was 
+%     negative. Combining |OMA| with a |form| attribute could however 
+%     be better than this.
+%   \end{ensproc}
+%   
+%   Still not implemented are:
+%   \begin{description}
+%     \renewcommand{\makelabel}[1]{\hspace\labelsep\texttt{#1},}
+%     \item[OMATP]
+%       but those should only appear inside |OMATTR| anyway, so 
+%       that's covered;
+%     \item[OMB]
+%       but that's probably not wanted anyway\Dash in case of 
+%       emergency it could be made an alias to |OMSTR|;
+%     \item[OMBIND]
+%       which really should get implemented;
+%     \item[OMBVAR]
+%       but that's dependent on |OMBIND|;
+%     \item[OME]
+%       but for the moment I'm not wrapping any errors;
+%     \item[OMFOREIGN]
+%       but that is almost by definition not possible to implement 
+%       generically.
+%   \end{description}
+% \end{ensemble}
+% 
+% 
+% 
+% \subsection{Putting it all together}
+% 
+% The following combines the above into a basic ``\LaTeX\ formula 
+% from \mtl\ near-OpenMath generator''.
+% 
+% \setnamespace{mtmtcl::latex}
+% 
+% \begin{proc}{convertto}
+%   Preliminary syntax
+%   \begin{displaysyntax}
+%     mtmtcl::latex::convertto \word{tree}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc mtmtcl::latex::convertto {tree} {
+   set typified [[namespace parent]::present::typography $tree]
+   variable phrasebook
+   [namespace parent]::present::decorate typified phrasebook
+   fold [
+      lindex [metax:: {*}[
+         make::tool::make {*}[
+            [namespace parent]::present::fence::tool::fence\
+              {*}$typified -Inf -Inf none
+         ] 0 0 ord
+      ]] 0
+   ] 70 2 ; # width, level
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayvar}{phrasebook}
+%   The following array holds basic directions on how to decorate a 
+%   near-OpenMath tree before converting it to a \LaTeX\ formula.
+%   \begin{tcl}
+namespace eval mtmtcl::latex {
+   variable phrasebook
+   array unset phrasebook
+}
+%   \end{tcl}
+%   Two easy symbols are \OMSref{alg1}{one} and \OMSref{alg1}{zero}.
+%   \begin{tcl}
+set mtmtcl::latex::phrasebook(alg1#one) {
+   OMATTR altenc#LaTeX_encoding [OMSTR 1]
+}
+set mtmtcl::latex::phrasebook(alg1#zero) {
+   OMATTR altenc#LaTeX_encoding [OMSTR 0]
+}
+%   \end{tcl}
+%   
+%   The first operation handled is addition. Its formatting is 
+%   normally controlled by decorations at the |OMA| node; the 
+%   attributes affect fencing and the attribution with a |sumnode| 
+%   prefix the actual formatting.
+%   \begin{tcl}
+set mtmtcl::latex::phrasebook(arith1#plus) {
+   rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
+      attrdefault priority 1 form infix
+      OMATTR altenc#LaTeX_encoding {
+         OMFOREIGN {encoding Tcl-prefix} {
+           {#text {sumnode {#text +} {#text -} {#text 0}}}
+         }
+      }
+   }
+%   \end{tcl}
+%   But in case the symbol occurs in an other capacity than as an 
+%   operation acting on operands, a direct symbol is available as 
+%   well.
+%   \begin{tcl}
+   OMATTR altenc#LaTeX_encoding {
+      OMSTR {} { {#text +} }
+   }
+}
+%   \end{tcl}
+%   The second operation handled is ordinary multiplication. This 
+%   is slightly tricky, since there are three different cases to 
+%   take into account. First there is the basic associative 
+%   multiplication where factors are merely written next to each 
+%   other, so the default \describestring+[attribute]{form} should 
+%   be \describestring+{juxtaposed}. Second there is the 
+%   multiplication of numbers, which has an explicit infix symbol 
+%   and which I prefer to render as a |\cdot|; this form of 
+%   multiplication has |form|${}={}$\describestring+{infix}. Finally 
+%   there is the scalar multiple multiplication, which should perhaps 
+%   be encoded using a different symbol altogether, but which for now 
+%   is recognised by having an 
+%   \describestring+[attribute]{mtmtcl:path} ending in `|.|'; this 
+%   gets \describestring+[attribute]{priority} $3.9$ rather than the 
+%   juxtaposition default of $4$, to avoid a (usually unnecessary) 
+%   fencing of the right operand.
+%   \begin{tcl}
+set mtmtcl::latex::phrasebook(arith1#times) {
+   mtmtcl:path {(?w)^\.\Z} {
+      rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
+         attrdefault form juxtaposed priority 3.9
+      }
+   } default {
+      rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
+         attrdefault form juxtaposed
+      }
+   }
+   OMATTR altenc#LaTeX_encoding {
+      OMSTR {} { {#text {\cdot}} }
+   }
+}
+%   \end{tcl}
+%   The third operation is of course the power. It is virtually 
+%   always set as superscripting, so no fallback symbol is provided, 
+%   but if one is required then |\mathbin{\arrowup}| is probably the 
+%   best alternative.
+%   \begin{tcl}
+set mtmtcl::latex::phrasebook(arith1#power) {
+   rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
+      attrdefault form exponent
+   }
+}
+%   \end{tcl}
+%   A symbol that needs rendering, because it can be generated by 
+%   preprocessing an |OMF| node, is \OMSref{nums1}{infinity}. 
+%   \OMSref{nums1}{NaN} can also be generated that way, but it is 
+%   probably better off being rendered in its fallback form anyway.
+%   \begin{tcl}
+set mtmtcl::latex::phrasebook(nums1#infinity) {
+   OMATTR altenc#LaTeX_encoding {
+      OMSTR {} { {#text {\infty}} }
+   }
+}
+%   \end{tcl}
+%   Negation can also occur as an operation, although it would 
+%   typically have been regurgitated by the typographic preprocessing 
+%   already.
+%   \begin{tcl}
+set mtmtcl::latex::phrasebook(arith1#unary_minus) {
+   rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
+      attrdefault form prefix
+   }
+   OMATTR altenc#LaTeX_encoding {
+      OMSTR {} { {#text -} }
+   }
+}
+%   \end{tcl}
+%   Matrices can be used to test another piece of code.
+%   \begin{tcl}
+set mtmtcl::latex::phrasebook(linalg2#matrix) {
+   rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
+      OMATTR altenc#LaTeX_encoding {
+         OMFOREIGN {encoding Tcl-prefix} {
+           {#text {mrowjoin {{#text {\begin{pmatrix}}}}\
+             {{#text {\end{pmatrix}}}} {} {} {{#text {\\}}}}}
+         }
+      }
+      attrdefault form enclosed
+   }
+}
+set mtmtcl::latex::phrasebook(linalg2#matrixrow) {
+   rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
+      OMATTR altenc#LaTeX_encoding {
+         OMFOREIGN {encoding Tcl-prefix} {
+           {#text {mrowjoin {} {} {} {} {{#text &}}}}
+         }
+      }
+      attrdefault form enclosed
+   }
+}
+%   \end{tcl}
+%   \begin{tcl}
+%   \end{tcl}
+% \end{arrayvar}
+% 
+% 
+% 
+% \begin{tcl}
+%</pkg>
+% \end{tcl}
+% 
+% 
+\endinput
+

@@ -9,10 +9,18 @@
 % \fi
 % 
 % 
+% \part{Rings and modules}
+% 
 % \section{Rings}
 % 
+% The basic rings are put in the |mtmtcl::rings| namespace. The main 
+% |mtmtcl| namespace is put in the path of that namespace to 
+% facilitate using features from other parts of the system (at the 
+% time of writing, particularly |mtmtcl::openmath::gettext|).
 % \begin{tcl}
-namespace eval mtmtcl::rings {}
+namespace eval mtmtcl::rings {
+   namespace path [list [namespace parent]]
+}
 % \end{tcl}
 % \setnamespace{mtmtcl::rings}
 % 
@@ -88,12 +96,14 @@ namespace eval ::tcl::mathop {
             "additive group" 1.2
             ring 1.0
             semigroup 1.2  monoid 1.2
+            canonise 1.1
             division 1.0
-            export 1.0
+            export 2.0
+            import 1.0
          }
       }
       = ==
-      0 {::mtmtcl::support::constant 0}
+      0 {::return -level 0 0}
       iszero {== 0}
       integer. *
       1 *
@@ -101,13 +111,14 @@ namespace eval ::tcl::mathop {
       canonise +
 %   \end{tcl}
 %   I originally tried to use |::tcl::mathfunc::entier| for 
-%   canonising integers, but it turned out that didn't canonise them, 
-%   whereas |::tcl::mathop::+| did.
+%   canonising integers, but it turned out that \emph{didn't} 
+%   canonise them, whereas |::tcl::mathop::+| did.
 %   \begin{tcl}
       / ::mtmtcl::rings::integer_divide
       div /
       mod %
       export ::mtmtcl::rings::integer_export
+      export ::mtmtcl::rings::integer_import
    } -command ::mtmtcl::rings::integer
 }
 %   \end{tcl}
@@ -127,19 +138,49 @@ proc ::mtmtcl::rings::integer_divide {numer denom} {
 %   \end{proc}
 %   
 %   \begin{proc}{integer_export}
-%     This procedure implements the \APIref+{export}{1.0} interface 
+%     This procedure implements the \APIref+{export}{2.0} interface 
 %     for integers. The call syntax is
 %     \begin{displaysyntax}
-%       |::mtmtcl::rings::integer_divide| \word{element} 
-%       \word{path} \word{options-dict} \begin{regblock}[\regstar] 
-%       \word{option} \word{value} \end{regblock}
+%       |::mtmtcl::rings::integer_export| \word{element} 
+%       \word{attributes}
 %     \end{displaysyntax}
-%     but for the moment everything except the \word{element} is 
-%     ignored.
 %     
 %     \begin{tcl}
-proc ::mtmtcl::rings::integer_export {elem path optD args} {
+proc ::mtmtcl::rings::integer_export {elem attr} {
    list integer [dict create value $elem] {}
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{integer_import}
+%     This procedure implements the \APIref+{import}{1.0} interface 
+%     for integers. The call syntax is
+%     \begin{displaysyntax}
+%       |::mtmtcl::rings::integer_import| \word{path} \word{data-tree}
+%     \end{displaysyntax}
+%     It understands both \describestring*+[node type]{integer} and 
+%     \describestring*+[node type]{OMI} nodes, but the former is 
+%     preferred. It also skips any |OMATTR| nodes that may surround 
+%     the element.
+%     
+%     \begin{tcl}
+proc ::mtmtcl::rings::integer_import {path tree} {
+   while {[lindex $tree 0] eq "OMATTR"} {
+      set tree [lindex $tree 2 1]
+   }
+   switch -- [lindex $tree 0] "integer" {
+      set value [dict get [lindex $tree 1] value]
+      if {[string is integer -strict $value]} then {return $value}
+   } "OMI" {
+      set str [openmath::gettext $tree]
+      regsub -all {\s} $str {} str
+      if {[regsub {[Xx]} $str {} str] ?\
+        [scan $str %llx value] : [scan $str %lld value]} then {
+         return $value
+      }
+   }
+   return -code error -errorcode [list API import EDOM $path $tree]\
+     "Not an integer"
 }
 %     \end{tcl}
 %   \end{proc}
@@ -271,7 +312,7 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %     is very standard. Slighly less standard is the need to find a 
 %     number $r$ such that \(r b \equiv c_k \pmod{n}\). This is done 
 %     by maintaining $r_k$ and $s_k$ such that \(r_k b \equiv c_k 
-%     \pmod{m}\) and \(s_k b \equiv b_k \pmod{m}\). Clearly \(r_0=0\) 
+%     \pmod{n}\) and \(s_k b \equiv b_k \pmod{n}\). Clearly \(r_0=0\) 
 %     and \(s_0=1\) satisfy these conditions, as do
 %     \begin{align*}
 %       s_k :={}& r_{k-1} - q_k s_{k-1}\\
@@ -313,8 +354,8 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{iszero}
-%     The final method needed for v\,1.2 of \APIref{additive group} 
-%     is the unary test for being zero.
+%     The final method needed for v\,1.2 of \APIref{additive 
+%     group}{1.2} is the unary test for being zero.
 %     \begin{tcl}
       iszero { expr {[lindex $args 0] % $n == 0} }
 %     \end{tcl}
@@ -391,6 +432,157 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% \begin{ensemble}{float}
+%   \setnamespace{mtmtcl::rings}
+%   Like integers, a structure for floating-point numbers can be 
+%   implemented directly as an ensemble. The format of a |float| 
+%   element is that of \Tcl's native |double| numbers.
+%   \begin{tcl}
+namespace eval ::tcl::mathop {
+   namespace ensemble create -subcommands {
+      API 
+      = 
+      + - 0 iszero integer.
+      * 
+      1 ^ 
+      canonise
+      /
+      export import
+   } -map {
+      API {
+         ::APIutil::API {
+            equality 1.1
+            "additive group" 1.2
+            ring 1.0
+            semigroup 1.2  monoid 1.2  group 1.2
+%   \end{tcl}
+%   Unlike the case with |integer|, it is reasonable for |float| to 
+%   claim it is a \APIref{group}{1.2}, even though it doesn't quite 
+%   fit the description when $0$ is involved. Supporting |group| is 
+%   however no reason not to also support \APIref{division}{1.0}.
+%   \begin{tcl}
+            division 1.0
+            canonise 1.1
+            export 2.0
+            export 1.0
+         }
+      }
+      =   ==
+      0   {::return -level 0 0.0}
+      iszero {== 0}
+      integer. *
+      1   {::return -level 0 1.0}
+      inverse /
+      ^   **
+      canonise +
+      export ::mtmtcl::rings::float_export
+      import ::mtmtcl::rings::float_import
+   } -command ::mtmtcl::rings::float
+}
+%   \end{tcl}
+%   The issue of \emph{which} |double| values are legal as elements 
+%   of this ring is one that gets surprisingly technical. One might 
+%   expect that $1/0$ (technically |[float / 1.0 0.0]|) should not be 
+%   defined, and thus require a custom proc to convert \Tcl's native 
+%   |ARITH DIVZERO| error to an |API division| error, but 
+%   |[::tcl::mathfunc::/ 1.0 0.0]| returns |Inf|, so by including 
+%   this (and |-Inf|) in the ``ring'' the issue solves itself. It is 
+%   not possible to e.g.~add the two infinities together (an 
+%   |ARITH DOMAIN| error will be thrown), but that feels reasonable.
+%   
+%   Similarly including |NaN| might seem like a good idea, but since 
+%   not even |::tcl::mathfunc::double| will take that as input without 
+%   throwing an error it seems more practical to leave it out.
+%   
+%   What turns out to be a thorny issue is however that of what to do 
+%   with |-0.0|: this is in IEEE floating-point arithmetic a value 
+%   which is distinct from the ordinary zero |0.0| in having inverse 
+%   |-Inf| rather than |Inf|. Since |::tcl::mathfunc::==| sees the 
+%   two zeroes as equal, one could argue that |-0.0| is merely a 
+%   noncanonical representation for |0.0|, and in order to satisfy 
+%   \APIref{canonise}{1.1} it becomes necessary to choose a 
+%   |canonise| implementation which transform one into the other; the 
+%   |+| command happens to fulfill this request. The only operation 
+%   which can tell |0.0| and |-0.0| apart is |/|, and since this is 
+%   not required to be congruent, we actually manage to get by 
+%   without violating that part of any interface! (As is well known, 
+%   floating-point arithmetic violates most axioms of a ring in one 
+%   way or another, but these violations are generally overlooked as 
+%   they are usually small.) An alternative could be to treat |0.0| 
+%   and |-0.0| as distinct values, with |tcl::mathfunc::double| as 
+%   |canonise|, but that would only satisfy version~1.0 of 
+%   \APIref{canonise}{1.0}.
+%   
+%   
+%   \begin{proc}{float_export}
+%     This procedure implements the \APIref+{export}{2.0} interface 
+%     for |float|s. The call syntax is
+%     \begin{displaysyntax}
+%       |::mtmtcl::rings::float_export| \word{element} 
+%       \word{attributes}
+%     \end{displaysyntax}
+%     The default implementation is to use \Tcl's string 
+%     representation of the canonical value as 
+%     \describestring+[attribute]{dec} attribute, since that is much 
+%     better than the default for e.g.~|format %g|, but just in case 
+%     the syntax doesn't wholly match that of OpenMath, I've also 
+%     included the \Module{hexfloat} variant which encodes the exact 
+%     IEEE value in the \describestring+[attribute]{hex} attribute
+%     \begin{tcl}
+proc ::mtmtcl::rings::float_export {elem attr} {
+%<*hexfloat>
+   binary scan [binary format Q $elem] H* hex
+   list OMF [dict create hex $hex] {}
+%</hexfloat>
+%<!hexfloat>   list OMF [dict create dec [expr {double($elem)}] {}
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{float_import}
+%     Conversely, this procedure implements the \APIref+{import}{1.0} 
+%     interface for |float|s. The call syntax is thus
+%     \begin{displaysyntax}
+%       |::mtmtcl::rings::float::import| \word{path} \word{data-tree} 
+%     \end{displaysyntax}
+%     and it accepts not only |OMF| elements, but also |integer| and 
+%     |OMI| elements, and skips |OMATTR| wrappers around the number 
+%     in question.
+%     \begin{tcl}
+proc ::mtmtcl::rings::float_import {path tree} {
+   while {[lindex $tree 0] eq "OMATTR"} {
+      set tree [lindex $tree 2 1]
+   }
+   switch -- [lindex $tree 0] "OMF" {
+%     \end{tcl}
+%     See |mtmtcl::present::tpp::OMF| for the concerns encountered 
+%     when parsing an |OMF| element. It's possible though that it 
+%     should be refactored into a separate procedure somewhere in 
+%     the |mtmtcl::openmath| namespace.
+%     \begin{tcl}
+      if {[dict exists $attr dec]} then {
+         scan [dict get $attr dec] %g value
+      } else {
+         binary scan [binary format H* [dict get $attr hex]] Q value
+      }
+      return $value
+   } "integer" - "OMI" {
+      if {![catch {
+         integer_import $path $tree
+      } value]} then {
+         return [expr {double($value)}]
+      }
+   }
+   return -code error -errorcode [list API import EDOM $path $tree]\
+     "Not a float"
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{ensemble}
+% 
+% 
+% \section{Modules}
 % 
 % \begin{APIspec}{ring-module}{1.1}
 %   The |ring-module| interface is for left modules over a ring 
@@ -797,6 +989,8 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 % \end{proc}
 % 
 % 
+% \section{Algebras}
+% 
 % \begin{APIspec}{ring-algebra}{1.0}
 %   An algebra over a ring is a module with a bilinear multiplication 
 %   operation.
@@ -1068,6 +1262,17 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
+%   \begin{procmethod}{named}
+%     The |named| method is a shorthand for applying |basiselement| 
+%     to the result of the |named| method of the semigroup.
+%     \begin{tcl}
+      named {
+         dict create [{*}$S canonise [{*}$S named [lindex $args 0]]]\
+           [{*}$R 1]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
 %   \begin{procmethod}{export}
 %     The part of the internal representation that this structure 
 %     needs to convert for export is the formal linear combination, 
@@ -1075,34 +1280,30 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %     throughout, even if the coefficients are negative, since a 
 %     general coefficient ring doesn't have a concept of negative; 
 %     if the minuses are to be extracted, then that should probably 
-%     be done at a later stage. The multiplication by scalar is 
-%     represented using |binop|, since it isn't really an associative 
+%     be done at a later stage. For now the multiplication by scalar 
+%     is represented by the \texttt{arith1} \texttt{times} symbol, 
+%     but this isn't quite right as it isn't really an associative 
 %     operation.
 %     \begin{tcl}
       export {
-         lassign $args elemD path optD
-         set childL [list]
-         set bpath [linsert $path end basis]
-         set cpath [linsert $path end scalar]
-         set mattr [dict create mtmtcl-path [linsert $path end .]]
+         lassign $args elemD attr
+         set battr $attr
+         set cattr $attr
+         set mattr [dict replace $attr  cd arith1  name times]
+         set aattr [dict replace $attr  cd arith1  name plus]
+         dict lappend battr mtmtcl:path basis
+         dict lappend cattr mtmtcl:path scalar
+         dict lappend mattr mtmtcl:path .
+         dict lappend aattr mtmtcl:path +
+         set mnode        [list OMS $mattr {}]
+         set childL [list [list OMS $aattr {}]]
          dict for {k v} $elemD {
             lappend childL [
-               list binop $mattr [list [
-                  {*}$R export $v $cpath $optD
-               ] [
-                  {*}$S export $k $bpath $optD
-               ]]
+               list OMA $attr [list $mnode\
+                 [{*}$R export $v $cattr] [{*}$S export $k $battr]]
             ]
          }
-         if {[llength $childL]} then {
-            return [list assop [
-               dict create \
-                 symbol + \
-                 mtmtcl-path [linsert $path end +]
-            ] $childL]
-         } else {
-            return [list #text 0]
-         }
+         return [list OMA $attr $childL]
       }
 %     \end{tcl}
 %     
@@ -1114,12 +1315,41 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %     total order).
 %   \end{procmethod}
 %   
+%   \begin{procmethod}{/}
+%     Having a division-by-monomial operation is convenient for 
+%     factoring.
+%     \begin{tcl}
+      / {
+         lassign $args numer denom
+         if {[dict size $denom] != 1} then {
+            return -code error -errorcode {API division unimplemented}\
+              "Sorry, I only know how to divide by monomials"
+         }
+%     \end{tcl}
+%     This relies heavily on having division in the underlying ring 
+%     and semigroup, and will in particular error out if any 
+%     coefficient or monomial errors out. Each term in the numerator 
+%     gives rise to a separate term in the result, since only 
+%     $k = {}$\texttt{[$S$ * $\mathit{sd}$ $x$]} can give rise to a 
+%     result term with key $x$.
+%     \begin{tcl}
+         lassign [dict get $denom] sd rd
+         set res {}
+         dict for {k v} $numer {
+            dict set res [{*}$S canonise [{*}$S / $k $sd]]\
+              [{*}$R / $v $rd]
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
 %   \begin{procmethod}{API}
 %     \begin{tcl}
       API {
          if {![{*}$R API ring 1.0] || ![{*}$R API monoid 1.0] ||\
-           [{*}$R API "additive group" 1.1] ||\
-           [{*}$S API semigroup 1.0]} then {
+           ![{*}$R API "additive group" 1.1] ||\
+           ![{*}$S API semigroup 1.0]} then {
             return [::APIutil::API {} {*}$args]
          }
          set D {
@@ -1132,8 +1362,11 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
             equality 1.0
          }
          if {[{*}$S API monoid 1.0]} then {dict lappend D monoid 1.0}
-         if {[{*}$R API export 1.0] && [{*}$S API export 1.0]} then {
-            dict lappend D export 1.0
+         if {[{*}$R API export 2.0] && [{*}$S API export 2.0]} then {
+            dict lappend D export 2.0
+         }
+         if {[{*}$R API division 1.0] && [{*}$S API division 1.0]} then {
+            dict lappend D division 1.0
          }
          return [::APIutil::API $D {*}$args]
       }

@@ -427,19 +427,16 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
 %     example of how to handle the paths.
 %     \begin{tcl}
       export {
-         lassign $args L path optD
-         set childL [list]
-         set bpath [linsert $path end namestructure]
+         lassign $args L attr
+         set sattr [dict replace $attr  cd arith1  name times]
+         dict lappend sattr mtmtcl:path *
+         set childL [list [list OMS $sattr {}]]
+         set battr $attr
+         dict lappend battr mtmtcl:path namestructure
          foreach factor $L {
-            lappend childL [{*}$base export $factor $bpath $optD]
+            lappend childL [{*}$base export $factor $battr]
          }
-         if {[llength $childL]} then {
-            return [list assop [
-               dict create  mtmtcl-path [linsert $path end *]
-            ] $childL]
-         } else {
-            return [list #text 1]
-         }
+         return [list OMA $attr $childL]
       }
 %     \end{tcl}
 %     In a free monoid with power operation, it might be more 
@@ -464,8 +461,8 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
          if {[{*}$base API canonise 1.0]} then {
             dict set D canonise 1.0 
          }
-         if {[{*}$base API export 1.0]} then {
-            dict set D export 1.0 
+         if {[{*}$base API export 2.0]} then {
+            dict set D export 2.0 
          }
          ::APIutil::API $D {*}$args
       }
@@ -553,7 +550,7 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
 %     |power_product_monoid| \word{generator set}
 %   \end{displaysyntax}
 %   where the \word{generator set} is the command prefix of a 
-%   \APIref*{finite set}{1.1}.
+%   \APIref+{finite set}{1.1}.
 %   
 %   Elements are lists of exponents, where the $i$th exponent 
 %   corresponds to the $i$th generator. The exponents are native 
@@ -697,40 +694,59 @@ proc ::mtmtcl::groups::power_product_monoid_1.3 {base method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
-%   ---
-%   
 %   \begin{procmethod}{export}
-%     Exporting is pretty straightforward: just form the product of 
-%     the exports of each element separately. This may serve as an 
-%     example of how to handle the paths.
+%     Not surprisingly, power products are exported as products of 
+%     powers. The format is somewhat prolix in that it has a power 
+%     for \emph{every} generator (even those with exponent $0$ or 
+%     $1$), but it is easier to get rid of these than to reinsert 
+%     them.
 %     \begin{tcl}
       export {
-         error "This hasn't been implemented yet (sorry)"
-         
-         lassign $args L path optD
-         set childL [list]
-         set bpath [linsert $path end namestructure]
-         foreach factor $L {
-            lappend childL [{*}$base export $factor $bpath $optD]
+         lassign $args L attr
+         set pattr [dict replace $attr  cd arith1  name power]
+         set mattr [dict replace $attr  cd arith1  name times]
+         set battr $attr
+         dict lappend pattr mtmtcl:path ^
+         dict lappend mattr mtmtcl:path *
+         dict lappend battr mtmtcl:path namestructure
+         set pow [list OMS $pattr {}]
+         set childL [list [list OMS $mattr {}]]
+         foreach name [{*}$base elements] exponent $L {
+            lappend childL [list OMA $attr [list $pow [
+               {*}$base export $name $battr
+            ] [
+               list integer [dict create value $exponent] {}
+            ]]]
          }
-         if {[llength $childL]} then {
-            return [list assop [
-               dict create  mtmtcl-path [linsert $path end *]
-            ] $childL]
-         } else {
-            return [list #text 1]
-         }
+         return [list OMA $attr $childL]
       }
 %     \end{tcl}
-%     In a free monoid with power operation, it might be more 
-%     appropriate to use powers as much as possible when expressing 
-%     the element.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{/}
+%     The quotient of two power products exists iff each exponent in 
+%     the numerator is $\geqslant$ the corresponding exponent in the 
+%     denominator.
+%     \begin{tcl}
+      / {
+         lassign $args a b
+         set res {}
+         foreach k $a l $b {
+            lappend res [expr {$k-$l}]
+            if {[lindex $res end] < 0} then {
+               return -code error -errorcode {API division nosolution}\
+                 "Would get negative exponent"
+            }
+         }
+         return $res
+      }
+%     \end{tcl}
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{API}
 %     The base structure API is only queried when the |API| method is 
 %     called. The adapter denounces support for everything unless the 
-%     base structure at least supports \APIref*{finite set}{1.1}.
+%     base structure at least supports \APIref+{finite set}{1.1}.
 %     \begin{tcl}
       API {
          set D [dict create]
@@ -738,14 +754,15 @@ proc ::mtmtcl::groups::power_product_monoid_1.3 {base method args} {
             dict lappend D equality 1.0 
             dict lappend D semigroup 1.3 
             dict lappend D monoid 1.3
+            dict lappend D division 1.0
             dict lappend D "named element" 1.0
             dict lappend D "* decomposition" 1.0
          }
          if {[{*}$base API canonise 1.0]} then {
             dict set D canonise 1.0 
          }
-         if {[{*}$base API export 1.0]} then {
-            # dict set D export 1.0 
+         if {[{*}$base API export 2.0]} then {
+            dict set D export 2.0 
          }
          ::APIutil::API $D {*}$args
       }

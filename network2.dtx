@@ -34,15 +34,24 @@
       \includegraphics[#1]{#2}%
    \fi
    \begingroup
-      \let\begin=\iftrue
+      \let\begin=\iffalse
       \let\end=\fi
    \expandafter\endgroup
-   \expandafter\end \iffalse
+   \expandafter\end \begin %^^A This \begin is \iffalse
 }{}
 \newenvironment{mpgraphics*}{%
   \vcenter\bgroup\hbox\bgroup\mpgraphics
 }{\egroup\egroup}
 \RequirePackage{graphicx}
+
+\usepackage{ifpdf}
+\ifpdf
+   \DeclareGraphicsRule{*}{mps}{*}{} % For pdfLaTeX
+   % \newcommand{\myepssuffix}{}
+\else
+   % \newcommand{\myepssuffix}{.eps}
+\fi
+
 
 \makeatletter
 \DeclareRobustCommand\SMC{%
@@ -350,18 +359,18 @@
 %<*mpfigs>
 beginfig(1);
   % A simple PROP element
-  IC_equations1(7,8)(); % Need to exchange vertical and horizontal!!
+  IC_equations1(7,8)();
   z1.ll = (1in,1in);
   draw_IC1(
-    btex $\scriptstyle 1$ etex, btex $\scriptstyle 1$ etex, 
-    btex $a$ etex, 
-    btex $\scriptstyle m$ etex, btex $\scriptstyle n$ etex
+    btex $\scriptstyle 1$ etex, btex $\scriptstyle n$ etex,
+    btex $a$ etex,
+    btex $\scriptstyle 1$ etex, btex $\scriptstyle m$ etex
   );
   for i := 1 upto 7:
-     drawarrow z1l[i] -- z1l[i] - (0.7cm,0);
+     drawarrow z1b[i] -- z1b[i] - (0,0.7cm);
   endfor
   for i := 1 upto 8:
-     drawarrow z1r[i] + (0.7cm,0) -- z1r[i];
+     drawarrow z1t[i] + (0,0.7cm) -- z1t[i];
   endfor
 endfig;
 %</mpfigs>
@@ -369,1011 +378,1011 @@ endfig;
 % \end{equation*}
 % 
 % 
-
-
-\subsection{Graphic \PROP\ expressions}
-
-As in quite a lot of universal algebra, the right way to get a grip 
-on an algebraic structure is to construct a useful model of 
-expressions for that structure, and then conclude that this model is 
-in fact the free object for this kind of structure.
-
-\begin{definition}
-  A \DefOrd{\PROP\ signature} is a tuple $(X,\alpha,\omega)$, where 
-  $X$ is a set (the set of symbols) and \(\alpha,\omega\colon X \Fpil 
-  \N\) are functions. $\alpha(x)$ is called the \DefOrd{arity} of the 
-  symbol \(x \in X\) and $\omega(x)$ is called the \DefOrd{coarity} 
-  of the symbol \(x \in X\).
-  
-  A \DefOrd{graphic \PROP\ expression} on the signature 
-  $(X,\alpha,\omega)$ is a tuple
-  \begin{equation}
-    G = (V,E,h,g,t,s,D)
-  \end{equation}
-  where
-  \begin{itemize}
-    \item
-      $V$ is a finite set, called the set of \emDefOrd{vertices}. \(V 
-      \owns 0,1\), where $0$ is called the \emDefOrd{output vertex} 
-      and $1$ is called the \emDefOrd{input vertex}. Elements of \(V 
-      \setminus \{0,1\}\) are called \emDefOrd{inner vertices}.
-    \item
-      $E$ is a finite set, called the set of \emDefOrd{edges}.
-    \item
-      \(h\colon E \Fpil V \setminus \{1\}\) is called the 
-      \emDefOrd{head} map. \(t\colon E \Fpil V \setminus \{0\}\) is 
-      called the \emDefOrd{tail} map. Define the input $d^-(v)$ and 
-      output $d^+(v)$ valencies of a vertex $v$ by
-      \begin{align*}
-        d^-(v) ={}& 
-          \card[\Big]{ \setOf[\big]{ e \in E }{ h(e) = v } }
-          \text{,}\\
-        d^+(v) ={}& 
-          \card[\Big]{ \setOf[\big]{ e \in E }{ t(e) = v } }
-          \text{.}
-      \end{align*}
-    \item
-      \(g,s\colon E \Fpil \Zp\) are 
-      called the \emDefOrd{head index} and \emDefOrd{tail index} 
-      maps.
-    \item
-      \(D\colon V \setminus \{0,1\} \Fpil X\) is called the 
-      \emDefOrd{annotation}.
-  \end{itemize}
-  and these satisfy
-  \begin{enumerate}
-    \item
-      The tuple $(V,E,h,t)$ is a directed acyclic graph, i.e., there 
-      is no sequence \(e_1,\dotsc,e_n \in E\) such that 
-      \(h(e_i)=t(e_{i+1})\) for \(i=1,\dotsc,n-1\) and 
-      \(h(e_n)=t(e_1)\).
-    \item
-      Head and head index uniquely identifies an edge, as does the 
-      combination of tail and tail index; if \(e_1,e_2 \in E\) satisfy 
-      \(h(e_1)=h(e_2)\) and \(g(e_1) = g(e_2)\) then \(e_1=e_2\); 
-      similarly if \(e_1,e_2 \in E\) satisfy \(t(e_1)=t(e_2)\) and 
-      \(s(e_1) = s(e_2)\) then \(e_1=e_2\).
-    \item
-      Head indices are assigned from $1$ and up; if \(e_1 \in E\) is 
-      such that \(g(e_1)>1\) then there exists some \(e_2 \in E\) such 
-      that \(h(e_2)=h(e_1)\) and \(g(e_2) = g(e_1)-1\). Similarly 
-      tail indices are assigned from $1$ and up; if \(e_1 \in E\) is 
-      such that \(s(e_1)>1\) then there exists some \(e_2 \in E\) such 
-      that \(t(e_2)=t(e_1)\) and \(s(e_2) = s(e_1)-1\).
-    \item
-      Arities and coarities of the annotations agree with the 
-      in-valencies and out-valencies respectively of the inner vertices; 
-      \(d^-(v) = \alpha\bigl( D(v) \bigr)\) and 
-      \(d^+(v) = \omega\bigl( D(v) \bigr)\) for every \(v \in V 
-      \setminus \{0,1\}\).
-  \end{enumerate}
-  The valency $d^+(1)$ of the input vertex $1$ is called the 
-  \DefOrd{arity} of the expression $G$ and is denoted $\arity(G)$. The 
-  valency \(d^-(0)\) of the output vertex $0$ is called the 
-  \DefOrd{coarity} of the expression $G$ and is denoted $\coarity(G)$.
-      
-  Denote by \(\mc{GPE}_{(X,\alpha,\omega)}(m,n)\) the set of all 
-  graphic \PROP\ expressions on the signature $(X,\alpha,\omega)$ 
-  which have \(V,E \subset \N\), coarity $m$, and arity $n$.
-\end{definition}
-
-
-The most elementary expressions are those corresponding to just one 
-operation, with inputs and outputs connected to the input and output 
-vertices in the same order as to the operation vertex. It will turn 
-out these are the only expressions which one explicitly needs to 
-assign a value to, so it is useful to have a name for them.
-
-\begin{definition}
-  A graphic \PROP\ expression \(G = (V,E,h,g,t,s,D)\) said to be 
-  \DefOrd{elementary} if \(V = \{0,1,v\}\) and it for all \(e \in E\) 
-  holds that
-  \begin{gather*}
-    g(e)=s(e)\text{,}\\
-    h(e)=0 \iff t(e)=v\text{,}\\
-    h(e)=v \iff t(e)=1\text{.}
-  \end{gather*}
-  The annotation $D(v)$ is called the \DefOrd{nucleus} of $G$.
-  
-  A graphic \PROP\ expression \(G = (V,E,h,g,t,s,D)\) said to be a 
-  \DefOrd{permutation expression} if \(V = \{0,1\}\). The 
-  permutation \DefOrd{expressed by $G$} is the \(\sigma \in 
-  \Sigma_{\card{E}}\) which satisfies \(g = \sigma \circ s\).
-  
-  For any \(v \in V\), the restriction of $g$ to $\setOf[\big]{ 
-  e \in E }{ h(e) = v }$ will be denoted $g^G_v$ and the restriction 
-  of $s$ to $\setOf[\big]{ e \in E }{ t(e) = v }$ will be denoted 
-  $s^G_v$.
-\end{definition}
-
-The point of naming particular restrictions of the head and tail 
-index maps is that the \emph{inverses} of these maps are frequently 
-useful in explicit expressions, e.g.~for various permutations. The 
-point of having the graphic \PROP\ expression be a part of the symbol 
-is that an argument may involve several such expressions.
-
-Values for more composite expressions can be assigned by decomposing 
-them into elementary expressions. The most important decomposition is 
-the \emph{cut}, which goes across edges.
-
-\begin{definition}
-  A \DefOrd{cut} in a graphic \PROP\ expression \(G = 
-  (V,E,h,g,t,s,D)\) is a bipartition \(W_0 \cup W_1\) of $V \setminus 
-  \{0,1\}$ such that no \(e \in E\) satisfies \(h(e) \in W_1\) and 
-  \(t(e) \in W_0\). The cut is said to be \DefOrd{non-trivial} if 
-  $W_0$ and $W_1$ are both nonempty.
-  
-  An edge \(e \in E\) is said to be a \emDefOrd{cut edge} if \(h(e) 
-  \in W_0 \cup \{0\}\) and \(t(e) \in W_1 \cup \{1\}\). Let $E_c$ be 
-  the set of all cut edges. A cut is said to be 
-  \DefOrd[*{ordered cut}]{ordered} if it is given as $(W_0,W_1,p)$ 
-  where \(p\colon E_c \Fpil \bigl[ \card{E_c} \bigr]\) is a bijection. 
-  The \emDefOrd[*{graphic expression decomposition}]{decomposition} 
-  of $G$ induced by the ordered cut $(W_0,W_1,p)$ is $(G',G'')$, 
-  where \(G' = (V',E',h',g',t',s',D')\) and 
-  \(G'' = (V'',E'',h'',g'',t'',s'',D'')\) are defined by
-  \begin{align*}
-    V' ={}& W_0 \cup \{0,1\} &   V'' ={}& W_1 \cup \{0,1\}\\
-    E' ={}& \setOf[\big]{e \in E}{h(e) \in W_0 \cup \{0\}} &
-    E'' ={}& \setOf[\big]{e \in E}{t(e) \in W_1 \cup \{1\}} 
-      \displaybreak[0]\\
-    h' ={}& \restr{h}{E'} & t'' ={}& \restr{t}{E''}\\
-    t'(e) ={}& \begin{cases}
-      1& \text{if \(e \in E_c\),}\\
-      t(e)& \text{otherwise,}
-    \end{cases} &
-    h''(e) ={}& \begin{cases}
-      0& \text{if \(e \in E_c\),}\\
-      h(e)& \text{otherwise,}
-    \end{cases} \displaybreak[0]\\
-    g' ={}& \restr{g}{E'} & s'' ={}& \restr{s}{E''} 
-      \displaybreak[0]\\
-    s'(e) ={}& \begin{cases}
-      p(e)& \text{if \(e \in E_c\),}\\
-      s(e)& \text{otherwise,}
-    \end{cases} &
-    g''(e) ={}& \begin{cases}
-      p(e)& \text{if \(e \in E_c\),}\\
-      g(e)& \text{otherwise,}
-    \end{cases} \\
-    D' ={}& \restr{D}{W_0} & 
-    D'' ={}& \restr{D}{W_1} \text{.}
-  \end{align*}
-\end{definition}
-
-Obseve that a decomposition is such that \(V' \cap V'' = \{0,1\}\) 
-and \(E' \cap E'' = E_c\). What happens is effectively that the cut 
-edges are ordered according to $p$, cut in half, and a new input and 
-output vertex is created for the edges to attach to.
-
-An alternative method of decomposing a \PROP\ expression is to split 
-the existing input and output vertices in half, provided that there 
-then are no other connections between the resulting halves. This is 
-the idea behind the next concept.
-
-
-\begin{definition}
-  A \DefOrd{split} in a graphic \PROP\ expression \(G = 
-  (V,E,h,g,t,s,D)\) is a tuple $(F_l,F_r,W_l,W_r)$, where \(F_l \cup 
-  F_r\) is a bipartition of $E$ and \(W_l \cup W_r\) is a bipartition 
-  of $V \setminus \{0,1\}$, such that:
-  \begin{enumerate}
-    \item
-      if \(e \in F_l\) then \(h(e) \in W_l \cup \{0\}\) and \(t(e) 
-      \in W_l \cup\{1\}\),
-    \item
-      if \(e \in F_r\) then \(h(e) \in W_r \cup \{0\}\) and \(t(e) 
-      \in W_r \cup\{1\}\),
-    \item
-      if \(e_l \in F_l\) and \(e_r \in F_r\) are such that \(h(e_l) = 
-      h(e_r) = 0\) then \(g(e_l) < g(e_r)\), and
-    \item
-      if \(e_l \in F_l\) and \(e_r \in F_r\) are such that \(t(e_l) = 
-      t(e_r) = 0\) then \(s(e_l) < s(e_r)\).
-  \end{enumerate}
-  Let \(k = \card[\big]{\setOf{e \in F_l}{h(e)=0}}\) and 
-  \(l = \card[\big]{\setOf{e \in F_l}{t(e)=1}}\). The 
-  \emDefOrd[*{graphic expression decomposition}]{decomposition} 
-  of $G$ induced by the split $(F_l,F_r,W_l,W_r)$ is $(G',G'')$, 
-  where \(G' = (V',F_l,h',g',t',s',D')\) and 
-  \(G'' = (V'',F_r,h'',g'',t'',s'',D'')\) are defined by
-  \begin{align*}
-    V' ={}& W_0 \cup \{0,1\} &   V'' ={}& W_1 \cup \{0,1\}\\
-    h' ={}& \restr{h}{F_l} & h'' ={}& \restr{h}{F_r}
-      \displaybreak[0]\\
-    t' ={}& \restr{t}{F_l} & t'' ={}& \restr{t}{F_r}
-      \displaybreak[0]\\
-    g' ={}& \restr{g}{F_l} & 
-      g''(e) ={}& \begin{cases}
-        g(e)-k& \text{if \(h''(e)=0\),}\\
-        g(e)& \text{otherwise,}
-      \end{cases}
-      \displaybreak[0]\\
-    s' ={}& \restr{s}{F_l} & 
-      s''(e) ={}& \begin{cases}
-        s(e)-l& \text{if \(t''(e)=1\),}\\
-        s(e)& \text{otherwise,}
-      \end{cases}\\
-    D' ={}& \restr{D}{W_l} & 
-    D'' ={}& \restr{D}{W_r} \text{.}
-  \end{align*}
-\end{definition}
-
-In other words, all that happens in the decomposition induced by a 
-split, apart from the fact that the underlying graph is split into 
-two, is that the head indices at the output vertex and tail indices 
-at the input vertex are adjusted in the right component to assure 
-that they start at $0$.
-
-
-\begin{lemma} \label{L:UppdelningOrdning3}
-  Let $G$ be an arbitrary graphic \PROP\ expression on the form 
-  $\bigl( \{0,1,v\}, E,h,g,t,s,D \bigr)$. Let \(m = \coarity(G)\), 
-  \(n = \arity(G)\), and \(k = m - d^+(v) = n - d^-(v)\). Then there 
-  exist unique \(\sigma \in \Sigma_m\) and \(\tau \in \Sigma_n\) such 
-  that:
-  \begin{enumerate}
-    \item \label{C1:L:UppdelningOrdning3}
-      If \(e \in E\) is such that \(h(e)=0\) and \(t(e)=1\) then 
-      \(g(e) = \sigma( \tau( s(e) ) )\).
-    \item \label{C2:L:UppdelningOrdning3}
-      If \(e \in E\) is such that \(h(e)=0\) and \(t(e)=v\) then 
-      \(g(e) = \sigma\bigl( s(e) +\nobreak k \bigr)\).
-    \item \label{C3:L:UppdelningOrdning3}
-      If \(e \in E\) is such that \(h(e)=v\) and \(t(e)=1\) then 
-      \(g(e) = \tau\bigl( s(e) \bigr) - k\).
-    \item \label{C4:L:UppdelningOrdning3}
-      $\sigma$ is strictly increasing on $[k]$.
-  \end{enumerate}
-  Moreover, these data determine a decomposition
-  \begin{equation*}
-    \fbox{\(\begin{array}{ccc}
-      G_0 & \fbox{\(\begin{array}{c} G_2 \\ G_3 \end{array}\)} & G_1
-    \end{array}\)}
-  \end{equation*}
-  of $G$ where $G_0$ is a permutation expression for $\sigma$, $G_1$ 
-  is a permutation expression for $\tau$, $G_2$ is a permutation 
-  expression for $\same{k}$, and $G_3$ is an elementary expression 
-  with nucleus $D(v)$.
-  
-  Concretely, let \(p_0 = \sigma^{-1} \circ g^G_0\) and \(p_1 = \tau 
-  \circ s^G_1\). 
-  Let \(F_l = \setOf[\big]{ e \in E }{ \text{\(h(e)=0\) and 
-  \(t(e)=1\)} }\), and let \(F_r = E \setminus F_l\). Then 
-  $\bigl( \varnothing, \{v\}, p_0 \bigr)$ is an ordered cut in $G$ 
-  which induces a decomposition $(G_0,G_{231})$ and $\bigl( \{v\}, 
-  \varnothing, p_1 \bigr)$ is an ordered cut in $G$ which induces a 
-  decomposition $(G_{023},G_1)$. The same $\bigl( \varnothing, \{v\}, 
-  p_0 \bigr)$ is an ordered cut in $G_{023}$ which induces a 
-  decomposition $(G_0,G_{23})$ and $\bigl( \{v\}, \varnothing, p_1 
-  \bigr)$ is an ordered cut in $G_{231}$ which induces the 
-  decomposition $(G_{23},G_1)$. Finally this $G_{23}$ has a split 
-  $\bigl( F_l, F_r, \varnothing, \{v\} \bigr)$ which induces a 
-  decomposition $(G_2,G_3)$.
-\end{lemma}
-\begin{proof}
-  By the acyclicity of $G$, every \(e \in E\) with \(t(e)=v\) has 
-  \(h(e) = 0\) and thus condition~\ref{C2:L:UppdelningOrdning3} 
-  defines $\sigma(i)$ for all \(i>k\). 
-  Condition~\ref{C4:L:UppdelningOrdning3} then completes the 
-  definition of $\sigma$. Condition~\ref{C1:L:UppdelningOrdning3} can 
-  then be restated as: if \(e \in E\) is such that \(h(e) \neq v\) and 
-  \(t(e)=1\) then \(\sigma^{-1}\bigl( g(e) \bigr) = \tau\bigl( s(e) 
-  \bigr)\). Together with condition~\ref{C3:L:UppdelningOrdning3} 
-  this completes the definition of $\tau$, and the piecewise 
-  definition cannot make the function noninjective since 
-  \(\sigma^{-1}\bigl( g(e) \bigr) \leqslant k\) for all \(e \in E\) 
-  with \(h(e) = 0\) and \(t(e) = 1\).
-  
-  Let the graphic \PROP\ expressions $G_0$, $G_{231}$, $G_{023}$, and 
-  $G_1$ be defined by the decompositions $(G_0,G_{231})$ and 
-  $(G_{023},G_1)$ induced by the cuts $\bigl( \varnothing, \{v\}, p_0 
-  \bigr)$ and $\bigl( \{v\}, \varnothing, p_1 \bigr)$ respectively. 
-  It is then obvious that $G_0$ is a permutation expression 
-  corresponding to $\sigma$ and $G_1$ is a permutation expression 
-  corresponding to $\tau$. Furthermore $G_{231}$ differs from $G$ 
-  only in the value of $g$ and $G_{023}$ differs from $G$ only in the 
-  value of $s$, so $\bigl( \varnothing, \{v\}, p_0 \bigr)$ is an 
-  ordered cut also in $G_{023}$ and $\bigl( \{v\}, \varnothing, p_1 
-  \bigr)$ is an ordered cut also in $G_{231}$. Let $(G_0',G_{23})$ 
-  and $(G_{23}',G_1')$ be the corresponding decompositions. A 
-  comparison using the definition immediately shows \(G_0' = G_0\) 
-  and \(G_1' = G_1\), as claimed. Since cutting away $G_0$ only 
-  changes $g$ to conform with $p_0$ and cutting away $G_1$ only 
-  changes $s$ to conform with $p_1$, it follows that these operations 
-  commute and \(G_{23} = G_{23}' = \bigl( \{0,1,v\}, E, h, g', t, s', 
-  D \bigr)\), where
-  \begin{align*}
-    g'(e) ={}& \begin{cases}
-      p_0(e)& \text{if \(h(e) = 0\),}\\
-      p_1(e) - k& \text{if \(h(e) = v\),}
-    \end{cases} \\
-    s'(e) ={}& \begin{cases}
-      p_1(e)& \text{if \(t(e) = 1\),}\\
-      p_0(e) - k& \text{if \(t(e) = v\).}
-    \end{cases}
-  \end{align*}
-  Observe that \(p_0(e) = p_1(e)\) for all \(e \in F_l\) and that 
-  \(p_0(e) \leqslant k\) if and only if \(e \in F_l\). Hence $G_{23}$ 
-  has a split $\bigl( F_l, F_r, \varnothing, \{v\} \bigr)$ and the  
-  induced decomposition $(G_2,G_3)$ is such that $G_2$ is a 
-  permutation expression where head and tail indices are always 
-  equal, i.e., it expresses $\same{k}$. Furthermore \(\GV(G_3) = 
-  \{0,1,v\}\), an edge in it goes from $1$ to $v$ or from $v$ to $0$, 
-  and the head index of an edge is always equal to the tail index. 
-  Hence $G_3$ is an elementary expression, and the nucleus is $D(v)$.
-\end{proof}
-
-
-\begin{definition}
-  Let a signature $\Omega$ and a \PROP\ $\mc{P}$ be given. A relation 
-  $\propto$ which relates $\mc{GPE}_\Omega(m,n)$ to $\mc{P}(m,n)$ for 
-  all \(m,n \in \N\) is said to be an \DefOrd{evaluation relation} if 
-  it satisfies the following conditions:
-  \begin{enumerate}
-    \item
-      If $G$ has a decomposition $(G_0,G_1)$ induced by some 
-      cut, \(G_0 \propto a_0\), and \(G_1 \propto a_1\) then 
-      \(G \propto a_0 \circ a_1\).
-    \item
-      If $G$ has a decomposition $(G_l,G_r)$ induced by some 
-      split, \(G_l \propto a_l\), and \(G_r \propto a_r\) then 
-      \(G \propto a_l \otimes a_r\).
-    \item \label{Villk:Permutation}
-      If $G$ is a permutation expression then \(G \propto 
-      \phi_n(\sigma)\), where $\sigma$ is the permutation expressed 
-      by $G$.
-  \end{enumerate}
-  
-  A function \(f\colon X \Fpil \mc{P}\) such that 
-  \(f(x) \in \mc{P}\bigl( \omega(x), \alpha(x) \bigr)\) for all 
-  \(x \in X\) is called an \DefOrd{evaluation seed}. For any 
-  evaluation seed $f$, denote by $\stackrel{f}{\propto}$ the minimal 
-  evaluation relation which satisfies \(G \stackrel{f}{\propto} 
-  f(x)\) for every elementary \(G \in \mc{GPE}_\Omega\) with nucleus 
-  \(x \in X\).
-\end{definition}
-
-The purpose of these definitions is to define an evaluation 
-\emph{function} which assigns a value to every graphic \PROP\ 
-expression, and as it happens that evaluation function will be 
-$\stackrel{f}{\propto}$, but since the univocality of this function 
-is not obvious from its definition, it is for the time being 
-necessary to view it as possibly multivalued, and then it is a mere 
-relation from $\mc{GPE}_\Omega(m,n)$ to $\mc{P}(m,n)$. What is 
-obvious from the definition is however that the intersection of a 
-family of evaluation relations is again an evaluation relation, and 
-from this follows that $\stackrel{f}{\propto}$ exists and is unique. 
-The next step is to show that it assigns at least one value to every 
-graphical \PROP\ expression.
-
-
-\begin{lemma}
-  If the domain of an evaluation relation contains all elementary 
-  expressions, then all graphic \PROP\ expressions are in the domain 
-  of that relation.
-\end{lemma}
-\begin{proof}
-  The proof is by induction on the number of vertices. Let \(G = 
-  (V,E,h,g,t,s,D)\) be an arbitrary graphic \PROP\ expression. If 
-  \(\card{V}=2\) then $G$ is a permutation expression and as such 
-  by condition~\ref{Villk:Permutation} related to a \PROP\ element.
-  
-  If \(\card{V} = 3\) then \(V = \{0,1,v\}\) for some $v$. Let
-  \begin{align*}
-    E_0 ={}& \setOf[\big]{ e \in E }{ 
-      \text{\(h(e)=0\) and \(t(e)=v\)} }\text{,}\\
-    E_1 ={}& \setOf[\big]{ e \in E }{ 
-      \text{\(h(e)=v\) and \(t(e)=1\)} }\text{,}\\
-    E_2 ={}& \setOf[\big]{ e \in E }{ 
-      \text{\(h(e)=0\) and \(t(e)=1\)} }\text{.}
-  \end{align*}
-  Also let \(n_i = \card{E_i}\) for \(i=0,1,2\). Then \(d^-(0) = 
-  n_2+n_0\), \(d^+(1) = n_2+n_1\), \(d^+(v) = n_0\), and 
-  \(d^-(v)=n_1\). Let \(p_0 \colon E_2 \cup E_0 \Fpil [n_2 +\nobreak 
-  n_0]\) and \(p_1 \colon E_2 \cup E_1 \Fpil [n_2 +\nobreak n_1]\) be 
-  the bijections which satisfy:
-  \begin{enumerate}
-    \item
-      If \(e_1,e_2 \in E_2\) are such that \(s(e_1)<s(e_2)\) then 
-      \(p_1(e_1)<p_1(e_2)\).
-    \item
-      If \(e_1,e_2 \in E_1\) are such that \(g(e_1)<g(e_2)\) then 
-      \(p_1(e_1)<p_1(e_2)\).
-    \item
-      If \(e_1 \in E_1\) and \(e_2 \in E_2\) then 
-      \(p_1(e_1)>p_1(e_2)\).
-    \item
-      \(p_1(e)=p_2(e)\) for all \(e \in E_2\).
-    \item
-      If \(e_1,e_2 \in E_0\) are such that \(s(e_1)<s(e_2)\) then 
-      \(p_2(e_1)<p_2(e_2)\).
-  \end{enumerate}
-  Now $(\{v\},\varnothing,p_1)$ is an ordered cut in $G$ and thus it 
-  induces a decomposition $(G_1,G_2)$, where $G_2$ is a permutation 
-  expression and thus related to the \PROP\ element 
-  $\phi_{n_2+n_1}(\sigma)$ for \(\sigma^{-1} = s \circ p_1^{-1}\). 
-  Furthermore \((\varnothing,\{v\},p_2)$ is an ordered cut in $G_1$ 
-  and thus it induces a decomposition $(G_3,G_4)$, where $G_3$ is a 
-  permutation expression and thus related to the \PROP\ element 
-  $\phi_{n_2+n_0}(\tau)$ for \(\tau = g \circ p_2^{-1}\). 
-  Finally, $(E_2, E_0 \cup\nobreak E_1, \varnothing, \{v\})$ is a 
-  split in $G_4$ and thus it induces a decomposition $(G_5,G_6)$ of 
-  that expression. \(G_5 \propto \phi_{n_2}(\same{n_2})\) by 
-  construction, whereas $G_6$ is elementary and thus \(G_6 \propto a\) 
-  for some element $a$ by assumption. Hence \(G_4 \propto \id_{n_2} 
-  \otimes a\) and \(G \propto \tau \cdot (\id_{n_2} \otimes\nobreak 
-  a) \cdot \sigma\).
-  
-  If \(\card{V} > 3\) then we enter the induction step. Let 
-  $(W_0,W_1)$ be a nontrivial cut in $G$\Ldash such a cut always 
-  exist, because the acyclicity of $G$ always makes it possible to 
-  pick \(W_0 = \{v\}\), where \(v \in V\) is such that if \(t(e)=v\) 
-  for some \(e \in E\) then \(h(e)=0\)\Dash and let $(G_0,G_1)$ be 
-  some decomposition induced by this cut. Then by the induction 
-  hypothesis there exists \PROP\ elements $a_0$ and $a_1$ such that 
-  \(G_0 \propto a_0\) and \(G_1 \propto a_1\), and hence \(G \propto 
-  a_0 \circ a_1\). This completes the induction.
-\end{proof}
-
-The next couple of lemmas are about proving univocality of 
-$\stackrel{f}{\propto}$. This is done step by step, considering one 
-specific class of expressions after another. The typical method used 
-is to define a $\propto'$ relation which is exactly like 
-$\stackrel{f}{\propto}$ except in the particular class one considers 
-at this step, where instead an alternative definition is given 
-approximates $\stackrel{f}{\propto}$ from below. Then it is shown that 
-$\propto'$ is also an evaluation relation, from which follows that it 
-actually is equal to $\stackrel{f}{\propto}$.
-
-
-\begin{lemma} \label{L:EntydighetOrdning2}
-  Let a signature \(\Omega = (X,\alpha,\omega)\), and \PROP\ 
-  $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
-  given. If \(G = (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega\) and 
-  \(a \in \mc{P}\) are such that \(G \stackrel{f}{\propto} a\) and 
-  \(\card{V}=2\) then \(a = \phi_{\card{E}}(g \circ\nobreak s^{-1})\).
-\end{lemma}
-\begin{proof}
-  Define the relation $\propto'$ from $\mc{GPE}_\Omega$ to $\mc{P}$ by
-  \begin{equation*}
-    (V,E,h,g,t,s,D) \propto' a \quad\Longrightarrow\quad \begin{cases}
-      (V,E,h,g,t,s,D) \stackrel{f}{\propto} a&
-        \text{if \(\card{V}>2\),}\\
-      a = \phi_{\card{E}}(g \circ s^{-1})&
-        \text{if \(\card{V}=2\).}
-    \end{cases}
-  \end{equation*}
-  Since the definition of $\propto'$ for \(\card{V}=2\) is exactly 
-  what is required for an evaluation relation, it follows that the 
-  permutation condition is fulfilled. Since furthermore $\propto'$ 
-  for \(\card{V}>2\) is equal to $\stackrel{f}{\propto}$, it follows 
-  that also the cut and split conditions for an evaluation condition 
-  are fulfilled for decompositions of expressions with more than two 
-  vertices. What remains is therefore to verify these for expressions 
-  with exactly two vertices, i.e., for permutation expressions.
-  
-  Let \(G = \bigl( \{0,1\}, E,h,g,t,s,D) \in \mc{GPE}_\Omega(n,n)\) and 
-  an ordered cut $(\varnothing,\varnothing,p)$ of $G$ be given. The 
-  corresponding decomposition is $(G_0,G_1)$ where \(G_0 = 
-  \bigl( \{0,1\}, E,h,g,t,p,D)\) and \(G_1 = \bigl( \{0,1\}, 
-  E,h,p,t,s,D)\). The only solution to \(G_0 \propto' a_0\) is \(a_0 
-  = \phi_n(g \circ\nobreak p^{-1})\) and the only solution to 
-  \(G_1 \propto' a_1\) is \(a_1 = \phi_n(p \circ\nobreak s^{-1})\). 
-  Hence \(G \propto \phi_n(g \circ\nobreak s^{-1}) = 
-  \phi_n(g \circ\nobreak p^{-1} \circ\nobreak p \circ\nobreak s^{-1}) = 
-  \phi_n(g \circ\nobreak p^{-1}) \circ \phi_n(p \circ\nobreak s^{-1}) 
-  = a_0 \circ a_1\) by the permutation composition \PROP\ axiom, and 
-  thus $\propto'$ fulfils the cut condition.
-  
-  Let \(G = \bigl( \{0,1\}, E,h,g,t,s,D) \in \mc{GPE}_\Omega(n,n)\) 
-  and a split $(F_l, F_r, \varnothing, \varnothing)$ of $G$ be given. 
-  Let \(k = \card{F_l}\). Then \(g(e),s(e) \leqslant k\) for all \(e 
-  \in F_l\) and \(g(e),s(e) > k\) for all \(e \in F_r\). Let \(\sigma 
-  \in \Sigma_k\) be defined by \(g(e) = \sigma\bigl( s(e) \bigr)\) 
-  for all \(e \in F_l\), and let \(\tau \in \Sigma_{n-k}\) be defined 
-  by \(g(e) = \tau\bigl( s(e) -\nobreak k \bigr) + k\) for all \(e 
-  \in F_r\). The permutation expressed by $G$ is then $\sigma \star 
-  \tau$ and hence \(G \propto' \phi_n(\sigma \star\nobreak \tau) = 
-  \phi_k(\sigma) \otimes \phi_{n-k}(\tau)\) by the permutation 
-  juxtaposition \PROP\ axiom. The decomposition $(G_l,G_r)$ induced by 
-  the split is by definition such that \(G_l = \bigl( \{0,1\}, F_l, 
-  0, g_l, 1, s_l, D \bigr)\) and \(G_r = \bigl( \{0,1\}, F_r, 0, g_r, 1, 
-  s_r, D \bigr)\), where \(g_l(e) = g(e)\) for all \(e \in F_l\), 
-  \(s_l(e) = s(e)\) for all \(e \in F_l\), \(g_r(e) = g(e)-k\) for all 
-  \(e \in F_r\), and \(s_r(e) = s(e)-k\) for all \(e \in F_r\). Hence 
-  \(g_l \circ s_l^{-1} = \sigma\) and \(a_l = \phi_k(\sigma)\) is the 
-  only solution to \(G_l \propto' a_l\). Similarly \(g_r \circ s_r^{-1} 
-  = \tau\) and \(a_r = \phi_{n-k}(\tau)\) is the only solution to 
-  \(G_r \propto' a_r\). Thus $\propto'$ fulfils the split condition.
-\end{proof}
-
-
-\begin{lemma}
-  Let a signature \(\Omega = (X,\alpha,\omega)\), a \PROP\ 
-  $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
-  given. The minimial evaluation relation $\stackrel{f}{\propto}$ is 
-  univocal for all \(G \in \mc{GPE}_\Omega\) which have 
-  \(\card[\big]{\GV(G)} = 3\).
-\end{lemma}
-
-An interesting thing about this proof is that it employs all \PROP\ 
-axioms.
-
-\begin{proof}
-  By Lemma~\ref{L:UppdelningOrdning3}, every graphic \PROP\ 
-  expression \(G = (V,E,h,g,t,s,D)\) with \(\card{V} = 3\) uniquely 
-  determine two permutations \(\sigma_G \in \Sigma_{\coarity(G)}\) 
-  and \(\tau_G \in \Sigma_{\arity(G)}\) with various properties. Also 
-  define \(x_G = D(v)\) and \(k_G = \arity(G) - \alpha(x_G) = 
-  \coarity(G) - \omega(x_G)\). Define the relation $\propto'$ from 
-  $\mc{GPE}_\Omega$ to $\mc{P}$ by
-  \begin{equation*}
-    G \propto' a \quad\iff\quad \begin{cases}
-      G \stackrel{f}{\propto} a&
-        \text{if \(\card[\big]{\GV(G)} \neq 3\),}\\
-      a = \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) 
-        \circ \phi(\tau_G)&
-        \text{if \(\card[\big]{\GV(G)} = 3\).}
-    \end{cases}
-  \end{equation*}
-  If $G$ is elementary then \(G \propto' \phi(\same{\omega(x_G)}) 
-  \circ \phi(\same{0}) \otimes f(x_G) \circ \phi(\same{\alpha(x_G)}) 
-  = \phi(\same{\omega(x_G)}) \circ f(x_G) \circ 
-  \phi(\same{\alpha(x_G)}) = f(x_G)\). By the decomposition part of 
-  Lemma~\ref{L:UppdelningOrdning3}, it thus follows that \(G \propto' 
-  a\) implies \(G \stackrel{f}{\propto} a\). Since it also works the 
-  other way round if \(\card[\big]{\GV(G)} \neq 3\), it follows that 
-  $\propto'$ satisfies the cut and split conditions of evaluation 
-  relations for all $G$ with \(\card[\big]{\GV(G)} \neq 3\). It 
-  remains only to prove them for \(\card[\big]{\GV(G)} = 3\).
-  
-  Let \(G \in \mc{GPE}_\Omega\) with \(\card[\big]{\GV(G)} = 3\) be 
-  given. An ordered cut in $G$ either has the form $\bigl( \{v\}, 
-  \varnothing, p \bigr)$ or $\bigl( \varnothing, \{v\}, p \bigr)$, 
-  depending on which part the inner vertex $v$ goes to. If the 
-  decomposition $(G_0,G_1)$ is induced by the first type of cut then 
-  the only solution to \(G_0 \propto' a_0\) is \(a_0 = 
-  \phi(\sigma_{G_0}) \circ  \phi(\same{k_{G_0}}) \otimes 
-  f(x_{G_0})  \circ \phi(\tau_{G_1})\) and the only solution to 
-  \(G_1 \propto' a_1\) is \(a_1 = \phi\bigl( g^{G_1}_0 \circ\nobreak 
-  (s^{G_1}_1)^{-1} \bigr)\) by Lemma~\ref{L:EntydighetOrdning2}. 
-  \(\sigma_{G_0} = \sigma_G\), \(x_{G_0} = D(v) = x_G\), and 
-  \(k_{G_0} = k_G\) since these are all defined from the same data, 
-  so what remains is to prove that \(\tau_G = \tau_{G_0} \circ 
-  g^{G_1}_0 \circ (s^{G_1}_1)^{-1}\). For \(e \in E\) with \(h(e)=0\) 
-  and \(t(e)=1\), the defining property of $\tau_G$ is that 
-  \(\sigma_G( \tau_G( s(e) ) ) = g(e)\), and indeed
-  \begin{multline*}
-    \sigma_G\Bigl( 
-      \bigl( \tau_{G_0} \circ g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr)
-      \bigl( s(e) \bigr) \Bigr) =
-    \sigma_G\Bigl( \tau_{G_0}\bigl( g^{G_1}_0(e) \bigr) \Bigr) 
-      = \\ =
-    \sigma_{G_0}\Bigl( \tau_{G_0}\bigl( s^{G_0}_1(e) \bigr) \Bigr) =
-    g^{G_0}_0(e) = g(e) 
-    \text{.}
-  \end{multline*}
-  For \(e \in E\) with \(h(e)=v\) and \(t(e)=1\), the defining property 
-  of $\tau_G$ is that \(\tau_G( s(e) ) = g(e) + k_G\), so similarly
-  \begin{multline*}
-    \bigl( \tau_{G_0} \circ g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr)
-      \bigl( s(e) \bigr) \Bigr) =
-    \tau_{G_0}\bigl( g^{G_1}_0(e) \bigr) = \\ =
-    \tau_{G_0}\bigl( s^{G_0}_1(e) \bigr) =
-    g^{G_0}_v(e) + k_G = g(e) + k_G
-    \text{.}
-  \end{multline*}
-  Together these imply \(\tau_G = \tau_{G_0} \circ g^{G_1}_0 \circ 
-  (s^{G_1}_1)^{-1}\) and hence
-  \begin{multline*}
-    G \propto'
-    \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-      \phi(\tau_G) = \\ =
-    \phi(\sigma_{G_0}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-      \phi(\tau_{G_0}) \circ 
-      \phi\bigl( g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr) =
-    a_0 \circ a_1
-    \text{.}
-  \end{multline*}
-  
-  In the second type of cut decomposition $(G_0,G_1)$, the only 
-  solution to \(G_0 \propto' a_0\) is \(a_0 = \phi(g^G_0 \circ\nobreak 
-  p^{-1})\) by Lemma~\ref{L:EntydighetOrdning2} and the only solution to 
-  \(G_1 \propto' a_1\) is \(a_1 = \phi(\sigma_{G_1}) \circ 
-  \phi(\same{k_{G_1}}) \otimes f(x_{G_1}) \bigr) \circ 
-  \phi(\tau_{G_1})\). Clearly \(x_{G_1} = x_G\) and hence \(k_{G_1} = 
-  k_G\), but it need not be the case that \(\tau_{G_1} = \tau_G\) since 
-  these $\tau$s depend on the corresponding $\sigma$s. Let \(\rho \in 
-  \Sigma_{k_G}\) be such that \(\rho \star \same{\omega(x_G)} = 
-  \sigma_G^{-1} \circ (g^{G_0}_0 \circ\nobreak p^{-1}) \circ 
-  \sigma_{G_1}\); that the right hand side permutation really is on 
-  this form follows from the fact that \(\sigma_G^{-1}\bigl( 
-  g^{G_0}_0(e) \bigr) = \sigma_G^{-1}\bigl( g(e) \bigr) = s(e) + k_G 
-  = \sigma_{G_1}^{-1}\bigl( g^{G_1}_0(e) \bigr)\) for all \(e \in E\) 
-  with \(h(e)=0\) and \(t(e) = v\). Furthermore
-  \begin{align*}
-    a_0 \circ a_1 ={}&
-    \phi(g^{G_0}_0 \circ p^{-1}) \circ 
-      \phi(\sigma_{G_1}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-      \phi(\tau_{G_1}) = \\ ={}&
-    \phi( g^{G_0}_0 \circ p^{-1} \circ \sigma_{G_1} ) \circ
-      \phi(\sigma_{G_1}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-      \phi(\tau_{G_1}) = \\ ={}&
-    \phi\bigl( \sigma_G \circ (\rho \star \same{\omega(x_G)}) \bigr) 
-      \circ \phi(\same{k_G}) \otimes f(x_G) \circ \phi(\tau_{G_1}) 
-      = \\ ={}&
-    \phi(\sigma_G) \circ \phi(\rho) \otimes \phi(\same{\omega(x_G)}) 
-      \circ \phi(\same{k_G}) \otimes f(x_G) \circ \phi(\tau_{G_1}) 
-      = \\ ={}&
-    \phi(\sigma_G) \circ \bigl( \phi(\rho) \circ \phi(\same{k_G}) 
-      \bigr) \otimes \bigl( \phi(\same{\omega(x_G)}) \circ f(x_G) 
-      \bigr) \circ \phi(\tau_{G_1}) = \\ ={}&
-    \phi(\sigma_G) \circ \bigl( \phi(\same{k_G}) \circ \phi(\rho) 
-      \bigr) \otimes \bigl( f(x_G) \circ \phi(\same{\alpha(x_G)}) 
-      \bigr) \circ \phi(\tau_{G_1}) = \\ ={}&
-    \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-      \phi(\rho) \otimes \phi(\same{\alpha(x_G)}) \circ 
-      \phi(\tau_{G_1}) = \\ ={}&
-    \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-      \phi\bigl( (\rho \star \same{\alpha(x_G)}) \circ \tau_{G_1} 
-      \bigr)
-  \end{align*}
-  and it will therefore follow that \(G \propto' a_0 \circ a_1\) once 
-  it has been shown that \(\tau_G = (\rho \star\nobreak 
-  \same{\alpha(x_G)}) \circ \tau_{G_1}\). As before, one finds for 
-  \(e \in E\) with \(h(e)=v\) and \(t(e)=1\) that
-  \begin{equation*}
-    \bigl( (\rho \star \same{\alpha(x_G)}) \circ \tau_{G_1} \bigr)
-      \bigl( s(e) \bigr) =
-    (\rho \star \same{\alpha(x_G)})\bigl( g(e) + k_G \bigr) =
-    g(e) + k_G = 
-    \tau_G\bigl( s(e) \bigr)
-  \end{equation*}
-  whereas for \(e \in E\) with \(h(e)=0\) and \(t(e)=1\),
-  \begin{multline*}
-    \sigma_G\Bigl( \bigl( (\rho \star \same{\alpha(x_G)}) \circ 
-      \tau_{G_1} \bigr)\bigl( s(e) \bigr) \Bigr) =
-    \sigma_G \Bigl( \rho\bigl( (\tau_{G_1} \circ s)(e) \bigr) \Bigr) 
-      = \\ =
-    (g^{G_0}_0 \circ p^{-1} \circ \sigma_{G_1})\bigl( 
-      (\tau_{G_1} \circ s)(e) \bigr) =
-    (g^{G_0}_0 \circ p^{-1})\bigl( g^{G_1}_0(e) \bigr) =
-    g^{G_0}_0(e) = g(e) \text{,}
-  \end{multline*}
-  and hence \(\tau_G = (\rho \star\nobreak \same{\alpha(x_G)}) \circ 
-  \tau_{G_1}\). Thus \(G \propto' a_0 \circ a_1\).
-  
-  A split in $G$ has the form $\bigl( F_l, F_r, \varnothing, \{v\} 
-  \bigr)$ or $\bigl( F_l, F_r, \{v\}, \varnothing \bigr)$. If 
-  $(G_l,G_r)$ is the decomposition induced by a split of the first 
-  kind then \(h(e)=0\) and \(t(e)=1\) for all \(e \in F_l\). Let \(l 
-  = \card{F_l}\), \(m = \coarity(G_r)\), \(n = \arity(G_r)\), and 
-  \(a_r \in \mc{P}(m,n)\) be such that \(G_r \propto' a_r\). 
-  Since \(g(F_l) = [l]\), it follows that \(\sigma_G = \same{l} \star 
-  \sigma_{G_r}\) and hence \(\tau_G = \rho \star \tau_{G_r}\) for 
-  \(\rho = g^{G_l}_0 \circ (s^{G_l}_1)^{-1}\). Thus
-  \begin{align*}
-    G \propto' {}&
-    \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-      \phi(\tau_G) = \\ ={}&
-    \phi(\same{l} \star \sigma_{G_r}) \circ 
-      \phi(\same{l} \star \same{k_{G_r}}) \otimes f(x_G) \circ 
-      \phi(\rho \star \tau_{G_r}) = \\ ={}&
-    \phi(\same{l}) \otimes \phi(\sigma_{G_r}) \circ 
-      \phi(\same{l}) \otimes \phi(\same{k_{G_r}}) \otimes f(x_G) \circ 
-      \phi(\rho) \otimes \phi(\tau_{G_r}) = \\ ={}&
-    \bigl( \phi(\same{l}) \circ \phi(\same{l}) \circ \phi(\rho) 
-      \bigr) \otimes \bigl( \phi(\sigma_{G_r}) \circ 
-      \phi(\same{k_{G_r}}) \otimes f(x_G) \circ \phi(\tau_{G_r}) 
-      \bigr) = \\ ={}&
-    \phi(\rho) \otimes a_r \text{.}
-  \end{align*}
-  
-  If $(G_l,G_r)$ is the decomposition induced by a split of the second 
-  kind then \(h(e)=0\) and \(t(e)=1\) for all \(e \in F_r\). Let \(r 
-  = \card{F_r}\), \(m = \coarity(G_l)\), \(n = \arity(G_l)\), and 
-  \(a_l \in \mc{P}(m,n)\) be such that \(G_l \propto' a_l\). Clearly 
-  \(x_{G_l} = x_G\) and \(k_{G_l} = k_G - r\). Since \(g(e) > m\) for 
-  all \(e \in F_r\), it follows that \(k_G-r < \sigma_G^{-1}\bigl( 
-  g(e) \bigr) \leqslant k_G\) for \(e \in F_r\), and hence
-  \begin{equation*}
-    \sigma_G \circ ( \same{k_G-r} \star \cross{\omega(x_G)}{r} ) =
-    \sigma_{G_l} \star \same{r} \text{.}
-  \end{equation*}
-  Therefore
-  \begin{align*}
-    G \propto'{}&
-    \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-      \phi(\tau_G) = \\ ={}&
-    \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ
-      \phi(\same{k_{G_l}}) \otimes \phi(\cross{r}{\omega(x_G)}) \circ
-      \phi(\same{k_{G_l}}) \otimes \phi(\same{r}) \otimes f(x_G) \circ 
-      \phi(\tau_G) = \\ ={}&
-    \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ \Bigl( 
-      \phi(\same{k_{G_l}}) \circ \phi(\same{k_{G_l}}) \Bigr) \otimes 
-      \Bigl( \phi(\cross{r}{\omega(x_G)}) \circ \phi(\same{r}) \otimes 
-      f(x_G) \Bigr) \circ \phi(\tau_G) 
-      = \\ ={}&
-    \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ \Bigl( 
-      \phi(\same{k_{G_l}}) \circ \phi(\same{k_{G_l}}) \Bigr) \otimes 
-      \Bigl( f(x_G) \otimes \phi(\same{r}) \circ 
-      \phi(\cross{r}{\omega(x_G)}) \Bigr) \circ \phi(\tau_G) 
-      = \\ ={}&
-    \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ
-      \phi(\same{k_{G_l}}) \otimes f(x_G) \otimes \phi(\same{r}) \circ 
-      \phi(\same{k_{G_l}}) \otimes \phi(\cross{r}{\omega(x_G)}) \circ 
-      \phi(\tau_G) 
-      = \\ ={}&
-    \Bigl( \phi(\sigma_{G_l}) \circ \phi(\same{k_{G_l}}) \otimes f(x_G) 
-      \Bigr) \otimes \phi(\same{r}) \circ \phi\Bigl( (\same{k_{G_l}} 
-      \star \cross{r}{\omega(x_G)}) \circ \tau_G \Bigr) 
-  \end{align*}
-  and the wanted result follows once it has been shown that 
-  \((\same{k_{G_l}} \star\nobreak \cross{r}{\omega(x_G)}) \circ 
-  \tau_G = \tau_{G_l} \star \bigl( g^{G_r}_0 \circ\nobreak 
-  (s^{G_r}_1)^{-1} \bigr)\). 
-  
-  To that end, one can as usual prove that
-  \begin{equation*}
-    \tau' = (\same{k_{G_l}} \star \cross{\omega(x_G)}{r}) \circ 
-    \Bigl( \tau_{G_l} \star \bigl( g^{G_r}_0 \circ 
-    (s^{G_r}_1)^{-1} \bigr) \Bigr)
-  \end{equation*}
-  fulfills the condition defining $\tau_G$. If \(e \in F_l\) is such 
-  that \(h(e)=0\) and \(t(e)=1\) then \(s(e) \leqslant n\) and \(g(e) 
-  \leqslant m\), hence \(\sigma_{G_l}^{-1}\bigl( g(e) \bigr) \leqslant 
-  k_{G_l}\). It follows that
-  \begin{equation*}
-    \sigma_G\Bigl( \tau'\bigl( s(e) \bigr) \Bigr) =
-    \sigma_{G_l}\Bigl( \tau_{G_l}\bigl( s(e) \bigr) \Bigr) = g(e)
-    \text{.}
-  \end{equation*}
-  If \(e \in F_l\) is such that \(h(e)=v\) and \(t(e)=1\) then
-  \begin{multline*}
-    \tau'\bigl( s(e) \bigr) =
-    (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\Bigl(
-      \tau_{G_l}\bigl( s(e) \bigr) \Bigr) =
-    (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})
-      \bigl( g(e) + k_{G_l} \bigr) = \\ =
-    \cross{\omega(x_G)}{r}\bigl( g(e) \bigr) + k_{G_l} =
-    g(e) + r + k_{G_l} = g(e) + k_G
-    \text{.}
-  \end{multline*}
-  Finally if \(e \in F_r\) then \(s(e)>n\) and hence
-  \begin{multline*}
-    \sigma_G\Bigl( \tau'\bigl( s(e) \bigr) \Bigr) =
-    \sigma_G\biggl( (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\Bigl(
-      n + \bigl( g^{G_r}_0 \circ (s^{G_r}_1)^{-1} \bigr)\bigl( s(e)-n 
-      \bigr) \Bigr) \biggr) = \\ =
-    \sigma_G\Bigl( (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\bigl(
-      n + g^{G_r}_0(e) \bigr) \Bigr) =
-    \sigma_G\bigl( k_{G_l} + g^{G_r}_0(e) \bigr) = \\ =
-    (\sigma_{G_l} \star \same{r}) \Bigl(
-      ( \same{k_{G_l}} \star \cross{r}{\omega(x_G)} )
-      \bigl( k_{G_l} + g^{G_r}_0(e) \bigr) \Bigr) = \\ =
-    (\sigma_{G_l} \star \same{r}) \bigl( m + g^{G_r}_0(e) \bigr) =
-    m + g^{G_r}_0(e) = g(e)
-   \text{.}
-  \end{multline*}
-  Therefore \(\tau' = \tau_G\) and the split axiom for an evaluation 
-  relation is fulfulled also for the second kind of split 
-  decomposition.
-\end{proof}
-
-
-\begin{lemma} \label{L:EvaluationProperCut}
-  Let a signature \(\Omega = (X,\alpha,\omega)\), and \PROP\ 
-  $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
-  given. If \(G = (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega\) and \(a \in 
-  \mc{P}\) are such that \(G \stackrel{f}{\propto} a\) and 
-  \(\card{V}>3\) then there exists a decomposition $(G_0,G_1)$ of $G$ 
-  induced by a proper cut, and \(a_0,a_1 \in \mc{P}\), such that 
-  \(G_0 \stackrel{f}{\propto} a_0\), \(G_1 \stackrel{f}{\propto} 
-  a_1\), and \(a = a_0 \circ a_1\).
-\end{lemma}
-\begin{proof}
-  \relax
-  [Define a relation $\propto'$ to be equal to 
-  $\stackrel{f}{\propto}$ for graphic \PROP\ expressions that don't 
-  have the same number of vertices as $G$, and define it by 
-  composition over proper cuts for those with the same number of 
-  vertices as $G$. Then show $\propto'$ is an evaluation relation. It 
-  follows that the two evaluation relations are equal.]
-\end{proof}
-
-
-\begin{theorem}
-  For every evaluation seed \(f\colon X \Fpil \mc{P}\), the 
-  corresponding evaluation relation $\stackrel{f}{\propto}$ is univocal.
-\end{theorem}
-\begin{proof}
-  \relax
-  [By induction on $\card{V}$. By Lemma~\ref{L:EvaluationProperCut}, 
-  there are decompositions $(G_0,G_1)$ and $(G_0',G_1')$ of $G$ 
-  giving rise to the values $a$ and $a'$. Use the values on the 
-  intersections.]
-\end{proof}
-
-
-
----
-
-\iffalse
-
-M\"ojliga symboler f\"or evalueringsrelation:
-\vdash
-\dashv
-\models
-\propto
-\leadsto (ringlande pil)
-
-\(G \vdash \sigma \cdot a\)
-
-\(G \dashv \sigma \cdot a\)
-
-\(G \models \sigma \cdot a\)
-
-\(G \propto \sigma \cdot a\)
-
-\(G \leadsto \sigma \cdot a\)
-
-
-De tv\r{a} b\"asta verkar vara $\models$ och $\propto$.
-
-\fi
-
-
----
-
-
-
-\begin{lemma}
-  Let \(\Omega = (X,\alpha,\omega)\) be a signature, let $\mc{P}$ 
-  be a \PROP, and let \(f\colon X \Fpil \mc{P}\) be a map such that 
-  \(f(x) \in \mc{P}\bigl( \omega(x), \alpha(x) \bigr)\) for all 
-  \(x \in X\). Then the identities
-  \begin{enumerate}
-    \item \label{GrafIdent:Sammans.}
-      \(f_{l,n}(G) = f_{l,m}(G') \circ f_{m,n}(G'')\) for every 
-      decomposition $G' \circ G''$ of \(G \in \mc{GPE}_\Omega(l,n)\).
-    \item \label{GrafIdent:Perm.}
-      \(f_{n,n}(G) = \sigma\) if \(G = (V,E,h,g,t,s,D) \in 
-      \mc{GPE}_\Omega(n,n)\) is such that \(V = \{0,1\}\), 
-      where \(\sigma\in\Sigma_n\) is the premutation which satisfies 
-      \(\sigma\bigl( s(e) \bigr) = g(e)\) for all \(e \in E\).
-    \item \label{GrafIdent:Horn.}
-      \(f_{m,n}(G) = \id_l \otimes f\bigl( D(v) \bigr)\) if \(G = 
-      (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega(m,n)\) is such that:
-      \begin{enumerate}
-        \item \(V = \{0,1,v\}\),
-        \item \(g(e) = s(e) \leqslant l\) for all \(e \in E\) such 
-          that \(h(e)=0\) and \(t(e)=1\),
-        \item \(g(e) = s(e) + l\) for all \(e \in E\) such that 
-          \(t(e)=v\),
-        \item \(s(e) = g(e) + l\) for all \(e \in E\) such that 
-          \(h(e)=v\)
-      \end{enumerate}
-      where \(l = n - \alpha\bigl( D(v) \bigr) = m - \omega\bigl( 
-      D(v) \bigr)\).
-  \end{enumerate}
-  uniquely define a family \(\{f_{m,n}\colon \mc{GPE}_\Omega(m,n) 
-  \Fpil \mc{P}(m,n) \}_{m,n\in\N}\) of maps. The element 
-  $f_{\coarity(G),\arity(G)}(G)$ is called the \DefOrd{value} of $G$ 
-  under the assignment $f$.
-\end{lemma}
-\begin{proof}
-  The proof that $f_{m,n}$ is uniquely defined on \(G = 
-  (V,E,h,g,t,s,D)\) with \(m = \coarity(G)\) and \(n = \arity(G)\) is 
-  by induction on $\card{V}$. Note that the number of vertices in a 
-  part of a decomposition is less than or equal to the number of 
-  vertices in the whole, and that equality holds only when the cut is 
-  trivial.
-  
-  There are two base cases. The first is the minimal \(\card{V} = 
-  2\), in which identity~\ref{GrafIdent:Perm.} uniquely defines 
-  the value of $G$ and it only needs to be checked that 
-  identity~\ref{GrafIdent:Sammans.} is satisfied. Thus let \(G' \circ 
-  G''\) be a decomposition of $G$. It follows from the definition of 
-  decomposition that
-  \begin{align*}
-    G' ={}& \bigl( \{0,1\}, E, h, g', t, s', \varnothing \bigr) \\
-    G''={}& \bigl( \{0,1\}, E, h, g'', t, s'', \varnothing \bigr)
-  \end{align*}
-  where \(h\colon E \Fpil \{0\}\) and \(t\colon E \Fpil \{1\}\) are 
-  constant functions, and furthermore \(s' = g''\). The permutations 
-  to which $G$, $G'$, and $G''$ are mapped according to 
-  identity~\ref{GrafIdent:Perm.} are \(\sigma,\sigma',\sigma'' \in 
-  \Sigma_n\) defined for all \(e \in E\) by
-  \begin{align*}
-    \sigma\bigl( s''(e) \bigr) ={}& g'(e) \text{,}\\
-    \sigma'\bigl( s'(e) \bigr) ={}& g'(e) \text{,}\\
-    \sigma''\bigl( s''(e) \bigr) ={}& g''(e) = s'(e)
-  \end{align*}
-  and thus \(f_{n,n}(G) = \sigma = \sigma' \circ \sigma'' = 
-  f_{n,n}(G') \circ f_{n,n}(G'')\), as claimed.
-  
-  The second base case is that \(\card{V} = 3\), in which
-  
-  ---
-  
-  The induction step is used in the case \(\card{V} > 3\), for which 
-  it should be assumed that the identities hold for all expressions 
-  with fewer that $\card{V}$ vertices. 
-  
-  ---
-\end{proof}
-
-
-
-\subsection{The free \PROP}
-
----
-
-The graph underlying one of these expressions is for convenience 
-labelled (each vertex and edge has a ``name''), but usually one only 
-cares about the corresponding unlabelled structures. These can be 
-constructed as isomorphism classes of labelled expressions.
-
-\begin{definition}
-  Two graphic \PROP\ expressions \(G = (V,E,h,g,t,s,D)\) and 
-  \(H = (V',E',h',g',t',s',D')\) are said to be 
-  \DefOrd{isomorphic}, symbolically \(G \simeq H\), if there exists 
-  bijections \(\phi\colon V \Fpil V'\) and \(\psi\colon E \Fpil E'\) 
-  such that
-  \begin{align*}
-    \phi(0) ={}& 0  &  \phi(1) ={}& 1 \\
-    h' \circ \psi ={}& \phi \circ h \text{,}&
-    g' \circ \psi ={}& g \text{,}\\
-    t' \circ \psi ={}& \phi \circ t \text{,}&
-    s' \circ \psi ={}& s \text{,}\\
-    D' \circ \phi ={}& D \text{.}
-  \end{align*}
-  Denote by \(\widetilde{\mc{GPE}}_\Omega(m,n)\) the set of 
-  isomorphism classes of \(\mc{GPE}_\Omega(m,n)\).
-\end{definition}
-
----
-
-When drawing these (unlabelled) graphic expressions, some additional 
-simplifications are often possible. First, one may express the head 
-and tail indices at inner vertices using the cyclic order of edges 
-around these vertices. Following the pattern from 
-page~\ref{Sid:PROP-diagram}ff, one would divide the circumference of 
-each vertex into two parts, where one is for incoming (incident at 
-the head) edges and the other part is for outgoing (incixent at the 
-tail) edges, such that the index of incoming edges increases in the 
-clockwise direction and the index of outgoing edges increases in the 
-counterclockwise direction. 
-% Second, one may similarly imagine a frame 
-% around the diagram and divide its circumference in one 
-% incoming and one outgoing part, place the input and output 
-% vertices on this circumflerence, and order them after increasing 
-% indices. 
-Second, 
-thanks to the acyclicity one can fix a main arrow direction in the 
-diagram (right to left in the examples above) and arrange the 
-vertices so that edges follow this direction; this lets one skip 
-drawing arrowheads on edges. Third, it is possible to use vertex 
-shapes rather than explicit annotations to encode the $D$ map into 
-the diagram, and symbols with different arity or coarity may share 
-the same shape as one can anyway tell them apart by the number of 
-incoming and outgoing edges.
-
-% ATT G\"ORA:
-% Rita diagram som visar de olika f\"orenklingsstegen.
-
-As it turns out, operations can be defined on 
-$\widetilde{\mc{GPE}}_\Omega$ that turn it into the free \PROP\ on 
-the signature $\Omega$. Graphic expressions give a clearer presentation 
-than traditional formulae in terms of products and composition do, 
-because the redundancy in the representation is more regular and 
-easier to factor out.
-
-
----
-
-
+% 
+% 
+% \subsection{Graphic \PROP\ expressions}
+% 
+% As in quite a lot of universal algebra, the right way to get a grip 
+% on an algebraic structure is to construct a useful model of 
+% expressions for that structure, and then conclude that this model is 
+% in fact the free object for this kind of structure.
+% 
+% \begin{definition}
+%   A \DefOrd{\PROP\ signature} is a tuple $(X,\alpha,\omega)$, where 
+%   $X$ is a set (the set of symbols) and \(\alpha,\omega\colon X \Fpil 
+%   \N\) are functions. $\alpha(x)$ is called the \DefOrd{arity} of the 
+%   symbol \(x \in X\) and $\omega(x)$ is called the \DefOrd{coarity} 
+%   of the symbol \(x \in X\).
+%   
+%   A \DefOrd{graphic \PROP\ expression} on the signature 
+%   $(X,\alpha,\omega)$ is a tuple
+%   \begin{equation}
+%     G = (V,E,h,g,t,s,D)
+%   \end{equation}
+%   where
+%   \begin{itemize}
+%     \item
+%       $V$ is a finite set, called the set of \emDefOrd{vertices}. \(V 
+%       \owns 0,1\), where $0$ is called the \emDefOrd{output vertex} 
+%       and $1$ is called the \emDefOrd{input vertex}. Elements of \(V 
+%       \setminus \{0,1\}\) are called \emDefOrd{inner vertices}.
+%     \item
+%       $E$ is a finite set, called the set of \emDefOrd{edges}.
+%     \item
+%       \(h\colon E \Fpil V \setminus \{1\}\) is called the 
+%       \emDefOrd{head} map. \(t\colon E \Fpil V \setminus \{0\}\) is 
+%       called the \emDefOrd{tail} map. Define the input $d^-(v)$ and 
+%       output $d^+(v)$ valencies of a vertex $v$ by
+%       \begin{align*}
+%         d^-(v) ={}& 
+%           \card[\Big]{ \setOf[\big]{ e \in E }{ h(e) = v } }
+%           \text{,}\\
+%         d^+(v) ={}& 
+%           \card[\Big]{ \setOf[\big]{ e \in E }{ t(e) = v } }
+%           \text{.}
+%       \end{align*}
+%     \item
+%       \(g,s\colon E \Fpil \Zp\) are 
+%       called the \emDefOrd{head index} and \emDefOrd{tail index} 
+%       maps.
+%     \item
+%       \(D\colon V \setminus \{0,1\} \Fpil X\) is called the 
+%       \emDefOrd{annotation}.
+%   \end{itemize}
+%   and these satisfy
+%   \begin{enumerate}
+%     \item
+%       The tuple $(V,E,h,t)$ is a directed acyclic graph, i.e., there 
+%       is no sequence \(e_1,\dotsc,e_n \in E\) such that 
+%       \(h(e_i)=t(e_{i+1})\) for \(i=1,\dotsc,n-1\) and 
+%       \(h(e_n)=t(e_1)\).
+%     \item
+%       Head and head index uniquely identifies an edge, as does the 
+%       combination of tail and tail index; if \(e_1,e_2 \in E\) satisfy 
+%       \(h(e_1)=h(e_2)\) and \(g(e_1) = g(e_2)\) then \(e_1=e_2\); 
+%       similarly if \(e_1,e_2 \in E\) satisfy \(t(e_1)=t(e_2)\) and 
+%       \(s(e_1) = s(e_2)\) then \(e_1=e_2\).
+%     \item
+%       Head indices are assigned from $1$ and up; if \(e_1 \in E\) is 
+%       such that \(g(e_1)>1\) then there exists some \(e_2 \in E\) such 
+%       that \(h(e_2)=h(e_1)\) and \(g(e_2) = g(e_1)-1\). Similarly 
+%       tail indices are assigned from $1$ and up; if \(e_1 \in E\) is 
+%       such that \(s(e_1)>1\) then there exists some \(e_2 \in E\) such 
+%       that \(t(e_2)=t(e_1)\) and \(s(e_2) = s(e_1)-1\).
+%     \item
+%       Arities and coarities of the annotations agree with the 
+%       in-valencies and out-valencies respectively of the inner vertices; 
+%       \(d^-(v) = \alpha\bigl( D(v) \bigr)\) and 
+%       \(d^+(v) = \omega\bigl( D(v) \bigr)\) for every \(v \in V 
+%       \setminus \{0,1\}\).
+%   \end{enumerate}
+%   The valency $d^+(1)$ of the input vertex $1$ is called the 
+%   \DefOrd{arity} of the expression $G$ and is denoted $\arity(G)$. The 
+%   valency \(d^-(0)\) of the output vertex $0$ is called the 
+%   \DefOrd{coarity} of the expression $G$ and is denoted $\coarity(G)$.
+%       
+%   Denote by \(\mc{GPE}_{(X,\alpha,\omega)}(m,n)\) the set of all 
+%   graphic \PROP\ expressions on the signature $(X,\alpha,\omega)$ 
+%   which have \(V,E \subset \N\), coarity $m$, and arity $n$.
+% \end{definition}
+% 
+% 
+% The most elementary expressions are those corresponding to just one 
+% operation, with inputs and outputs connected to the input and output 
+% vertices in the same order as to the operation vertex. It will turn 
+% out these are the only expressions which one explicitly needs to 
+% assign a value to, so it is useful to have a name for them.
+% 
+% \begin{definition}
+%   A graphic \PROP\ expression \(G = (V,E,h,g,t,s,D)\) said to be 
+%   \DefOrd{elementary} if \(V = \{0,1,v\}\) and it for all \(e \in E\) 
+%   holds that
+%   \begin{gather*}
+%     g(e)=s(e)\text{,}\\
+%     h(e)=0 \iff t(e)=v\text{,}\\
+%     h(e)=v \iff t(e)=1\text{.}
+%   \end{gather*}
+%   The annotation $D(v)$ is called the \DefOrd{nucleus} of $G$.
+%   
+%   A graphic \PROP\ expression \(G = (V,E,h,g,t,s,D)\) said to be a 
+%   \DefOrd{permutation expression} if \(V = \{0,1\}\). The 
+%   permutation \DefOrd{expressed by $G$} is the \(\sigma \in 
+%   \Sigma_{\card{E}}\) which satisfies \(g = \sigma \circ s\).
+%   
+%   For any \(v \in V\), the restriction of $g$ to $\setOf[\big]{ 
+%   e \in E }{ h(e) = v }$ will be denoted $g^G_v$ and the restriction 
+%   of $s$ to $\setOf[\big]{ e \in E }{ t(e) = v }$ will be denoted 
+%   $s^G_v$.
+% \end{definition}
+% 
+% The point of naming particular restrictions of the head and tail 
+% index maps is that the \emph{inverses} of these maps are frequently 
+% useful in explicit expressions, e.g.~for various permutations. The 
+% point of having the graphic \PROP\ expression be a part of the symbol 
+% is that an argument may involve several such expressions.
+% 
+% Values for more composite expressions can be assigned by decomposing 
+% them into elementary expressions. The most important decomposition is 
+% the \emph{cut}, which goes across edges.
+% 
+% \begin{definition}
+%   A \DefOrd{cut} in a graphic \PROP\ expression \(G = 
+%   (V,E,h,g,t,s,D)\) is a bipartition \(W_0 \cup W_1\) of $V \setminus 
+%   \{0,1\}$ such that no \(e \in E\) satisfies \(h(e) \in W_1\) and 
+%   \(t(e) \in W_0\). The cut is said to be \DefOrd{non-trivial} if 
+%   $W_0$ and $W_1$ are both nonempty.
+%   
+%   An edge \(e \in E\) is said to be a \emDefOrd{cut edge} if \(h(e) 
+%   \in W_0 \cup \{0\}\) and \(t(e) \in W_1 \cup \{1\}\). Let $E_c$ be 
+%   the set of all cut edges. A cut is said to be 
+%   \DefOrd[*{ordered cut}]{ordered} if it is given as $(W_0,W_1,p)$ 
+%   where \(p\colon E_c \Fpil \bigl[ \card{E_c} \bigr]\) is a bijection. 
+%   The \emDefOrd[*{graphic expression decomposition}]{decomposition} 
+%   of $G$ induced by the ordered cut $(W_0,W_1,p)$ is $(G',G'')$, 
+%   where \(G' = (V',E',h',g',t',s',D')\) and 
+%   \(G'' = (V'',E'',h'',g'',t'',s'',D'')\) are defined by
+%   \begin{align*}
+%     V' ={}& W_0 \cup \{0,1\} &   V'' ={}& W_1 \cup \{0,1\}\\
+%     E' ={}& \setOf[\big]{e \in E}{h(e) \in W_0 \cup \{0\}} &
+%     E'' ={}& \setOf[\big]{e \in E}{t(e) \in W_1 \cup \{1\}} 
+%       \displaybreak[0]\\
+%     h' ={}& \restr{h}{E'} & t'' ={}& \restr{t}{E''}\\
+%     t'(e) ={}& \begin{cases}
+%       1& \text{if \(e \in E_c\),}\\
+%       t(e)& \text{otherwise,}
+%     \end{cases} &
+%     h''(e) ={}& \begin{cases}
+%       0& \text{if \(e \in E_c\),}\\
+%       h(e)& \text{otherwise,}
+%     \end{cases} \displaybreak[0]\\
+%     g' ={}& \restr{g}{E'} & s'' ={}& \restr{s}{E''} 
+%       \displaybreak[0]\\
+%     s'(e) ={}& \begin{cases}
+%       p(e)& \text{if \(e \in E_c\),}\\
+%       s(e)& \text{otherwise,}
+%     \end{cases} &
+%     g''(e) ={}& \begin{cases}
+%       p(e)& \text{if \(e \in E_c\),}\\
+%       g(e)& \text{otherwise,}
+%     \end{cases} \\
+%     D' ={}& \restr{D}{W_0} & 
+%     D'' ={}& \restr{D}{W_1} \text{.}
+%   \end{align*}
+% \end{definition}
+% 
+% Obseve that a decomposition is such that \(V' \cap V'' = \{0,1\}\) 
+% and \(E' \cap E'' = E_c\). What happens is effectively that the cut 
+% edges are ordered according to $p$, cut in half, and a new input and 
+% output vertex is created for the edges to attach to.
+% 
+% An alternative method of decomposing a \PROP\ expression is to split 
+% the existing input and output vertices in half, provided that there 
+% then are no other connections between the resulting halves. This is 
+% the idea behind the next concept.
+% 
+% 
+% \begin{definition}
+%   A \DefOrd{split} in a graphic \PROP\ expression \(G = 
+%   (V,E,h,g,t,s,D)\) is a tuple $(F_l,F_r,W_l,W_r)$, where \(F_l \cup 
+%   F_r\) is a bipartition of $E$ and \(W_l \cup W_r\) is a bipartition 
+%   of $V \setminus \{0,1\}$, such that:
+%   \begin{enumerate}
+%     \item
+%       if \(e \in F_l\) then \(h(e) \in W_l \cup \{0\}\) and \(t(e) 
+%       \in W_l \cup\{1\}\),
+%     \item
+%       if \(e \in F_r\) then \(h(e) \in W_r \cup \{0\}\) and \(t(e) 
+%       \in W_r \cup\{1\}\),
+%     \item
+%       if \(e_l \in F_l\) and \(e_r \in F_r\) are such that \(h(e_l) = 
+%       h(e_r) = 0\) then \(g(e_l) < g(e_r)\), and
+%     \item
+%       if \(e_l \in F_l\) and \(e_r \in F_r\) are such that \(t(e_l) = 
+%       t(e_r) = 0\) then \(s(e_l) < s(e_r)\).
+%   \end{enumerate}
+%   Let \(k = \card[\big]{\setOf{e \in F_l}{h(e)=0}}\) and 
+%   \(l = \card[\big]{\setOf{e \in F_l}{t(e)=1}}\). The 
+%   \emDefOrd[*{graphic expression decomposition}]{decomposition} 
+%   of $G$ induced by the split $(F_l,F_r,W_l,W_r)$ is $(G',G'')$, 
+%   where \(G' = (V',F_l,h',g',t',s',D')\) and 
+%   \(G'' = (V'',F_r,h'',g'',t'',s'',D'')\) are defined by
+%   \begin{align*}
+%     V' ={}& W_0 \cup \{0,1\} &   V'' ={}& W_1 \cup \{0,1\}\\
+%     h' ={}& \restr{h}{F_l} & h'' ={}& \restr{h}{F_r}
+%       \displaybreak[0]\\
+%     t' ={}& \restr{t}{F_l} & t'' ={}& \restr{t}{F_r}
+%       \displaybreak[0]\\
+%     g' ={}& \restr{g}{F_l} & 
+%       g''(e) ={}& \begin{cases}
+%         g(e)-k& \text{if \(h''(e)=0\),}\\
+%         g(e)& \text{otherwise,}
+%       \end{cases}
+%       \displaybreak[0]\\
+%     s' ={}& \restr{s}{F_l} & 
+%       s''(e) ={}& \begin{cases}
+%         s(e)-l& \text{if \(t''(e)=1\),}\\
+%         s(e)& \text{otherwise,}
+%       \end{cases}\\
+%     D' ={}& \restr{D}{W_l} & 
+%     D'' ={}& \restr{D}{W_r} \text{.}
+%   \end{align*}
+% \end{definition}
+% 
+% In other words, all that happens in the decomposition induced by a 
+% split, apart from the fact that the underlying graph is split into 
+% two, is that the head indices at the output vertex and tail indices 
+% at the input vertex are adjusted in the right component to assure 
+% that they start at $0$.
+% 
+% 
+% \begin{lemma} \label{L:UppdelningOrdning3}
+%   Let $G$ be an arbitrary graphic \PROP\ expression on the form 
+%   $\bigl( \{0,1,v\}, E,h,g,t,s,D \bigr)$. Let \(m = \coarity(G)\), 
+%   \(n = \arity(G)\), and \(k = m - d^+(v) = n - d^-(v)\). Then there 
+%   exist unique \(\sigma \in \Sigma_m\) and \(\tau \in \Sigma_n\) such 
+%   that:
+%   \begin{enumerate}
+%     \item \label{C1:L:UppdelningOrdning3}
+%       If \(e \in E\) is such that \(h(e)=0\) and \(t(e)=1\) then 
+%       \(g(e) = \sigma( \tau( s(e) ) )\).
+%     \item \label{C2:L:UppdelningOrdning3}
+%       If \(e \in E\) is such that \(h(e)=0\) and \(t(e)=v\) then 
+%       \(g(e) = \sigma\bigl( s(e) +\nobreak k \bigr)\).
+%     \item \label{C3:L:UppdelningOrdning3}
+%       If \(e \in E\) is such that \(h(e)=v\) and \(t(e)=1\) then 
+%       \(g(e) = \tau\bigl( s(e) \bigr) - k\).
+%     \item \label{C4:L:UppdelningOrdning3}
+%       $\sigma$ is strictly increasing on $[k]$.
+%   \end{enumerate}
+%   Moreover, these data determine a decomposition
+%   \begin{equation*}
+%     \fbox{\(\begin{array}{ccc}
+%       G_0 & \fbox{\(\begin{array}{c} G_2 \\ G_3 \end{array}\)} & G_1
+%     \end{array}\)}
+%   \end{equation*}
+%   of $G$ where $G_0$ is a permutation expression for $\sigma$, $G_1$ 
+%   is a permutation expression for $\tau$, $G_2$ is a permutation 
+%   expression for $\same{k}$, and $G_3$ is an elementary expression 
+%   with nucleus $D(v)$.
+%   
+%   Concretely, let \(p_0 = \sigma^{-1} \circ g^G_0\) and \(p_1 = \tau 
+%   \circ s^G_1\). 
+%   Let \(F_l = \setOf[\big]{ e \in E }{ \text{\(h(e)=0\) and 
+%   \(t(e)=1\)} }\), and let \(F_r = E \setminus F_l\). Then 
+%   $\bigl( \varnothing, \{v\}, p_0 \bigr)$ is an ordered cut in $G$ 
+%   which induces a decomposition $(G_0,G_{231})$ and $\bigl( \{v\}, 
+%   \varnothing, p_1 \bigr)$ is an ordered cut in $G$ which induces a 
+%   decomposition $(G_{023},G_1)$. The same $\bigl( \varnothing, \{v\}, 
+%   p_0 \bigr)$ is an ordered cut in $G_{023}$ which induces a 
+%   decomposition $(G_0,G_{23})$ and $\bigl( \{v\}, \varnothing, p_1 
+%   \bigr)$ is an ordered cut in $G_{231}$ which induces the 
+%   decomposition $(G_{23},G_1)$. Finally this $G_{23}$ has a split 
+%   $\bigl( F_l, F_r, \varnothing, \{v\} \bigr)$ which induces a 
+%   decomposition $(G_2,G_3)$.
+% \end{lemma}
+% \begin{proof}
+%   By the acyclicity of $G$, every \(e \in E\) with \(t(e)=v\) has 
+%   \(h(e) = 0\) and thus condition~\ref{C2:L:UppdelningOrdning3} 
+%   defines $\sigma(i)$ for all \(i>k\). 
+%   Condition~\ref{C4:L:UppdelningOrdning3} then completes the 
+%   definition of $\sigma$. Condition~\ref{C1:L:UppdelningOrdning3} can 
+%   then be restated as: if \(e \in E\) is such that \(h(e) \neq v\) and 
+%   \(t(e)=1\) then \(\sigma^{-1}\bigl( g(e) \bigr) = \tau\bigl( s(e) 
+%   \bigr)\). Together with condition~\ref{C3:L:UppdelningOrdning3} 
+%   this completes the definition of $\tau$, and the piecewise 
+%   definition cannot make the function noninjective since 
+%   \(\sigma^{-1}\bigl( g(e) \bigr) \leqslant k\) for all \(e \in E\) 
+%   with \(h(e) = 0\) and \(t(e) = 1\).
+%   
+%   Let the graphic \PROP\ expressions $G_0$, $G_{231}$, $G_{023}$, and 
+%   $G_1$ be defined by the decompositions $(G_0,G_{231})$ and 
+%   $(G_{023},G_1)$ induced by the cuts $\bigl( \varnothing, \{v\}, p_0 
+%   \bigr)$ and $\bigl( \{v\}, \varnothing, p_1 \bigr)$ respectively. 
+%   It is then obvious that $G_0$ is a permutation expression 
+%   corresponding to $\sigma$ and $G_1$ is a permutation expression 
+%   corresponding to $\tau$. Furthermore $G_{231}$ differs from $G$ 
+%   only in the value of $g$ and $G_{023}$ differs from $G$ only in the 
+%   value of $s$, so $\bigl( \varnothing, \{v\}, p_0 \bigr)$ is an 
+%   ordered cut also in $G_{023}$ and $\bigl( \{v\}, \varnothing, p_1 
+%   \bigr)$ is an ordered cut also in $G_{231}$. Let $(G_0',G_{23})$ 
+%   and $(G_{23}',G_1')$ be the corresponding decompositions. A 
+%   comparison using the definition immediately shows \(G_0' = G_0\) 
+%   and \(G_1' = G_1\), as claimed. Since cutting away $G_0$ only 
+%   changes $g$ to conform with $p_0$ and cutting away $G_1$ only 
+%   changes $s$ to conform with $p_1$, it follows that these operations 
+%   commute and \(G_{23} = G_{23}' = \bigl( \{0,1,v\}, E, h, g', t, s', 
+%   D \bigr)\), where
+%   \begin{align*}
+%     g'(e) ={}& \begin{cases}
+%       p_0(e)& \text{if \(h(e) = 0\),}\\
+%       p_1(e) - k& \text{if \(h(e) = v\),}
+%     \end{cases} \\
+%     s'(e) ={}& \begin{cases}
+%       p_1(e)& \text{if \(t(e) = 1\),}\\
+%       p_0(e) - k& \text{if \(t(e) = v\).}
+%     \end{cases}
+%   \end{align*}
+%   Observe that \(p_0(e) = p_1(e)\) for all \(e \in F_l\) and that 
+%   \(p_0(e) \leqslant k\) if and only if \(e \in F_l\). Hence $G_{23}$ 
+%   has a split $\bigl( F_l, F_r, \varnothing, \{v\} \bigr)$ and the  
+%   induced decomposition $(G_2,G_3)$ is such that $G_2$ is a 
+%   permutation expression where head and tail indices are always 
+%   equal, i.e., it expresses $\same{k}$. Furthermore \(\GV(G_3) = 
+%   \{0,1,v\}\), an edge in it goes from $1$ to $v$ or from $v$ to $0$, 
+%   and the head index of an edge is always equal to the tail index. 
+%   Hence $G_3$ is an elementary expression, and the nucleus is $D(v)$.
+% \end{proof}
+% 
+% 
+% \begin{definition}
+%   Let a signature $\Omega$ and a \PROP\ $\mc{P}$ be given. A relation 
+%   $\propto$ which relates $\mc{GPE}_\Omega(m,n)$ to $\mc{P}(m,n)$ for 
+%   all \(m,n \in \N\) is said to be an \DefOrd{evaluation relation} if 
+%   it satisfies the following conditions:
+%   \begin{enumerate}
+%     \item
+%       If $G$ has a decomposition $(G_0,G_1)$ induced by some 
+%       cut, \(G_0 \propto a_0\), and \(G_1 \propto a_1\) then 
+%       \(G \propto a_0 \circ a_1\).
+%     \item
+%       If $G$ has a decomposition $(G_l,G_r)$ induced by some 
+%       split, \(G_l \propto a_l\), and \(G_r \propto a_r\) then 
+%       \(G \propto a_l \otimes a_r\).
+%     \item \label{Villk:Permutation}
+%       If $G$ is a permutation expression then \(G \propto 
+%       \phi_n(\sigma)\), where $\sigma$ is the permutation expressed 
+%       by $G$.
+%   \end{enumerate}
+%   
+%   A function \(f\colon X \Fpil \mc{P}\) such that 
+%   \(f(x) \in \mc{P}\bigl( \omega(x), \alpha(x) \bigr)\) for all 
+%   \(x \in X\) is called an \DefOrd{evaluation seed}. For any 
+%   evaluation seed $f$, denote by $\stackrel{f}{\propto}$ the minimal 
+%   evaluation relation which satisfies \(G \stackrel{f}{\propto} 
+%   f(x)\) for every elementary \(G \in \mc{GPE}_\Omega\) with nucleus 
+%   \(x \in X\).
+% \end{definition}
+% 
+% The purpose of these definitions is to define an evaluation 
+% \emph{function} which assigns a value to every graphic \PROP\ 
+% expression, and as it happens that evaluation function will be 
+% $\stackrel{f}{\propto}$, but since the univocality of this function 
+% is not obvious from its definition, it is for the time being 
+% necessary to view it as possibly multivalued, and then it is a mere 
+% relation from $\mc{GPE}_\Omega(m,n)$ to $\mc{P}(m,n)$. What is 
+% obvious from the definition is however that the intersection of a 
+% family of evaluation relations is again an evaluation relation, and 
+% from this follows that $\stackrel{f}{\propto}$ exists and is unique. 
+% The next step is to show that it assigns at least one value to every 
+% graphical \PROP\ expression.
+% 
+% 
+% \begin{lemma}
+%   If the domain of an evaluation relation contains all elementary 
+%   expressions, then all graphic \PROP\ expressions are in the domain 
+%   of that relation.
+% \end{lemma}
+% \begin{proof}
+%   The proof is by induction on the number of vertices. Let \(G = 
+%   (V,E,h,g,t,s,D)\) be an arbitrary graphic \PROP\ expression. If 
+%   \(\card{V}=2\) then $G$ is a permutation expression and as such 
+%   by condition~\ref{Villk:Permutation} related to a \PROP\ element.
+%   
+%   If \(\card{V} = 3\) then \(V = \{0,1,v\}\) for some $v$. Let
+%   \begin{align*}
+%     E_0 ={}& \setOf[\big]{ e \in E }{ 
+%       \text{\(h(e)=0\) and \(t(e)=v\)} }\text{,}\\
+%     E_1 ={}& \setOf[\big]{ e \in E }{ 
+%       \text{\(h(e)=v\) and \(t(e)=1\)} }\text{,}\\
+%     E_2 ={}& \setOf[\big]{ e \in E }{ 
+%       \text{\(h(e)=0\) and \(t(e)=1\)} }\text{.}
+%   \end{align*}
+%   Also let \(n_i = \card{E_i}\) for \(i=0,1,2\). Then \(d^-(0) = 
+%   n_2+n_0\), \(d^+(1) = n_2+n_1\), \(d^+(v) = n_0\), and 
+%   \(d^-(v)=n_1\). Let \(p_0 \colon E_2 \cup E_0 \Fpil [n_2 +\nobreak 
+%   n_0]\) and \(p_1 \colon E_2 \cup E_1 \Fpil [n_2 +\nobreak n_1]\) be 
+%   the bijections which satisfy:
+%   \begin{enumerate}
+%     \item
+%       If \(e_1,e_2 \in E_2\) are such that \(s(e_1)<s(e_2)\) then 
+%       \(p_1(e_1)<p_1(e_2)\).
+%     \item
+%       If \(e_1,e_2 \in E_1\) are such that \(g(e_1)<g(e_2)\) then 
+%       \(p_1(e_1)<p_1(e_2)\).
+%     \item
+%       If \(e_1 \in E_1\) and \(e_2 \in E_2\) then 
+%       \(p_1(e_1)>p_1(e_2)\).
+%     \item
+%       \(p_1(e)=p_2(e)\) for all \(e \in E_2\).
+%     \item
+%       If \(e_1,e_2 \in E_0\) are such that \(s(e_1)<s(e_2)\) then 
+%       \(p_2(e_1)<p_2(e_2)\).
+%   \end{enumerate}
+%   Now $(\{v\},\varnothing,p_1)$ is an ordered cut in $G$ and thus it 
+%   induces a decomposition $(G_1,G_2)$, where $G_2$ is a permutation 
+%   expression and thus related to the \PROP\ element 
+%   $\phi_{n_2+n_1}(\sigma)$ for \(\sigma^{-1} = s \circ p_1^{-1}\). 
+%   Furthermore \((\varnothing,\{v\},p_2)$ is an ordered cut in $G_1$ 
+%   and thus it induces a decomposition $(G_3,G_4)$, where $G_3$ is a 
+%   permutation expression and thus related to the \PROP\ element 
+%   $\phi_{n_2+n_0}(\tau)$ for \(\tau = g \circ p_2^{-1}\). 
+%   Finally, $(E_2, E_0 \cup\nobreak E_1, \varnothing, \{v\})$ is a 
+%   split in $G_4$ and thus it induces a decomposition $(G_5,G_6)$ of 
+%   that expression. \(G_5 \propto \phi_{n_2}(\same{n_2})\) by 
+%   construction, whereas $G_6$ is elementary and thus \(G_6 \propto a\) 
+%   for some element $a$ by assumption. Hence \(G_4 \propto \id_{n_2} 
+%   \otimes a\) and \(G \propto \tau \cdot (\id_{n_2} \otimes\nobreak 
+%   a) \cdot \sigma\).
+%   
+%   If \(\card{V} > 3\) then we enter the induction step. Let 
+%   $(W_0,W_1)$ be a nontrivial cut in $G$\Ldash such a cut always 
+%   exist, because the acyclicity of $G$ always makes it possible to 
+%   pick \(W_0 = \{v\}\), where \(v \in V\) is such that if \(t(e)=v\) 
+%   for some \(e \in E\) then \(h(e)=0\)\Dash and let $(G_0,G_1)$ be 
+%   some decomposition induced by this cut. Then by the induction 
+%   hypothesis there exists \PROP\ elements $a_0$ and $a_1$ such that 
+%   \(G_0 \propto a_0\) and \(G_1 \propto a_1\), and hence \(G \propto 
+%   a_0 \circ a_1\). This completes the induction.
+% \end{proof}
+% 
+% The next couple of lemmas are about proving univocality of 
+% $\stackrel{f}{\propto}$. This is done step by step, considering one 
+% specific class of expressions after another. The typical method used 
+% is to define a $\propto'$ relation which is exactly like 
+% $\stackrel{f}{\propto}$ except in the particular class one considers 
+% at this step, where instead an alternative definition is given 
+% approximates $\stackrel{f}{\propto}$ from below. Then it is shown that 
+% $\propto'$ is also an evaluation relation, from which follows that it 
+% actually is equal to $\stackrel{f}{\propto}$.
+% 
+% 
+% \begin{lemma} \label{L:EntydighetOrdning2}
+%   Let a signature \(\Omega = (X,\alpha,\omega)\), and \PROP\ 
+%   $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
+%   given. If \(G = (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega\) and 
+%   \(a \in \mc{P}\) are such that \(G \stackrel{f}{\propto} a\) and 
+%   \(\card{V}=2\) then \(a = \phi_{\card{E}}(g \circ\nobreak s^{-1})\).
+% \end{lemma}
+% \begin{proof}
+%   Define the relation $\propto'$ from $\mc{GPE}_\Omega$ to $\mc{P}$ by
+%   \begin{equation*}
+%     (V,E,h,g,t,s,D) \propto' a \quad\Longrightarrow\quad \begin{cases}
+%       (V,E,h,g,t,s,D) \stackrel{f}{\propto} a&
+%         \text{if \(\card{V}>2\),}\\
+%       a = \phi_{\card{E}}(g \circ s^{-1})&
+%         \text{if \(\card{V}=2\).}
+%     \end{cases}
+%   \end{equation*}
+%   Since the definition of $\propto'$ for \(\card{V}=2\) is exactly 
+%   what is required for an evaluation relation, it follows that the 
+%   permutation condition is fulfilled. Since furthermore $\propto'$ 
+%   for \(\card{V}>2\) is equal to $\stackrel{f}{\propto}$, it follows 
+%   that also the cut and split conditions for an evaluation condition 
+%   are fulfilled for decompositions of expressions with more than two 
+%   vertices. What remains is therefore to verify these for expressions 
+%   with exactly two vertices, i.e., for permutation expressions.
+%   
+%   Let \(G = \bigl( \{0,1\}, E,h,g,t,s,D) \in \mc{GPE}_\Omega(n,n)\) and 
+%   an ordered cut $(\varnothing,\varnothing,p)$ of $G$ be given. The 
+%   corresponding decomposition is $(G_0,G_1)$ where \(G_0 = 
+%   \bigl( \{0,1\}, E,h,g,t,p,D)\) and \(G_1 = \bigl( \{0,1\}, 
+%   E,h,p,t,s,D)\). The only solution to \(G_0 \propto' a_0\) is \(a_0 
+%   = \phi_n(g \circ\nobreak p^{-1})\) and the only solution to 
+%   \(G_1 \propto' a_1\) is \(a_1 = \phi_n(p \circ\nobreak s^{-1})\). 
+%   Hence \(G \propto \phi_n(g \circ\nobreak s^{-1}) = 
+%   \phi_n(g \circ\nobreak p^{-1} \circ\nobreak p \circ\nobreak s^{-1}) = 
+%   \phi_n(g \circ\nobreak p^{-1}) \circ \phi_n(p \circ\nobreak s^{-1}) 
+%   = a_0 \circ a_1\) by the permutation composition \PROP\ axiom, and 
+%   thus $\propto'$ fulfils the cut condition.
+%   
+%   Let \(G = \bigl( \{0,1\}, E,h,g,t,s,D) \in \mc{GPE}_\Omega(n,n)\) 
+%   and a split $(F_l, F_r, \varnothing, \varnothing)$ of $G$ be given. 
+%   Let \(k = \card{F_l}\). Then \(g(e),s(e) \leqslant k\) for all \(e 
+%   \in F_l\) and \(g(e),s(e) > k\) for all \(e \in F_r\). Let \(\sigma 
+%   \in \Sigma_k\) be defined by \(g(e) = \sigma\bigl( s(e) \bigr)\) 
+%   for all \(e \in F_l\), and let \(\tau \in \Sigma_{n-k}\) be defined 
+%   by \(g(e) = \tau\bigl( s(e) -\nobreak k \bigr) + k\) for all \(e 
+%   \in F_r\). The permutation expressed by $G$ is then $\sigma \star 
+%   \tau$ and hence \(G \propto' \phi_n(\sigma \star\nobreak \tau) = 
+%   \phi_k(\sigma) \otimes \phi_{n-k}(\tau)\) by the permutation 
+%   juxtaposition \PROP\ axiom. The decomposition $(G_l,G_r)$ induced by 
+%   the split is by definition such that \(G_l = \bigl( \{0,1\}, F_l, 
+%   0, g_l, 1, s_l, D \bigr)\) and \(G_r = \bigl( \{0,1\}, F_r, 0, g_r, 1, 
+%   s_r, D \bigr)\), where \(g_l(e) = g(e)\) for all \(e \in F_l\), 
+%   \(s_l(e) = s(e)\) for all \(e \in F_l\), \(g_r(e) = g(e)-k\) for all 
+%   \(e \in F_r\), and \(s_r(e) = s(e)-k\) for all \(e \in F_r\). Hence 
+%   \(g_l \circ s_l^{-1} = \sigma\) and \(a_l = \phi_k(\sigma)\) is the 
+%   only solution to \(G_l \propto' a_l\). Similarly \(g_r \circ s_r^{-1} 
+%   = \tau\) and \(a_r = \phi_{n-k}(\tau)\) is the only solution to 
+%   \(G_r \propto' a_r\). Thus $\propto'$ fulfils the split condition.
+% \end{proof}
+% 
+% 
+% \begin{lemma}
+%   Let a signature \(\Omega = (X,\alpha,\omega)\), a \PROP\ 
+%   $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
+%   given. The minimial evaluation relation $\stackrel{f}{\propto}$ is 
+%   univocal for all \(G \in \mc{GPE}_\Omega\) which have 
+%   \(\card[\big]{\GV(G)} = 3\).
+% \end{lemma}
+% 
+% An interesting thing about this proof is that it employs all \PROP\ 
+% axioms.
+% 
+% \begin{proof}
+%   By Lemma~\ref{L:UppdelningOrdning3}, every graphic \PROP\ 
+%   expression \(G = (V,E,h,g,t,s,D)\) with \(\card{V} = 3\) uniquely 
+%   determine two permutations \(\sigma_G \in \Sigma_{\coarity(G)}\) 
+%   and \(\tau_G \in \Sigma_{\arity(G)}\) with various properties. Also 
+%   define \(x_G = D(v)\) and \(k_G = \arity(G) - \alpha(x_G) = 
+%   \coarity(G) - \omega(x_G)\). Define the relation $\propto'$ from 
+%   $\mc{GPE}_\Omega$ to $\mc{P}$ by
+%   \begin{equation*}
+%     G \propto' a \quad\iff\quad \begin{cases}
+%       G \stackrel{f}{\propto} a&
+%         \text{if \(\card[\big]{\GV(G)} \neq 3\),}\\
+%       a = \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) 
+%         \circ \phi(\tau_G)&
+%         \text{if \(\card[\big]{\GV(G)} = 3\).}
+%     \end{cases}
+%   \end{equation*}
+%   If $G$ is elementary then \(G \propto' \phi(\same{\omega(x_G)}) 
+%   \circ \phi(\same{0}) \otimes f(x_G) \circ \phi(\same{\alpha(x_G)}) 
+%   = \phi(\same{\omega(x_G)}) \circ f(x_G) \circ 
+%   \phi(\same{\alpha(x_G)}) = f(x_G)\). By the decomposition part of 
+%   Lemma~\ref{L:UppdelningOrdning3}, it thus follows that \(G \propto' 
+%   a\) implies \(G \stackrel{f}{\propto} a\). Since it also works the 
+%   other way round if \(\card[\big]{\GV(G)} \neq 3\), it follows that 
+%   $\propto'$ satisfies the cut and split conditions of evaluation 
+%   relations for all $G$ with \(\card[\big]{\GV(G)} \neq 3\). It 
+%   remains only to prove them for \(\card[\big]{\GV(G)} = 3\).
+%   
+%   Let \(G \in \mc{GPE}_\Omega\) with \(\card[\big]{\GV(G)} = 3\) be 
+%   given. An ordered cut in $G$ either has the form $\bigl( \{v\}, 
+%   \varnothing, p \bigr)$ or $\bigl( \varnothing, \{v\}, p \bigr)$, 
+%   depending on which part the inner vertex $v$ goes to. If the 
+%   decomposition $(G_0,G_1)$ is induced by the first type of cut then 
+%   the only solution to \(G_0 \propto' a_0\) is \(a_0 = 
+%   \phi(\sigma_{G_0}) \circ  \phi(\same{k_{G_0}}) \otimes 
+%   f(x_{G_0})  \circ \phi(\tau_{G_1})\) and the only solution to 
+%   \(G_1 \propto' a_1\) is \(a_1 = \phi\bigl( g^{G_1}_0 \circ\nobreak 
+%   (s^{G_1}_1)^{-1} \bigr)\) by Lemma~\ref{L:EntydighetOrdning2}. 
+%   \(\sigma_{G_0} = \sigma_G\), \(x_{G_0} = D(v) = x_G\), and 
+%   \(k_{G_0} = k_G\) since these are all defined from the same data, 
+%   so what remains is to prove that \(\tau_G = \tau_{G_0} \circ 
+%   g^{G_1}_0 \circ (s^{G_1}_1)^{-1}\). For \(e \in E\) with \(h(e)=0\) 
+%   and \(t(e)=1\), the defining property of $\tau_G$ is that 
+%   \(\sigma_G( \tau_G( s(e) ) ) = g(e)\), and indeed
+%   \begin{multline*}
+%     \sigma_G\Bigl( 
+%       \bigl( \tau_{G_0} \circ g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr)
+%       \bigl( s(e) \bigr) \Bigr) =
+%     \sigma_G\Bigl( \tau_{G_0}\bigl( g^{G_1}_0(e) \bigr) \Bigr) 
+%       = \\ =
+%     \sigma_{G_0}\Bigl( \tau_{G_0}\bigl( s^{G_0}_1(e) \bigr) \Bigr) =
+%     g^{G_0}_0(e) = g(e) 
+%     \text{.}
+%   \end{multline*}
+%   For \(e \in E\) with \(h(e)=v\) and \(t(e)=1\), the defining property 
+%   of $\tau_G$ is that \(\tau_G( s(e) ) = g(e) + k_G\), so similarly
+%   \begin{multline*}
+%     \bigl( \tau_{G_0} \circ g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr)
+%       \bigl( s(e) \bigr) \Bigr) =
+%     \tau_{G_0}\bigl( g^{G_1}_0(e) \bigr) = \\ =
+%     \tau_{G_0}\bigl( s^{G_0}_1(e) \bigr) =
+%     g^{G_0}_v(e) + k_G = g(e) + k_G
+%     \text{.}
+%   \end{multline*}
+%   Together these imply \(\tau_G = \tau_{G_0} \circ g^{G_1}_0 \circ 
+%   (s^{G_1}_1)^{-1}\) and hence
+%   \begin{multline*}
+%     G \propto'
+%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
+%       \phi(\tau_G) = \\ =
+%     \phi(\sigma_{G_0}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
+%       \phi(\tau_{G_0}) \circ 
+%       \phi\bigl( g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr) =
+%     a_0 \circ a_1
+%     \text{.}
+%   \end{multline*}
+%   
+%   In the second type of cut decomposition $(G_0,G_1)$, the only 
+%   solution to \(G_0 \propto' a_0\) is \(a_0 = \phi(g^G_0 \circ\nobreak 
+%   p^{-1})\) by Lemma~\ref{L:EntydighetOrdning2} and the only solution to 
+%   \(G_1 \propto' a_1\) is \(a_1 = \phi(\sigma_{G_1}) \circ 
+%   \phi(\same{k_{G_1}}) \otimes f(x_{G_1}) \bigr) \circ 
+%   \phi(\tau_{G_1})\). Clearly \(x_{G_1} = x_G\) and hence \(k_{G_1} = 
+%   k_G\), but it need not be the case that \(\tau_{G_1} = \tau_G\) since 
+%   these $\tau$s depend on the corresponding $\sigma$s. Let \(\rho \in 
+%   \Sigma_{k_G}\) be such that \(\rho \star \same{\omega(x_G)} = 
+%   \sigma_G^{-1} \circ (g^{G_0}_0 \circ\nobreak p^{-1}) \circ 
+%   \sigma_{G_1}\); that the right hand side permutation really is on 
+%   this form follows from the fact that \(\sigma_G^{-1}\bigl( 
+%   g^{G_0}_0(e) \bigr) = \sigma_G^{-1}\bigl( g(e) \bigr) = s(e) + k_G 
+%   = \sigma_{G_1}^{-1}\bigl( g^{G_1}_0(e) \bigr)\) for all \(e \in E\) 
+%   with \(h(e)=0\) and \(t(e) = v\). Furthermore
+%   \begin{align*}
+%     a_0 \circ a_1 ={}&
+%     \phi(g^{G_0}_0 \circ p^{-1}) \circ 
+%       \phi(\sigma_{G_1}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
+%       \phi(\tau_{G_1}) = \\ ={}&
+%     \phi( g^{G_0}_0 \circ p^{-1} \circ \sigma_{G_1} ) \circ
+%       \phi(\sigma_{G_1}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
+%       \phi(\tau_{G_1}) = \\ ={}&
+%     \phi\bigl( \sigma_G \circ (\rho \star \same{\omega(x_G)}) \bigr) 
+%       \circ \phi(\same{k_G}) \otimes f(x_G) \circ \phi(\tau_{G_1}) 
+%       = \\ ={}&
+%     \phi(\sigma_G) \circ \phi(\rho) \otimes \phi(\same{\omega(x_G)}) 
+%       \circ \phi(\same{k_G}) \otimes f(x_G) \circ \phi(\tau_{G_1}) 
+%       = \\ ={}&
+%     \phi(\sigma_G) \circ \bigl( \phi(\rho) \circ \phi(\same{k_G}) 
+%       \bigr) \otimes \bigl( \phi(\same{\omega(x_G)}) \circ f(x_G) 
+%       \bigr) \circ \phi(\tau_{G_1}) = \\ ={}&
+%     \phi(\sigma_G) \circ \bigl( \phi(\same{k_G}) \circ \phi(\rho) 
+%       \bigr) \otimes \bigl( f(x_G) \circ \phi(\same{\alpha(x_G)}) 
+%       \bigr) \circ \phi(\tau_{G_1}) = \\ ={}&
+%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
+%       \phi(\rho) \otimes \phi(\same{\alpha(x_G)}) \circ 
+%       \phi(\tau_{G_1}) = \\ ={}&
+%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
+%       \phi\bigl( (\rho \star \same{\alpha(x_G)}) \circ \tau_{G_1} 
+%       \bigr)
+%   \end{align*}
+%   and it will therefore follow that \(G \propto' a_0 \circ a_1\) once 
+%   it has been shown that \(\tau_G = (\rho \star\nobreak 
+%   \same{\alpha(x_G)}) \circ \tau_{G_1}\). As before, one finds for 
+%   \(e \in E\) with \(h(e)=v\) and \(t(e)=1\) that
+%   \begin{equation*}
+%     \bigl( (\rho \star \same{\alpha(x_G)}) \circ \tau_{G_1} \bigr)
+%       \bigl( s(e) \bigr) =
+%     (\rho \star \same{\alpha(x_G)})\bigl( g(e) + k_G \bigr) =
+%     g(e) + k_G = 
+%     \tau_G\bigl( s(e) \bigr)
+%   \end{equation*}
+%   whereas for \(e \in E\) with \(h(e)=0\) and \(t(e)=1\),
+%   \begin{multline*}
+%     \sigma_G\Bigl( \bigl( (\rho \star \same{\alpha(x_G)}) \circ 
+%       \tau_{G_1} \bigr)\bigl( s(e) \bigr) \Bigr) =
+%     \sigma_G \Bigl( \rho\bigl( (\tau_{G_1} \circ s)(e) \bigr) \Bigr) 
+%       = \\ =
+%     (g^{G_0}_0 \circ p^{-1} \circ \sigma_{G_1})\bigl( 
+%       (\tau_{G_1} \circ s)(e) \bigr) =
+%     (g^{G_0}_0 \circ p^{-1})\bigl( g^{G_1}_0(e) \bigr) =
+%     g^{G_0}_0(e) = g(e) \text{,}
+%   \end{multline*}
+%   and hence \(\tau_G = (\rho \star\nobreak \same{\alpha(x_G)}) \circ 
+%   \tau_{G_1}\). Thus \(G \propto' a_0 \circ a_1\).
+%   
+%   A split in $G$ has the form $\bigl( F_l, F_r, \varnothing, \{v\} 
+%   \bigr)$ or $\bigl( F_l, F_r, \{v\}, \varnothing \bigr)$. If 
+%   $(G_l,G_r)$ is the decomposition induced by a split of the first 
+%   kind then \(h(e)=0\) and \(t(e)=1\) for all \(e \in F_l\). Let \(l 
+%   = \card{F_l}\), \(m = \coarity(G_r)\), \(n = \arity(G_r)\), and 
+%   \(a_r \in \mc{P}(m,n)\) be such that \(G_r \propto' a_r\). 
+%   Since \(g(F_l) = [l]\), it follows that \(\sigma_G = \same{l} \star 
+%   \sigma_{G_r}\) and hence \(\tau_G = \rho \star \tau_{G_r}\) for 
+%   \(\rho = g^{G_l}_0 \circ (s^{G_l}_1)^{-1}\). Thus
+%   \begin{align*}
+%     G \propto' {}&
+%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
+%       \phi(\tau_G) = \\ ={}&
+%     \phi(\same{l} \star \sigma_{G_r}) \circ 
+%       \phi(\same{l} \star \same{k_{G_r}}) \otimes f(x_G) \circ 
+%       \phi(\rho \star \tau_{G_r}) = \\ ={}&
+%     \phi(\same{l}) \otimes \phi(\sigma_{G_r}) \circ 
+%       \phi(\same{l}) \otimes \phi(\same{k_{G_r}}) \otimes f(x_G) \circ 
+%       \phi(\rho) \otimes \phi(\tau_{G_r}) = \\ ={}&
+%     \bigl( \phi(\same{l}) \circ \phi(\same{l}) \circ \phi(\rho) 
+%       \bigr) \otimes \bigl( \phi(\sigma_{G_r}) \circ 
+%       \phi(\same{k_{G_r}}) \otimes f(x_G) \circ \phi(\tau_{G_r}) 
+%       \bigr) = \\ ={}&
+%     \phi(\rho) \otimes a_r \text{.}
+%   \end{align*}
+%   
+%   If $(G_l,G_r)$ is the decomposition induced by a split of the second 
+%   kind then \(h(e)=0\) and \(t(e)=1\) for all \(e \in F_r\). Let \(r 
+%   = \card{F_r}\), \(m = \coarity(G_l)\), \(n = \arity(G_l)\), and 
+%   \(a_l \in \mc{P}(m,n)\) be such that \(G_l \propto' a_l\). Clearly 
+%   \(x_{G_l} = x_G\) and \(k_{G_l} = k_G - r\). Since \(g(e) > m\) for 
+%   all \(e \in F_r\), it follows that \(k_G-r < \sigma_G^{-1}\bigl( 
+%   g(e) \bigr) \leqslant k_G\) for \(e \in F_r\), and hence
+%   \begin{equation*}
+%     \sigma_G \circ ( \same{k_G-r} \star \cross{\omega(x_G)}{r} ) =
+%     \sigma_{G_l} \star \same{r} \text{.}
+%   \end{equation*}
+%   Therefore
+%   \begin{align*}
+%     G \propto'{}&
+%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
+%       \phi(\tau_G) = \\ ={}&
+%     \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ
+%       \phi(\same{k_{G_l}}) \otimes \phi(\cross{r}{\omega(x_G)}) \circ
+%       \phi(\same{k_{G_l}}) \otimes \phi(\same{r}) \otimes f(x_G) \circ 
+%       \phi(\tau_G) = \\ ={}&
+%     \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ \Bigl( 
+%       \phi(\same{k_{G_l}}) \circ \phi(\same{k_{G_l}}) \Bigr) \otimes 
+%       \Bigl( \phi(\cross{r}{\omega(x_G)}) \circ \phi(\same{r}) \otimes 
+%       f(x_G) \Bigr) \circ \phi(\tau_G) 
+%       = \\ ={}&
+%     \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ \Bigl( 
+%       \phi(\same{k_{G_l}}) \circ \phi(\same{k_{G_l}}) \Bigr) \otimes 
+%       \Bigl( f(x_G) \otimes \phi(\same{r}) \circ 
+%       \phi(\cross{r}{\omega(x_G)}) \Bigr) \circ \phi(\tau_G) 
+%       = \\ ={}&
+%     \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ
+%       \phi(\same{k_{G_l}}) \otimes f(x_G) \otimes \phi(\same{r}) \circ 
+%       \phi(\same{k_{G_l}}) \otimes \phi(\cross{r}{\omega(x_G)}) \circ 
+%       \phi(\tau_G) 
+%       = \\ ={}&
+%     \Bigl( \phi(\sigma_{G_l}) \circ \phi(\same{k_{G_l}}) \otimes f(x_G) 
+%       \Bigr) \otimes \phi(\same{r}) \circ \phi\Bigl( (\same{k_{G_l}} 
+%       \star \cross{r}{\omega(x_G)}) \circ \tau_G \Bigr) 
+%   \end{align*}
+%   and the wanted result follows once it has been shown that 
+%   \((\same{k_{G_l}} \star\nobreak \cross{r}{\omega(x_G)}) \circ 
+%   \tau_G = \tau_{G_l} \star \bigl( g^{G_r}_0 \circ\nobreak 
+%   (s^{G_r}_1)^{-1} \bigr)\). 
+%   
+%   To that end, one can as usual prove that
+%   \begin{equation*}
+%     \tau' = (\same{k_{G_l}} \star \cross{\omega(x_G)}{r}) \circ 
+%     \Bigl( \tau_{G_l} \star \bigl( g^{G_r}_0 \circ 
+%     (s^{G_r}_1)^{-1} \bigr) \Bigr)
+%   \end{equation*}
+%   fulfills the condition defining $\tau_G$. If \(e \in F_l\) is such 
+%   that \(h(e)=0\) and \(t(e)=1\) then \(s(e) \leqslant n\) and \(g(e) 
+%   \leqslant m\), hence \(\sigma_{G_l}^{-1}\bigl( g(e) \bigr) \leqslant 
+%   k_{G_l}\). It follows that
+%   \begin{equation*}
+%     \sigma_G\Bigl( \tau'\bigl( s(e) \bigr) \Bigr) =
+%     \sigma_{G_l}\Bigl( \tau_{G_l}\bigl( s(e) \bigr) \Bigr) = g(e)
+%     \text{.}
+%   \end{equation*}
+%   If \(e \in F_l\) is such that \(h(e)=v\) and \(t(e)=1\) then
+%   \begin{multline*}
+%     \tau'\bigl( s(e) \bigr) =
+%     (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\Bigl(
+%       \tau_{G_l}\bigl( s(e) \bigr) \Bigr) =
+%     (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})
+%       \bigl( g(e) + k_{G_l} \bigr) = \\ =
+%     \cross{\omega(x_G)}{r}\bigl( g(e) \bigr) + k_{G_l} =
+%     g(e) + r + k_{G_l} = g(e) + k_G
+%     \text{.}
+%   \end{multline*}
+%   Finally if \(e \in F_r\) then \(s(e)>n\) and hence
+%   \begin{multline*}
+%     \sigma_G\Bigl( \tau'\bigl( s(e) \bigr) \Bigr) =
+%     \sigma_G\biggl( (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\Bigl(
+%       n + \bigl( g^{G_r}_0 \circ (s^{G_r}_1)^{-1} \bigr)\bigl( s(e)-n 
+%       \bigr) \Bigr) \biggr) = \\ =
+%     \sigma_G\Bigl( (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\bigl(
+%       n + g^{G_r}_0(e) \bigr) \Bigr) =
+%     \sigma_G\bigl( k_{G_l} + g^{G_r}_0(e) \bigr) = \\ =
+%     (\sigma_{G_l} \star \same{r}) \Bigl(
+%       ( \same{k_{G_l}} \star \cross{r}{\omega(x_G)} )
+%       \bigl( k_{G_l} + g^{G_r}_0(e) \bigr) \Bigr) = \\ =
+%     (\sigma_{G_l} \star \same{r}) \bigl( m + g^{G_r}_0(e) \bigr) =
+%     m + g^{G_r}_0(e) = g(e)
+%    \text{.}
+%   \end{multline*}
+%   Therefore \(\tau' = \tau_G\) and the split axiom for an evaluation 
+%   relation is fulfulled also for the second kind of split 
+%   decomposition.
+% \end{proof}
+% 
+% 
+% \begin{lemma} \label{L:EvaluationProperCut}
+%   Let a signature \(\Omega = (X,\alpha,\omega)\), and \PROP\ 
+%   $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
+%   given. If \(G = (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega\) and \(a \in 
+%   \mc{P}\) are such that \(G \stackrel{f}{\propto} a\) and 
+%   \(\card{V}>3\) then there exists a decomposition $(G_0,G_1)$ of $G$ 
+%   induced by a proper cut, and \(a_0,a_1 \in \mc{P}\), such that 
+%   \(G_0 \stackrel{f}{\propto} a_0\), \(G_1 \stackrel{f}{\propto} 
+%   a_1\), and \(a = a_0 \circ a_1\).
+% \end{lemma}
+% \begin{proof}
+%   \relax
+%   [Define a relation $\propto'$ to be equal to 
+%   $\stackrel{f}{\propto}$ for graphic \PROP\ expressions that don't 
+%   have the same number of vertices as $G$, and define it by 
+%   composition over proper cuts for those with the same number of 
+%   vertices as $G$. Then show $\propto'$ is an evaluation relation. It 
+%   follows that the two evaluation relations are equal.]
+% \end{proof}
+% 
+% 
+% \begin{theorem}
+%   For every evaluation seed \(f\colon X \Fpil \mc{P}\), the 
+%   corresponding evaluation relation $\stackrel{f}{\propto}$ is univocal.
+% \end{theorem}
+% \begin{proof}
+%   \relax
+%   [By induction on $\card{V}$. By Lemma~\ref{L:EvaluationProperCut}, 
+%   there are decompositions $(G_0,G_1)$ and $(G_0',G_1')$ of $G$ 
+%   giving rise to the values $a$ and $a'$. Use the values on the 
+%   intersections.]
+% \end{proof}
+% 
+% 
+% 
+% ---
+% 
+% \iffalse
+% 
+% M\"ojliga symboler f\"or evalueringsrelation:
+% \vdash
+% \dashv
+% \models
+% \propto
+% \leadsto (ringlande pil)
+% 
+% \(G \vdash \sigma \cdot a\)
+% 
+% \(G \dashv \sigma \cdot a\)
+% 
+% \(G \models \sigma \cdot a\)
+% 
+% \(G \propto \sigma \cdot a\)
+% 
+% \(G \leadsto \sigma \cdot a\)
+% 
+% 
+% De tv\r{a} b\"asta verkar vara $\models$ och $\propto$.
+% 
+% \fi
+% 
+% 
+% ---
+% 
+% 
+% 
+% \begin{lemma}
+%   Let \(\Omega = (X,\alpha,\omega)\) be a signature, let $\mc{P}$ 
+%   be a \PROP, and let \(f\colon X \Fpil \mc{P}\) be a map such that 
+%   \(f(x) \in \mc{P}\bigl( \omega(x), \alpha(x) \bigr)\) for all 
+%   \(x \in X\). Then the identities
+%   \begin{enumerate}
+%     \item \label{GrafIdent:Sammans.}
+%       \(f_{l,n}(G) = f_{l,m}(G') \circ f_{m,n}(G'')\) for every 
+%       decomposition $G' \circ G''$ of \(G \in \mc{GPE}_\Omega(l,n)\).
+%     \item \label{GrafIdent:Perm.}
+%       \(f_{n,n}(G) = \sigma\) if \(G = (V,E,h,g,t,s,D) \in 
+%       \mc{GPE}_\Omega(n,n)\) is such that \(V = \{0,1\}\), 
+%       where \(\sigma\in\Sigma_n\) is the premutation which satisfies 
+%       \(\sigma\bigl( s(e) \bigr) = g(e)\) for all \(e \in E\).
+%     \item \label{GrafIdent:Horn.}
+%       \(f_{m,n}(G) = \id_l \otimes f\bigl( D(v) \bigr)\) if \(G = 
+%       (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega(m,n)\) is such that:
+%       \begin{enumerate}
+%         \item \(V = \{0,1,v\}\),
+%         \item \(g(e) = s(e) \leqslant l\) for all \(e \in E\) such 
+%           that \(h(e)=0\) and \(t(e)=1\),
+%         \item \(g(e) = s(e) + l\) for all \(e \in E\) such that 
+%           \(t(e)=v\),
+%         \item \(s(e) = g(e) + l\) for all \(e \in E\) such that 
+%           \(h(e)=v\)
+%       \end{enumerate}
+%       where \(l = n - \alpha\bigl( D(v) \bigr) = m - \omega\bigl( 
+%       D(v) \bigr)\).
+%   \end{enumerate}
+%   uniquely define a family \(\{f_{m,n}\colon \mc{GPE}_\Omega(m,n) 
+%   \Fpil \mc{P}(m,n) \}_{m,n\in\N}\) of maps. The element 
+%   $f_{\coarity(G),\arity(G)}(G)$ is called the \DefOrd{value} of $G$ 
+%   under the assignment $f$.
+% \end{lemma}
+% \begin{proof}
+%   The proof that $f_{m,n}$ is uniquely defined on \(G = 
+%   (V,E,h,g,t,s,D)\) with \(m = \coarity(G)\) and \(n = \arity(G)\) is 
+%   by induction on $\card{V}$. Note that the number of vertices in a 
+%   part of a decomposition is less than or equal to the number of 
+%   vertices in the whole, and that equality holds only when the cut is 
+%   trivial.
+%   
+%   There are two base cases. The first is the minimal \(\card{V} = 
+%   2\), in which identity~\ref{GrafIdent:Perm.} uniquely defines 
+%   the value of $G$ and it only needs to be checked that 
+%   identity~\ref{GrafIdent:Sammans.} is satisfied. Thus let \(G' \circ 
+%   G''\) be a decomposition of $G$. It follows from the definition of 
+%   decomposition that
+%   \begin{align*}
+%     G' ={}& \bigl( \{0,1\}, E, h, g', t, s', \varnothing \bigr) \\
+%     G''={}& \bigl( \{0,1\}, E, h, g'', t, s'', \varnothing \bigr)
+%   \end{align*}
+%   where \(h\colon E \Fpil \{0\}\) and \(t\colon E \Fpil \{1\}\) are 
+%   constant functions, and furthermore \(s' = g''\). The permutations 
+%   to which $G$, $G'$, and $G''$ are mapped according to 
+%   identity~\ref{GrafIdent:Perm.} are \(\sigma,\sigma',\sigma'' \in 
+%   \Sigma_n\) defined for all \(e \in E\) by
+%   \begin{align*}
+%     \sigma\bigl( s''(e) \bigr) ={}& g'(e) \text{,}\\
+%     \sigma'\bigl( s'(e) \bigr) ={}& g'(e) \text{,}\\
+%     \sigma''\bigl( s''(e) \bigr) ={}& g''(e) = s'(e)
+%   \end{align*}
+%   and thus \(f_{n,n}(G) = \sigma = \sigma' \circ \sigma'' = 
+%   f_{n,n}(G') \circ f_{n,n}(G'')\), as claimed.
+%   
+%   The second base case is that \(\card{V} = 3\), in which
+%   
+%   ---
+%   
+%   The induction step is used in the case \(\card{V} > 3\), for which 
+%   it should be assumed that the identities hold for all expressions 
+%   with fewer that $\card{V}$ vertices. 
+%   
+%   ---
+% \end{proof}
+% 
+% 
+% 
+% \subsection{The free \PROP}
+% 
+% ---
+% 
+% The graph underlying one of these expressions is for convenience 
+% labelled (each vertex and edge has a ``name''), but usually one only 
+% cares about the corresponding unlabelled structures. These can be 
+% constructed as isomorphism classes of labelled expressions.
+% 
+% \begin{definition}
+%   Two graphic \PROP\ expressions \(G = (V,E,h,g,t,s,D)\) and 
+%   \(H = (V',E',h',g',t',s',D')\) are said to be 
+%   \DefOrd{isomorphic}, symbolically \(G \simeq H\), if there exists 
+%   bijections \(\phi\colon V \Fpil V'\) and \(\psi\colon E \Fpil E'\) 
+%   such that
+%   \begin{align*}
+%     \phi(0) ={}& 0  &  \phi(1) ={}& 1 \\
+%     h' \circ \psi ={}& \phi \circ h \text{,}&
+%     g' \circ \psi ={}& g \text{,}\\
+%     t' \circ \psi ={}& \phi \circ t \text{,}&
+%     s' \circ \psi ={}& s \text{,}\\
+%     D' \circ \phi ={}& D \text{.}
+%   \end{align*}
+%   Denote by \(\widetilde{\mc{GPE}}_\Omega(m,n)\) the set of 
+%   isomorphism classes of \(\mc{GPE}_\Omega(m,n)\).
+% \end{definition}
+% 
+% ---
+% 
+% When drawing these (unlabelled) graphic expressions, some additional 
+% simplifications are often possible. First, one may express the head 
+% and tail indices at inner vertices using the cyclic order of edges 
+% around these vertices. Following the pattern from 
+% page~\ref{Sid:PROP-diagram}ff, one would divide the circumference of 
+% each vertex into two parts, where one is for incoming (incident at 
+% the head) edges and the other part is for outgoing (incixent at the 
+% tail) edges, such that the index of incoming edges increases in the 
+% clockwise direction and the index of outgoing edges increases in the 
+% counterclockwise direction. 
+% % Second, one may similarly imagine a frame 
+% % around the diagram and divide its circumference in one 
+% % incoming and one outgoing part, place the input and output 
+% % vertices on this circumflerence, and order them after increasing 
+% % indices. 
+% Second, 
+% thanks to the acyclicity one can fix a main arrow direction in the 
+% diagram (right to left in the examples above) and arrange the 
+% vertices so that edges follow this direction; this lets one skip 
+% drawing arrowheads on edges. Third, it is possible to use vertex 
+% shapes rather than explicit annotations to encode the $D$ map into 
+% the diagram, and symbols with different arity or coarity may share 
+% the same shape as one can anyway tell them apart by the number of 
+% incoming and outgoing edges.
+% 
+% % ATT G\"ORA:
+% % Rita diagram som visar de olika f\"orenklingsstegen.
+% 
+% As it turns out, operations can be defined on 
+% $\widetilde{\mc{GPE}}_\Omega$ that turn it into the free \PROP\ on 
+% the signature $\Omega$. Graphic expressions give a clearer presentation 
+% than traditional formulae in terms of products and composition do, 
+% because the redundancy in the representation is more regular and 
+% easier to factor out.
+% 
+% 
+% ---
+% 
+% 
 % \section{Preparations}
 % 
 % The code is declared as a package. Commands are kept in the |network| 
@@ -2024,7 +2033,7 @@ namespace eval network::pure {
 % completion).
 % 
 % \begin{proc}{composition}
-%   This procedure computes the tensor composition of a list of pure 
+%   This procedure computes the composition of a list of pure 
 %   networks, i.e., it places them all in sequence (with the first 
 %   on the output side). The syntax is
 %   \begin{quote}
@@ -2885,6 +2894,575 @@ proc network::pure::replace {G region K} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% 
+% \subsection{Decomposing networks}
+% 
+% For some applications, it is important to take networks apart into 
+% smaller pieces (while still keeping these pieces natural).
+% 
+% \begin{proc}{inner_components}
+%   This procedure decomposes a network into its components with 
+%   respect to internal edges. The call syntax is
+%   \begin{quote}
+%     |inner_components| \word{network}
+%   \end{quote}
+%   and the return value is a list
+%   \begin{displaysyntax}
+%     \word{$\sigma$} \word{components} \word{k} \word{$\tau$}
+%   \end{displaysyntax}
+%   where $\sigma$ and $\tau$ are permutations, $k$ is an integer, 
+%   and \word{components} is a list of networks. These are such that
+%   \begin{equation*}
+%     \sigma \cdot \left( 
+%     \bigotimes_{G \in \text{\word{components}}} G 
+%     \otimes \phi(\same{k}) \right) \cdot \tau
+%   \end{equation*}
+%   is equivalent to the original \word{network}.
+%   
+%   The components appear in vertex label order, so the first 
+%   contains vertex $2$, the second the minimal vertex which is not 
+%   in the first, and so on. The permutations $\sigma$ and $\tau$ 
+%   does not change the relative order of edges within a component; 
+%   this helps to avoid \emph{creating} crossings.
+%   
+%   The first step is a loop to determine to which component the 
+%   various vertices and edges should belong, but one might as well 
+%   use it to construct the components since mapping one anyway 
+%   requires visiting all its vertices and edges. |CL| is thus the 
+%   list of components being constructed, in the form of finished 
+%   networks. |V| and |E| are lists of vertices and edges in the 
+%   component currently being constructed; these are at first not so 
+%   finished. |queue| is a list of items, in one of the forms
+%   \begin{quote}
+%     |vertex| \word{original-label}\\
+%     |edge| \word{original-label}
+%   \end{quote}
+%   to add to the component. The |Vto| and |Eto| arrays are indexed by 
+%   original-label and map this to the pair of component number and 
+%   new label; entries are added to these arrays when they have been 
+%   added to |V| or |E|. The data in the |base| and |baseL| variables 
+%   are used later when constructing $\tau$; it is the offset from 
+%   component input indices to full tensor product input indices.
+%   \begin{tcl}
+proc network::pure::inner_components {NW} {
+   array set Vto {0 {x 0} 1 {x 1}}
+   set CL {}
+   set base 0
+   set baseL {}
+   set outLL {}
+   for {set u 2} {$u < [llength [lindex $NW 0]]} {incr u} {
+      if {[info exists Vto($u)]} then {continue}
+      set V {x x}
+      set E {}
+      set queue [list [list vertex $u]]
+      for {set n 0} {$n < [llength $queue]} {incr n} {
+         foreach {type label} [lindex $queue $n] break
+         switch -- $type "vertex" {
+            if {[info exists Vto($label)]} then {continue}
+            lappend Vto($label) [llength $CL] [llength $V]
+            lappend V [lindex $NW 0 $label]
+            foreach e [concat [lindex $V end 1] [lindex $V end 2]] {
+               lappend queue [list edge $e]
+            }
+         } "edge" {
+            if {[info exists Eto($label)]} then {continue}
+            lappend Eto($label) [llength $CL] [llength $E]
+            lappend E [lindex $NW 1 $label]
+            lappend queue [list vertex [lindex $E end 0]]\
+              [list vertex [lindex $E end 2]]
+         }
+      }
+%   \end{tcl}
+%   Finishing the vertices means updating the edge labels. In the 
+%   case of the external vertices it also means updating head or tail 
+%   indices, since these are generally not the same.
+%   \begin{tcl}
+      set V2 {}
+      set Lo {}
+      set outL {}
+      foreach e [lindex $NW 0 0 2] {
+         if {[info exists Eto($e)] &&\
+           [lindex $Eto($e) 0]==[llength $CL]} then {
+            lset E [lindex $Eto($e) 1] 1 [llength $Lo]
+            lappend Lo [lindex $Eto($e) 1]
+            lappend outL $e
+         }
+      }
+      lappend outLL $outL
+      lappend V2 [list {} {} $Lo]
+      set Li {}
+      foreach e [lindex $NW 0 1 1] {
+         if {[info exists Eto($e)] &&\
+           [lindex $Eto($e) 0]==[llength $CL]} then {
+            lset E [lindex $Eto($e) 1] 3 [llength $Li]
+            lappend Li [lindex $Eto($e) 1]
+         }
+      }
+      lappend V2 [list {} $Li {}]
+      lappend baseL $base
+      incr base [llength $Li]
+      foreach v [lrange $V 2 end] {
+         set v2 [lrange $v 0 0]
+         set Lo {}
+         foreach e [lindex $v 1] {lappend Lo [lindex $Eto($e) 1]}
+         lappend v2 $Lo
+         set Li {}
+         foreach e [lindex $v 2] {lappend Li [lindex $Eto($e) 1]}
+         lappend v2 $Li
+         lappend V2 $v2
+      }
+%   \end{tcl}
+%   Finishing the edges conversely means updating the vertex labels 
+%   of the endpoints. Here it is useful to have |0| and |1| in the 
+%   |Vto| array.
+%   \begin{tcl}
+      set E2 {}
+      foreach e $E {
+         lappend E2 [list [lindex $Vto([lindex $e 0]) 1] [lindex $e 1]\
+           [lindex $Vto([lindex $e 2]) 1] [lindex $e 3]]
+      }
+      lappend CL [list $V2 $E2]
+   }
+%   \end{tcl}
+%   Next comes the construction of $\tau$. This follows the original 
+%   list of network inputs and stores a list of old edge labels for 
+%   stray edges in the |E| variable.
+%   \begin{tcl}
+   set E {}
+   set tau {}
+   foreach e [lindex $NW 0 1 1] {
+      if {[info exists Eto($e)]} then {
+         lappend tau [expr {[lindex $baseL [lindex $Eto($e) 0]] +\
+           [lindex $CL [lindex $Eto($e) 0] 1 [lindex $Eto($e) 1] 3]}]
+      } else {
+         lappend tau [expr {$base + [llength $E]}]
+         lappend E $e
+      }
+   }
+%   \end{tcl}
+%   The sought $k$ is now the length of |E|. Finally there is the 
+%   construction of $\sigma$, which employs the per-component list 
+%   |outLL| of old-labels of output edges.
+%   \begin{tcl}
+   lappend outLL $E
+   set sigma {}
+   foreach outL $outLL {
+      foreach e $outL {
+         lappend sigma [lindex $NW 1 $e 1]
+      }
+   }
+   return [list $sigma $CL [llength $E] $tau]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% The following aims to discover natural blocks in a network which 
+% have low connectivity to the rest of it. One important application 
+% of this is the evaluation of networks as expressions in some \PROP, 
+% since the complexity of the basic operations on elements of a 
+% linear \PROP\ tends to grow exponentially with the arities and 
+% coarities involved. If natural blocks in the network can be found 
+% an exploited as subexpressions then the number of operations on the 
+% full width of the network can usually be reduced, and sometimes the 
+% maximal width with which one has to deal can be reduced as well.
+% 
+% The primary concept used is that of a \emph{sparsest cut} in the 
+% network: one for which 
+% \begin{equation}
+%   \Phi(S) = \frac{ 
+%     \Bigl\lvert \setOf[\big]{ uv \in \GE(G) }{ u \in S, v \notin S }
+%     \Bigr\rvert
+%   }{ \min\bigl\{ \lvert S\rvert, \lvert \GV(G) \setminus S \rvert
+%     \bigr\rvert
+%   }
+%   \qquad\text{for \(S \subseteq \GV(G)\)}
+% \end{equation}
+% (proportion of edges in cut to vertices in the smaller partition 
+% created by the cut) attains its minimum. Computing this is NP-hard, 
+% but efficient polynomial approximation methods 
+% exist~\cite{AroraLeeNaor}, although they involve solving a 
+% semidefinite program. At least to start with, a straightforward 
+% enumeration will probably suffice.
+% 
+% 
+% \begin{proc}{sparsest_cut}
+%   This procedure computes the sparsest nontrivial cut in a network, 
+%   and returns it in the form of a region. The call syntax is merely
+%   \begin{quote}
+%     |sparsest_cut| \word{network}
+%   \end{quote}
+%   The algorithm is a straightforward enumeration, with a few 
+%   restrictions on the regions that are considered:
+%   \begin{itemize}
+%     \item
+%       The region must be connected, since if a nonconnected region 
+%       attains the minimum then it must be a union of two regions 
+%       which both attain the minimum. In such situations, one would 
+%       probably rather want to find one of these components.
+%     \item
+%       The region must contain at least two vertices, since the 
+%       single vertex cuts are often uninteresting and anyway easy to 
+%       compute separately, nor may it be the entire network.
+%     \item
+%       The region contains all intervals between region vertices; no 
+%       path in the network may intersect the region more than once. 
+%       This ensures that the region can be contracted to a vertex.
+%   \end{itemize}
+%   If such a region exists then the sparsest such region is returned, 
+%   otherwise the result is an empty list is returned. The general 
+%   case in which no such region exists is that the network is a 
+%   tensor product of networks with at most one component each.
+%   
+%   When computing the sparsity of a cut, the two external vertices 
+%   $0$ and $1$ (which may never be in the region, but matter for 
+%   regions of more than half of the network) count as one vertex. 
+%   This gives a nice symmetry to the nontriviality condition: the 
+%   numerator in the sparsity calculation must be at least $2$.
+%   
+%   At the outermost level, the algorithm is a loop over the minimal 
+%   label $v_0$ of a vertex in the region; this vertex is taken as 
+%   the seed from which the region is grown. Within this is the loop 
+%   over partial regions containing $v_0$; unprocessed partial 
+%   regions are kept in a stack and each processing step decides 
+%   whether one vertex adjacent to the partial region should be made 
+%   part of it or not. The |stack| elements are lists with the 
+%   structure
+%   \begin{displaysyntax}
+%     \word{vertex-list} \word{vertex-states} \word{out-edges} 
+%     \word{in-edges} \word{down-edges} \word{up-edges}
+%   \end{displaysyntax}
+%   where \word{vertex-list}, \word{out-edges}, and \word{in-edges} 
+%   are what will become the region. The \word{vertex-states} is a 
+%   list indexed by vertex label, whose entries are |1|, |-1|, or |0| 
+%   depending on whether the vertex is in the region, not in the 
+%   region, or undecided respectively. The \word{down-edges} and 
+%   \word{up-edges} are edges on the out-side or in-side respectively 
+%   boundary of the partial region, for which it has not yet been 
+%   determined whether they should be in the cut or not.
+%   
+%   \begin{proc}{sparsest_cut,exclude}
+%     The |sparsest_cut,exclude| procedure is a helper of 
+%     |sparsest_cut| which updates the \word{vertex-states} list with 
+%     the information that something is outside the region. The call 
+%     syntax is
+%     \begin{quote}
+%       |sparsest_cut,exclude| \word{network} \word{vertex-states} 
+%       \word{vertex} \word{direction}
+%     \end{quote}
+%     where the \word{direction} is |down| or |up|, depending on 
+%     which direction we're going in. The return value is a modified 
+%     \word{vertex-states} list, where some |0| elements can have 
+%     been changed to |-1|, or an empty list if there turned out to 
+%     be some |1| in the requested direction.
+%     \begin{tcl}
+proc network::pure::sparsest_cut,exclude {NW vstate v dir} {
+   switch -- $dir "down" {
+      set vi 1
+      set ei 0
+   } "up" {
+      set vi 2
+      set ei 2
+   } default {error "Unknown direction: $dir"}
+   set queue [list $v]
+   for {set n 0} {$n < [llength $queue]} {incr n} {
+      set v [lindex $queue $n]
+      switch -- [lindex $vstate $v] -1 {
+         continue
+      } 1 {
+         return
+      }
+      lset vstate $v -1
+      foreach e [lindex $NW 0 $v $vi] {
+         lappend queue [lindex $NW 1 $e $ei]
+      }
+   }
+   return $vstate
+}
+%     \end{tcl}
+%     It is important that the set of excluded vertices always is the 
+%     union of an up-set (filter) and a down-set (ideal), since 
+%     detection of violations of the ``region contains its 
+%     intervals'' conditions relies on this; the set of vertices to 
+%     which the region cannot be extended because of this condition 
+%     is simply the set of vertices which are already excluded.
+%   \end{proc}
+%   
+%   \begin{tcl}
+proc network::pure::sparsest_cut {NW} {
+   set startstate {-1 -1}
+   while {[llength $startstate] < [llength [lindex $NW 0]]} {
+      lappend startstate 0
+   }
+   set best_sparse infinity
+   for {set v0 2} {$v0 < [llength [lindex $NW 0]]-1} {incr v0} {
+      set stack [list [
+         list [list $v0] [lreplace $startstate $v0 $v0 1] {} {}\
+           [lindex $NW 0 $v0 1] [lindex $NW 0 $v0 2] 
+      ]]
+      while {[llength $stack]} {
+         foreach {vL vstate outL inL downL upL} [lindex $stack end] break
+         set stack [lreplace $stack [set stack end] end]
+%   \end{tcl}
+%   The first step for a partial region is to look at its active 
+%   boundary and pick a vertex to make a choice for. Concretely, the 
+%   vertex is picked which has the largest number of neighbours 
+%   within the region, since this feels like it should be a good 
+%   strategy. While examining the active boundary, one may however 
+%   discover that some edges are in fact no longer active, so |upL| 
+%   and |downL| are rebuilt while we're at it.
+%   \begin{tcl}
+         set upL2 {}
+         set downL2 {}
+         array unset next
+         foreach e $downL {
+            set v [lindex $NW 1 $e 0]
+            switch -- [lindex $vstate $v] -1 {
+               lappend outL $e
+            } 0 {
+               lappend downL2 $e
+               lappend next($v) $e down
+            }
+         }
+         foreach e $upL {
+            set v [lindex $NW 1 $e 2]
+            switch -- [lindex $vstate $v] -1 {
+               lappend inL $e
+            } 0 {
+               lappend upL2 $e
+               lappend next($v) $e up
+            }
+         }
+         if {![array size next]} then {
+%   \end{tcl}
+%   We're out of active edges, so apparently the region is complete. 
+%   Time to compute its sparsity and compare it to the best so far.
+%   \begin{tcl}
+            set order [expr {[llength [lindex $NW 0]]\
+              - [llength $vL] - 1}]
+            if {$order>[llength $vL]} then {set order [llength $vL]}
+            if {$order<2} then {continue}
+            set s [expr {double([llength $inL] + [llength $outL]) /\
+              $order}]
+            if {$s < $best_sparse} then {
+               set best_region [list $vL $outL $inL]
+               set best_sparse $s
+            }
+            continue
+         }
+%   \end{tcl}
+%   Otherwise it's time to pick a vertex $v_1$ to exclude from the 
+%   region or expand the region with.
+%   \begin{tcl}
+         set maxdeg 0
+         foreach {v L} [array get next] {
+            if {$maxdeg<[llength $L]} then {
+               set maxdeg [llength $L]
+               set v1 $v
+            }
+         }
+%   \end{tcl}
+%   First the case of excluding $v_1$ (although due to the |stack| 
+%   structure, the corresponding branch of the search tree will be 
+%   processed last). The stack entry is somewhat dirty in that edges 
+%   which are deactivated by this will still show appear in the 
+%   active lists, but this gets cleaned up in the processing of that 
+%   entry. Besides, it would be difficult to deactivate all edges 
+%   explicitly since not all of them need to go to $v_1$.
+%   \begin{tcl}
+         set L [sparsest_cut,exclude $NW $vstate $v1\
+           [lindex $next($v1) 1]]
+         if {[llength $L]} then {
+            lappend stack [list $vL $L $outL $inL $downL2 $upL2]
+         }
+%   \end{tcl}
+%   Second, the case of including $v_1$. This only happens if 
+%   \(v_1>v_0\), since $v_0$ is supposed to be the minimal vertex in 
+%   the region.
+%   \begin{tcl}
+         if {$v1>$v0} then {
+            lappend stack [
+               list [linsert $vL end $v1]\
+                 [lreplace $vstate $v1 $v1 1] $outL $inL\
+                 [concat $downL2 [lindex $NW 0 $v1 1]]\
+                 [concat $upL2 [lindex $NW 0 $v1 2]]
+            ]
+         }
+      }
+   }
+   if {[info exists best_region]} then {
+      return $best_region
+   } else {
+      return {}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{contract_region}
+%   This procedure contracts a network region to single vertex. The 
+%   call syntax is
+%   \begin{quote}
+%     |contract_region| \word{network} \word{region} \word{annotation}
+%   \end{quote}
+%   and the return value is the modified \word{network}. The 
+%   \word{region} must not have an in-edge below one of its 
+%   out-edges; failing this requirement will create a network with a 
+%   cycle.
+%   
+%   For the moment, this is implemented as an |annex|ation. Most of 
+%   the code is just for constructing a single-vertex network.
+%   \begin{tcl}
+proc network::pure::contract_region {NW region annot} {
+   set E {}
+   set Li {}
+   foreach i [lindex $region 2] {
+      set e [llength $E]
+      lappend E [list 2 [llength $Li] 1 [llength $Li]]
+      lappend Li $e
+   }
+   set Lo {}
+   foreach i [lindex $region 1] {
+      set e [llength $E]
+      lappend E [list 0 [llength $Lo] 2 [llength $Lo]]
+      lappend Lo $e
+   }
+   set V [list [list "" {} $Lo] [list "" $Li {}] [list $annot $Lo $Li]]
+   return [annex [detach $NW $region] [list $V $E]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{decompose_2NW}
+%   This procedure takes a network with two inner vertices and at 
+%   least one inner edge as argument. It returns a list with the 
+%   structure
+%   \begin{displaysyntax}
+%     twopart \word{$\rho$} \word{$A$} \word{$k$} \word{$\sigma$} 
+%     \word{$B$} \word{$l$} \word{$\tau$}
+%   \end{displaysyntax}
+%   where $\rho$, $\sigma$, and $\tau$ are permutations, \(k,l \in 
+%   \mathbb{N}\), and $A$ and $B$ are the vertex annotations. These 
+%   are such that
+%   \begin{equation*}
+%     \phi(\rho) \circ A \otimes \phi(\same{k}) \circ 
+%     \phi(\sigma) \circ B \otimes \phi(\same{l}) \circ \phi(\tau)
+%   \end{equation*}
+%   is equivalent to the original network.
+%   
+%   The first step is to sort out which vertex is which. This 
+%   involves a loop over the edges, looking for one which has neither 
+%   $0$ nor $1$ as endpoint.
+%   \begin{tcl}
+proc network::pure::decompose_2NW {NW} {
+   foreach e [lindex $NW 1] {
+      foreach {u "" v} $e break
+      if {$u>1 && $v>1} then {break}
+   }
+%   \end{tcl}
+%   Now $A$ will be the annotation of $u$ and $B$ will be the 
+%   annotation of $v$.
+%   \begin{tcl}
+   set A [lindex $NW 0 $u 0]
+   set B [lindex $NW 0 $v 0]
+   set k [expr {[llength [lindex $NW 0 0 2]] -\
+     [llength [lindex $NW 0 $u 1]]}]
+   set l [expr {[llength [lindex $NW 0 1 1]] -\
+     [llength [lindex $NW 0 $v 2]]}]
+%   \end{tcl}
+%   The tricky part is to compute the permutations. The idea is to 
+%   keep a list of edges (in order) at the top of a level, and 
+%   construct the list of edges below that level when looping over 
+%   the previous list.
+%   \begin{tcl}
+   set tau {}
+   set L [lindex $NW 0 $v 1]
+   set i [llength [lindex $NW 0 $v 2]]
+   foreach e [lindex $NW 0 1 1] {
+      if {[lindex $NW 1 $e 0] == $v} then {
+         lappend tau [lindex $NW 1 $e 1]
+      } else {
+         lappend tau $i
+         lappend L $e
+         incr i
+      }
+   }
+   set sigma {}
+   set L2 [lindex $NW 0 $u 1]
+   set i [llength [lindex $NW 0 $u 2]]
+   foreach e $L {
+      if {[lindex $NW 1 $e 0] == $u} then {
+         lappend sigma [lindex $NW 1 $e 1]
+      } else {
+         lappend sigma $i
+         lappend L2 $e
+         incr i
+      }
+   }
+   set rho {}
+   foreach e $L2 {
+      lappend rho [lindex $NW 1 $e 1]
+   }
+%   \end{tcl}
+%   Finally construct the result.
+%   \begin{tcl}
+   list twopart $rho $A $k $sigma $B $l $tau
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{blocktree_decompose}
+%   This procedure converts a network to a binary tree composed only 
+%   of |twopart| joins and annotation leaves. The two node types that 
+%   can be had are thus
+%   \begin{displaysyntax}
+%     twopart \word{permutation} \word{down-child} \word{integer} 
+%     \word{permutation} \word{up-child} \word{integer} 
+%     \word{permutation}\par
+%     atom \word{annotation}
+%   \end{displaysyntax}
+%   where the |twopart| form is as returned by the |decompose_2NW| 
+%   procedure, except that \word{down-child} and \word{up-child} are 
+%   again trees of this form, and each vertex of the original tree 
+%   gives rise to exactly one |atom| node.
+%   
+%   The call syntax is
+%   \begin{quote}
+%     |blocktree_decompose| \word{network}
+%   \end{quote}
+%   where the \word{network} must be an inner component (connected 
+%   after removal of extrenal vertices and edges).
+%   
+%   The idea is to find a sparsest cut, convert its region through a 
+%   recursive call, contract it to a vertex, and repeat until there 
+%   is less than three internal vertices left.
+%   \begin{tcl}
+proc network::pure::blocktree_decompose,recurse {NW} {
+   while {[llength [lindex $NW 0]] > 4} {
+      set region [sparsest_cut $NW]
+      set NW [contract_region $NW $region [
+         blocktree_decompose,recurse [uncover $NW $region]
+      ]]
+   }
+   decompose_2NW $NW
+}
+proc network::pure::blocktree_decompose {NW} {
+   set V {}
+   foreach v [lindex $NW 0] {
+      lappend V [lreplace $v 0 0 [list atom [lindex $v 0]]]
+   }
+   lset V 0 0 {}
+   lset V 1 0 {}
+   blocktree_decompose,recurse [lreplace $NW 0 0 $V]
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % 
 % 
 % \subsection{Conversions}
@@ -4112,6 +4690,634 @@ proc network::pure::vertex_levels3 {NW} {
 %   \end{tcl}
 % \end{proc}
 % 
+% \changes{2.2}{2008/12/06}{Linear-programming based method for 
+%   assigning vertex levels. (LH)}
+% 
+% The approach above is adequate, but will occationally put some vertex 
+% in a level that leads to more edges in the image than what looks 
+% necessary, so perhaps it is time to do it properly by choosing an 
+% optimal arragement. What should be minimised is the combined 
+% (vertical) lengths of the edges in the network, while respecting 
+% the basic restriction that the length of an edge has to be at 
+% least $1$. If the variables in the optimisation problem are taken 
+% to be the levels assigned to the vertices, then both the objective 
+% function and the constraints are linear, so what needs to be solved 
+% is really a linear program.
+% 
+% Recalling the basics of linear programming, we are seeking a vector 
+% $\mathbf{x}$ which minimises $\mathbf{c}^{\mathrm{T}} \mathbf{x}$ 
+% subject to \(A \mathbf{x} \geqslant \mathbf{b}\) for some matrix 
+% $A$ and (column) vectors $\mathbf{b}$ and $\mathbf{c}$. The 
+% inequality corresponding to an edge \(e = \overrightarrow{uv}\) is 
+% that \(x_u - x_v \geqslant 1\), and \(c_u = d^+(u)-d^-(u)\) since 
+% $d^+(u)$ is the number of vertices going down from $u$ and $d^-(u)$ 
+% is the number of vertices going up from $u$. In principle, this is 
+% all one needs to know in order to find an optimal arrangement.
+% 
+% In practice, one might want to add a few restrictions to get 
+% results comparable to those of the other procedures above. First, 
+% it was given that \(x_0 = 0\). Second, all inner vertices must be 
+% at levels between those for the external vertices, so \(0 = x_0 < 
+% x_u < x_1\) for all \(u \geqslant 2\); this amounts to adding extra 
+% edges that have weight $0$ in $\mathbf{c}$. Third, $x_1$ is 
+% minimised first and the edge length is only a secondary minimisation 
+% objective; this rarely makes a difference for the result, but it 
+% helps to avoid large linear programs, since vertices on a longest 
+% chain get their level assigned without a need for invoking a linear 
+% program solver (although linear programs can be solved in 
+% polynomial time, the exponent is not particularly small).
+% 
+% Now then, what algorithm should be used to solve the linear 
+% program? Interior point method? Ellipsoid method? No, just plain 
+% old \textsc{simplex}. The main reason for this is that it gets by 
+% with simpler arithmetic\Dash after imposing the above restrictions, 
+% an inequality in the system has one of the three forms
+% \begin{align*}
+%   x_1 - x_2 \geqslant{}& 1\text{,} &
+%   x_1 \geqslant{}& b\text{,} &
+%   -x_1 \geqslant{}& b\text{,}
+% \end{align*}
+% where the lack of coefficients other than $1$, $0$, and $-1$ means 
+% every corner of the polyhedron will have integer coefficients; 
+% neither provably polynomial method makes do with integer 
+% arithmetic. It also turns out that no matrix elimination or 
+% factorisation is required to run simplex here; the relevant systems 
+% are already on a form that can be solved through substitution.
+% 
+% Recall that the main internal state of the simplex method is the 
+% \emph{working set} of inequalities; in a system with $n$ variables, 
+% one selects a subset \(A' \mathbf{x} \geqslant \mathbf{b}'\) of the 
+% inequality system \(A \mathbf{x} \geqslant \mathbf{b}\) such that 
+% $A'$ is invertible and defines the current approximation as the 
+% solution $\mathbf{x}$ to \(A' \mathbf{x} = \mathbf{b}'\). Consider 
+% now the graph $G$ obtained from the network as follows: first add 
+% edges to $0$ and $1$ from every internal vertex $u$ to express the 
+% second restriction that \(0 = x_0 < x_u < x_1\), then contract all 
+% non-variable vertices (those whose values were fixed by the third 
+% restriction that $x_1$ is minimal) into one common reference 
+% vertex. Each inequality corresponds uniquely to an edge in $G$, 
+% and a set of inequalities corresponds to a linearly independent set 
+% of rows in $A$ if and only if they do not form a cycle in $G$. 
+% Hence a working set is the same thing as a spanning tree in $G$, 
+% and every path starting in the reference vertex contains precisely 
+% those edges that prescribe the current value for the variable at 
+% the other endpoint.
+% 
+% The data structure used for keeping track of the working set is a 
+% doubly-linked tree, with one node for each vertex, sitting in a 
+% list indexed by vertex label. The point of using this kind of 
+% structure is that it simplifies reversing the parent-child 
+% relationship by having all the information available locally; some 
+% such reversals typically happen at every step of the simplex 
+% algorithm. Each \emph{edge} and \emph{vertex} below is a vertex or 
+% edge label. The two forms for elements in the top level list are
+% \begin{displaysyntax}
+%   \word{parent-edge} \word{orientation} \word{children}\par
+%   at \word{height} \word{children}
+% \end{displaysyntax}
+% where the first form is for variable vertices and the second is for 
+% fixed vertices; the \word{height} is then the assigned height for 
+% that vertex. The \word{children} is a list\slash dictionary with the 
+% structure
+% \begin{quote}
+%   \begin{regblock}[\regstar] \word{child-edge} 
+%   \word{child-vertex} \end{regblock}
+% \end{quote}
+% enumerating the tree children of this vertex. Fixed vertices other 
+% than |0| are not in the tree, and their lists of children are 
+% therefore empty.
+% 
+% The \word{orientation} is the sign of the \word{parent-edge} 
+% relative to the tree; it is |1| if the edge points towards the root 
+% and |-1| if it points away from it; this is also the coefficient in 
+% $A$ of this edge at the node's vertex. The vertex on the parent side 
+% of a \word{parent-edge} is 
+% \begin{displaysyntax}
+%   [lindex \word{network} 1 \word{parent-edge}
+%   [expr |{|1-\word{orientation}|}|]]
+% \end{displaysyntax}
+% which may be fixed, and if so counts as the root when traversing the 
+% tree.
+% 
+% One thing that one generally has to watch out for with 
+% \textsc{simplex} is degenerate corners (i.e., points which 
+% correspond to several working sets) since steps taken at such 
+% points may be of length $0$ (switching from one tree to another, 
+% but not actually moving any vertex). This is serious because the 
+% basic argument for the termination of \textsc{simplex} is that the 
+% objective function decreases at each step; where length $0$ steps 
+% occur this argument is no longer valid, and there are indeed 
+% examples in the literature where \textsc{simplex} gets stuck in 
+% a loop. Degenerate corners are unfortunately rather common in this 
+% setting, where all inequalities look pretty much the same.
+% 
+% One way to avoid this problem is to perturb the inequalities 
+% slightly so that no degeneracies occur. In an algebraic setting 
+% such as this, the most elegant solution is probably to subtract an 
+% infinitesimal amount from the length of every edge, so that the 
+% shadow of a perturbed solution is still the optimal solution to the 
+% unperturbed solution. Thus, the minimal length of edge $e$ will 
+% not be $1$, but $1-\varepsilon^{1+e}$, where $\varepsilon$ is some 
+% positive infinitesimal; this moves all sides of the polytope 
+% slightly further out, so all admissible points remain admissible. 
+% Furthermore no corner of the enlarged polytope can be degenerate, 
+% since its coordinates encode the corresponding working set in the 
+% orders of infinitesimals that occur. In other words, there will at 
+% each step always be a unique inequality which goes sharp, and no 
+% step can have length $0$. This puts the matter of finding that edge 
+% next on the agenda.
+% 
+% \begin{proc}{vertex_levels4,ypos}
+%   This procedure computes the $y$-position of a vertex with respect 
+%   to the current working set. Its call syntax is
+%   \begin{displaysyntax}
+%     |vertex_levels4,ypos| \word{network} \word{heap} \word{vertex}
+%   \end{displaysyntax}
+%   where \word{network} is the underlying network, \word{heap} is 
+%   the list indexed by vertex label that defines the current tree, 
+%   and \word{vertex} is the vertex whose position is to be computed. 
+%   The return value is a list\slash dictionary
+%   \begin{displaysyntax}
+%     finite \word{integer} \begin{regblock}[\regstar] \word{edge} 
+%     \word{coefficient} \end{regblock}
+%   \end{displaysyntax}
+%   that gives not only the finite component \word{integer} of the 
+%   $y$-position, but also the infinitesimal \word{coefficients}.
+%   
+%   \begin{tcl}
+proc network::pure::vertex_levels4,ypos {NW heap v} {
+   set res {finite 0}
+   set finite 0
+   while {[lindex $heap $v 0] ne "at"} {
+      set orient [lindex $heap $v 1]
+      incr finite $orient
+      set e [lindex $heap $v 0]
+      lappend res $e [expr {-$orient}]
+      set v [lindex $NW 1 $e [expr {1-$orient}]]
+   }
+   incr finite [lindex $heap $v 1]
+   lset res 1 $finite
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% The working set is not the only parts of the simplex algorithm that 
+% gets a graph-theoretical interpretations in $G$. The descent 
+% direction $\mathbf{p}$ to use if dropping the $s$'th inequality is 
+% for example in general the solution to \(A' \mathbf{p} = 
+% \mathbf{e}_s\), where the right hand side is the unit vector with a 
+% $1$ in the $s$'th position\Dash here this $\mathbf{p}$ turns out to 
+% be a vector with elements in $\{0,1\}$ or $\{0,-1\}$, and the 
+% elements that are nonzero are precisely those whose path to the 
+% reference vertex contains the edge corresponding to the $s$'th 
+% inequality. What happens graph-theoretically is merely that the 
+% tree is cut at this edge, and the branch thus separated from the 
+% rest is moving in the direction of lengthening this edge. After 
+% moving so far that some other edge has shrunk to its minimum length 
+% $1 - \varepsilon^{1+e}$, the branch is then reattached to the base 
+% tree at that position instead; a rather elementary observation.
+% 
+% What the general theory contributes that is not elementary is the 
+% optimality (and thus termination) condition, namely that the vector 
+% $\mathbf{m}$ of Lagrangian multipliers satisfying 
+% \(\mathbf{m}^{\mathrm{T}} A' = \mathbf{c}^{\mathrm{T}}\) is 
+% nonnegative. Since the rows of $A'$ correspond to inequalities and 
+% the columns to variables, the elements of $\mathbf{c}$ are indexed 
+% by vertices and the elements of $\mathbf{m}$ are indexed by edges 
+% in the current spanning tree. It doesn't seem these multipliers 
+% have an (easy) interpretation in general, but here they do: a 
+% multiplier is the difference between the numbers of network edges 
+% leaving and coming into the tree branch that would be cut off from 
+% the root by the deletion of the corresponding edge, with sign 
+% depending on whether the edge is oriented towards or away from the 
+% root. For an edge pointing towards the root, the multiplier is the 
+% number of outgoing edges minus the number of incoming edges (like a 
+% $\mathbf{c}$ element), and for edges pointing away from the root it 
+% is the other way around.
+% 
+% \begin{proc}{vertex_levels4,multipliers}
+%   The command used to compute the current multipliers has the call 
+%   syntax
+%   \begin{displaysyntax}
+%     |vertex_levels4,multipliers| \word{network} \word{tree-heap} 
+%     \word{node-index}
+%   \end{displaysyntax}
+%   where \word{network} is the network being considered, 
+%   \word{tree-heap} is the list in which the working set spanning 
+%   tree is stored, and \word{node-index} is an index into this list. 
+%   The call computes the multpliers of all tree edges incident to 
+%   vertices in the branch of which \word{node-index} is the root. 
+%   The return value is a bit more than just a list of multipliers, 
+%   however. Concretely it is a list
+%   \begin{displaysyntax}
+%     \word{multiplier-list} \word{up-edges} \word{down-edges}
+%   \end{displaysyntax}
+%   where \word{multiplier-list} is the list of the \emph{negative} 
+%   multipliers, where in turn each multiplier is stored as a list
+%   \begin{displaysyntax}
+%     \word{multiplier} \word{edge} \word{shrink-edges} 
+%     \word{orientation}
+%   \end{displaysyntax}
+%   where \word{multiplier} is the actual element of $\mathbf{m}$, 
+%   \word{edge} is the label of the corresponding edge, 
+%   \word{shink-edges} is the list of edges which shrink when 
+%   \word{edge} is lengthened, and \word{orientation} is the sign of 
+%   the \word{edge} relative to the tree; it is |1| if the edge points 
+%   towards the root and |-1| if it points away from it; this is also 
+%   the coefficient in $A$ of this edge at this vertex. The 
+%   \word{up-edges} and \word{down-edges} are lists of all edges 
+%   whose heads and tails respectively are in the branch. Edges within 
+%   the branch are in both lists.
+%   
+%   The implementation is pretty straightforward: first recurse over 
+%   the children to collect data, then amend with data for the 
+%   current node.
+%   \begin{tcl}
+proc network::pure::vertex_levels4,multipliers {NW heap node} {
+   set multiplierL {}
+   set upedgeL [lindex $NW 0 $node 2]
+   set downedgeL [lindex $NW 0 $node 1]
+   foreach {e v} [lindex $heap $node 2] {
+      foreach {mL uL dL} [vertex_levels4,multipliers $NW $heap $v]\
+        break
+      eval [list lappend multiplierL] $mL
+      eval [list lappend upedgeL] $uL
+      eval [list lappend downedgeL] $dL
+   }
+%   \end{tcl}
+%   In the equation system \(\mathbf{m}^{\mathrm{T}} A' = 
+%   \mathbf{c}^{\mathrm{T}}\), every row has at most two nonzero 
+%   elements, one which is $1$ and one which is $-1$. Hence the 
+%   sequence of elementary column operations (since this equation 
+%   system is transposed relative to the standard form) which frees 
+%   the \word{multiplier} unknown is simply to add all columns for 
+%   vertices in the branch together, and the same holds for the right 
+%   hand side. Hence the numerical value of the multiplier is 
+%   determined by the lengths of |upedgeL| and |downedgeL| together 
+%   with the orientation.
+%   \begin{tcl}
+   foreach {edge orientation} [lindex $heap $node] break
+   set mult [expr {
+     ([llength $downedgeL] - [llength $upedgeL]) / $orientation
+   }]
+   if {$mult<0} then {
+      foreach e [
+         if {$orientation>0} then {set upedgeL} else {set downedgeL}
+      ] {set S($e) {}}
+      foreach e [
+         if {$orientation<0} then {set upedgeL} else {set downedgeL}
+      ] {unset -nocomplain S($e)}
+      lappend multiplierL\
+        [list $mult $edge [array names S] $orientation]
+   }
+   list $multiplierL $upedgeL $downedgeL
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% A valid objection at this point would be that 
+% |vertex_levels4,multipliers| makes no distinction between network 
+% edges (which contribute to $\mathbf{c}$) and other inequalities 
+% (which do not)! How does that work out? Well, if one to every 
+% vertex \(v \neq 0,1\) adds one input edge to $1$ and one output 
+% edge to $0$ (which precisely cover all extra inequalities as $v$) 
+% then the difference between input and output valency stays the 
+% same, so one can use a \word{network} augmented with edges for the 
+% extra inequalities also as a basis for computing $\mathbf{c}$. If 
+% this is not acceptable, then one should probably rewrite that 
+% procedure to explicitly require $\mathbf{c}$ as a separate vector.
+% 
+% \begin{proc}{vertex_levels4,shrink}
+%   This procedure computes how much an the length of edge can shrink 
+%   from its current value before it reaches the its minimum, and 
+%   encodes that in a form that is suitable for use as a sort key. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |vertex_levels4,shrink| \word{network} \word{heap} \word{edge}
+%   \end{displaysyntax}
+%   and the return value is the sort key, which should be compared in 
+%   |-dictionary| mode.
+%   
+%   The basic algorithm is trivial: the shrink is the $y$-position of 
+%   the tail of the \word{edge}, minus the $y$-position of the head 
+%   of the \word{edge}, minus the minimal length $1-\varepsilon^{1+e}$.
+%   \begin{tcl}
+proc network::pure::vertex_levels4,shrink {NW heap edge} {
+   array set S {finite -1}
+   set S($edge) 1
+   foreach {v ""} [lindex $NW 1 $edge] sign {-1 1} {
+      foreach {e c} [vertex_levels4,ypos $NW $heap $v] {
+         set c [expr {$sign*$c}]
+         if {[info exists S($e)]}\
+         then {incr S($e) $c} else {set S($e) $c}
+      }
+   }
+%   \end{tcl}
+%   The encoding as a sort key is not so trivial. In part this is 
+%   because it is optimised for sparse polynomials in the 
+%   infinitesimal, and omits edges with $0$ coefficients, which 
+%   conversely means edge numbers have to appear explicitly in the 
+%   encoding. There is also an optimisation based on the observation 
+%   that the only coefficients an infinitesimal can have are $1$, 
+%   $0$, and $-1$; this is because no edge occurs more than once in 
+%   the cycle formed by the tree and the \word{edge}.
+%   
+%   The idea is that one has to find a sequence of representations 
+%   for infinitesimal terms such that $-\varepsilon < 
+%   -\varepsilon^2 < \dotsb < -\varepsilon^m < 0 < \varepsilon^m < 
+%   \dotsb < \varepsilon^2 < \varepsilon$ in |-dictionary| order. 
+%   This is solved by using |a|--|j| as ``negative'' digits and 
+%   |q|--|z| as ``positive'' digits; one starts with the digits of 
+%   $m$ (padded with zeroes on the left to ensure uniform width) and 
+%   maps |0| through |9| to |a| through |j| or |z| through |q| (note 
+%   reversal) depending on whether the coefficient is $+1$ or $-1$. 
+%   The zero in between may be represented as |o|.
+%   
+%   Once such a representation is given for individual terms, one may 
+%   represent sums of terms simply by concatenating the 
+%   representations of the terms, sorted by absolute value. The 
+%   |-dictionary| comparison of two concatenations is then determined 
+%   by the first position where they differ, i.e., by comparing the 
+%   first two terms that are not identical, and the sums then compare 
+%   as these terms do. For this to work when one sum is a prefix of 
+%   another, it is however necessary to explictly put a ``zero'' term 
+%   last.
+%   \begin{tcl}
+   set fs %0[string length [format %d\
+     [expr {[llength [lindex $NW 1]]-1}]]]d
+   set res $S(finite)
+   unset S(finite)
+   foreach e [lsort -integer [array names S]] {
+      if {$S($e)>0} then {
+         append res [string map {
+            0 z 1 y 2 x 3 w 4 v 5 u 6 t 7 s 8 r 9 q
+         } [format $fs $e]]
+      } elseif {$S($e)<0} then {
+         append res [string map {
+            0 a 1 b 2 c 3 d 4 e 5 f 6 g 7 h 8 i 9 j
+         } [format $fs $e]]
+      }
+   }
+   append res o
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{vertex_levels4,simplex}
+%   This procedure runs the \textsc{simplex} algorithm until 
+%   termination, and returns the final working tree. The call syntax 
+%   is
+%   \begin{displaysyntax}
+%     |vertex_levels4,simplex| \word{network} \word{heap}
+%   \end{displaysyntax}
+%   
+%   \begin{tcl}
+proc network::pure::vertex_levels4,simplex {NW heap} {
+   while {[
+%   \end{tcl}
+%   The first part is to compute all negative multipliers, and among 
+%   these choose an edge to cut.
+%   \begin{tcl}
+      set multL {}
+      foreach {e v} [lindex $heap 0 2] {
+         eval [list lappend multL]\
+           [lindex [vertex_levels4,multipliers $NW $heap $v] 0]
+      }
+      llength $multL
+   ]} {
+      foreach {mult cutedge edgeL orient}\
+        [lindex [lsort -integer -index 0 $multL] 0] break
+%   \end{tcl}
+%   The second part is to determine which shrink-edge will reach its 
+%   minimum length first.
+%   \begin{tcl}
+      set L {}
+      foreach e $edgeL {
+         lappend L [list $e [vertex_levels4,shrink $NW $heap $e]]
+      }
+      set shrinkedge [lindex [lsort -dictionary -index 1 $L] 0 0]
+%   \end{tcl}
+%   It is known that there is at least one shrink-edge, since the 
+%   multiplier is negative.
+%   
+%   The third part is to remove the cut-edge from and add the 
+%   shrink-edge to the working tree. This is by far the longest, 
+%   since the relevant operations are not provided by any helper 
+%   prodicedure. So, first remove the cut-edge from the 
+%   \word{children} of its parent. A complication here is that the 
+%   parent need not be the vertex at the parent end of the edge, but 
+%   may be the root instead.
+%   \begin{tcl}
+      set p [lindex $NW 1 $cutedge [expr {1-$orient}]]
+      if {[lindex $heap $p 0] eq "at"} then {set p 0}
+      set L {}
+      foreach {e v} [lindex $heap $p 2] {
+         if {$e != $cutedge} then {lappend L $e $v}
+      }
+      lset heap $p 2 $L
+%   \end{tcl}
+%   Next, add the shrink-edge to the tree. The orientation of this 
+%   edge will be opposite to that of the cut-edge, since it 
+%   vertically attaches to the other side of the brach; if the tail 
+%   of the cut-edge was in the branch then it must be the head of the 
+%   shrink-edge and vice versa, since one shrinks when the other 
+%   grows.
+%   \begin{tcl}
+      set orient [expr {-$orient}]
+      set p [lindex $NW 1 $shrinkedge [expr {1-$orient}]]
+      if {[lindex $heap $p 0] eq "at"} then {set p 0}
+      set q [lindex $NW 1 $shrinkedge [expr {1+$orient}]]
+      lset heap $p 2\
+        [linsert [lindex $heap $p 2] end $shrinkedge $q]
+%   \end{tcl}
+%   Finally flip all edges along the path from the new branch root to 
+%   the old one. As above, $p$ is the tree node whose entry is being 
+%   modified and $q$ is the next node to modify---incidentally also 
+%   the old parent of $p$, but afterwards it will be the other way 
+%   round. The |shrinkedge| is what will become the parent edge of 
+%   $p$.
+%   \begin{tcl}
+      set p $q
+      foreach {e2 o2 childL} [lindex $heap $p] break
+      while {$e2 != $cutedge} {
+         set q [lindex $NW 1 $e2 [expr {1-$o2}]]
+         set L [list $e2 $q]
+         foreach {e v} $childL {
+            if {$e != $shrinkedge} then {lappend L $e $v}
+         }
+         lset heap $p [list $shrinkedge $orient $L]
+         set p $q
+         set orient [expr {-$o2}]
+         set shrinkedge $e2
+         foreach {e2 o2 childL} [lindex $heap $p] break
+      }
+      set L {}
+      foreach {e v} $childL {
+         if {$e != $shrinkedge} then {lappend L $e $v}
+      }
+      lset heap $p [list $shrinkedge $orient $L]
+   }
+   return $heap
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Before one can actually use this procedure to find the optimal 
+% solution, it is however necessary to construct a valid initial 
+% \word{heap}, which is not altogether trivial. The method used by 
+% |vertex_levels4| is to put each vertex at its minimal position, 
+% considering a vertex only when all its down-neighbours have already 
+% been put in the tree.
+% 
+% 
+% \begin{proc}{vertex_levels4}
+%   Providing yet another solution to the same problem, the 
+%   |vertex_levels4| procedure computes a list assigning an integer 
+%   level to each vertex, in such a way that the output end of an edge 
+%   is always strictly less than the input end. The call syntax is
+%   \begin{quote}
+%     |network::pure::vertex_levels4| \word{network}
+%   \end{quote}
+%   and the return value is the list, indexed by vertex labels, of the 
+%   assigned vertex levels.
+%   
+%   The lowest level is $0$, whose lone occupant is the output vertex 
+%   |0|. Levels are always integers. The output vertex |0| always has 
+%   a level less than any other vertex, and the input vertex |1| always 
+%   has a level greater than any other vertex.
+%   
+%   The first step is to augment the \word{network} with extra 
+%   edges for the non-edge inequalities.
+%   \begin{tcl}
+proc network::pure::vertex_levels4 {NW} {
+%<timing>puts [time {
+   set V [lrange [lindex $NW 0] 0 1]
+   set E [lindex $NW 1]
+   set outL [lindex $NW 0 0 2]
+   set inL [lindex $NW 0 1 1]
+   set e [list 0 [llength $outL] 1 [llength $inL]]
+   lappend outL [llength $E]
+   lappend inL [llength $E]
+   lappend E $e
+   foreach v [lrange [lindex $NW 0] 2 end] {
+      foreach {a b c} $v break
+      set e [list [llength $V] [llength $c] 1 [llength $inL]]
+      lappend inL [llength $E]
+      lappend c [llength $E]
+      lappend E $e
+      set e [list 0 [llength $outL] [llength $V] [llength $b]]
+      lappend outL [llength $E]
+      lappend b [llength $E]
+      lappend E $e
+      lappend V [list $a $b $c]
+   }
+   lset V 0 2 $outL
+   lset V 1 1 $inL
+%<timing>} 10]
+   set NW [list $V $E]
+%   \end{tcl}
+%   
+%   Then comes the task of constructing the initial working tree. 
+%   This is done with all vertices put in as low a $y$-position as 
+%   possible, only attaching a vertex after all its down-neighbours 
+%   have already been attached. This requires identifying the 
+%   down-neighbour which puts the strictest bound on the vertex to 
+%   attach, which amounts to finding the longest (when infinitesimal 
+%   corrections are taken into account) path from the vertex to the 
+%   root. Since all infinitesimal terms at this stage are negative, 
+%   they can be kept as lists of orders, and it is necessary to keep 
+%   track of all terms since the leading ones may well be common for 
+%   several paths being compared. On the other hand, it is then not 
+%   necessary to separately keep track of the finite part of the path 
+%   length, since it is equal to the length of the list of orders. In 
+%   the end, the longest path turns out to be the one whose list of 
+%   edges is largest in length-lexicographic order.
+%   \begin{tcl}
+%<timing>puts [time {
+   set heap {}
+   foreach v $V {
+      set Needed([llength $heap]) [llength [lindex $v 1]]
+      lappend heap dummy
+   }
+   lset heap 0 {at 0 {}}
+   set Orders(0) {}
+   set queue {}
+   foreach e [lindex $V 0 2] {
+      set u [lindex $E $e 2]
+      if {![incr Needed($u) -1]} then {lappend queue $u}
+   }
+   for {set n 0} {$n < [llength $queue]} {incr n} {
+      set v [lindex $queue $n]
+      lset heap $v [list at [llength $V] {}]
+      set L {}
+      foreach e [lindex $V $v 1] {
+         set u [lindex $E $e 0]
+         lappend L [list $e [llength $Orders($u)] [
+            lsort -integer [linsert $Orders($u) end $e]
+         ]]
+      }
+      set L [lsort -index 1 -integer [lsort -index 2 -dictionary $L]]
+      set e [lindex $L end 0]
+      set Orders($v) [lindex $L end 2]
+      lset heap $v [list $e 1 {}]
+      set u [lindex $E $e 0]
+      lset heap $u 2 [linsert [lindex $heap $u 2] end $e $v]
+      foreach e [lindex $V $v 2] {
+         set u [lindex $E $e 2]
+         if {![incr Needed($u) -1]} then {lappend queue $u}
+      }
+   }
+%   \end{tcl}
+%   The above leaves vertex $1$ variable, but it has been claimed 
+%   that this vertex should be fixed, so here's how to do that:
+%   \begin{tcl}
+   set v [lindex $E [lindex $heap 1 0] 0]
+   lset heap 1 [list at [llength $Orders(1)] {}]
+   lset heap $v 2 {}
+%   \end{tcl}
+%   Many more vertices may be fixed, to reduce the number of 
+%   variables in the \textsc{simplex} phase, but the problem is how 
+%   to do that. Fixing all vertices on the tree path from $1$ to $0$ 
+%   may seem like the thing to do, but the problem is that this moves 
+%   vertices infinitesimally upwards, which in turn may require other 
+%   vertices to be reattached.
+%   \begin{tcl}
+%<timing>} 10]
+%   \end{tcl}
+%   Running \textsc{simplex} is delegated to a separate procedure 
+%   (partly because this might eventually be shared with Yet Another 
+%   |vertex_levels|$n$, should \(n=4\) prove too slow or something).
+%   \begin{tcl}
+%<timing>puts [time {
+%<timing>   set heap2 [vertex_levels4,simplex $NW $heap]
+%<timing>} 10]
+%<-timing>   set heap [vertex_levels4,simplex $NW $heap]
+%   \end{tcl}
+%   Then there's the matter of constructing the result. This is done 
+%   by changing all variable nodes in the tree to fixed nodes.
+%   \begin{tcl}
+%<timing>puts [time {
+%<timing>   set heap $heap2
+   set queue {}
+   foreach {e v} [lindex $heap 0 2] {
+      set u [lindex $E $e [expr {1-[lindex $heap $v 1]}]]
+      lappend queue [list $v [lindex $heap $u 1]]
+   }
+   for {set n 0} {$n < [llength $queue]} {incr n} {
+      foreach {v level} [lindex $queue $n] break
+      incr level [lindex $heap $v 1]
+      foreach {e u} [lindex $heap $v 2] {lappend queue [list $u $level]}
+      lset heap $v [list at $level {}]
+   }
+   set res {}
+   foreach p $heap {lappend res [lindex $p 1]}
+%<timing>} 10]
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
 % 
 % 
 % \subsection{Sequencing of levels}
@@ -5782,14 +6988,19 @@ proc network::pure::component_DU_levels {NW support {levelL ""}} {
 %   
 %   The \word{list} of the |-levellist| option is the standard list 
 %   indexed by vertex label of the levels for the vertices. If this 
-%   is not given, then |vertex_levels3| is called to compute it.
+%   is not given, then |vertex_levels4| is called to compute it.
+%   \changes{2.2}{2009/02/06}{Switching from 
+%     \texttt{vertex\_levels3} to \texttt{vertex\_levels4} for 
+%     computing default \texttt{-levellist}. This is slightly slower 
+%     (maybe half as fast in common cases) but produces superior 
+%     results in a fair number of cases. (LH)}
 %   \begin{tcl}
 proc network::pure::ordered_graded_components {args} {
    set NW [lindex $args end]
    set Opt(-orderchunk) component
    array set Opt [lrange $args 0 end-1]
    if {![info exists Opt(-levellist)]} then {
-      set Opt(-levellist) [vertex_levels3 $NW]
+      set Opt(-levellist) [vertex_levels4 $NW]
    }
    switch -- $Opt(-orderchunk) "component" {
 %   \end{tcl}
@@ -6116,8 +7327,10 @@ proc network::pure::autodeconstruct {NW} {
 }
 %   \end{tcl}
 % \end{proc}
-
-
+% 
+% 
+% 
+% 
 % \section{Networks with feedback}
 % 
 % The relevant context for substitutions is not networks as such, but 
@@ -6427,13 +7640,13 @@ proc network::wfb::right_action {NW sigma} {
 % 
 % \begin{proc}{instances}
 %   The |instances| procedure determines the instances in which the 
-%   network $H$ within another $G$. The call syntax is
+%   network $H$ occurs within the network $G$. The call syntax is
 %   \begin{quote}
 %     |network::wfb::instances| \word{network $G$} \word{network $H$} 
 %     \word{limit}\regopt
 %   \end{quote}
 %   where the \word{limit} (an non-negative integer) is the maximal 
-%   number of instances returned. The return value is a list of 
+%   number of instances returned. The return value is a list of those 
 %   regions (as defined in Subsection~\ref{Ssec:Regionkirurgi}) which 
 %   constitute instances of $H$ (i.e., which would |uncover| a 
 %   subnetwork isomorphic to $H$).
@@ -7232,7 +8445,7 @@ proc verify_instances {NWG NWH unspec args} {
 %   \end{tcl}
 % \end{proc}
 % 
-% The first batch is to see that the kind of the 
+% The first batch is to see that the kind of subnetworks the 
 % old |network::searchsub| could do (networks spanned by their 
 % vertices, without feedbacks to worry about) is handled correctly.
 % \begin{tcl}
@@ -9085,7 +10298,7 @@ namespace eval network::rich {}
 % \end{quote}
 % where each triplet specifies one canvas item drawn for this vertex.
 % The \word{item-type} is a canvas item type, \word{options} is a 
-% list of item options to apply to that item, and 
+% list of item options (and pseudooptions) to apply to that item, and 
 % \word{coordinates-command} is a command prefix that, when given 
 % the position of the vertex as two additional arguments, returns the 
 % list of coordinates needed for the canvas item. More precisely the 
@@ -9140,6 +10353,17 @@ proc network::shape::offsets {args} {
 %   \end{tcl}
 % \end{proc}
 % 
+% In general, proper item options begin with a minus (|-|), so all 
+% options that don't are assumed to be pseudooptions. The only 
+% pseudooption defined so far is 
+% \describestring+[pseudooption]{colourable}, which controls how 
+% colour is applied to a vertex. The format of this option is a 
+% dictionary of options and values, which specifies the default state 
+% for the corresponding item (typically |-fill black| or 
+% |-outline black|, but this is very item-dependent). When the item 
+% is coloured, all these option values are instead set to the target 
+% colour.
+% 
 % \begin{proc}{drawit}
 %   The |drawit| procedure draws a network in a canvas (or reasonable 
 %   simulation). The call syntax is
@@ -9169,23 +10393,39 @@ proc network::shape::offsets {args} {
 %     \item[-update]
 %       Takes a boolean value, defaults to |0|. If true, all items in 
 %       the network are assumed to already exist, and only their 
-%       coordinates should be updated. If false, create new canvas 
-%       items for everything.
+%       coordinates and options should be updated. If false, create 
+%       new canvas items for everything.
 %     \item[-origin]
 %       Takes a pair of numbers, defaults to |0 0|. The value is the 
 %       position in the canvas's coordinate system of the origin of 
 %       the network's coordinate system. This option can be used to 
 %       graphically offset the network, in particular for situations 
 %       where several networks are drawn into the same canvas.
+%     \item[-region]
+%       Takes as value a region which should be highlighted in the 
+%       drawing. Defaults to `|{} {} {}|', i.e., the empty region.
+%     \item[-incolour]
+%       The colour to use for edges on the in-boundary of the region; 
+%       defaults to |blue|.
+%     \item[-outcolour]
+%       The colour to use for edges on the out-boundary of the region; 
+%       defaults to |red|.
+%     \item[-midcolour]
+%       The colour to use for vertices, internal edges, and in\&out 
+%       edges of the region; defaults to |green|.
 %   \end{ttdescription}
 %   The network specified through the |-val| or |-var| option must 
 %   have the |vpos-Tk| and |ecurve-Tk-tt| entries set to suitable 
 %   values. This network is not modified, and there is no particular 
 %   return value.
+%   \changes{2.1}{2008/10/30}{Added support for colouring a region, 
+%     and the concept of pseudooptions so that this could be 
+%     supported. (LH)}
 %   
 %   \begin{tcl}
 proc network::rich::drawit {canvas appearance tagL args} {
-   array set Opt {-update 0 -origin {0 0}}
+   array set Opt {-update 0 -origin {0 0}\
+     -region {{} {} {}} -incolour blue -outcolour red -midcolour green}
    array set Opt $args
    if {[info exists Opt(-val)]} then {
       array set NW $Opt(-val)
@@ -9197,27 +10437,52 @@ proc network::rich::drawit {canvas appearance tagL args} {
    foreach {x0 y0} $Opt(-origin) break
    array set Look $appearance
 %   \end{tcl}
+%   The |Vreg| array has an entry for a vertex if it is in the 
+%   region, but the value of that entry is just an empty string. The 
+%   |Ereg| array has an entry for an edge if it is on the region 
+%   boundary. The value is one of |in|, |out|, and |inout|.
+%   \begin{tcl}
+   foreach v [lindex $Opt(-region) 0] {set Vreg($v) {}}
+   foreach e [lindex $Opt(-region) 2] {append Ereg($e) in}
+   foreach e [lindex $Opt(-region) 1] {append Ereg($e) out}
+%   \end{tcl}
 %   Since it is usually a good idea that vertex boundaries overlap 
 %   edge endpoints, the edges are drawn first.
 %   \begin{tcl}
    set cLL {}
+   set ecolL {}
    foreach L $NW(ecurve-Tk-tt) {
       set cL {}
       foreach {x y} $L {
          lappend cL [expr {$x0+$x}] [expr {$y0+$y}] 
       }
       lappend cLL $cL
+      if {[info exists Ereg([llength $ecolL])]} then {
+         switch -- $Ereg([llength $ecolL]) in {
+            lappend ecolL $Opt(-incolour)
+         } out {
+            lappend ecolL $Opt(-outcolour)
+         } inout {
+            lappend ecolL $Opt(-midcolour)
+         }
+      } elseif {[
+         info exists Vreg([lindex $NW(pure) 1 [llength $ecolL] 0])
+      ]} then {
+         lappend ecolL $Opt(-midcolour)
+      } else {
+         lappend ecolL black
+      }
    }
    if {$Opt(-update)} then {
-      set n -1; foreach L $cLL {incr n
-         uplevel 1 [linsert $canvas end coords [
-            join [linsert $tagL end "edge$n"] &&
-         ] $L]
+      set n -1; foreach L $cLL col $ecolL {incr n
+         set tag [join [linsert $tagL end "edge$n"] &&]
+         uplevel 1 [linsert $canvas end coords $tag $L]
+         uplevel 1 [linsert $canvas end itemconfigure $tag -fill $col]
       }
    } else {
-      set n -1; foreach L $cLL {incr n
+      set n -1; foreach L $cLL col $ecolL {incr n
          uplevel 1 [linsert $canvas end create line $L -smooth true\
-           -tags [linsert $tagL end "edge$n"]]
+           -tags [linsert $tagL end "edge$n"] -fill $col]
       }
    }
 %   \end{tcl}
@@ -9225,27 +10490,32 @@ proc network::rich::drawit {canvas appearance tagL args} {
 %   the item-parts.
 %   \begin{tcl}
    set nsshape [namespace parent]::shape
-   if {$Opt(-update)} then {
-      set n -1; foreach v [lindex $NW(pure) 0] pos $NW(vpos-Tk) {
-         if {[incr n]<2} then {continue}
-         set k -1
-         foreach {type coordCmd optL} [lindex $Look([lindex $v 0]) 0] {
-            incr k
-            uplevel 1 [linsert $canvas end coords [
-               join [linsert $tagL end vertex$n item$k] &&
-            ] [
+   set n -1; foreach v [lindex $NW(pure) 0] pos $NW(vpos-Tk) {
+      if {[incr n]<2} then {continue}
+      set k -1
+      foreach {type coordCmd optL} [lindex $Look([lindex $v 0]) 0] {
+         incr k
+         array set A $optL
+         if {[info exists A(colourable)]} then {
+            if {[info exists Vreg($n)]} then {
+               foreach {opt col} $A(colourable) {
+                  set A($opt) $Opt(-midcolour)
+               }
+            } else {
+               foreach {opt col} $A(colourable) {set A($opt) $col}
+            }
+         }
+         set optL [array get A -*]
+         array unset A
+         if {$Opt(-update)} then {
+            set tag [join [linsert $tagL end vertex$n item$k] &&]
+            uplevel 1 [linsert $canvas end coords $tag [
                namespace inscope $nsshape $coordCmd\
                  [expr {$x0 + [lindex $pos 0]}]\
                  [expr {$y0 + [lindex $pos 1]}]
             ]]
-         }
-      }
-   } else {
-      set n -1; foreach v [lindex $NW(pure) 0] pos $NW(vpos-Tk) {
-         if {[incr n]<2} then {continue}
-         set k -1
-         foreach {type coordCmd optL} [lindex $Look([lindex $v 0]) 0] {
-            incr k
+            uplevel 1 [linsert $canvas end itemconfigure $tag] $optL
+         } else {
             set call $canvas
             lappend call create $type [
                namespace inscope $nsshape $coordCmd\
@@ -9307,33 +10577,35 @@ proc tclAE_wish {args} {
 %<*Hopf>
 set Hopf_appearance {
    m {
-      {oval {square 8} {}} 
+      {oval {square 8} {colourable {-outline black}}} 
       {{0 8}}
       {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
    }
    unit {
-      {oval {square 8} {}} 
+      {oval {square 8} {colourable {-outline black}}} 
       {{0 8}}
       {}
    }
    Delta {
-      {oval {square 8} {}} 
+      {oval {square 8} {colourable {-outline black}}} 
       {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
       {{0 -8}}
    }
    epsilon {
-      {oval {square 8} {}}
+      {oval {square 8} {colourable {-outline black}}}
       {}
       {{0 -8}}
    }
    S {
-      {rectangle {square 8} {}} 
+      {rectangle {square 8} {colourable {-outline black}}} 
       {{0 8}}
       {{0 -8}}
    }
    twist {
-      {oval {square 8} {}  line {square 5.657} {} \
-        line {offsets {5.657 -5.657} {-5.657 5.657}} {}} 
+      {oval {square 8} {colourable {-outline black}}
+       line {square 5.657} {colourable {-fill black}} 
+       line {offsets {5.657 -5.657} {-5.657 5.657}}\
+         {colourable {-fill black}}} 
       {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
       {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
    }
@@ -10293,7 +11565,7 @@ proc network::rich::ecurve-Tk-tt_by_level {dict style val} {
 % cases, but it is easier to justify the calculations below in a truly 
 % continuous model.
 % 
-% The relevant physical law for elasticify in this case is \emph{Hooke's 
+% The relevant physical law for elasticity in this case is \emph{Hooke's 
 % law}
 % \begin{equation} \label{Eq:Hooke}
 %   \sigma = E \varepsilon 
@@ -10803,6 +12075,12 @@ use compatibility implementations in 8.4.
 
 % 
 % \begin{thebibliography}{8}
+% 
+% \bibitem{AroraLeeNaor}
+%    \textsc{Sanjeev Arora}, \textsc{James R. Lee}, and 
+%    \textsc{Assaf Naor}:
+%    Euclidean distortion and the Sparsest Cut,
+%    \textit{J. Amer. Math. Soc.} \textbf{21} (2008), no. 1, 1--21.
 % 
 % \bibitem{Colley}
 %    \textsc{Wesley N. Colley}: 

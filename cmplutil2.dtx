@@ -1,0 +1,312 @@
+% 
+% \iffalse (driver)
+%<*driver>
+\documentclass{tclldoc}
+
+\usepackage{amsmath,amssymb,amsfonts,amsthm}
+
+% \newtheorem{lemma}{Lemma}[section]
+% \theoremstyle{definition}
+% \newtheorem{definition}[lemma]{Definition}
+% \newtheorem{example}[lemma]{Example}
+% \theoremstyle{remark}
+% \newtheorem*{remark}{Remark}
+% \newtheorem*{algsketch}{Algorithm sketch}
+
+\PageIndex
+\CodelineNumbered
+\setcounter{IndexColumns}{2}
+
+\newenvironment{ttdescription}{%
+  \description
+  \def\makelabel##1{\hspace\labelsep\normalfont\ttfamily ##1}%
+}{\enddescription}
+
+\makeatletter
+\NewDescribeCommand{\describecolumn}{%
+   \XD@grab@sarg{*}\XD@grab@sarg{+}%
+   \XD@grab@harmless@oarg\XD@grab@harmless{}%
+}{4}{%
+   \ifx #1\BooleanFalse
+      \GenericDescribePrint{%
+         \MacroFont #4 \normalfont(column)%
+      }%
+   \fi
+   \begingroup
+      \def\meta##1{(##1)}%
+      \unrestored@protected@xdef\@gtempa{#4}%
+   \endgroup
+   \IndexEntry{%
+      \LevelSorted{\@gtempa}{\texttt{#4} column}%
+      \ifx \NoValue#3\@empty \else
+         \LevelSorted{#3}{\texttt{#3} table}%
+      \fi
+   }{usage}{\thepage}%
+   \ifx \NoValue#3\@empty \else
+      \IndexEntry{%
+         \LevelSorted{#3}{\texttt{#3} (table)}%
+         \LevelSorted{\@gtempa}{\texttt{#4} column}%
+      }{usage}{\thepage}%
+   \fi
+   \ifx #2\BooleanTrue
+      \texttt{#4}%
+      \expandafter\@gobble % Eats \ignorespaces
+   \fi
+}
+\makeatother
+
+\makeatletter
+\DeclareRobustCommand\SMC{%
+  \ifx\@currsize\normalsize\small\else
+   \ifx\@currsize\small\footnotesize\else
+    \ifx\@currsize\footnotesize\scriptsize\else
+     \ifx\@currsize\large\normalsize\else
+      \ifx\@currsize\Large\large\else
+       \ifx\@currsize\LARGE\Large\else
+        \ifx\@currsize\scriptsize\tiny\else
+         \ifx\@currsize\tiny\tiny\else
+          \ifx\@currsize\huge\LARGE\else
+           \ifx\@currsize\Huge\huge\else
+            \small\SMC@unknown@warning
+ \fi\fi\fi\fi\fi\fi\fi\fi\fi\fi
+}
+\newcommand{\SMC@unknown@warning}{\TBWarning{\string\SMC: unrecognised
+    text font size command -- using \string\small}}
+\makeatother
+
+\newcommand{\PROP}{{\SMC PROP}}
+\newcommand{\PROPs}{{\SMC PROP}s}
+\newcommand{\PRO}{{\SMC PRO}}
+\newcommand{\ISBN}{{\SMC ISBN}}
+\newcommand{\ISBNX}{{\SMC X}}
+\providecommand*{\Dash}{%
+   \hspace*{0.166667em}\textemdash\hspace{0.166667em}%
+}
+\providecommand*{\Ldash}{%
+   \hspace{0.166667em}\textemdash\hspace*{0.166667em}%
+}
+\providecommand*{\dash}{\textendash\hspace{0pt}}
+
+\newcommand{\package}[1]{\textsf{#1}}
+
+\newcommand{\Tcl}{\Tcllogo}
+\newcommand*{\DefOrd}[2][]{\textbf{#2}}
+\newcommand*{\emDefOrd}[2][]{\emph{#2}}
+
+\newcommand{\mc}{\mathcal}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Zp}{\mathbb{Z}_{>0}}
+\newcommand{\Fpil}{\longrightarrow}
+\newcommand{\cross}[2]{{}^{#1}\mathsf{X}^{#2}}
+\newcommand{\same}[1]{\mathsf{I}^{#1}}
+
+\begin{document}
+\DocInput{cmplutil2.dtx}
+\PrintIndex
+\end{document}
+%</driver>
+% \fi
+% 
+% \title{Another \PROP py completion utility}
+% \author{Lars Hellstr\"om}
+% \date{2009-03-17--}
+% \maketitle
+% 
+% \begin{abstract}
+%   This is a full-featured utility for completing a set of 
+%   \PROP py identities. The main innovation compared to its 
+%   predecessor is that the rules and ambiguities are kept in 
+%   an external database rather than RAM, but it also adds support 
+%   for non-monomial identities and improved handling of undirectable 
+%   equalities.
+% \end{abstract}
+% 
+% 
+% \section{Data structures}
+% 
+% The main data structures are the list of rules and the list of 
+% ambiguities. Both of these are for size reasons kept in a database 
+% (any TDBC-compatible database can be used), as experience has shown 
+% that they have a tendency to grow beyond what is practical for 
+% \Tcl\ to keep in memory. It turns out that also certain search 
+% operations benefit from this arrangement, as the database machinery 
+% can perform a rather effective initial thinning of possibilities to 
+% consider, if provided with the necessary information.
+% A potential problem with putting things in a database is however 
+% the use of SQL, as implementations of this language are rather 
+% varied; in particular any English word \emph{might} turn out to 
+% have been seized for syntactic purposes, and thus not work as the 
+% name of column. Therefore the names which really \emph{are} English 
+% words have been obfuscated through the substitution of digits for 
+% one or several letters, as one sometimes sees in Leet orthography.
+% 
+% Accordingly, the table of rules is named
+% \describestring+[table]{ru1es} and the table of ambiguities is 
+% named \describestring+[table]{am6iguities}. 
+% Both rules and ambiguities are assigned a number when created, so 
+% there is in both a \describecolumn*[ru1es]{num6er}
+% \describecolumn+[am6iguities]{num6er} column that 
+% can be designated as the \texttt{PRIMARYKEY} for rows in the 
+% table.
+% 
+% \begin{arrayvar}{DB_column}
+%   The |DB_column| array is indexed by the name of a table and keeps 
+%   tracks of the columns in this table. Each element is a list with 
+%   the structure
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regstar] \word{name} \word{type} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{name} is the column name and \word{type} is its 
+%   SQL type.
+%   \begin{tcl}
+lappend DB_column(ru1es)       num6er {INTEGER PRIMARY KEY AUTOINCREMENT}
+lappend DB_column(am6iguities) num6er {INTEGER PRIMARY KEY AUTOINCREMENT}
+%   \end{tcl}
+%   One could probably do without the |AUTOINCREMENT| here, as rows 
+%   are never removed from these tables, but I don't think it hurts 
+%   either.
+%   
+%   Note: Need a mechanism for adjusting column types to underlying 
+%   database.
+% \end{arrayvar}
+% 
+% \describecolumn[ru1es]{lhs}
+% \describecolumn[am6iguities]{si7e}
+% \describecolumn[ru1es]{feed6acks}
+% \describecolumn*[am6iguities]{feed6acks}
+% Conceptually however, the identifying feature of a rule or ambiguity 
+% is a network with feedback. Since all networks involved in a rule 
+% or ambiguity has the same set of feedbacks, this information is put 
+% in the separate column |feed6acks|. The network itself is the left 
+% hand side in the case of a rule, and the site of the ambiguity in 
+% the other case, so these columns are named |lhs| and |si7e|.
+% \begin{tcl}
+lappend DB_column(ru1es) lhs {} feed6acks {} rhs {}
+lappend DB_column(am6iguities) si7e {} feed6acks {}
+% \end{tcl}
+% 
+% \describecolumn[ru1es]{rhs}
+% The other part of a rule is the right hand side, which is a linear 
+% combination of networks. Hence it is a list\slash dictionary
+% \begin{displaysyntax}
+%   \begin{regblock}[\regstar] \word{network} \word{coefficient} 
+%   \end{regblock}
+% \end{displaysyntax}
+% where the \word{network}s should be on canonical form and the 
+% \word{coefficient}s belong to whatever ring of scalars one operates 
+% over.
+% 
+% Another important column in |ru1es| is the 
+% \describecolumn+[ru1es]{st4te} column, which expresses the state of 
+% said row. (|am6iguities| has a similar |st4te| column, documented 
+% separately.) This is basically a column where the values are 
+% individual characters, interpreted as follows:
+% \begin{ttdescription}
+%   \item[R]
+%     An ordinary active rule. Only rows in this state are used in 
+%     reduction.
+%   \item[r]
+%     An ordinary inactive rule. Rules get demoted from |R| to |r| 
+%     when a new rule is discovered which act on the same networks as 
+%     this one does.
+%   \item[E]
+%     An active equality pseudo-rule. These are created when an 
+%     equality without unique leading term are discovered, and 
+%     participate in ambiguity creation but are not used for 
+%     reduction (since that would generate cycles). The rewrite 
+%     system cannot be complete as long as there exists this kind of 
+%     entries.
+%   \item[e]
+%     An inactive equality pseduo-rule (does not form ambiguities, 
+%     and is tolerated in a complete rewrite system).
+% \end{ttdescription}
+% It may also be of interest to introduce a class |I| of rules where 
+% the leading coefficient is not invertible, but that can be a later 
+% development. 
+% \begin{tcl}
+lappend DB_column(ru1es) st4te CHAR pr00f INTEGER
+% \end{tcl}
+% The \describecolumn+[ru1es]{pr00f} column in the |ru1es| table 
+% contains the number of the ambiguity from which the rule or 
+% equality was derived, or null if it was given as an axiom.
+% 
+% 
+% 
+% \subsection{The legend}
+% 
+% Besides the two main tables, there is a table 
+% \describestring+[table]{le9end} which basically is a dictionary of 
+% auxiliary information providing context to the |ru1es| and 
+% |am6iguities|. This table only has two columns: 
+% \describecolumn+[le9end]{k3y} and \describecolumn+[le9end]{va1ue}, 
+% both of which are arbitrary strings. The |k3y| must be unique 
+% within the table.
+% \begin{tcl}
+lappend DB_column(le9end) k3y {} va1ue {}
+% \end{tcl}
+% 
+% The \describestring+[legend key]{coeff_cmd} entry in the legend is 
+% the command prefix of the ring of coefficients. 
+% The \describestring+[legend key]{coeff_setup} entry is a script 
+% that sets up anything needed for the |coeff_cmd| (requires 
+% packages, creates aliases, etc.).
+% 
+% The \describestring+[legend key]{signature} entry in the legend is 
+% the signature of the free \PROP\ in which the calculations are 
+% carried out, in the form of a dictionary mapping each annotation 
+% $x$ to the pair `$\alpha(x) \ \omega(x)$' of arity and coarity. In 
+% other words, it has the structure of the \word{type-dict} argument 
+% of the |network::pure::construct| procedure. \emph{The order of 
+% the keys in this dictionary is significant} since the interpretation 
+% of the profile columns depend on it.
+% 
+% 
+% \subsection{Network profiles}
+% 
+% When reducing a network, the most time-consuming task is that of 
+% finding a rule whose |lhs| occurs in it or deciding that no such 
+% rule exists, since |network::wfb::instances| is rather complicated. 
+% Profiles count the number of occurencies of certain features 
+% within a network, and provide a way of eliminating rules from the 
+% search before even looking at the |lhs|, since there can be no 
+% instances of $H$ in $G$ if there are more occurencies of some 
+% feature in $H$ than there is in $G$.
+% 
+% 
+% \subsection{Ambiguities}
+% 
+% 
+% 
+% \describecolumn+[am6iguities]{st4te}, 
+% which expresses the status of a rule or ambiguity
+% \begin{ttdescription}
+%   \item[A]
+%     An active ambiguity, i.e., one that still requires resolution.
+%   \item[0]
+%     An ambiguity that has been resolved to $0$.
+%   \item[r]
+%     An ambiguity that was made resolvable by the creation of a new 
+%     rule; exactly which rule that was can be determined by 
+%     looking at the |pr00f| column in the |ru1es| table.
+%   \item[e]
+%     An ambiguity that could not be resolved, and instead lead to 
+%     the creation of two or more equalities. Exactly which 
+%     equalities can be determined by looking at the |pr00f| column 
+%     in the |ru1es| table.
+%   \item[S]
+%     A suspended ambiguity, i.e., one that still requires resolution 
+%     but is expected to resolve when an additional rule has been 
+%     added. Information about where that rule might come from is not 
+%     kept in the database.
+% \end{ttdescription}
+% \begin{tcl}
+lappend DB_column(am6iguities) st4te CHAR
+% \end{tcl}
+% 
+% 
+% \describecolumn+[am6iguities]{re5olution}
+% 
+% 
+% 
+\endinput

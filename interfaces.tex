@@ -118,17 +118,17 @@ group), $\mathbb{N}$~(semiring, additive monoid, multiplicative
 monoid, divisor lattice, max/min lattice), $\mathbb{Z}[x]$~(ring etc.), 
 $\mathbb{Z}[x]\big/ \langle x^2 - 2\rangle$~(ditto), $\mathbb{Z} + 
 i\mathbb{Z}$~(Gaussian integers, ring etc.), 
-$\mathrm{M}_n(\mathbb{R}$)$~(real $n \times n$ matrices, ring etc.), 
-$\mathrm{GL}_n(\mathbb{R}$)~(invertible real $n \times n$ matrices, a 
+$\mathrm{M}_n(\mathbb{R})$~(real $n \times n$ matrices, ring etc.), 
+$\mathrm{GL}_n(\mathbb{R})$~(invertible real $n \times n$ matrices, a 
 group), and so on. What should be apparent from these examples is 
 that many structures naturally support more than one interface; it is 
 seldom useful to ask for a name describing all that a structure is, 
 but generally quite sufficient to pick an interface and ask whether 
 the structure supports it. The case of the natural numbers should 
-also make clear that there are sometimes more than one way in which 
+also make it clear that there are sometimes more than one way in which 
 a set can often be turned into a structure supporting a particular 
 interface; the ways in which one can reinterpret the basic 
-mathematical structure are surprisingly many.
+mathematical structures are surprisingly many.
 
 What this means in practice is that in order to multiply two 
 elements $a$ and $b$ of some algebra $\mathcal{A}$ one does not 
@@ -168,10 +168,13 @@ lower level structures.
   addition operations in $\mathbb{Q}$. Going further, one can 
   consider the subgroup $\mathrm{SO}_n(\mathbb{Q})$, and even the 
   corresponding group algebra $\mathbb{Q}\bigl[ 
-  \mathrm{SO}_n(\mathbb{Q}) \bigr]$.
+  \mathrm{SO}_n(\mathbb{Q}) \bigr]$. There are now four different 
+  multiplication operations involved in this definition, so the 
+  computer would have a lot to choose from if we didn't tell it which 
+  one of these we mean in each case.
 \end{example}
 
-In ordinary mathematical writing this 
+In ordinary mathematical writing the structure name 
 is usually omitted\Ldash e.g.~when each particular argument only 
 involves one multiplication operation anyway\Rdash but in higher 
 algebra the normal state of affairs is rather than there are 
@@ -272,7 +275,68 @@ algebraic constructions.
 
 \subsection{A \Tcl\ primer}
 
-A \Tcl\ program (or \emph{script}) is syntactically a sequence of 
+Informally, a \Tcl\ program (or \emph{script}) is a sequence of 
+\emph{command sentences}\Ldash typically one per line, although there 
+is variance in both directions\Dash and a sentence consists of 
+\emph{words} which are separated by whitespace. The style of these 
+sentences can range from the cryptic:
+\begin{quote}
+  |while {$b} {set b [expr {$a % [set a $b]}]}|
+\end{quote}
+via shell-like:
+\begin{quote}
+  |fconfigure $socket -encoding utf-8 -eofchar "\x19"|
+\end{quote}
+to almost pseudocode:
+\begin{quote}
+  |pick z maximizing realpart from points|
+\end{quote}
+but as far as the language is concerned, all of these are merely 
+lists of words, the first of which is the name of a command. Beyond 
+that, it is up to that command to interpret and use the remaining 
+words as it sees fit. This allows e.g.~`|*|' to be both a binary 
+infix operation (times) in numeric expressions and a unary postfix 
+operation (zero or more) in regular expressions; neither is part of 
+the overall language syntax, so it is entirely up to the command 
+whether to make such an interpretation of the `|*|' character. 
+\Tcl\ was designed to \emph{not get in the way} of programmers 
+needing to express some domain-specific concept, and will happily 
+allow several ``little languages'' (of which numerical expressions 
+and regexps are two built-in examples) to coexist within a single 
+interpreter.
+
+What the language syntax \emph{does} control is how a script is split 
+up into sentences, how these are split up into words, and what the 
+contents of these words will be. Within each sentence, there are 
+three interacting processes: grouping, substitution, and expansion.
+
+\emph{Grouping} collects text into a word, even if it contains whitespace 
+characters which would otherwise act as word or sentence separators. 
+The characters which can trigger grouping are `|"|', `|{|', and 
+`|}|', and they appear as delimiters at the beginning and end of the 
+word, with the contents of the word consisting of all characters in 
+between. A word begun by a quote ends with the next quote (that has 
+not been escaped), whereas a word begun by a left brace ends at the 
+matching right brace; the contents of a brace-delimited word have to 
+be balanced with respect to (unescaped) left and right braces. In 
+practice, quotes are often used to delimit ``ordinary'' strings, 
+whereas braces are used to delimit blocks of code or data, but once a 
+word has been parsed, it will have no memory of whether it was 
+quote-, brace-, or just plain whitespace-delimited.
+
+The difference between the two lies instead in their relation to 
+\emph{substitution}, which is inhibited in brace-delimited words but 
+carried out otherwise. The three types of substitution are:
+\begin{description}
+  \item[Variable substitution,]
+    which is triggered by the dollar sign `|$|'.
+    , which should be 
+    followed by the name of a variable. 
+\end{description}
+
+---
+
+syntactically a sequence of 
 \emph{command sentences} and comments, separated by newlines. Each 
 sentence is a sequence of \emph{words}, separated by whitespace 
 (typically one or several spaces, but tabs are fine too). Words can 
@@ -514,6 +578,70 @@ first two.
 
 ---
 
+
+\subsection{Concrete and abstract data}
+
+The interfaces mostly deal with \emph{abstract} data, i.e., it does 
+not specify how the data is to be encoded. This is generally because 
+the interface may productively be applied to mathematical objects 
+well beyond the interface author's imagination; when even the 
+basic information that needs to be encoded is unknown, there 
+obviously wouldn't be any point in trying to prescribe an encoding 
+for it. There are however also data involved in the interfaces that 
+are quite concretely known, and for that it seems appropriate to lay 
+down standard encodings.
+
+\paragraph{Booleans}
+A boolean is true or false. In \Tcl\ the canonical representations 
+for these are |1| and |0| respectively, but any nonzero integer is 
+accepted as true, and several strings (|on|, |off|, |yes|, |no|, 
+|true|, and |false|) are accepted as boolean values. In \mtl, 
+anything \Cfunctionidentifier{Tcl\_GetBooleanFromObj} accepts as boolean 
+is a valid boolean.
+
+\paragraph{Integers}
+Any string matching the regular expression \verb"0|-?[1-9][0-9]*" is 
+a valid integer, and two such strings are equal as integers if and 
+only if they are equal as string. (Hence these are \emph{proper} 
+integers, not machine-integers.) These are the canonical 
+representations of integers. There are also some valid noncanonical 
+representations, e.g.~hexadecimal notation as strings matching 
+|-?0x[0-9A-Fa-f]+|, and octal notation.
+
+\paragraph{Permutations}
+A permutation $\sigma$ is typically regarded as a bijection from 
+$\{0,1,\dotsc, n-\nobreak1\}$ to itself. It is encoded as a list of 
+$n$ elements, where the element at index $i$ is the value of 
+$\sigma(i)$.
+
+\paragraph{Data-tree}
+A \emph{data-tree} is effectively the type of data structure that 
+XML encodes: a rooted tree where the nodes carry a type-tag and 
+optionally attributes, the children of a node are ordered, and (as a 
+special case) strings may appear as children of a node. The encoding 
+of these follow the \textsf{tdom} ``list'' format for XML nodes, 
+i.e., a data-tree is either (i)~a three element list
+\begin{quote}
+  \word{tag} \word{attributes} \word{children}
+\end{quote}
+where \word{tag} is a string (which must be a valid XML name), 
+\word{attributes} is a dictionary (mapping attribute name to value), 
+and \word{children} is a list of data-trees, or a data-tree is (ii)~a 
+two element list
+\begin{quote}
+  |#text| \word{string}
+\end{quote}
+encoding the explicit string \word{string}.
+
+Note that all \word{string}s and attribute values are \Tcl\ strings, 
+not XML encodings of such strings. This means the amperand character 
+is really `|&|', not `|&amp;|'. Also note that |#text| is not a valid 
+\word{tag}, since `|#|' is not allowed in XML names. This implies 
+that \textbf{data-trees can be processed directly using the 
+data-is-code technique}.
+
+
+\DocInclude{export}
 \DocInclude{support}
 \DocInclude{groups}
 \DocInclude{rings}
