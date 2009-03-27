@@ -2761,7 +2761,7 @@ add_rule {} pure [
 % 
 % Late 2008, I had advanced other parts of the theory enough that I 
 % could device a more orderly solution to the problem, namely that of 
-% importing an order from the affine \PROP\ over the natural numbers. 
+% importing an order from the biaffine \PROP\ over the natural numbers. 
 % This is still fairly close to being a path-counting order, but 
 % avoids some of the technical difficulties inherent in proving that 
 % the above is DCC.
@@ -2783,11 +2783,11 @@ add_rule {} pure [
 %<*Hopf>
 proc compare_networks {args} {
    foreach PROP {
-      integer_affine_PROP 
-      integer_affine_PROP
+      integer_biaffine_PROP 
+      integer_biaffine_PROP
 %<*twist>
-      realmatrix_affine_PROP
-      integer_affine_PROP
+      realmatrix_biaffine_PROP
+      integer_biaffine_PROP
 %</twist>
    } array {
       ::Hopf_value_1
@@ -2797,11 +2797,11 @@ proc compare_networks {args} {
       ::Hopf_value_4
 %</twist>
    } cmpcmd {
-      integer_affine_PROP_cmp
-      integer_affine_PROP_cmp
+      integer_biaffine_PROP_cmp
+      integer_biaffine_PROP_cmp
 %<*twist>
       realmatrix_PROP_cmp
-      integer_affine_PROP_cmp
+      integer_biaffine_PROP_cmp
 %</twist>
    } {
       foreach NW $args {
@@ -2822,33 +2822,33 @@ proc compare_networks {args} {
 %   \end{tcl}
 % \end{proc}
 % 
-% \begin{tclcommand}{alias}{integer_affine_PROP}
-%   The primary ordered \PROP\ used is the affine \PROP\ over the 
+% \begin{tclcommand}{alias}{integer_biaffine_PROP}
+%   The primary ordered \PROP\ used is the biaffine \PROP\ over the 
 %   integers (primarily the natural numbers, to ensure DCC).
 %   \begin{tcl}
-interp alias {} integer_affine_PROP {}\
-  mtmtcl::matprop::affine ::mtmtcl::rings::integer
+interp alias {} integer_biaffine_PROP {}\
+  mtmtcl::matprop::biaffine ::mtmtcl::rings::integer
 %   \end{tcl}
 % \end{tclcommand}
 % 
-% \begin{proc}{integer_affine_PROP_cmp}
-%   The natural order to use in an affine \PROP\ is the partial order 
+% \begin{proc}{integer_biaffine_PROP_cmp}
+%   The natural order to use in an biaffine \PROP\ is the partial order 
 %   of element-wise comparisons.
 %   \begin{tcl}
-proc integer_affine_PROP_cmp {left right} {
+proc integer_biaffine_PROP_cmp {left right} {
    set diffL {}
-   lappend diffL [expr {[integer_affine_PROP part closed $left] -\
-     [integer_affine_PROP part closed $right]}]
-   foreach l [integer_affine_PROP part begin $left]\
-           r [integer_affine_PROP part begin $right] {
+   lappend diffL [expr {[integer_biaffine_PROP part closed $left] -\
+     [integer_biaffine_PROP part closed $right]}]
+   foreach l [integer_biaffine_PROP part begin $left]\
+           r [integer_biaffine_PROP part begin $right] {
       lappend diffL [expr {$l-$r}]
    }
-   foreach l [integer_affine_PROP part end $left]\
-           r [integer_affine_PROP part end $right] {
+   foreach l [integer_biaffine_PROP part end $left]\
+           r [integer_biaffine_PROP part end $right] {
       lappend diffL [expr {$l-$r}]
    }
-   foreach L [integer_affine_PROP part open $left]\
-           R [integer_affine_PROP part open $right] {
+   foreach L [integer_biaffine_PROP part open $left]\
+           R [integer_biaffine_PROP part open $right] {
       foreach l $L r $R {lappend diffL [expr {$l-$r}]}
    }
    if {[lsearch -glob $diffL {-*}] >= 0} then {
@@ -2879,17 +2879,17 @@ proc integer_affine_PROP_cmp {left right} {
 %   the other side at weight $0$.
 %   \begin{tcl}
 set Hopf_value_1(m)\
-  [integer_affine_PROP fromparts 0 1 {0 0} {{1 1}}]
+  [integer_biaffine_PROP fromparts 0 1 {0 0} {{1 1}}]
 set Hopf_value_1(unit)\
-  [integer_affine_PROP fromparts 0 1 {} {}]
+  [integer_biaffine_PROP fromparts 0 1 {} {}]
 set Hopf_value_1(Delta)\
-  [integer_affine_PROP fromparts 0 {0 0} 1 {{1} {1}}]
+  [integer_biaffine_PROP fromparts 0 {0 0} 1 {{1} {1}}]
 set Hopf_value_1(epsilon)\
-  [integer_affine_PROP fromparts 0 {} 1 {}]
+  [integer_biaffine_PROP fromparts 0 {} 1 {}]
 set Hopf_value_1(S)\
-  [integer_affine_PROP fromparts 0 0 0 2]
+  [integer_biaffine_PROP fromparts 0 0 0 2]
 set Hopf_value_1(twist)\
-  [integer_affine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
+  [integer_biaffine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
 %   \end{tcl}
 % \end{arrayvar}
 % 
@@ -2903,19 +2903,19 @@ set Hopf_value_1(twist)\
 %   closed component.
 %   \begin{tcl}
 array set Hopf_value_2 [array get Hopf_value_1]
-set Hopf_value_2(m)     [integer_affine_PROP fromparts 0 1 {0 1} {{1 1}}]
-set Hopf_value_2(Delta) [integer_affine_PROP fromparts 0 {0 1} 1 {{1} {1}}]
+set Hopf_value_2(m)     [integer_biaffine_PROP fromparts 0 1 {0 1} {{1 1}}]
+set Hopf_value_2(Delta) [integer_biaffine_PROP fromparts 0 {0 1} 1 {{1} {1}}]
 %   \end{tcl}
 % \end{arrayvar}
 % 
-% \begin{tclcommand}{alias}{realmatrix_affine_PROP}
-%   The secondary ordered \PROP\ used is the affine \PROP\ over 
+% \begin{tclcommand}{alias}{realmatrix_biaffine_PROP}
+%   The secondary ordered \PROP\ used is the biaffine \PROP\ over 
 %   $\mathrm{M}_2(\mathbb{R})$, i.e., over real $2 \times 2$ 
 %   matrices. Rational numbers would work too, but I currently don't 
 %   have an implementation of these.
 %   \begin{tcl}
-interp alias {} realmatrix_affine_PROP {}\
-  mtmtcl::matprop::affine {
+interp alias {} realmatrix_biaffine_PROP {}\
+  mtmtcl::matprop::biaffine {
      ::mtmtcl::matprop::ring 2 ::mtmtcl::rings::float
   }
 %   \end{tcl}
@@ -2931,19 +2931,19 @@ set zero    {{0.0  0.0} {0.0 0.0 }}
 set quarter {{0.25 0.0} {0.0 0.25}}
 set double  {{2.0  0.0} {0.0 2.0 }}
 set induce  {{0.0  1.0} {0.0 0.0 }}
-set Hopf_value_3(m) [realmatrix_affine_PROP fromparts\
+set Hopf_value_3(m) [realmatrix_biaffine_PROP fromparts\
     $zero [list $zero] [list $zero $zero]\
     [list [list $double $double]]]
-set Hopf_value_3(unit) [realmatrix_affine_PROP fromparts\
+set Hopf_value_3(unit) [realmatrix_biaffine_PROP fromparts\
     $zero [list $one] {} {}]
-set Hopf_value_3(Delta) [realmatrix_affine_PROP fromparts\
+set Hopf_value_3(Delta) [realmatrix_biaffine_PROP fromparts\
     $zero [list $zero $zero] [list $zero]\
     [list [list $quarter] [list $quarter]]]
-set Hopf_value_3(epsilon) [realmatrix_affine_PROP fromparts\
+set Hopf_value_3(epsilon) [realmatrix_biaffine_PROP fromparts\
     $zero {} [list $one] {}]
-set Hopf_value_3(S) [realmatrix_affine_PROP fromparts\
+set Hopf_value_3(S) [realmatrix_biaffine_PROP fromparts\
     $zero [list $zero] [list $zero] [list [list $one]]]
-set Hopf_value_3(twist) [realmatrix_affine_PROP fromparts\
+set Hopf_value_3(twist) [realmatrix_biaffine_PROP fromparts\
     $zero [list $zero $zero] [list $zero $zero]\
     [list [list $induce $one] [list $one $induce]]]
 %   \end{tcl}
@@ -2976,24 +2976,24 @@ proc compare_matrix {left right} {
 % \end{proc}
 % 
 % \begin{proc}{realmatrix_PROP_cmp}
-%   The natural order to use in an affine \PROP\ is the partial order 
+%   The natural order to use in an biaffine \PROP\ is the partial order 
 %   of element-wise comparisons.
 %   \begin{tcl}
 proc realmatrix_PROP_cmp {left right} {
    array set A {= 0 < 0 > 0 incomparable 0}
    incr A([compare_matrix\
-     [realmatrix_affine_PROP part closed $left]\
-     [realmatrix_affine_PROP part closed $right]])
-   foreach l [realmatrix_affine_PROP part begin $left]\
-           r [realmatrix_affine_PROP part begin $right] {
+     [realmatrix_biaffine_PROP part closed $left]\
+     [realmatrix_biaffine_PROP part closed $right]])
+   foreach l [realmatrix_biaffine_PROP part begin $left]\
+           r [realmatrix_biaffine_PROP part begin $right] {
       incr A([compare_matrix $l $r])
    }
-   foreach l [realmatrix_affine_PROP part end $left]\
-           r [realmatrix_affine_PROP part end $right] {
+   foreach l [realmatrix_biaffine_PROP part end $left]\
+           r [realmatrix_biaffine_PROP part end $right] {
       incr A([compare_matrix $l $r])
    }
-   foreach L [realmatrix_affine_PROP part open $left]\
-           R [realmatrix_affine_PROP part open $right] {
+   foreach L [realmatrix_biaffine_PROP part open $left]\
+           R [realmatrix_biaffine_PROP part open $right] {
       foreach l $L r $R {incr A([compare_matrix $l $r])}
    }
    if {$A(incomparable)} then {return "incomparable (element)"}
@@ -3015,17 +3015,17 @@ proc realmatrix_PROP_cmp {left right} {
 %   in the former case, but first left and then right in the latter.
 %   \begin{tcl}
 set Hopf_value_4(m)\
-  [integer_affine_PROP fromparts 0 0 {0 0} {{1 1}}]
+  [integer_biaffine_PROP fromparts 0 0 {0 0} {{1 1}}]
 set Hopf_value_4(unit)\
-  [integer_affine_PROP fromparts 0 1 {} {}]
+  [integer_biaffine_PROP fromparts 0 1 {} {}]
 set Hopf_value_4(Delta)\
-  [integer_affine_PROP fromparts 0 {0 0} 0 {{1} {1}}]
+  [integer_biaffine_PROP fromparts 0 {0 0} 0 {{1} {1}}]
 set Hopf_value_4(epsilon)\
-  [integer_affine_PROP fromparts 0 {} 1 {}]
+  [integer_biaffine_PROP fromparts 0 {} 1 {}]
 set Hopf_value_4(S)\
-  [integer_affine_PROP fromparts 0 0 0 1]
+  [integer_biaffine_PROP fromparts 0 0 0 1]
 set Hopf_value_4(twist)\
-  [integer_affine_PROP fromparts 0 {0 0} {1 0} {{0 2} {1 0}}]
+  [integer_biaffine_PROP fromparts 0 {0 0} {1 0} {{0 2} {1 0}}]
 %   \end{tcl}
 % \end{arrayvar}
 % 

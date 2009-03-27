@@ -1749,12 +1749,12 @@ proc mtmtcl::matprop::homfdpower::export {d ring A attr} {
 % \end{ensemble}
 % 
 % 
-% \section{The affine PROP}
+% \section{The biaffine PROP}
 % 
-% The |affine| PROP is a relative of the |trivial| PROP, which 
+% The |biaffine| PROP is a relative of the |trivial| PROP, which 
 % however extends it in a way similar to that in which the affine 
 % transformations extend the set of linear transformations. Indeed, 
-% the set of elements in the affine PROP includes the set of affine 
+% the set of elements in the biaffine PROP includes the set of affine 
 % transformations, but it also contains a somewhat curious set of 
 % ``coaffine'' transformation for which I currently don't have a 
 % geometrical interpretation.
@@ -1781,9 +1781,9 @@ proc mtmtcl::matprop::homfdpower::export {d ring A attr} {
 %   \mathbf{c}_3 ={}& \mathbf{c}_1 A_2 + \mathbf{c}_2 &
 %     d_3 ={}& d_1 + \mathbf{c}_1\mathbf{b}_2 + d_2
 % \end{align*}
-% This is also the composition law for the affine PROP.
+% This is also the composition law for the biaffine PROP.
 % 
-% Like ordinary affine transformations, composition of affine PROP 
+% Like ordinary affine transformations, composition of biaffine PROP 
 % elements can be expressed as ordinary multiplication of larger 
 % matrices into which the affine parts have been suitably embedded, 
 % like so:
@@ -1795,7 +1795,7 @@ proc mtmtcl::matprop::homfdpower::export {d ring A attr} {
 %   \end{pmatrix}
 % \end{equation}
 % Two nice corollaries to this observation are that the associativity 
-% and unitarity of composition. It does not reduce the affine PROP 
+% and unitarity of composition. It does not reduce the biaffine PROP 
 % to a subset of the |trivial| PROP however, as the tensor product 
 % and permutation embeddings act differently on the non-matrix parts. 
 % Instead choosing the more compact block matrix encoding
@@ -1805,7 +1805,7 @@ proc mtmtcl::matprop::homfdpower::export {d ring A attr} {
 %     \mathbf{b} & A
 %   \end{bmatrix}
 % \end{equation*}
-% for an element of the affine PROP, its operations can be summarised 
+% for an element of the biaffine PROP, its operations can be summarised 
 % as
 % \begin{align}
 %   \begin{bmatrix}
@@ -1848,10 +1848,10 @@ proc mtmtcl::matprop::homfdpower::export {d ring A attr} {
 % where $\sigma \cdot I$ denotes the |trivial| action of the 
 % permutation $\sigma$ on the identity matrix.
 % 
-% \begin{ensemble}[mtmtcl::matprop]{affine}
+% \begin{ensemble}[mtmtcl::matprop]{biaffine}
 %   This implementation of a |PROP| is as the command prefix
 %   \begin{displaysyntax}
-%     mtmtcl::matprop::affine \word{ring}
+%     mtmtcl::matprop::biaffine \word{ring}
 %   \end{displaysyntax}
 %   where the base command is an ensemble with one parameter 
 %   \word{ring} (which must be a \APIref{ring}{1.0} and 
@@ -1864,7 +1864,7 @@ proc mtmtcl::matprop::homfdpower::export {d ring A attr} {
 %   use-case for that.
 %   
 %   \begin{tcl}
-namespace eval mtmtcl::matprop::affine {
+namespace eval mtmtcl::matprop::biaffine {
    namespace ensemble create -parameters {ring}
    namespace export {[ -^`-~]*}
    namespace path [list [namespace parent]]
@@ -1890,7 +1890,7 @@ namespace eval mtmtcl::matprop::affine {
 %   \begin{ensproc}{arity}
 %     The arity is measured as the length of the \word{end} part.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::arity {ring element} {
+proc mtmtcl::matprop::biaffine::arity {ring element} {
    llength [lindex $element 2]
 }
 %     \end{tcl}
@@ -1899,7 +1899,7 @@ proc mtmtcl::matprop::affine::arity {ring element} {
 %   \begin{ensproc}{coarity}
 %     The coarity is measured as the length of the \word{begin} part.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::coarity {ring element} {
+proc mtmtcl::matprop::biaffine::coarity {ring element} {
    llength [lindex $element 1]
 }
 %     \end{tcl}
@@ -1914,7 +1914,7 @@ proc mtmtcl::matprop::affine::coarity {ring element} {
 %     \end{displaysyntax}
 %     and it returns the specified part of the \word{element}.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::part {ring part element} {
+proc mtmtcl::matprop::biaffine::part {ring part element} {
    switch -- $part "open" {
       lindex $element 3
    } "begin" {
@@ -1932,7 +1932,7 @@ proc mtmtcl::matprop::affine::part {ring part element} {
 %   \end{ensproc}
 %   
 %   \begin{ensproc}{fromparts}
-%     This is the converse of |part|: an |affine| PROP element 
+%     This is the converse of |part|: a |biaffine| PROP element 
 %     constructor. It has the call syntax
 %     \begin{displaysyntax}
 %       \meta{PROP} fromparts \word{closed} \word{begin} \word{end} 
@@ -1940,7 +1940,7 @@ proc mtmtcl::matprop::affine::part {ring part element} {
 %     \end{displaysyntax}
 %     and checks that the list lengths match.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::fromparts {ring closed begin end open} {
+proc mtmtcl::matprop::biaffine::fromparts {ring closed begin end open} {
    if {[llength $open] ? 
        [llength $begin] != [llength $open] ||\
        [llength $end] != [llength [lindex $open 0]]
@@ -1956,7 +1956,7 @@ proc mtmtcl::matprop::affine::fromparts {ring closed begin end open} {
 %     Equality testing is just about checking all elements, and 
 %     |return 0| if finding anything that doesn't match.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::= {ring L R} {
+proc mtmtcl::matprop::biaffine::= {ring L R} {
    if {[llength [lindex $L 1]] != [llength [lindex $R 1]] ||\
       [llength [lindex $L 2]] != [llength [lindex $R 2]]}\
    then {return 0}
@@ -1984,7 +1984,7 @@ proc mtmtcl::matprop::affine::= {ring L R} {
 %     procedure, but it is clearer to for each part test the 
 %     conditions which are relevant there.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::* {ring L R} {
+proc mtmtcl::matprop::biaffine::* {ring L R} {
    if {[llength [lindex $L 2]] != [llength [lindex $R 1]]} then {
       return -code error -errorcode {API PROP typenomatch}\
         "Left factor arity does not match right factor coarity"
@@ -2054,7 +2054,7 @@ proc mtmtcl::matprop::affine::* {ring L R} {
 %     remembering that it is the vector parts that determine how much 
 %     the matrix part should be padded.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::tensor {ring args} {
+proc mtmtcl::matprop::biaffine::tensor {ring args} {
    set d [{*}$ring 0]
    set rowparts {}
    set cc {}
@@ -2106,7 +2106,7 @@ proc mtmtcl::matprop::affine::tensor {ring args} {
 %     The easiest way to implement this is to use the |trivial| 
 %     counterpart.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::permutation {ring sigma} {
+proc mtmtcl::matprop::biaffine::permutation {ring sigma} {
    set zero [{*}$ring 0]
    set zerolist [lrepeat [llength $sigma] $zero]
    list $zero $zerolist $zerolist\
@@ -2118,7 +2118,7 @@ proc mtmtcl::matprop::affine::permutation {ring sigma} {
 %   
 %   \begin{ensproc}{fuse}
 %     The |fuse| procedure here is basically the same as in the 
-%     |trivial| PROP, but with the extra parts of an |affine| PROP 
+%     |trivial| PROP, but with the extra parts of a |biaffine| PROP 
 %     element. Thus every label represents a row of the open part 
 %     matrix (stored in the |Row| array) and an element in the begin 
 %     part vector (stored in the |Begin| array). The |end| and 
@@ -2128,7 +2128,7 @@ proc mtmtcl::matprop::affine::permutation {ring sigma} {
 %     left and the relevant subset of rows on the right.
 %     
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::fuse {ring args} {
+proc mtmtcl::matprop::biaffine::fuse {ring args} {
    if {[llength $args] % 3 != 2} then {
       return -code error "wrong # arguments"
    }
@@ -2213,7 +2213,7 @@ proc mtmtcl::matprop::affine::fuse {ring args} {
 %     view its primary task is to move data from the tail end to the 
 %     head end of a label, which concretely amounts to updating 
 %     |Need| at the head end. Then (almost as a side-effect) an 
-%     |affine| composition will be performed when the |Need| value 
+%     |biaffine| composition will be performed when the |Need| value 
 %     reaches zero, thus producing a new list of rows which get 
 %     appended to the queue, to be processed in due time.
 %     \begin{tcl}
@@ -2279,7 +2279,7 @@ proc mtmtcl::matprop::affine::fuse {ring args} {
 %     PROP elements make sense, but note that composition isn't 
 %     distributive or linear.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::+ {ring L R} {
+proc mtmtcl::matprop::biaffine::+ {ring L R} {
    if {[llength [lindex $L 1]] != [llength [lindex $R 1]] ||\
      [llength [lindex $L 2]] != [llength [lindex $R 2]]} then {
       return -code error "The two terms do not have the same shape"
@@ -2301,7 +2301,7 @@ proc mtmtcl::matprop::affine::+ {ring L R} {
    return $res
 }
 % \medskip
-proc mtmtcl::matprop::affine::- {ring L R} {
+proc mtmtcl::matprop::biaffine::- {ring L R} {
    if {[llength [lindex $L 1]] != [llength [lindex $R 1]] ||\
      [llength [lindex $L 2]] != [llength [lindex $R 2]]} then {
       return -code error "The two terms do not have the same shape"
@@ -2323,7 +2323,7 @@ proc mtmtcl::matprop::affine::- {ring L R} {
    return $res
 }
 % \medskip
-proc mtmtcl::matprop::affine::. {ring scalar element} {
+proc mtmtcl::matprop::biaffine::. {ring scalar element} {
    set res {}
    foreach depth {0 1 1 2} part $element {
       switch -- $depth 0 {
@@ -2391,7 +2391,7 @@ proc mtmtcl::matprop::affine::. {ring scalar element} {
 %     where the $0$s and $1$s are \OMSref{alg1}{zero} and 
 %     \OMSref{alg1}{one} respectively.
 %     \begin{tcl}
-proc mtmtcl::matprop::affine::export {ring elem attr} {
+proc mtmtcl::matprop::biaffine::export {ring elem attr} {
    set sattr $attr
    dict lappend sattr mtmtcl:path scalar
    set rowsymb [list OMS\

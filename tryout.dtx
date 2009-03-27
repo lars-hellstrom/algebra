@@ -600,7 +600,7 @@ set code "\\begin{gather}\n  [
 % inequality systems that need to be solved (and the computational 
 % complexity of computing the value of realistic networks) are 
 % overwhelming. However, late night inspiration struck and suggested 
-% a third PROP\Ldash quickly dubbed `the affine PROP'\Dash might be 
+% a third PROP\Ldash quickly dubbed `the biaffine PROP'\Dash might be 
 % of use in this situation. The definition of this PROP is a 
 % restatement of the old path-counting order for networks, and it 
 % combines the complexity of the trivial matrix PROP with the 
@@ -608,7 +608,7 @@ set code "\\begin{gather}\n  [
 % nullcoary elements.
 % 
 % \begin{tcl}
-interp alias {} PROP {} mtmtcl::matprop::affine ::mtmtcl::rings::integer
+interp alias {} PROP {} mtmtcl::matprop::biaffine ::mtmtcl::rings::integer
 if {[catch {
    lrepeat 0 0
 }]} then {
@@ -1128,7 +1128,7 @@ interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
    list ::mtmtcl::sets::variable_set\
      {a b c d e A B C D E T01 T02 T10 T11 T12 T20 T21 T22} $extraD
 ]]
-interp alias {} PROP {} mtmtcl::matprop::affine Coeff_ring
+interp alias {} PROP {} mtmtcl::matprop::biaffine Coeff_ring
 % \end{tcl}
 % The |fusediff| procedure is again useful, but of course the 
 % |PROPgen| array needs a new definition.
@@ -1242,7 +1242,7 @@ set comult2 [PROP fromparts [Coeff_ring 0]\
 % and 17.
 % 
 % \begin{proc}{latex_inequalities}
-%   This procedure maps existing rules into the |affine| PROP and 
+%   This procedure maps existing rules into the |biaffine| PROP and 
 %   manufactures a list of inequalities from the result, which are 
 %   then turned into \LaTeX\ code (as an |enumerate| environment with 
 %   the formulae in paragraphs, since they are frequently longer than 
@@ -1253,7 +1253,7 @@ set comult2 [PROP fromparts [Coeff_ring 0]\
 %     \word{PROP element} \end{regblock}
 %   \end{displaysyntax}
 %   where the \word{vertex annotation} \word{PROP element} uniquely 
-%   define a map from the free (networks) to the |affine| PROPs. The 
+%   define a map from the free (networks) to the |biaffine| PROPs. The 
 %   \word{rule-number list} contains integers for elements of the 
 %   |rulesL| variable and |e|\meta{integer} for elemnets of the 
 %   |equalitiesL| variable.
@@ -1623,9 +1623,9 @@ interp alias {} inequalities1417 {} latex_inequalities {14 17}
 % twist, which would violate DCC! Hence it might be time for another 
 % round of indeterminate calculations.
 % 
-% \subsubsection{Affine calculations}
+% \subsubsection{Biaffine calculations}
 % 
-% The |affine| PROP has been good so far, so it should be given pole 
+% The |biaffine| PROP has been good so far, so it should be given pole 
 % position in this calculation, but I fear it won't be enough.
 % \begin{tcl}
 interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
@@ -1634,7 +1634,7 @@ interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
    list ::mtmtcl::sets::variable_set\
      {a b c d e A B C D E T01 T02 T10 T11 T12 T20 T21 T22} $extraD
 ]]
-interp alias {} PROP {} mtmtcl::matprop::affine Coeff_ring
+interp alias {} PROP {} mtmtcl::matprop::biaffine Coeff_ring
 % \end{tcl}
 % The inequalities are going to be computed using 
 % |latex_inequalities|, which means the sides to compare will have to 
@@ -1680,7 +1680,7 @@ set code [
    ]
 ]
 % \end{tcl}
-% The result can be found in Table~\ref{Tab:Twist-Delta-affine}.
+% The result can be found in Table~\ref{Tab:Twist-Delta-biaffine}.
 % \begin{table}
 % \begin{enumerate}
 % \item[o0:1]
@@ -1734,9 +1734,9 @@ set code [
 % \item[24]
 %   \(T_{2,2} ( 1 - D T_{2,1} - E )  \geqslant 0\).
 % \end{enumerate}
-% \caption{Affine coefficients for \(\mathrm{id}\otimes\Delta \circ 
+% \caption{Biaffine coefficients for \(\mathrm{id}\otimes\Delta \circ 
 %   T\)}
-% \label{Tab:Twist-Delta-affine}
+% \label{Tab:Twist-Delta-biaffine}
 % \end{table}
 % A case-by-case analysis of this system reveals two solutions, both 
 % with \(1 \geqslant T_{1,2},T_{2,1} > 0\) and \(T_{0,1} = T_{0,2} = 
