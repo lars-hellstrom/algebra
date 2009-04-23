@@ -247,7 +247,7 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
       - {
          if {[llength $args] == 1} then {
             expr {(-[lindex $args 0]) % $n}
-         } elseif {[llength $args] == 1} then {
+         } elseif {[llength $args] == 2} then {
             expr {([lindex $args 0] - [lindex $args 1]) % $n}
          } else {
             return -code error "Wrong # of arguments for -,\

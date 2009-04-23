@@ -24,32 +24,32 @@
 
 \makeatletter
 \NewDescribeCommand{\describecolumn}{%
-   \XD@grab@sarg{*}\XD@grab@sarg{+}%
+   \XD@grab@sarg{/}\XD@grab@sarg{*}\XD@grab@sarg{+}%
    \XD@grab@harmless@oarg\XD@grab@harmless{}%
-}{4}{%
-   \ifx #1\BooleanFalse
+}{5}{%
+   \ifx #2\BooleanFalse
       \GenericDescribePrint{%
-         \MacroFont #4 \normalfont(column)%
+         \MacroFont #5 \normalfont(column)%
       }%
    \fi
    \begingroup
       \def\meta##1{(##1)}%
-      \unrestored@protected@xdef\@gtempa{#4}%
+      \unrestored@protected@xdef\@gtempa{#5}%
    \endgroup
    \IndexEntry{%
-      \LevelSorted{\@gtempa}{\texttt{#4} column}%
-      \ifx \NoValue#3\@empty \else
-         \LevelSorted{#3}{\texttt{#3} table}%
+      \LevelSorted{\@gtempa}{\texttt{#5} column}%
+      \ifx \NoValue#4\@empty \else
+         \LevelSorted{#4}{\texttt{#4} table}%
       \fi
-   }{usage}{\thepage}%
-   \ifx \NoValue#3\@empty \else
+   }{\ifx #1\BooleanTrue usage\else main\fi}{\thepage}%
+   \ifx \NoValue#4\@empty \else
       \IndexEntry{%
-         \LevelSorted{#3}{\texttt{#3} (table)}%
-         \LevelSorted{\@gtempa}{\texttt{#4} column}%
-      }{usage}{\thepage}%
+         \LevelSorted{#4}{\texttt{#4} (table)}%
+         \LevelSorted{\@gtempa}{\texttt{#5} column}%
+      }{\ifx #1\BooleanTrue usage\else main\fi}{\thepage}%
    \fi
-   \ifx #2\BooleanTrue
-      \texttt{#4}%
+   \ifx #3\BooleanTrue
+      \texttt{#5}%
       \expandafter\@gobble % Eats \ignorespaces
    \fi
 }
@@ -182,8 +182,9 @@ lappend DB_column(am6iguities) num6er {INTEGER PRIMARY KEY AUTOINCREMENT}
 % hand side in the case of a rule, and the site of the ambiguity in 
 % the other case, so these columns are named |lhs| and |si7e|.
 % \begin{tcl}
-lappend DB_column(ru1es) lhs {} feed6acks {} rhs {}
-lappend DB_column(am6iguities) si7e {} feed6acks {}
+lappend DB_column(ru1es)  lhs {NOT NULL}  feed6acks {NOT NULL} \
+  rhs {NOT NULL}
+lappend DB_column(am6iguities)  si7e {NOT NULL}  feed6acks {NOT NULL}
 % \end{tcl}
 % 
 % \describecolumn[ru1es]{rhs}
@@ -225,11 +226,22 @@ lappend DB_column(am6iguities) si7e {} feed6acks {}
 % the leading coefficient is not invertible, but that can be a later 
 % development. 
 % \begin{tcl}
-lappend DB_column(ru1es) st4te CHAR pr00f INTEGER
+lappend DB_column(ru1es) st4te {CHAR NOT NULL} pr00f INTEGER
 % \end{tcl}
 % The \describecolumn+[ru1es]{pr00f} column in the |ru1es| table 
 % contains the number of the ambiguity from which the rule or 
 % equality was derived, or null if it was given as an axiom.
+% 
+% The \describecolumn+[ru1es]{wh3n1} column is the timestamp 
+% (|clock seconds| value) for when the rule or equality was created 
+% and \describecolumn+[ru1es]{wh3n2} is (if non-null) the timestamp 
+% for when it was retired.
+% \begin{tcl}
+lappend DB_column(ru1es) wh3n1 INTEGER wh3n2 INTEGER
+% \end{tcl}
+% An SQL date value might have been more appropriate, but I find 
+% this sufficient. Some drivers might however require the column to 
+% be a bigint.
 % 
 % 
 % 
@@ -243,7 +255,7 @@ lappend DB_column(ru1es) st4te CHAR pr00f INTEGER
 % both of which are arbitrary strings. The |k3y| must be unique 
 % within the table.
 % \begin{tcl}
-lappend DB_column(le9end) k3y {} va1ue {}
+lappend DB_column(le9end) k3y {UNIQUE} va1ue {}
 % \end{tcl}
 % 
 % The \describestring+[legend key]{coeff_cmd} entry in the legend is 
@@ -267,24 +279,166 @@ lappend DB_column(le9end) k3y {} va1ue {}
 % When reducing a network, the most time-consuming task is that of 
 % finding a rule whose |lhs| occurs in it or deciding that no such 
 % rule exists, since |network::wfb::instances| is rather complicated. 
-% Profiles count the number of occurencies of certain features 
-% within a network, and provide a way of eliminating rules from the 
-% search before even looking at the |lhs|, since there can be no 
-% instances of $H$ in $G$ if there are more occurencies of some 
-% feature in $H$ than there is in $G$.
+% Profiles provide a shortcut, by counting the number of occurencies 
+% of certain features within a network, and thus a way of eliminating 
+% rules from the search before even looking at the |lhs|, since there 
+% can be no instances of $H$ in $G$ if there are more occurencies of 
+% some feature in $H$ than there is in $G$.
+% 
+% The features being counted are simply the vertices (separate count 
+% for each annotation) and the edges, where the endpoints are used to 
+% refine the count, paying attention to both vertex annotation and 
+% the index of the edge. For a signature $(\Omega,\alpha,\omega)$ 
+% there are thus $\sum_{x \in \Omega} \omega(x)$ different things that 
+% can be at the tail end of an edge, and 
+% $\sum_{x \in \Omega} \alpha(x)$ different things that can be at the 
+% head end of it, so the number of different edge features is the 
+% product of these. There is no point in counting boundary edges 
+% since their numbers are already determined by the counts of 
+% internal edges and vertices; also these counts are more troublesome 
+% to compare, as a boundary edge in $H$ can be internal in $G$. 
+% Counting edges this way is only slightly weaker than counting 
+% connected $2$-vertex subsemigraphs; it does not notice when such a 
+% subsemigraph is more than simply connected, but that will on the 
+% other hand probably be very rare and would not warrant the 
+% increased complexity.
+% 
+% \begin{proc}{network_profile}
+%   This procedure computes the profile (a dictionary mapping column 
+%   names to counts). The call syntax is
+%   \begin{displaysyntax}
+%     |network_profile| \word{signature} \word{network}\regopt
+%   \end{displaysyntax}
+%   When called without a \word{network} argument, the command 
+%   returns an ``all zeroes'' profile (technically it computes the 
+%   profile of the empty network) that can be used for example to get 
+%   the list of profile columns for this \word{signature}.
+%   
+%   The column names are of the form 
+%   \describecolumn*[am6iguities]{v\meta{num}}
+%   \describecolumn+[ru1es]{v\meta{num}} for vertex counts and 
+%   \describecolumn*[am6iguities]{e\meta{num}}
+%   \describecolumn+[ru1es]{e\meta{num}} for edge counts. The names 
+%   can be opaque because they are not meant to be interpreted; only 
+%   this procedure converts data from the network realm to the 
+%   profile realm, so it only needs to do so consistently.
+%   
+%   The implementation relies heavily on |incr|'s new auto-initialise 
+%   behaviour. The |VC| array is for vertex counts and is indexed by 
+%   vertex annotations. The |EC| array is for edge counts and is 
+%   indexed by lists on the form
+%   \begin{displaysyntax}
+%     \word{head-annotation} \word{head-index} \word{tail-annotation} 
+%     \word{tail-index}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc network_profile {signature {NW {{{"" {} {}} {"" {} {}}} {}}}} {
+   foreach v [lindex $NW 0] {incr VC([lindex $v 0])}
+   foreach e [lindex $NW 1] {
+      lset e 0 [lindex $NW 0 [lindex $e 0] 0]
+      lset e 2 [lindex $NW 0 [lindex $e 2] 0]
+      incr EC($e)
+   }
+   set inL {}
+   set outL {}
+   set res {}
+   set n 0
+   foreach {x p} $signature {
+      lappend res v$n [incr VC($x) 0]
+      for {set i 0} {$i < [lindex $p 0]} {incr i} {
+         lappend inL [list $x $i]
+      }
+      for {set i 0} {$i < [lindex $p 1]} {incr i} {
+         lappend outL [list $x $i]
+      }
+      incr n
+   }
+   set n 0
+   foreach o $outL {
+      foreach i $inL {
+         lappend res e$n [incr EC([concat $o $i]) 0]
+         incr n
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % 
 % 
 % \subsection{Ambiguities}
 % 
+% Most of the information in an ambiguity row is in the 
+% \describecolumn+[am6iguities]{re5olution} column, which holds the 
+% list of steps that were taken while trying to resolve the 
+% ambiguity. Each of these steps is a linear combination of networks, 
+% and therefore a dictionary mapping monomials to coefficients. The 
+% first step for an ambiguity $(t_1,\mu,t_2)$ is always the 
+% difference $t_1(\mu) - t_2(\mu)$ (the ``S-polynomial'').
+% Since each network typically appears in more than one step of the 
+% |re5olution|, the \emph{monomials} there are not the networks 
+% themselves, but indices into a list of networks that have occurred 
+% during the resolution of this ambiguity. That list of networks kept 
+% in the \describecolumn+[am6iguities]{m0n0mials} column.
+% \begin{tcl}
+lappend DB_column(am6iguities)\
+  re5olution {NOT NULL} m0n0mials {NOT NULL}
+% \end{tcl}
 % 
+% Besides the individual steps in the resolution, it is also 
+% interesting to keep track of which rules were applied, to which
+% monomial they were applied, and exactly where in these they were 
+% applied. The \describecolumn+[am6iguities]{wh1ch} column is a list of 
+% rule |num6er|s such that the $i$th rule listed here was used to 
+% transform the $i$th step into the $(i +\nobreak 1)$th step. The 
+% \describecolumn+[am6iguities]{wh3re} column is a list of pairs
+% \begin{displaysyntax}
+%   \word{monomial} \word{region}
+% \end{displaysyntax}
+% that specify to which monomial the corresponding rule from |wh1ch| 
+% was applied, and what region in it was replaced when doing so. The 
+% reason the rule numbers are kept in a separate column is that this 
+% makes it feasible to e.g.~search for resolutions that employed a 
+% particular rule.
+% \begin{tcl}
+lappend DB_column(am6iguities) wh1ch {} wh3re {}
+% \end{tcl}
 % 
-% \describecolumn+[am6iguities]{st4te}, 
-% which expresses the status of a rule or ambiguity
+% It should be observed that |wh1ch| and |wh3re| do not provide 
+% information about how the first resolution step $t_1(\mu)-t_2(\mu)$ 
+% is formed. The rules that take part in this are kept in the 
+% \describecolumn+[am6iguities]{p1us} and 
+% \describecolumn+[am6iguities]{m1nus} columns, where |p1us| is used 
+% in $t_1$ and |m1nus| is used in $t_2$. The corresponding regions 
+% of the |si7e| are kept in the 
+% \describecolumn+[am6iguities]{p1us2eg} and 
+% \describecolumn+[am6iguities]{m1nus2eg} columns.
+% \begin{tcl}
+lappend DB_column(am6iguities)\
+  p1us {INTEGER}  m1nus {INTEGER} \
+  p1us2eg {NOT NULL}  m1nus2eg {NOT NULL}
+% \end{tcl}
+% It should be observed that \emph{the \texttt{p1us} and \texttt{m1nus} 
+% columns may be null}, for an ambiguity that is used to feed an 
+% unspecified congruence into the completion procedure. In such 
+% ambiguities, the \describecolumn[am6iguities]{si7e} network is 
+% arbitrary (usually the first element of |m0n0mials|) and the 
+% profile columns are bogus (usually set to all zeroes). Furthermore 
+% the |p1us2eg| and |m1nus2eg| columns contain text descriptions of 
+% the identity being encoded. The format is unspecified, but the 
+% |p1us2eg| column can contain a longer description and |m1nus2eg| 
+% column a shorter description.
+% 
+% Then there is the \describecolumn+[am6iguities]{st4te} column, 
+% which expresses the status of an ambiguity.
 % \begin{ttdescription}
 %   \item[A]
 %     An active ambiguity, i.e., one that still requires resolution.
 %   \item[0]
-%     An ambiguity that has been resolved to $0$.
+%     An ambiguity that has been resolved to $0$. For ambiguities in 
+%     this state, the final element in the |re5olution| is empty 
+%     (representing $0$).
 %   \item[r]
 %     An ambiguity that was made resolvable by the creation of a new 
 %     rule; exactly which rule that was can be determined by 
@@ -294,19 +448,3751 @@ lappend DB_column(le9end) k3y {} va1ue {}
 %     the creation of two or more equalities. Exactly which 
 %     equalities can be determined by looking at the |pr00f| column 
 %     in the |ru1es| table.
+%   \item[d]
+%     An ambiguity that could not be resolved, and would have lead to 
+%     the creation of two or more equalities, where it not that these 
+%     (or some simpler form of them) are already known. The 
+%     \describecolumn/+[am6iguities]{wh1ch} list has one element, 
+%     namely the |num6er| of the equality that implied the final step 
+%     in the |re5olution|.
 %   \item[S]
 %     A suspended ambiguity, i.e., one that still requires resolution 
 %     but is expected to resolve when an additional rule has been 
 %     added. Information about where that rule might come from is not 
 %     kept in the database.
+%   \item[2]
+%     The ambiguity has not been explicitly resolved, but it has been 
+%     discarded as useless by ``Buchberger's second criterion''. The 
+%     \describecolumn/+[am6iguities]{wh1ch} list has one element, 
+%     namely the |num6er| of the rule or equality that has an 
+%     instance in the site of the ambiguity.
 % \end{ttdescription}
 % \begin{tcl}
-lappend DB_column(am6iguities) st4te CHAR
+lappend DB_column(am6iguities) st4te {CHAR NOT NULL}
+% \end{tcl}
+% It would not be possible to use the |st4te| column to distinguish 
+% ambiguities used to feed congruences into the system, as these 
+% ambiguities get resolved just like ordinary ones and thus change 
+% state.
+% 
+% As for rules, the \describecolumn+[am6iguities]{wh3n1} column is 
+% the timestamp for when the ambiguity was created and 
+% \describecolumn+[am6iguities]{wh3n2} is (if non-null) the timestamp 
+% for when the ambiguity was retired.
+% \begin{tcl}
+lappend DB_column(am6iguities) wh3n1 INTEGER wh3n2 INTEGER
+% \end{tcl}
+% 
+% The \describecolumn+[am6iguities]{vRe5Sum} column contains the 
+% total number of (internal) vertices in all terms of the first step 
+% of the |re5olution|. This number is one candidate to order by when 
+% selecting the next ambiguity to process. The 
+% \describecolumn+[am6iguities]{v2Re5Sum} column similarly contains 
+% the sum over all terms of the squares of the numbers of internal 
+% vertices.
+% \begin{tcl}
+lappend DB_column(am6iguities) vRe5Sum INTEGER v2Re5Sum INTEGER
 % \end{tcl}
 % 
 % 
-% \describecolumn+[am6iguities]{re5olution}
+% \subsection{Pairs}
+% 
+% Experience with the first example problem (Hopf with twist) has shown 
+% that the database is around $1.5\,mathrm{GB}$ when the |am6iguities| 
+% table reaches half a million rows. Most of these ambiguities are 
+% expected to be irrelevant\Ldash generated from a rule or equality 
+% that is subsequently dropped, and too large to figure in the proofs 
+% of anything interesting\Dash so it would be interesting to 
+% establish a less spacious storage for ambiguities far from those 
+% that are currently being chosen for resolution.
+% 
+% The natural format for this would be as a table of critical pairs 
+% that have not yet contributed to the |am6iguities| table. This 
+% table is called \describestring+[table]{pa1rs}, and its two main 
+% columns are \describecolumn+[pa1rs]{p1us} and 
+% \describecolumn+[pa1rs]{m1nus} with the same interpretations as in 
+% |am6iguities|.
+% \begin{tcl}
+lappend DB_column(pa1rs)  p1us {INTEGER}  m1nus {INTEGER} \
+  pick8y {NUMERIC}
+% \end{tcl}
+% There is also a column \describecolumn+[pa1rs]{pick8y} which holds 
+% whatever is used as criterion when picking ambiguities.
+% 
+% \begin{variable}{am6iguity_top}
+%   The |am6iguity_top| variable holds the largest value currently 
+%   allowed for the picking criterion for an ambiguity that goes into 
+%   the |am6iguities| table. Ambiguities that get a higher value (and 
+%   thus lower priority) than this will instead go into the |pa1rs| 
+%   table. The value increases over time, as it is always kept a bit 
+%   above the line where full ambiguities are being picked for 
+%   resolution, and when this happens then data should be moved back 
+%   from |pa1rs| to |am6iguities|.
+%   
+%   By default |am6iguity_top| is set to |infinity|, which means 
+%   everything is put in the |am6iguities| table.
+%   \begin{tcl}
+variable am6iguity_top infinity
+%   \end{tcl}
+% \end{variable}
+% 
+% More experience still has shown that even if the space requirements 
+% are kept in moderation when using pairs, it still takes an awful 
+% lot of time to enumerate all the overlaps, especially since most 
+% of the imformation is simply going to be thrown away. It would be 
+% better to delay this step until some ambiguity is actually going to 
+% be used; on one hand this means remembering also pairs for which 
+% there is no overlap, but on the other hand it means not keeping 
+% multiples (one pair for each ambiguity) of pairs, and on the whole 
+% it all seems to even out. The problem is then how to compute a 
+% reasonable |pick8y| value for a pair.
+% 
+% At least in the \Module{vsquare} case that the |pick8y| value is 
+% the sum over all terms of the squares of the orders of the 
+% networks, this is actually easy enough to be done in SQL. The basic 
+% idea is that when annexing to network $G$ of order $g$ a list 
+% $H_1,\dotsc,H_n$ of networks of orders $h_1,\dotsc,h_n$, the 
+% order-square sum of the result list is
+% \begin{equation*}
+%   \sum_{i=1}^n (g + h_i)^2 = 
+%   g^2 + 2g\sum_{i=1}^n h_i + \sum_{i=1}^n h_i^2
+%   \text{;}
+% \end{equation*}
+% hence in order to have the left hand side readily available for 
+% every value of $g$, it is sufficient to precompute and store the 
+% two sums in the right hand side.
+% 
+% A trickier issue is that of determining the appropriate value of 
+% $g$, since this is going to be the number of vertices (in the |lhs| 
+% of the other rule of the pair) that don't overlap. An accurate 
+% value is not feasible, but it should be sufficient to merely give 
+% a good guess, and as that can be taken the average number of in 
+% all overlaps with rule computed so far! Hence a prototypical 
+% command for adding to the |pa1rs| table all pairs that can be 
+% formed from a (new) rule would be:
+%\begin{verbatim}
+%  INSERT INTO pa1rs (p1us,m1nus,pick8y)
+%  SELECT num6er, :newnum, 
+%    annex1*annex1 + 2*annex1*vSum + v2Sum +
+%    annex2*annex2 + 2*annex2*:vSum + :v2Sum
+%  FROM ( SELECT num6er, vSum, v2Sum,
+%    :lhsOrder - overl4p AS annex1,
+%    lhsOrder - overl4p AS annex2
+%  FROM ( SELECT num6er, vSum, v2Sum, 
+%    v0+v1+v2+v3+v4+v5 AS lhsOrder,
+%    coalesce( overl4pSum / overl4pTimes, 1 ) AS overl4p
+%  FROM ru1es WHERE st4te IN ('R','E') ))
+%\end{verbatim}
+%
+% This requires some four new columns in the |ru1es| table, but no 
+% more than that. The \describecolumn+[ru1es]{vSum} and 
+% \describecolumn+[ru1es]{v2Sum} are thus the sum of the orders and 
+% sum of the squares of the orders respectively, of the networks in 
+% the |rhs| of the rule. The \describecolumn+[ru1es]{overl4pTimes} are 
+% the number of ambiguities constructed for a rule, and 
+% \describecolumn+[ru1es]{overl4pSum} is the sum of the orders of all 
+% overlap regions in these ambiguities.
+% \begin{tcl}
+%<*lazier>
+lappend DB_column(ru1es)  vSum REAL  v2Sum REAL \
+  overl4pSum {REAL DEFAULT 0}  overl4pTimes {INTEGER DEFAULT 0}
+%</lazier>
+% \end{tcl}
+% The main reason to make |overl4pSum| a real is that I haven't found 
+% any other way to avoid integer division above. The real 
+% declarations could just as well have been integers.
 % 
 % 
+% \subsection{Initialising the database}
+% 
+% 
+% \begin{proc}{prepare_statements}
+%   This procedure creates TDBC statement objects for database 
+%   transactions that are carried out frequently, and stores them 
+%   into the |DBCMD| array. The call syntax is
+%   \begin{displaysyntax}
+%     |prepare_statements| \word{db}
+%   \end{displaysyntax}
+%   and there is no particular return value.
+%   
+%   The first order of business is to retrieve the |signature|, since 
+%   that is needed to construct proper statements involving profiles.
+%   \begin{tcl}
+proc prepare_statements {db} {
+   variable DBCMD
+   set signature [dict get [lindex [
+      $db allrows {SELECT va1ue FROM le9end WHERE k3y='signature'}
+   ] 0] va1ue]
+   set pcols [dict keys [network_profile $signature]]
+%   \end{tcl}
+%   
+%   \begin{arrayentry}{DBCMD}{Divisors}
+%     The |Divisors| statement finds proper active rules whose |lhs| 
+%     might have an instance in a network with the provided profile.
+%     \begin{tcl}
+   set L [list {(st4te = 'R')}]
+   foreach col $pcols {lappend L "($col <= :$col)"}
+   set DBCMD(Divisors) [$db prepare "
+      SELECT num6er,lhs,rhs,feed6acks 
+      FROM ru1es WHERE ( [join $L " AND "] )
+   "]
+%     \end{tcl}
+%     This is used when reducing expressions, to find rules that 
+%     might act nontrivially.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{EDivisors}
+%     The |EDivisors| statement finds equalities whose |lhs| might 
+%     have an instance in a network with the provided profile.
+%     \begin{tcl}
+   set L [list {(st4te = 'E' OR st4te = 'e')}]
+   foreach col $pcols {lappend L "($col <= :$col)"}
+   set DBCMD(EDivisors) [$db prepare "
+      SELECT num6er,lhs,rhs,feed6acks 
+      FROM ru1es WHERE ( [join $L " AND "] )
+   "]
+%     \end{tcl}
+%     This is used when checking whether the end result of resolving 
+%     an ambiguity is just a duplicate of some known equality. It is 
+%     necessary to try also the inactive equalities, because 
+%     equalities can deactivate each other.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{RDividedBy}
+%     The |RDividedBy| statement finds active rules or equalities 
+%     whose |lhs| might contain an instance of a network with the 
+%     provided profile.
+%     \begin{tcl}
+   set L [list {(st4te = 'R' OR st4te = 'E')}]
+   foreach col $pcols {lappend L "($col >= :$col)"}
+   set DBCMD(RDividedBy) [$db prepare "
+      SELECT num6er,st4te,lhs,rhs,feed6acks 
+%<lazier>        , vSum, v2Sum
+      FROM ru1es WHERE ( [join $L " AND "] )
+   "]
+%     \end{tcl}
+%     This is used to find rules that should be dropped when a new 
+%     rule has been added. It is also used to discover the |num6er| 
+%     assigned to a newly created rule.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{RDividedBy2}
+%     The |RDividedBy| statement finds active rules or equalities 
+%     whose |lhs| might contain an instance of a network with the 
+%     provided profile and whose |num6er|s are greater than one that 
+%     is specified.
+%     \begin{tcl}
+   set L [list {(st4te = 'R' OR st4te = 'E')}]
+   lappend L {(num6er > :num6er)}
+   foreach col $pcols {lappend L "($col >= :$col)"}
+   set DBCMD(RDividedBy2) [$db prepare "
+      SELECT num6er,st4te,lhs,rhs,feed6acks 
+      FROM ru1es WHERE ( [join $L " AND "] )
+   "]
+%     \end{tcl}
+%     This is used to find rules that might imply an ambiguity with 
+%     the given profile can be discarded by ``Buchberger's second 
+%     criterion''.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{ADividedBy}
+%     The |ADividedBy| statement finds the |num6er|s of active or 
+%     suspended ambiguities whose |si7e| might contain an instance 
+%     of a network with the provided profile.
+%     \begin{tcl}
+   set L [list {(st4te = 'A' OR st4te = 'S')} {(p1us NOTNULL)}]
+   foreach col $pcols {lappend L "($col >= :$col)"}
+   set DBCMD(ADividedBy) [$db prepare "
+      SELECT num6er FROM am6iguities WHERE ( [join $L " AND "] )
+   "]
+%     \end{tcl}
+%     This is used to find ambiguities that can be discarded by 
+%     ``Buchberger's second criterion'', hence the restriction that 
+%     |p1us| must be non-null.
+%     
+%     This statement used to return full rows of the |am6iguities| 
+%     table, but this turned out to be infeasible when the table grew 
+%     to about $70000$ rows, as that often made the selection as a 
+%     whole too large to fit comfortably in RAM (although the exact 
+%     figure is of course machine-dependent). Using the TDBC 
+%     resultset interface did \emph{not} get around that, as the 
+%     underlying \textsf{tclsqlite} API did not provide such an 
+%     abstraction. (The SQLite C-level API sort-of provides this, but 
+%     possibly with the restriction that only one resultset per 
+%     statement is allowed.)
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{GetAmbiguity}
+%      Instead each ambiguity is going to be fetched by |num6er|, when 
+%      it is needed. The |GetAmbiguity| statement takes the |num6er| 
+%      as only parameter and returns the non-profile columns of the 
+%      row.
+%      \begin{tcl}
+   variable DB_column
+   set DBCMD(GetAmbiguity) [$db prepare "
+      SELECT [join [dict keys $DB_column(am6iguities)] ", "]
+      FROM am6iguities WHERE ( num6er = :num6er )
+   "]
+%      \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{ActiveRu1e}
+%     The |ActiveRu1e| statement finds the \emph{numbers} of all 
+%     active rules or equalities. It has no parameters.
+%     \begin{tcl}
+   set DBCMD(ActiveRu1e) [$db prepare {
+      SELECT num6er FROM ru1es WHERE ( st4te='R' OR st4te='E' )
+   }]
+%     \end{tcl}
+%     This is used to gather a list of rules against which one must 
+%     try to form new overlap ambiguities.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{GetRu1e}
+%     The |GetRu1e| statement takes the |num6er| of a rule or 
+%     equality as parameter and returns all non-profile 
+%     columns.
+%     \begin{tcl}
+   set DBCMD(GetRu1e) [$db prepare "
+      SELECT [join [dict keys $DB_column(ru1es)] ", "]
+      FROM ru1es WHERE ( num6er = :num6er )
+   "]
+%     \end{tcl}
+%     This is a basic ``get rule $i$'' operation. It is for example 
+%     used on the numbers obtained using the |ActiveRu1e| statement.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{NewRu1e}
+%     The |NewRu1e| statement creates a new rule or equality. 
+%     The parameters are |lhs|, |rhs|, |feed6acks|, |st4te|, |pr00f|, 
+%     |wh3n1|, |vSum|, |v2Sum|, and the profile components.
+%     \begin{tcl}
+   set L $pcols
+   lappend L lhs rhs feed6acks st4te pr00f wh3n1
+%<lazier>   lappend L vSum v2Sum
+   set DBCMD(NewRu1e) [$db prepare "
+      INSERT INTO ru1es ( [join $L ", "] )
+      VALUES ( :[join $L ", :"] )
+   "]
+
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{SetRu1eState}
+%     The |SetRu1eState| statement updates the state of a rule 
+%     identified by |num6er|. Parameters are |st4te| (the new state), 
+%     |wh3n2| (timestamp when doing this), and |num6er|.
+%     \begin{tcl}
+   set DBCMD(SetRu1eState) [$db prepare {
+      UPDATE ru1es SET st4te = :st4te, wh3n2 = :wh3n2 
+      WHERE num6er = :num6er
+   }]
+%     \end{tcl}
+%     This is typically used to deactivate a rule or equality.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{NewAmbiguity}
+%     The |NewAmbiguity| statement creates a new ambiguity. The 
+%     parameters are all the columns except |num6er|.
+%     \begin{tcl}
+   set L $pcols
+   lappend L {*}[dict keys\
+     [dict remove $DB_column(am6iguities) num6er]]
+   set DBCMD(NewAmbiguity) [$db prepare "
+      INSERT INTO am6iguities ( [join $L ", "] )
+      VALUES ( :[join $L ", :"] )
+   "]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{AdvanceAmbiguity}
+%     The |AdvanceAmbiguity| statement updates the columns of an 
+%     ambiguity that may change due to reductions of it, i.e., 
+%     |m0n0mials|, |re5olution|, |st4te|, |wh1ch|, |wh3re|, and 
+%     |wh3n2|. The parameters are |num6er| (which identifies the 
+%     ambiguity to update) and the six new values.
+%     \begin{tcl}
+   set DBCMD(AdvanceAmbiguity) [$db prepare {
+      UPDATE am6iguities SET 
+        m0n0mials = :m0n0mials, re5olution = :re5olution, 
+        st4te = :st4te, wh1ch = :wh1ch, wh3re = :wh3re, 
+        wh3n2 = :wh3n2
+      WHERE num6er = :num6er
+   }]
+%     \end{tcl}
+%     It is possible to advance an ambiguity after each reduction 
+%     step, but one typically leaves it as it is until an end is 
+%     reached.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{ChooseAmbiguity}
+%     The |ChooseAmbiguity| statement selects one active ambiguity, 
+%     returning all non-profile columns. There are no parameters. 
+%     The criterion used to choose an ambiguity is that the sum of 
+%     its vertex profile columns should be minimal; this is a sort 
+%     of ``least critical pair first'' strategy.
+%     \begin{tcl}
+   set DBCMD(ChooseAmbiguity) [$db prepare "
+      SELECT [join [dict keys $DB_column(am6iguities)] ", "]
+      FROM am6iguities WHERE st4te = 'A'
+%<classic>      ORDER BY m1nus,p1us ASC
+%<oldnew>      ORDER BY m1nus+p1us ASC
+%<pcols>      ORDER BY [join $pcols +] ASC
+%<vcols>      ORDER BY [join [lsearch -all -inline $pcols v*] +] ASC
+%<vsum>      ORDER BY vRe5Sum ASC
+%<vsquare>      ORDER BY v2Re5Sum ASC
+      LIMIT 1
+   "]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{AddPair}
+%     The |AddPair| statement adds a row to the |pa1rs| table. Its 
+%     parameters are the column values.
+%     \begin{tcl}
+   set DBCMD(AddPair) [$db prepare "
+      INSERT INTO pa1rs ( [join [dict keys $DB_column(pa1rs)] ", "] )
+      VALUES ( :[join [dict keys $DB_column(pa1rs)] ", :"] )
+   "]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{LeastPair}
+%     The |LeastPair| statement selects a pair with minimal |pick8y|. 
+%     There are no parameters.
+%     \begin{tcl}
+   set DBCMD(LeastPair) [$db prepare {
+      SELECT * FROM pa1rs ORDER BY pick8y ASC LIMIT 1
+   }]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{PairsUpto}
+%     The |PairsUpto| statement selects the |p1us| and |m1nus| values 
+%     of all |pa1rs| rows whose |pick8y| value is less than or equal 
+%     to the parameter with this name. It also reports (as |c0unt|) 
+%     the number of times each combination occurs, which incidentally 
+%     means each combination is only reported once.
+%     \begin{tcl}
+   set DBCMD(PairsUpto) [$db prepare {
+      SELECT p1us, m1nus, count(*) AS c0unt FROM pa1rs 
+      WHERE pick8y <= :pick8y GROUP BY p1us,m1nus
+   }]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{DropPair}
+%     The |DropPair| statement deletes the |pa1rs| row(s) made from 
+%     the specified |p1us| and |m1nus|.
+%     \begin{tcl}
+   set DBCMD(DropPair) [$db prepare {
+      DELETE FROM pa1rs WHERE p1us = :p1us AND m1nus = :m1nus
+   }]
+%     \end{tcl}
+%     This is usually applied to a pair that has been picked, after 
+%     its overlaps have been generated.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{DropPairsOf}
+%     The |DropPairsOf| statement deletes all |pa1rs| rows where the 
+%     specified |num6er| parameter matches |p1us| or |m1nus|.
+%     \begin{tcl}
+   set DBCMD(DropPairsOf) [$db prepare {
+      DELETE FROM pa1rs WHERE p1us = :num6er OR m1nus = :num6er
+   }]
+%     \end{tcl}
+%     This is used when a rule or equality is deactivated.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{DropPairsBelow}
+%     The |DropPairsBelow| statement deletes all |pa1rs| rows whose 
+%     |pick8y| value is less than or equal to the parameter with this 
+%     name.
+%     \begin{tcl}
+   set DBCMD(DropPairsBelow) [$db prepare {
+      DELETE FROM pa1rs WHERE pick8y <= :pick8y
+   }]
+%     \end{tcl}
+%     This is used in the \Module{lazy} setting, when a batch of 
+%     pairs have been converted to ambiguities.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{EstimatePairs}
+%     The |EstimatePairs| statement creates all pairs with an active 
+%     rule or equality as |p1us| and a given rule or equality as 
+%     |m1nus|, assigning each an estimated |pick8y|. The parameters are 
+%     |num6er| (the |m1nus|), |vSum| (order sum of |m1nus|'s |rhs|), 
+%     |v2Sum| (ditto order squared sum) and |lhsOrder| (order of 
+%     |m1nus|'s |lhs|).
+%     \begin{tcl}
+%<*lazier>
+   set DBCMD(EstimatePairs) [$db prepare "
+      INSERT INTO pa1rs (p1us,m1nus,pick8y)
+      SELECT num6er, :num6er, 
+        annex1*annex1 + 2*annex1*vSum + v2Sum +
+        annex2*annex2 + 2*annex2*:vSum + :v2Sum
+      FROM ( SELECT num6er, vSum, v2Sum,
+        :lhsOrder - overl4p AS annex1,
+        lhsOrder - overl4p AS annex2
+      FROM ( SELECT num6er, vSum, v2Sum, 
+        [join [lsearch -all -inline $pcols v*] +] AS lhsOrder,
+        coalesce( overl4pSum / overl4pTimes, 1 ) AS overl4p
+      FROM ru1es WHERE st4te IN ('R','E') ))
+   "]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{UpdateOverl4p}
+%     The |UpdateOverl4p| statement updates the |overl4pSum| and 
+%     |overl4pTimes| columns for a rule. The parameters are |num6er|, 
+%     |sum| and |times|.
+%     \begin{tcl}
+   set DBCMD(UpdateOverl4p) [$db prepare {
+      UPDATE ru1es SET 
+        overl4pSum = overl4pSum + :sum,
+        overl4pTimes = overl4pTimes + :times
+      WHERE num6er = :num6er
+   }]
+%</lazier>
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{signature}
+%     Although not strictly logical, it is convenient to store the 
+%     signature in the |DBCMD| array as well, since many statements 
+%     require that one computes a profile. To distinguish it from the 
+%     prepared statements, it is all lower case.
+%     \begin{tcl}
+   set DBCMD(signature) $signature
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{database}
+%     The object command for the database as a whole is also stored 
+%     in the |DBCMD| array; this is convenient for a more intelligent 
+%     transaction handling.
+%     \begin{tcl}
+   set DBCMD(database) $db
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{tcl}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{column_defs}
+%   The |column_defs| procedure takes lists with the structure
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regstar] \word{name} \word{type} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   as arguments and returns a single list of SQL column definitions 
+%   for columns with these names and these types. It mostly just 
+%   combines the \word{name} with its \word{type} in a single 
+%   argument, but it can also perform substitutions of the 
+%   \word{type} or leave it out altogether. The command call syntax 
+%   is
+%   \begin{displaysyntax}
+%     |column_defs| \word{list}\regstar
+%   \end{displaysyntax}
+%   The result of specifying several arguments is the same as the 
+%   result of specifying just their |concat|enation; this is a 
+%   conveniency feature.
+%   
+%   At the moment, the \word{type}s |CHAR| and empty string are left 
+%   out altogether, whereas the \word{type} |0| is replced by 
+%   |INTEGER|. The latter is a hack to allow mixing the result of 
+%   |network_profile| with entries in |DB_column|.
+%   \begin{tcl}
+proc column_defs {args} {
+   set res {}
+   foreach list $args {
+      foreach {name type} $list {
+         switch -- $type {
+            CHAR -
+            "" {lappend res $name}
+            0 {lappend res "$name INTEGER"}
+            "CHAR NOT NULL" {lappend res "$name NOT NULL"}
+            default {lappend res "$name $type"}
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{init_database}
+%   This procedure takes a TDBC connection object and \PROP\ 
+%   signature as arguments. It creates in that database the tables 
+%   |ru1es|, |am6iguities|, and |le9end| with the appropriate columns 
+%   for this signature. The call syntax is
+%   \begin{displaysyntax}
+%     |init_database| \word{db} \word{signature}
+%   \end{displaysyntax}
+%   and there is no particular return value.
+%   
+%   The first step is to create the |le9end| table and record the 
+%   \word{signature} in it.
+%   \begin{tcl}
+proc init_database {db signature} {
+   variable DB_column
+   set SQL {CREATE TABLE le9end }
+   append SQL ( [join [column_defs $DB_column(le9end)] ", "] )
+   $db allrows $SQL
+   $db allrows {
+      INSERT INTO le9end (k3y, va1ue) VALUES ( :k3y , :va1ue )
+   } [dict create k3y signature va1ue $signature]
+%   \end{tcl}
+%   The second step is to create the |ru1es| and |am6iguities| 
+%   tables.
+%   \begin{tcl}
+   set nullprofile [network_profile $signature]
+   foreach table {ru1es am6iguities} {
+      set SQL "CREATE TABLE $table "
+      append SQL ( [join [
+         column_defs $DB_column($table) $nullprofile
+      ] ", "] )
+      $db allrows $SQL
+   }
+%   \end{tcl}
+%   The third step is to create indices for the |ru1es| table: one 
+%   on the profile and |st4te| columns called 
+%   \describestring+[index table]{ru1esProfile} and one on the 
+%   |wh3n1| and |wh3n2| columns called 
+%   \describestring+[index table]{ru1esTimes}.
+%   \begin{tcl}
+   set L [dict keys $nullprofile]
+   lappend L st4te
+   set SQL "( [join $L ", "] )"
+   $db allrows "CREATE INDEX ru1esProfile ON ru1es $SQL"
+   $db allrows "CREATE INDEX ru1esTimes ON ru1es (wh3n1,wh3n2)"
+%   \end{tcl}
+%   The fourth step is to similarly create indices for the 
+%   |am6iguities| table. The most important is 
+%   \describestring+[index table]{am6iguitiesProfile} on the profile 
+%   and |st4te| columns (which in this case also includes the |p1us| 
+%   column, since the |ADividedBy| statement (below) has a condition 
+%   on that as well). The 
+%   \describestring+[index table]{am6iguitiesTimes} profile is 
+%   another clear parallel, whereas the 
+%   \describestring+[index table]{am6vRe5Sum} would be used by some 
+%   variants of the |ChooseAmbiguity| statement (others use the 
+%   |am6iguitiesProfile|).
+%   \begin{tcl}
+   lappend L p1us
+   set SQL "( [join $L ", "] )"
+   $db allrows "
+      CREATE INDEX am6iguitiesProfile ON am6iguities $SQL
+   "
+   $db allrows {
+      CREATE INDEX am6iguitiesTimes ON am6iguities (st4te,wh3n1,wh3n2)
+   }
+   $db allrows {
+      CREATE INDEX am6vRe5Sum ON am6iguities (st4te,v2Re5Sum,vRe5Sum)
+   }
+%   \end{tcl}
+%   The fifth step is to create the |pa1rs| table. It has an index on 
+%   the |pick8y| column and an index on the $($|p1us|$,{}$|m1nus|$)$ 
+%   pairs of columns. The first index is needed to get reasonable 
+%   performance for |LeastPair|, the other index is needed to get 
+%   reasonable performance for |DropPair|.
+%   \begin{tcl}
+   $db allrows "
+      CREATE TABLE pa1rs 
+      ( [join [column_defs $DB_column(pa1rs)] ", "] )
+   "
+   $db allrows {
+      CREATE INDEX pa1rsPick8y ON pa1rs (pick8y)
+   }
+   $db allrows {
+      CREATE INDEX pa1rsP1usM1nus ON pa1rs (p1us,m1nus)
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{proc}{sqlite3_init}
+%   This procedure creates and opens an SQLite database, setting up 
+%   the |DBCMD| array in the process. The call syntax is
+%   \begin{displaysyntax}
+%     |sqlite3_init| \word{filename} \word{signature}
+%   \end{displaysyntax}
+%   and the return value is the database connection object.
+%   \begin{tcl}
+proc sqlite3_init {fname signature} {
+   package require tdbc::sqlite3
+   set db [tdbc::sqlite3::connection create thedatabase $fname]
+   if {![llength [$db tables ru1es]]} then {
+      init_database $db $signature
+   }
+   prepare_statements $db
+   return $db
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \section{The completion main loop}
+% 
+% The main loop in the completion is an iterate that gets called by 
+% the \Tcl\ event loop. This permits intervention from the user, as 
+% well as live displays of the current activity.
+% 
+% \begin{proc}{push_main_task}
+% \begin{variable}{main_loop_stack}
+%   Each iteration of the main loop performs a specific \emph{task}, 
+%   which is concretely just a script to evaluate. The tasks waiting 
+%   to be done are kept in the |main_loop_stack| variable, which is 
+%   a stack-as-list with the top element last. New tasks are pushed 
+%   onto the stack with the command
+%   \begin{displaysyntax}
+%     |push_main_task| \word{word}\regplus
+%   \end{displaysyntax}
+%   where each \word{word} is a word of one task, which will be a 
+%   single command.
+%   \begin{tcl}
+variable main_loop_stack {}
+proc push_main_task {args} {
+   variable main_loop_stack
+   lappend main_loop_stack $args
+}
+%   \end{tcl}
+% \end{variable}\end{proc}
+% 
+% \begin{proc}{completion_main_loop}
+%   The main loop iterate command is |completion_main_loop|, which 
+%   neither takes any arguments nor returns anything particular. It 
+%   ends with a standard |after 0 after idle| to rescedule itself, 
+%   but its main task is to pop one task of the |main_loop_stack| and 
+%   perform it. If there is no task on the stack, then it calls 
+%   |pick_next_ambiguity| to start resolving something. The stack 
+%   usually gets empty between two ambiguities.
+%   
+%   \begin{tcl}
+variable main_loop_stack {}
+variable next_task_type {}
+proc completion_main_loop {} {
+   variable main_loop_stack
+   if {[llength $main_loop_stack]} then {
+      set cmd [lindex $main_loop_stack end]
+      set main_loop_stack [lreplace $main_loop_stack end end]
+   } else {
+      set cmd pick_next_ambiguity
+   }
+%<stats>   set before [clock microseconds]
+   {*}$cmd
+%<*stats>
+   set diff [expr {[clock microseconds]-$before}]
+   variable Stats
+   incr Stats(n,[lindex $cmd 0])
+   incr Stats(t,[lindex $cmd 0]) $diff
+%</stats>
+   if {[catch {lindex $main_loop_stack end 0} cmd]} then {set cmd ""}
+   variable next_task_type $cmd
+   after 0 [list after idle completion_main_loop]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{pause_main_loop}
+%   This procedure pauses the main loop, leaving it to be resumed 
+%   later by a call to |completion_main_loop|. It works by pushing a 
+%   |return| script on the |main_loop_stack|, as that causes 
+%   |completion_main_loop| to return without resceduling itself.
+%   \begin{tcl}
+interp alias {} pause_main_loop {} push_main_task return
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{halt_main_loop}
+%   This procedure is functionally similar to |pause_main_loop|, but 
+%   it inserts the |return| at the bottom of the stack rather than at 
+%   the top. This has the effect of delaying the stop until the main 
+%   loop stack is empty, which in particular means that the entire 
+%   state of the completion is recorded in the database. Halting is 
+%   thus the safe thing to do when you want to quit the completion 
+%   utility, saving all data until later.
+%   \begin{tcl}
+proc halt_main_loop {} {
+   variable main_loop_stack
+   set main_loop_stack [linsert $main_loop_stack 0 return]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayvar}{Stats}[n,\meta{command}]
+% \begin{arrayvar}{Stats}[t,\meta{command}]
+%   The |Stats| array is used to gather statistics on what is done in 
+%   the main loop. The |n,|\meta{command} entries count how many 
+%   times the \word{command} (just the command name) has been called, 
+%   whereas the |t,|\meta{command} entries count the number of 
+%   microseconds that have been spent doing so.
+% \end{arrayvar}\end{arrayvar}
+% 
+% \begin{arrayvar}{Count}
+%   The |Count| array keeps counts of how many things of various 
+%   states are (or at least should be) in the database: rules, 
+%   equalities, and ambiguities\Dash both in total and that have been 
+%   deactivated. These are incremented by procedures that modify the 
+%   database in these respects. The array entries in question are
+%   \begin{center}
+%     \begin{tabular}{r c c}
+%     & \textbf{Total}& \textbf{Deactivated}\\
+%     \textbf{Rules}& |Rr|& |r|\\
+%     \textbf{Equalities}& |Ee|& |e|\\
+%     \textbf{Ambiguities}& |Aa|& |a|
+%     \end{tabular}
+%   \end{center}
+%   The reason for keeping track of these things is that these are 
+%   the ones that increase with time; a counter for active things 
+%   would sometimes increase and sometimes decrease.
+% \begin{proc}{clear_counts}
+%   The |clear_counts| procedure zeroes the |Count| array. It takes 
+%   no arguments.
+%   \begin{tcl}
+proc clear_counts {} {
+   variable Count
+   foreach x {Rr r Ee e Aa a P p} {set Count($x) 0}
+}
+clear_counts
+%   \end{tcl}
+% \end{proc}\end{arrayvar}
+% 
+% \begin{proc}{database_counts}
+%   Alternatively, one may initialise the |Count| array from the 
+%   database. This is most interesting when reopening an existing 
+%   database.
+%   \begin{tcl}
+proc database_counts {} {
+   variable Count
+   variable DBCMD
+   foreach field {Rr r Ee e} {
+      set SQL {SELECT count(num6er) FROM ru1es WHERE }
+      append SQL {(st4te='} [join [split $field ""] {') OR (st4te='}] {')}
+      set Count($field) [lindex [
+         $DBCMD(database) allrows -as lists $SQL
+      ] 0 0]
+   }
+   set Count(Aa) [lindex [$DBCMD(database) allrows -as lists {
+      SELECT count(num6er) FROM am6iguities
+   }] 0 0]
+   set Count(a) [lindex [$DBCMD(database) allrows -as lists {
+      SELECT count(num6er) FROM am6iguities 
+      WHERE st4te!='A' AND st4te!='S'
+   }] 0 0]
+   set Count(P) [lindex [$DBCMD(database) allrows -as lists {
+      SELECT count(*) FROM pa1rs
+   }] 0 0]
+   set Count(p) 0
+%<*lazy>
+   if {$Count(P)} then {
+      variable am6iguity_top [lindex [
+         $DBCMD(database) allrows -as lists {
+            SELECT min(pick8y) FROM pa1rs
+         }
+      ] 0 0]
+   }
+%</lazy>
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayentry}{Count}{R}
+% \begin{arrayentry}{Count}{E}
+% \begin{arrayentry}{Count}{A}
+%   The |R|, |E|, and |A| entries in the |Count| array are maintained 
+%   through traces.
+%   \begin{tcl}
+apply {args {
+   variable Count
+   foreach V $args {
+      set v [string tolower $V]
+      set cmd [list ::apply [
+         list {x y z args} {
+            variable Count
+            set Count($x) [expr {$Count($y)-$Count($z)}]
+         } [namespace current]
+      ] $V $V$v $v]
+      foreach name [list $V$v $v] {
+         trace add variable Count($name) write $cmd
+      }
+   }
+}} R E A
+%   \end{tcl}
+% \end{arrayentry}\end{arrayentry}\end{arrayentry}
+% 
+% 
+% Under Tk, it is useful to provide a minimal control panel.
+% \begin{tcl}
+%<*Tk>
+eval {
+   toplevel .control
+   grid x [label .control.rule -text "Rules"]\
+     [label .control.equality -text "Equalities"]\
+     [label .control.pair -text "Pairs"]\
+     [label .control.ambiguity -text "Ambiguities"]
+   grid [label .control.active -text "Active:"]\
+     [label .control.lR -textvariable Count(R)]\
+     [label .control.lE -textvariable Count(E)]\
+     [label .control.lP -textvariable Count(P)]\
+     [label .control.lA -textvariable Count(A)]
+   grid [label .control.inactive -text "Inactive:"]\
+     [label .control.lr -textvariable Count(r)]\
+     [label .control.le -textvariable Count(e)]\
+     [label .control.lp -textvariable Count(p)]\
+     [label .control.la -textvariable Count(a)]
+   grid [
+      label .control.lnext -textvariable next_task_type
+   ] - - - -
+   grid x x x [
+      label .control.llpair -textvariable pair_level
+   ] [
+      label .control.llamb -textvariable ambiguity_level
+   ]
+   grid [
+      button .control.halt -text "Halt" -command halt_main_loop
+   ] x x [
+      button .control.pause -text "Pause" -command pause_main_loop
+   ] [
+      button .control.run -text "Run" -command completion_main_loop
+   ]
+   wm title .control "Control panel"
+}
+%</Tk>
+% \end{tcl}
+% 
+% \begin{variable}{pair_level}
+% \begin{variable}{ambiguity_level}
+%   These variables are used for displaying data in the control 
+%   panel, namely the current picking levels for pairs and 
+%   ambiguities, respectively.
+%   \begin{tcl}
+variable pair_level "" ambiguity_level ""
+%   \end{tcl}
+% \end{variable}\end{variable}
+% 
+% 
+% 
+% \subsection{Reducing ambiguities}
+% 
+% The roadmap for explicitly resolving an ambiguity is to find a 
+% sequence of reduction steps for the |re5olution| that ends in an 
+% irreducible element, and then update the database accordingly for 
+% the irreducible element that was discovered. This subsection deals 
+% with the reduction part of that road.
+% 
+% \begin{arrayvar}{RS}
+%   The |RS| (resolution state) array is where the elements of the 
+%   ambiguity row get dumped. It also contains several entries 
+%   which are related to the ambiguity, but are not exactly columns 
+%   in the table.
+% \end{arrayvar}
+% 
+% \begin{proc}{pick_next_ambiguity}
+%   This procedure uses the |chooseambiguity| statement to retrieve 
+%   one active ambiguity from the database, prepares the reduction 
+%   machinery to handle it, and pushes |reduce_step| as a task for 
+%   the main loop. In case there are no more active ambiguities in 
+%   the database (hooray!) it pauses the main loop.
+%   \begin{tcl}
+proc pick_next_ambiguity {} {
+   variable DBCMD
+   set resobj [$DBCMD(ChooseAmbiguity) execute]
+   if {[$resobj nextdict amb]} then {
+      $resobj close
+      variable ambiguity_level [dict get $amb v2Re5Sum]
+      if {[check_ambiguity_top $amb]} then {return}
+%<*lazy>
+      if {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
+         push_main_task prereduce_second_criterion $amb
+         return
+      }
+%</lazy>
+      prepare_ambiguity $amb
+      push_main_task reduce_step
+      return
+   } else {
+      $resobj close
+   }
+   set L [$DBCMD(database) allrows {
+      SELECT min(pick8y) AS t0p FROM pa1rs
+   }]
+   if {[dict exists [lindex $L 0] t0p]]} then {
+      push_main_task raise_ambiguity_top [dict get [lindex $L 0] t0p]
+   } else {
+      pause_main_loop
+   }
+}
+%   \end{tcl}
+%   
+%   The \Module{lazier} form of |pick_next_ambiguity| is however 
+%   quite different, as it picks both an ambiguity and a pair, 
+%   processing only the least of the two.
+%   \begin{tcl}
+%<*lazier&vsquare>
+proc pick_next_ambiguity {} {
+   variable DBCMD
+   set aobj [$DBCMD(ChooseAmbiguity) execute]
+   set pobj [$DBCMD(LeastPair) execute]
+   if {[$pobj nextdict pair]} then {
+      if {![$aobj nextdict amb]} then {
+         push_main_task overlaps_between [dict get $pair p1us]\
+           [dict get $pair m1nus]
+      } elseif {[dict get $pair pick8y] <= [dict get $amb v2Re5Sum]} then {
+%   \end{tcl}
+%   The point of processing pairs at a level before ambiguities is to 
+%   gather more data for estimating overlap sizes.
+%   \begin{tcl}
+         push_main_task overlaps_between [dict get $pair p1us]\
+           [dict get $pair m1nus]
+      } elseif {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
+         push_main_task prereduce_second_criterion $amb
+      } else {
+         prepare_ambiguity $amb
+         push_main_task reduce_step
+      }
+   } elseif {[$aobj nextdict amb]} then {
+      if {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
+         push_main_task prereduce_second_criterion $amb
+      } else {
+         prepare_ambiguity $amb
+         push_main_task reduce_step
+      }      
+   } else {
+      pause_main_loop
+   }
+   $aobj close
+   $pobj close
+   variable ambiguity_level\
+     [if {[info exists amb]} then {dict get $amb v2Re5Sum}]
+   variable pair_level\
+     [if {[info exists pair]} then {format %.1f [dict get $pair pick8y]}]
+}
+%<*lazier&vsquare>
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{check_ambiguity_top}
+%   This procedure gets called to check whether |am6iguity_top| 
+%   should be raised, and if so arrange that material is moved from 
+%   the |pa1rs| table to the |am6iguities| table. The reason it is a 
+%   separate procedure is that the exact growth condition needs to 
+%   depend on the quantity used for the picking criterion.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |check_ambiguity_top| \word{ambiguity}
+%   \end{displaysyntax}
+%   where \word{ambiguity} is an ambiguity just picked. The return 
+%   value is |0| if no raise was needed and |1| if it will be 
+%   performed.
+%   \begin{tcl}
+proc check_ambiguity_top {amb} {
+   variable am6iguity_top
+%<vsquare>   set level [expr {3 + round(1.5*[dict get $amb v2Re5Sum])}]
+%<!vsquare>   set level infinity
+   if {$level<=$am6iguity_top} then {return 0}
+   push_main_task raise_ambiguity_top $level
+   return 1
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{arrayentry}{RS}{NWID}
+%   The |m0n0mials| entry in the resultion state is a list mapping 
+%   monomial numbers to concrete networks, as is needed to decode the 
+%   |re5olution|. The |NWID| entry is a dictionary that goes the 
+%   other way, mapping (canonical) networks to indices into the 
+%   |m0n0mials| list.
+% \end{arrayentry}
+% 
+% \begin{arrayentry}{RS}{irr}
+% \begin{arrayentry}{RS}{rest}
+%   The expression being reduced is kept in two parts: |irr| contains 
+%   all terms that have turned out to be irreducible, and |rest| 
+%   keeps track of the rest. |irr| is a straightforward formal linear 
+%   combination\Ldash a dictionary mapping monomial numbers to 
+%   coefficients\Dash but |rest| is (the pointer to) a skiplist 
+%   mapping (extended) comparison keys to coefficients. This 
+%   arrangement has the advantage of making the leading term readily 
+%   available.
+% \end{arrayentry}\end{arrayentry}
+% 
+% 
+% \begin{variable}{restheap}
+% \begin{proc}{restheap}
+%   The |restheap| variable is where the |rest| skiplist lives. The 
+%   |restheap| command provides the operations in this heap.
+%   \begin{tcl}
+package require heap 1.0
+heap::makecmd restheap -command restheap
+package require heap::skiplist 1.0
+%   \end{tcl}
+% \end{proc}\end{variable}
+% 
+% The comparison keys employed are optimised for the case of an order 
+% that is a lexicographic composition of cartesian product orders, 
+% but also for use with skiplists. Concretely, the comparison key is 
+% a list of components, where each component corresponds to a factor 
+% in some cartesian product. Extended comparison keys contain the 
+% monomial number as an extra element at the end, to make sure they 
+% uniquely identify a network. When used in a skiplist, comparison 
+% keys are compared in a purely lexicographic manner (thus totally 
+% ordering them), but when deciding whether to make a rule or some 
+% equalities the actual partial order is needed. Since the skiplist 
+% total order is an extension of the proper partial order with which 
+% rules must be compatible, one can never generate a term already in 
+% |irr| by reducing a term still in |rest|.
+% 
+% \begin{arrayentry}{RS}{cmpkeycmd}
+%   Comparison keys are computed by calling a command prefix which is 
+%   kept in the |cmpkeycmd| entry of the |RS| array. The call syntax 
+%   for this is the basic
+%   \begin{displaysyntax}
+%     \meta{cmpkeycmd} \word{network}
+%   \end{displaysyntax}
+%   The reason this is kept in the |RS| array is that the details of 
+%   the comparison key \emph{may} depend on the type of the 
+%   \word{network}; there is formally a separate order for each 
+%   element of $\mathbb{B}^{\bullet\times\bullet}$.
+% \end{arrayentry}
+% 
+% \begin{arrayentry}{RS}{cmpcmds}
+% \begin{arrayentry}{RS}{cmpblocks}
+%   The |cmpcmds| entry is a list of command prefixes, with one for 
+%   each element of an extended comparison key. The call syntax for 
+%   these command prefixes is
+%   \begin{displaysyntax}
+%     \meta{cmp-cmd} \word{left} \word{right}
+%   \end{displaysyntax}
+%   and the result must be $<0$ when \(\mathit{left} < 
+%   \mathit{right}\), $>0$ when \(\mathit{left} > 
+%   \mathit{right}\), and $=0$ otherwise. This means |string compare| 
+%   and |::tcl::mathop::-| are both valid \word{cmp-cmd}s.
+%   
+%   The |cmpblocks| entry is another list of the same length and with 
+%   corresponding elements, but its elements are booleans. An element 
+%   is true if it corresponds to the final component of a block in 
+%   the key, i.e., if it is the final factor in a cartesian product. 
+%   These are used when determining what the partial order thinks 
+%   about two keys.
+% \end{arrayentry}\end{arrayentry}
+% 
+% \begin{proc}{compare_keys}
+%   This procedure takes two (extended) comparison keys as arguments, 
+%   and compares them using the current |RS(cmpcmds)| and 
+%   |RS(cmpblocks)|. The call syntax is
+%   \begin{displaysyntax}
+%     |compare_keys| \word{left} \word{right}
+%   \end{displaysyntax}
+%   and the return value is one of `|<|', `|=|', `|>|', and `|!=|' 
+%   depending on whether the \word{left} is less than, equal to, 
+%   greater than, or incomparable to the \word{right}. The comparison 
+%   performed is thus that for the \emph{partial order} relation 
+%   (which in general can be a quasiorder on the monomials, since 
+%   key elements after the final block are effectively ignored).
+%   
+%   \begin{tcl}
+proc compare_keys {left right} {
+   variable RS
+   set less 0
+   set greater 0
+   foreach l $left r $right cmd $RS(cmpcmds) f $RS(cmpblocks) {
+      set d [{*}$cmd $l $r]
+      if {$d<0} then {
+         set less 1
+      } elseif {$d>0} then {
+         set greater 1
+      }
+      if {$f} then {
+         if {$less} then {
+            if {$greater} then {return !=} else {return <}
+         } elseif {$greater} then {return >}
+      }
+   }
+   return =
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{set_cmpcmds}
+%   The |cmpkeycmd|, |cmpcmds|, and |cmpblocks| entries in the |RS| 
+%   arrays need to be initialised anew for every ambiguity processed, 
+%   and that is the responsibility of the |set_cmpcmds| command. It 
+%   takes no arguments (the |si7e| and |feed6acks| entries in the 
+%   |RS| arrray have already been set) and returns nothing 
+%   particular, but must initialise the three entries listed. In the 
+%   case of |cmpcmds| and |cmpblocks|, it \emph{must not} include the 
+%   extension element for monomial numbers, as that is handled by 
+%   |prepare_ambiguity|.
+%   
+%   The default implementation is for the equality relation;
+%   definitions of specific problems are expected to override it.
+%   \begin{tcl}
+proc set_cmpcmds {} {
+   variable RS
+   set RS(cmpkeycmd) [list ::apply {NW {}}]
+   set RS(cmpcmds) {}
+   set RS(cmpblocks) {}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayentry}{RS}{cmpkeys}
+%   In parallel to the |m0n0mials| list, the |cmpkeys| entry is a list 
+%   of the extended comparison keys of the networks.
+% \end{arrayentry}
+% 
+% 
+% \begin{proc}{prepare_ambiguity}
+%   This procedure is responsible for initialising all variables 
+%   involved in reduction for a particular ambiguity. The call syntax 
+%   is
+%   \begin{displaysyntax}
+%     |prepare_ambiguity| \word{ambiguity}
+%   \end{displaysyntax}
+%   where the \word{ambiguity} is the dictionary form of the database 
+%   row for the ambiguity. There is no particular return value, but 
+%   the |RS| array gets filled in.
+%   
+%   \begin{tcl}
+proc prepare_ambiguity {amb} {
+   variable RS
+   array unset RS
+   array set RS $amb
+%   \end{tcl}
+%   The first step is to initialise the system for computing 
+%   comparison keys.
+%   \begin{tcl}
+   set_cmpcmds
+   lappend RS(cmpcmds) ::tcl::mathop::-
+   lappend RS(cmpblocks) 0
+%   \end{tcl}
+%   The second step is to initialise the |NWID| dictionary and 
+%   |cmpkey| list for |m0n0mials| already known.
+%   \begin{tcl}
+   set RS(cmpkeys) {}
+   foreach NW $RS(m0n0mials) {
+      dict set RS(NWID) $NW [llength $RS(cmpkeys)]
+      set key [{*}$RS(cmpkeycmd) $NW]
+      lappend key [llength $RS(cmpkeys)]
+      lappend RS(cmpkeys) $key
+   }
+%   \end{tcl}
+%   The final step is to create and fill in the |rest| skiplist.
+%   \begin{tcl}
+   set RS(rest) [heap::skiplist::create restheap {*}$RS(cmpcmds)]
+   foreach {mu r} [lindex $RS(re5olution) end] {
+      heap::skiplist::Set restheap $RS(rest)\
+        [lindex $RS(cmpkeys) $mu] $r
+   }
+   set RS(irr) [dict create]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{variable}{coefficient}
+%   The |coefficient| variable holds the \meta{ring} command prefix 
+%   for coefficients of networks. Definitions are expected to override 
+%   this default definition of $\mathbb{Z}_{32003}$.
+%   \begin{tcl}
+variable coefficient {::mtmtcl::rings::integer_modulo 32003}
+%   \end{tcl}
+% \end{variable}
+% 
+% \begin{arrayentry}{RS}{candobj}
+%   The |candobj| entry in the |RS| array is the name of the current 
+%   TDBC resultset object being iterated over; it returns rows from 
+%   the |ru1es| table.
+% \end{arrayentry}
+% 
+% \begin{proc}{reduce_step}
+%   This procedure does the reducing part of ambiguity resolution. It 
+%   is meant to be run as a task in the main loop, so it doesn't 
+%   return anything particular.
+%   What it concretely does when called is that it pops the leading 
+%   term off the |rest| skiplist and tries to act upon it using one 
+%   of the rules. If there is a rule which will do this, then the 
+%   result is added back into the rest of |rest|, and otherwise the 
+%   term is appended to |irr| since it has been found irreducible. In 
+%   the special case that the skiplist is empty, reduction is 
+%   complete and the resolution process proceeds to the task of 
+%   ruling the ambiguity.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |reduce_step| \word{term}\regopt
+%   \end{displaysyntax}
+%   where the \word{term} argument defaults to an empty list. If 
+%   it is nonempty then it is a leading term popped off the |rest| 
+%   skiplist, and |RS(candobj)| is an existing object with 
+%   rules that should be tried for reducing the \word{term}. 
+%   Otherwise the leading term is popped off |rest|, and 
+%   |RS(candobj)| is initialised to the rules that might help with 
+%   this.
+%   
+%   \begin{tcl}
+proc reduce_step {{leading ""}} {
+   variable RS
+   if {![llength $leading]} then {
+      set leading [heap::skiplist::pop restheap $RS(rest)]
+      if {![llength $leading]} then {
+         judge_ambiguity
+         return
+      }
+%   \end{tcl}
+%   Now for the task of finding appropriate rules.
+%   \begin{tcl}
+      set NWFB [list [lindex $RS(m0n0mials) [lindex $leading 0 end]]\
+        $RS(feed6acks)]
+      variable DBCMD
+      set profile [network_profile $DBCMD(signature) [lindex $NWFB 0]]
+      set RS(candobj) [$DBCMD(Divisors) execute $profile]
+   } else {
+      set NWFB [list [lindex $RS(m0n0mials) [lindex $leading 0 end]]\
+        $RS(feed6acks)]
+   }
+%   \end{tcl}
+%   The loop over appropriate rules can be ended in three ways: 
+%   |limit| goes to $0$ (meaning it's time to return to the main 
+%   loop), the |nextdict| method returns $0$ (meaning there are no 
+%   more rules to try), or |sites| becomes nonempty (in which case a 
+%   rule that applies has been found).
+%   \begin{tcl}
+   set limit 20
+   set sites {}
+   while {![llength $sites]} {
+      if {![incr limit -1]} then {
+         push_main_task reduce_step $leading
+         return
+      }
+      if {![$RS(candobj) nextdict row]} then {
+         $RS(candobj) close
+         dict set RS(irr) [lindex $leading 0 end] [lindex $leading 1]
+         push_main_task reduce_step
+         return
+      }
+      set sites [network::wfb::instances $NWFB\
+        [list [dict get $row lhs] [dict get $row feed6acks]] 1]
+   }
+   $RS(candobj) close
+%   \end{tcl}
+%   If we get this far, a rule that applies has been found, so it is 
+%   applied, meaning concretely that the appropriate multiple of its 
+%   |rhs| is added to the skiplist.
+%   \begin{tcl}
+   variable coefficient
+   set G [network::pure::detach [lindex $NWFB 0]\
+     [lindex $sites 0]]
+   foreach {H r} [dict get $row rhs] {
+%   \end{tcl}
+%   For each term of the |rhs|, one must first construct the 
+%   underlying monomial, and add it to the |m0n0mials| list if it 
+%   hasn't been seen before in this resolution.
+%   \begin{tcl}
+      set NW [network::pure::canonise\
+        [network::pure::annex $G $H]]
+      if {![dict exists $RS(NWID) $NW]} then {
+         dict set RS(NWID) $NW [llength $RS(m0n0mials)]
+         set key [{*}$RS(cmpkeycmd) $NW]
+         lappend key [llength $RS(m0n0mials)]
+         lappend RS(cmpkeys) $key
+         lappend RS(m0n0mials) $NW
+      } else {
+         set key [lindex $RS(cmpkeys) [dict get $RS(NWID) $NW]]
+      }
+%   \end{tcl}
+%   Then the appropriate entry in the |rest| is to be updated. It is 
+%   quite possible that this updates the same entry several times, 
+%   since |annex|ing is not injective.
+%   \begin{tcl}
+      heap::skiplist::update restheap $RS(rest) $key s {
+         if {![info exists s]} then {set s [{*}$coefficient 0]}
+         set s [{*}$coefficient + $s\
+           [{*}$coefficient * [lindex $leading 1] $r]]
+         if {[{*}$coefficient iszero $s]} then {unset s}
+      }
+   }
+%   \end{tcl}
+%   Finally, the |re5olution| must be updated, since the combination 
+%   of |irr| and |rest| changed.
+%   \begin{tcl}
+   set D $RS(irr)
+   foreach {key val} [heap::skiplist::getall restheap $RS(rest)] {
+      dict set D [lindex $key end] $val
+   }
+   lappend RS(re5olution) $D
+   lappend RS(wh1ch) [dict get $row num6er]
+   lappend RS(wh3re)\
+     [list [lindex $leading 0 end] [lindex $sites 0]]
+   push_main_task reduce_step
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayentry}{RS}{leading}
+%   The |leading| entry in the |RS| array holds a list of the 
+%   (numbers of) maximal terms in the |irr| entry. It gets 
+%   initialised by the |judge_ambiguity| procedure.
+% \end{arrayentry}
+% 
+% \begin{proc}{judge_ambiguity}
+%   The |judge_ambiguity| procedure is called when the |rest| part of 
+%   the current ambiguity becomes empty. Its task is to determine 
+%   whether the ambiguity resolved to $0$, prompts the creation of a 
+%   new rule, or the creation of two or more equalities.
+%   
+%   First the (now empty) |rest| skiplist is destroyed, since it 
+%   isn't needed anymore.
+%   \begin{tcl}
+proc judge_ambiguity {} {
+   variable RS
+   heap::skiplist::destroy restheap $RS(rest)
+%   \end{tcl}
+%   Second, it is determined which monomials are maximal in the given 
+%   partial order.
+%   \begin{tcl}
+   set RS(leading) {}
+   dict for {mu r} $RS(irr) {
+      set maximal 1
+      foreach nu $RS(leading) {
+         if {">" eq [
+            compare_keys [lindex $RS(cmpkeys) $nu]\
+              [lindex $RS(cmpkeys) $mu] 
+         ]} then {
+            set maximal 0; break
+         }
+      }
+      if {$maximal} then {lappend RS(leading) $mu}
+   }
+%   \end{tcl}
+%   Third, the ambiguity is updated and new rules or equalities are 
+%   created as necessary (or rather, tasks to create them are pushed 
+%   into the main loop).
+%   \begin{tcl}
+   variable coefficient
+   if {0 == [llength $RS(leading)]} then {
+      set RS(st4te) 0
+   } elseif {1 == [llength $RS(leading)]} then {
+      set RS(st4te) r
+      set lhs [lindex $RS(m0n0mials) [lindex $RS(leading) 0]]
+      set s [{*}$coefficient - [dict get $RS(irr) [lindex $RS(leading) 0]]]
+      set rhs {}
+      dict for {nu r} [dict remove $RS(irr) [lindex $RS(leading) 0]] {
+         lappend rhs [lindex $RS(m0n0mials) $nu] [{*}$coefficient / $r $s]
+      }
+      push_main_task new_ru1e R $lhs $rhs $RS(feed6acks) $RS(num6er)
+   } else {
+      reduce_equality
+      return
+   }
+   variable DBCMD
+   set RS(wh3n2) [clock seconds]
+   $DBCMD(AdvanceAmbiguity) allrows [array get RS]
+   variable Count
+   incr Count(a)
+   array unset RS
+}
+%   \end{tcl}
+%   That |new_ru1e| commands are placed on the |main_loop_stack| like 
+%   this means the completion is not entirely durable; a deletion of 
+%   the |main_loop_stack| (e.g.~due to a power outage) could cause 
+%   some rules or equalities to be lost, even though the ambiguity 
+%   that gave rise to them is no longer active. Such lost |ru1es| 
+%   entries may however be recovered by checking that every ambiguity 
+%   in state |r| or |e| really is the |pr00f| of something, and 
+%   reactivating the ambiguity if that is not the case.
+% \end{proc}
+% 
+% \begin{proc}{reduce_equality}
+%   This procedure is called when reduction by rules of what is in 
+%   |RS| has reached a terminal element, and that has more than one 
+%   leading term. What one may then do is attempt further reductions 
+%   using equalities, and in particular try to discover when the 
+%   element is just a duplicate of a known equality. There are no 
+%   arguments, since all information is in the |RS| array, nor any 
+%   particular return value.
+%   
+%   This procedure used to be |equality_duplicate?| and part of 
+%   |judge_ambiguity|, but it turned out to be a rather 
+%   time-consuming operation, and was therefore split off so that 
+%   it could yield to the event loop.
+%   \begin{tcl}
+proc reduce_equality {} {
+   variable RS
+   variable DBCMD
+   set RS(candobj) [$DBCMD(EDivisors) execute [network_profile\
+     $DBCMD(signature) [lindex $RS(m0n0mials) [lindex $RS(leading) 0]]]]
+   reduce_equality_A 19
+}
+%   \end{tcl}
+%   
+%   \begin{proc}{reduce_equality_B}
+%     This procedure is called by |reduce_equality_A| when it has 
+%     determined whether the equality was a duplicate. Its main tasks 
+%     are to |close| the resultset object, update the database 
+%     regarding this ambiguity, and push |new_ru1e| tasks when the 
+%     equality was not a duplicate.
+%     
+%     Whether the equality turned out to be a duplicate or not can be 
+%     seen from the |st4te| in the |RS| array.
+%     \begin{tcl}
+proc reduce_equality_B {} {
+   variable RS
+   $RS(candobj) close
+   if {$RS(st4te) eq "e"} then {
+      variable coefficient
+      foreach mu $RS(leading) {
+         set lhs [lindex $RS(m0n0mials) $mu]
+         set s [{*}$coefficient - [dict get $RS(irr) $mu]]
+         set rhs {}
+         dict for {nu r} [dict remove $RS(irr) $mu] {
+            lappend rhs [lindex $RS(m0n0mials) $nu] [{*}$coefficient / $r $s]
+         }
+         push_main_task new_ru1e E $lhs $rhs $RS(feed6acks) $RS(num6er)
+      }
+   }
+   variable DBCMD
+   set RS(wh3n2) [clock seconds]
+   $DBCMD(AdvanceAmbiguity) allrows [array get RS]
+   variable Count
+   incr Count(a)
+   array unset RS
+}
+%     \end{tcl}
+%     A possible improvement (for improved recoverability) might be 
+%     to put the ambiguity in a |P| (for pending) state here, that 
+%     will be changed to |e| (or whatever) after the new rules have 
+%     been created.
+%   \end{proc}
+%   
+%   \begin{proc}{reduce_equality_A}
+%     This procedure is the iterate part of |reduce_equality|. It 
+%     takes as its only argument the number of equalities and sites 
+%     to consider before yielding into the main loop.
+%     \begin{tcl}
+proc reduce_equality_A {limit} {
+   variable RS
+   set mu [lindex $RS(leading) 0]
+   set lhs [lindex $RS(m0n0mials) [lindex $RS(leading) 0]]
+   variable coefficient
+   set z [{*}$coefficient 0]
+   for {} {$limit>0 && [$RS(candobj) nextdict row]} {incr limit -1} {
+      foreach site [
+         network::wfb::instances [list $lhs $RS(feed6acks)]\
+           [list [dict get $row lhs] [dict get $row feed6acks]]
+      ] {
+         incr limit -1
+         set G [network::pure::detach $lhs $site]
+%   \end{tcl}
+%   Matching equalities against each other is done by adding the 
+%   proper multiple $s$ of the equality to what is in |RS(irr)|, and 
+%   in the end testing whether this has cancelled all terms. A 
+%   seemingly easier approach would be to match terms against each 
+%   other and see if this covers all of them, but that wouldn't be 
+%   entirely correct since the operation of annexing something to $G$ 
+%   is not necessarily injective; several terms of the |rhs| can 
+%   combine into one.
+%   \begin{tcl}
+         set s [dict get $RS(irr) $mu]
+         set target [dict remove $RS(irr) $mu]
+         foreach {H r} [dict get $row rhs] {
+            set NW [network::pure::canonise\
+              [network::pure::annex $G $H]]
+            if {[dict exists $RS(NWID) $NW]} then {
+               set nu [dict get $RS(NWID) $NW]
+            } else {
+%   \end{tcl}
+%   |target| is indexed by monomial numbers, but this term didn't 
+%   have any. In most cases, that is a sign that we don't have a 
+%   match, but there is a slight chance that another subsequent term 
+%   will cancel this one out, so it should be handled gracefully. 
+%   The by far easiest solution is to use the entire network as key 
+%   for this abnormal entry.
+%   \begin{tcl}
+               set nu $NW
+            }
+            dict update target $nu t {
+               if {![info exists t]} then {set t $z}
+               set t [{*}$coefficient + $t [{*}$coefficient * $s $r]]
+               if {[{*}$coefficient iszero $t]} then {unset t}
+            }
+         }
+%   \end{tcl}
+%   If |target| is empty here, after all terms have been processed, 
+%   then the ambiguity can indeed be resolved as an equality 
+%   duplicate. An extra resolution step (whose naive interpretation 
+%   is that the equality is applied as if it was a rule) makes it 
+%   possible to tell what it was a duplicate of.
+%   \begin{tcl}
+         if {![dict size $target]} then {
+            set RS(st4te) d
+            lappend RS(re5olution) {}
+            lappend RS(wh1ch) [dict get $row num6er]
+            lappend RS(wh3re) [list $mu $site]
+            reduce_equality_B
+            return
+         }
+      }
+   }
+%   \end{tcl}
+%   If, on the other hand, we get this far and |limit| is still 
+%   positive then the |candobj| returned false, so all equalities have 
+%   been checked and none of them matched what is in |RS(irr)|. 
+%   Therefore this must be a new equality.
+%   \begin{tcl}
+   if {$limit>0} then {
+      set RS(st4te) e
+      reduce_equality_B
+   } else {
+      push_main_task reduce_equality_A 20
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{proc}
+% 
+% 
+% \begin{proc}{equality_duplicate?}
+%   This procedure checks whether |RS(irr)| is a duplicate or 
+%   annexation of an existing equality. It returns |0| if it is not, 
+%   but |1| if it is, and in the latter case it has also added a step 
+%   to the |re5olution|. The call syntax is
+%   \begin{displaysyntax}
+%     |equality_duplicate?| \word{leading-monomial-list}
+%   \end{displaysyntax}
+%   wher the \word{leading-monomial-list} is the list of all 
+%   |m0n0mials| numbers of maximal monomials occurring in |RS(irr)|.
+%   
+%   The idea is to test if any equality has an |lhs| which occurs in 
+%   the first leading term, and if so whether this equality matches 
+%   what is in |RS(irr)|. It is sufficient to test against the first 
+%   leading monomial, since equalities get oriented every way there 
+%   is. It is however necessary to check also the |rhs| part, since 
+%   two equalities with the same |lhs| but different |rhs|es should 
+%   form an ambiguity.
+%   \begin{tcl}
+proc equality_duplicate? {leading} {
+   variable RS
+   set mu [lindex $leading 0]
+   set lhs [lindex $RS(m0n0mials) $mu]
+   variable coefficient
+   set z [{*}$coefficient 0]
+   variable DBCMD
+   foreach row [
+      $DBCMD(EDivisors) allrows\
+        [network_profile $DBCMD(signature) $lhs]
+   ] {
+%   \end{tcl}
+%   A difference compared to ordinary reductions is that all 
+%   instances must be considered.
+%   \begin{tcl}
+      foreach site [
+         network::wfb::instances [list $lhs $RS(feed6acks)]\
+           [list [dict get $row lhs] [dict get $row feed6acks]]
+      ] {
+         set G [network::pure::detach $lhs $site]
+%   \end{tcl}
+%   Matching equalities against each other is done by adding the 
+%   proper multiple $s$ of the equality to what is in |RS(irr)|, and 
+%   in the end testing whether this has cancelled all terms. A 
+%   seemingly easier approach would be to match terms against each 
+%   other and see if this covers all of them, but that wouldn't be 
+%   entirely correct since the operation of annexing something to $G$ 
+%   is not necessarily injective; several terms of the |rhs| can 
+%   combine into one.
+%   \begin{tcl}
+         set s [dict get $RS(irr) $mu]
+         set target [dict remove $RS(irr) $mu]
+         foreach {H r} [dict get $row rhs] {
+            set NW [network::pure::canonise\
+              [network::pure::annex $G $H]]
+            if {[dict exists $RS(NWID) $NW]} then {
+               set nu [dict get $RS(NWID) $NW]
+            } else {
+%   \end{tcl}
+%   |target| is indexed by monomial numbers, but this term didn't 
+%   have any. In most cases, that is a sign that we don't have a 
+%   match, but there is a slight chance that another subsequent term 
+%   will cancel this one out, so it should be handled gracefully. 
+%   The by far easiest solution is to use the entire network as key 
+%   for this abnormal entry.
+%   \begin{tcl}
+               set nu $NW
+            }
+            dict update target $nu t {
+               if {![info exists t]} then {set t $z}
+               set t [{*}$coefficient + $t [{*}$coefficient * $s $r]]
+               if {[{*}$coefficient iszero $t]} then {unset t}
+            }
+         }
+%   \end{tcl}
+%   If |target| is empty here, after all terms have been processed, 
+%   then the ambiguity can indeed be resolved as an equality 
+%   duplicate. An extra resolution step (formally applying the 
+%   equality as if it was a rule) makes it possible to tell what it 
+%   was a duplicate of.
+%   \begin{tcl}
+         if {![dict size $target]} then {
+            lappend RS(re5olution) {}
+            lappend RS(wh1ch) [dict get $row num6er]
+            lappend RS(wh3re) [list $mu $site]
+            return 1
+         }
+      }
+   }
+%   \end{tcl}
+%   If, on the other hand, we get this far then all equalities have 
+%   been checked, and none of them matched what is in |RS(irr)|, so 
+%   it must be a new one.
+%   \begin{tcl}
+   return 0
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{prereduce_second_criterion}
+%   In the \Module{lazy} setting, ``Buchberger's second criterion'' 
+%   is applied to rules not when new rules are discovered, but as a 
+%   preparation step before reduction proper starts. The rationale 
+%   for this approach is that it reduces the amount of data that has 
+%   to flow from disk to RAM, by switching the nesting orders of the 
+%   loop over ambiguities (long) and the loop over rules (not so 
+%   long).
+%   
+%   The call syntax for this procedure is
+%   \begin{displaysyntax}
+%     |prereduce_second_criterion| \word{ambiguity}
+%   \end{displaysyntax}
+%   where the \word{ambiguity} is the relevant row from the 
+%   |am6iguities| table, minus the profile columns. (Since the 
+%   profile is needed, it could have been nice to have them included, 
+%   but profiles are on the other hand rather quick to compute.)
+%   
+%   \begin{tcl}
+proc prereduce_second_criterion {amb} {
+   variable DBCMD
+   set profile [network_profile $DBCMD(signature) [dict get $amb si7e]]
+   dict set profile num6er\
+     [::tcl::mathfunc::max [dict get $amb p1us] [dict get $amb m1nus]]
+   push_main_task second_criterion_chunk $amb\
+     [list [dict get $amb si7e] [dict get $amb feed6acks]]\
+     [$DBCMD(RDividedBy2) execute $profile]
+}
+%   \end{tcl}
+%   As in the actual reduction, the loop over candidate rules is put 
+%   in a separate procedure that gets called from the main loop.
+%   
+%   \begin{proc}{second_criterion_chunk}
+%     The |second_criterion_chunk| procedure tries a chunk of rules 
+%     against the |si7e| of an ambiguity, and resolves the ambiguity 
+%     to state |2| if one of them applies; otherwise it sets up a 
+%     standard reduction. The call syntax is
+%     \begin{displaysyntax}
+%       |second_criterion_chunk| \word{ambiguity} \word{NWFB} 
+%         \word{resultset}
+%     \end{displaysyntax}
+%     where \word{ambiguity} is the ambiguity (dictionary encoding a 
+%     database row), \word{NWFB} is the |si7e| of that ambiguity as a 
+%     network with feedback, and \word{resultset} is a TDBC resultset 
+%     object for the rules to try.
+%     
+%     \begin{tcl}
+proc second_criterion_chunk {amb NWFB obj} {
+   set limit 20
+   set sites {}
+   while {![llength $sites]} {
+      if {$limit<=0} then {
+         push_main_task second_criterion_chunk $amb $NWFB $obj
+         return
+      }
+      incr limit -1
+      if {![$obj nextdict row]} then {
+         $obj close
+         prepare_ambiguity $amb
+         push_main_task reduce_step
+         return
+      }
+      set sites [network::wfb::instances $NWFB\
+        [list [dict get $row lhs] [dict get $row feed6acks]] 1]
+   }
+   $obj close
+   variable DBCMD
+   dict set amb st4te 2
+   dict set amb wh1ch [dict get $row num6er]
+   dict set amb wh3n2 [clock seconds]
+   $DBCMD(AdvanceAmbiguity) allrows $amb
+   variable Count
+   incr Count(a)
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{proc}
+% 
+% 
+% 
+% \subsection{Making new rules}
+% 
+% \begin{proc}{new_ru1e}
+%   This procedure is the top-level handler when creating new rules 
+%   or equalities. It has the call syntax
+%   \begin{displaysyntax}
+%     |new_ru1e| \word{state} \word{lhs} \word{rhs} \word{feedbacks} 
+%     \word{proof}\regopt
+%   \end{displaysyntax}
+%   Besides actually adding a row to the |ru1es| table, it also 
+%   checks for rules, equalities, and ambiguities that can be retired 
+%   because of this, and sees to that ambiguities involving the new 
+%   row will be created. There is no particular return value, as the 
+%   call is typically a task in the main loop.
+%   
+%   This procedure potentially causes lots of updates, so it is all 
+%   one big transaction.
+%   \begin{tcl}
+proc new_ru1e {state lhs rhs feedbacks args} {
+   variable DBCMD
+   $DBCMD(database) transaction {
+%   \end{tcl}
+%   The first step is to add the new row to the |ru1es| table.
+%   \begin{tcl}
+      set profile [network_profile $DBCMD(signature) $lhs]
+      set D [dict replace $profile  st4te $state  lhs $lhs \
+        rhs $rhs  feed6acks $feedbacks  wh3n1 [clock seconds]]
+      if {[llength $args]} then {dict set D pr00f [lindex $args 0]}
+      $DBCMD(NewRu1e) allrows $D
+      variable Count
+      incr Count($state[string tolower $state])
+%   \end{tcl}
+%   Next, the list of |ru1es| whose profile is divided by the new one 
+%   is retrieved. If the new rule has state |R| then the rows in this 
+%   list will be tested for instances of the \word{lhs}, in which 
+%   case the row will be deactivated and an ambiguity added, but 
+%   first this list is needed to find the number assigned to the new 
+%   row.
+%   \begin{tcl}
+      set dividedL [$DBCMD(RDividedBy) allrows $profile]
+      set me {}
+      foreach row $dividedL {
+         if {[dict get $row lhs] eq $lhs &&\
+           [dict get $row num6er]>$me} then {
+            set me [dict get $row num6er]
+            set merow $row
+         }
+      }
+      if {$state ne "R"} then {set dividedL {}}
+%   \end{tcl}
+%   There is a slight chance that several rows can have the same 
+%   |lhs| (if all but the first one are equalities), but the |num6er| 
+%   is increasing with time.
+%   
+%   With |me| known, it is possible to discard ambiguities by 
+%   Buchberger's second criterion.
+%   \begin{tcl}
+      foreach row [
+         $DBCMD(ADividedBy) allrows $profile
+      ] {
+         set sites [network::wfb::instances\
+           [list [dict get $row si7e] [dict get $row feed6acks]]\
+           [list $lhs $feedbacks] 1]
+         if {![llength $sites]} then {continue}
+         dict set row st4te 2
+         dict set row wh1ch [list $me]
+         dict set row wh3n2 [clock seconds]
+         $DBCMD(AdvanceAmbiguity) allrows $row
+         incr Count(a)
+      }
+%   \end{tcl}
+%   And with that done, it is possible to deactivate rows in 
+%   |dividedL|. Each deactivation gives rise to an ambiguity, which 
+%   is why this could not be done before. Most of the work done by 
+%   the |new_ambiguity| procedure, so what has to be done here is 
+%   mostly the construction of its arguments, particularly the region 
+%   of the row being dropped.
+%   \begin{tcl}
+      foreach row $dividedL {
+         if {[dict get $row num6er] == $me} then {continue}
+         set whole [dict get $row lhs]
+         set sites [network::wfb::instances\
+           [list $whole [dict get $row feed6acks]]\
+           [list $lhs $feedbacks] 1]
+         if {![llength $sites]} then {continue}
+         set L {}
+         foreach v [lindex $whole 0] {lappend L [llength $L]}
+         set L [list [lrange $L 2 end] [lindex $whole 0 0 2]\
+           [lindex $whole 0 1 1]]
+         set amb [make_ambiguity $whole [dict get $row feed6acks]\
+           $row $L $merow [lindex $sites 0]]
+         $DBCMD(NewAmbiguity) allrows $amb
+         incr Count(Aa)
+         if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
+         dict set row st4te [string tolower [dict get $row st4te]]
+         dict set row wh3n2 [clock seconds]
+         $DBCMD(SetRu1eState) allrows $row
+         incr Count([dict get $row st4te])
+      }
+%   \end{tcl}
+%   The final step of adding a new rule would be to generate all 
+%   overlap ambiguities it takes part in, but this is expected to be 
+%   such a large chunk of work that each pair of rules is set up as a 
+%   separate task.
+%   \begin{tcl}
+      $DBCMD(ActiveRu1e) foreach row {
+         push_main_task overlaps_between [dict get $row num6er] $me
+      }
+   }
+}
+%   \end{tcl}
+%   However, it turns out that this is frequently a large chunk of 
+%   work\Dash long enough for the process to become unresponsive. 
+%   Hence it should be split up in smaller pieces.
+%   
+%   \begin{proc}{new_ru1e_A}
+%     This procedure handles the loop over ambiguities that might be 
+%     dropped. Its call syntax is
+%     \begin{displaysyntax}
+%       |new_ru1e_A| \word{state} \word{lhs} \word{rhs} 
+%       \word{feedbacks} \word{profile} \word{divided-list} \word{me} 
+%       \word{merow} \word{when} \word{resultset} \word{limit}
+%     \end{displaysyntax}
+%     where \word{resultset} is a resultset object for the 
+%     ambiguities to process, and \word{limit} is an integer with the 
+%     maximal number of these that may be considered on this iteration. 
+%     \word{when} is the timestamp to use for all |wh3n1| and |wh3n2| 
+%     fields set. Remaining arguments are like the corresponding local 
+%     variables from the above procedure.
+%     
+%     \begin{tcl}
+proc new_ru1e_A {state lhs rhs feedbacks profile dividedL me merow\
+  when resultset limit} {
+   variable DBCMD
+   variable Count
+   for {} {$limit>0 && [$resultset nextdict numrow]} {incr limit -1} {
+      set row [lindex [$DBCMD(GetAmbiguity) allrows $numrow] 0]
+      set sites [network::wfb::instances\
+        [list [dict get $row si7e] [dict get $row feed6acks]]\
+        [list $lhs $feedbacks] 1]
+      if {![llength $sites]} then {continue}
+      dict set row st4te 2
+      dict set row wh1ch [list $me]
+      dict set row wh3n2 $when
+      $DBCMD(AdvanceAmbiguity) allrows $row
+      incr Count(a)
+   }
+   if {$limit<=0} then {
+      push_main_task new_ru1e_A $state $lhs $rhs $feedbacks\
+        $profile $dividedL $me $merow $when $resultset 20
+      return
+   }
+   $resultset close
+   new_ru1e_B $state $lhs $rhs $feedbacks $profile $dividedL\
+     $me $merow $when $limit
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   |new_ru1e_A| is called from a following modified |new_ru1e|, 
+%   which first does the following tasks:
+%   \begin{enumerate}
+%     \item 
+%        In some configurations, starts a transaction. (The original 
+%        intent for this was to speed up the many \texttt{UPDATE}s 
+%        that |new_ru1e| can do, but it has since turned out that 
+%        this can be a very lengthy operation where transaction 
+%        isolation is a small worry.)
+%     \item Creates the new rule
+%     \item Retrieves the list of all active rules whose profiles are 
+%       divided by that of the new rule, and from that locates the 
+%       |num6er| assigned to the new rule.
+%     \item Retrieves a resultset for the list of all active 
+%       ambiguities whose profiles divided by that of the new rule.
+%   \end{enumerate}
+%   \begin{tcl}
+proc new_ru1e {state lhs rhs feedbacks args} {
+   variable DBCMD
+   variable Count
+%<trans>   $DBCMD(database) begintransaction
+   set profile [network_profile $DBCMD(signature) $lhs]
+   set when [clock seconds]
+   set D [dict replace $profile  st4te $state  lhs $lhs \
+     rhs $rhs  feed6acks $feedbacks  wh3n1 $when]
+   if {[llength $args]} then {dict set D pr00f [lindex $args 0]}
+%<*lazier>
+   dict set D vSum 0
+   dict set D v2Sum 0
+   dict for {H r} $rhs {
+      set v [expr {[llength [lindex $H 0]]-2}]
+      dict incr D vSum $v
+      dict incr D v2Sum [expr {$v*$v}]
+   }
+%</lazier>
+   $DBCMD(NewRu1e) allrows $D
+   incr Count($state[string tolower $state])
+%<*splitnewrule>
+   push_main_task new_ru1e_1 $state $lhs $rhs $feedbacks $profile\
+     $when
+}
+proc new_ru1e_1 {state lhs rhs feedbacks profile when} {
+   variable DBCMD
+%</splitnewrule>
+   set dividedL [$DBCMD(RDividedBy) allrows $profile]
+   set edividedL {}
+   set me {}
+   foreach row $dividedL {
+      if {[dict get $row st4te] eq "E"} then {
+         lappend edividedL $row
+      }
+      if {[dict get $row lhs] eq $lhs && [dict get $row num6er]>$me}\
+      then {
+         set me [dict get $row num6er]
+         set merow $row
+      }
+   }
+%<*lazy,lazier>
+   if {$state eq "R"} then {
+      push_main_task new_ru1e_B $state $lhs $rhs $feedbacks $profile\
+        $dividedL $me $merow $when 20
+   } else {
+      push_main_task new_ru1e_BE $state $lhs $rhs $feedbacks $profile\
+        $edividedL $me $merow $when 20
+   }
+   return
+%</lazy,lazier>
+   if {$state ne "R"} then {set dividedL $edividedL}
+%<*splitnewrule>
+   push_main_task new_ru1e_2 $state $lhs $rhs $feedbacks $profile\
+     $dividedL $me $merow $when
+}
+proc new_ru1e_2\
+  {state lhs rhs feedbacks profile dividedL me merow when} {
+   variable DBCMD
+   push_main_task\
+%</splitnewrule>
+   new_ru1e_A $state $lhs $rhs $feedbacks $profile $dividedL $me\
+     $merow $when [$DBCMD(ADividedBy) execute $profile] 17
+}
+%   \end{tcl}
+%   
+%   \begin{proc}{new_ru1e_B}
+%     This procedure handles the loop over rules that might be 
+%     dropped. Its call syntax is
+%     \begin{displaysyntax}
+%       |new_ru1e_B| \word{state} \word{lhs} \word{rhs} 
+%       \word{feedbacks} \word{profile} \word{divided-list} \word{me} 
+%       \word{merow} \word{when} \word{limit}
+%     \end{displaysyntax}
+%     where \word{divided-list} is the list of rules to consider, and 
+%     \word{limit} is an integer with the maximal number of these 
+%     that may be considered on this iteration. 
+%     
+%     \begin{tcl}
+proc new_ru1e_B {state lhs rhs feedbacks profile dividedL me merow\
+  when limit} {
+   variable DBCMD
+   variable Count
+   foreach row [lrange $dividedL 0 ${limit}-1] {
+      if {[dict get $row num6er] == $me} then {continue}
+      set whole [dict get $row lhs]
+      set sites [network::wfb::instances\
+        [list $whole [dict get $row feed6acks]]\
+        [list $lhs $feedbacks] 1]
+      if {![llength $sites]} then {continue}
+      set L {}
+      foreach v [lindex $whole 0] {lappend L [llength $L]}
+      set L [list [lrange $L 2 end] [lindex $whole 0 0 2]\
+        [lindex $whole 0 1 1]]
+      set amb [make_ambiguity $whole [dict get $row feed6acks]\
+        $row $L $merow [lindex $sites 0] $when]
+      $DBCMD(NewAmbiguity) allrows $amb
+      incr Count(Aa)
+      if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
+      dict set row st4te [string tolower [dict get $row st4te]]
+      dict set row wh3n2 $when
+      $DBCMD(SetRu1eState) allrows $row
+      incr Count([dict get $row st4te])
+      set obj [$DBCMD(DropPairsOf) execute $row]
+      incr Count(p) [$obj rowcount]
+      incr Count(P) [expr {-[$obj rowcount]}]
+      $obj close
+   }
+   set dividedL [lrange $dividedL $limit end]
+   if {[llength $dividedL]} then {
+      push_main_task new_ru1e_B $state $lhs $rhs $feedbacks $profile\
+        $dividedL $me $merow $when 20
+   } else {
+      push_main_task new_ru1e_C $me $merow $when
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{new_ru1e_BE}
+%     This procedure handles the loop over equalities that might be 
+%     dropped when a new equality is added. This is different from 
+%     |new_ru1e_B| mainly in that only equalities that are duplicates 
+%     of the new one will be dropped. The call syntax is the same as 
+%     for |new_ru1e_B|, i.e.,
+%     \begin{displaysyntax}
+%       |new_ru1e_BE| \word{state} \word{lhs} \word{rhs} 
+%       \word{feedbacks} \word{profile} \word{divided-list} \word{me} 
+%       \word{merow} \word{when} \word{limit}
+%     \end{displaysyntax}
+%     even though the \word{state} is superfluous, as it should 
+%     always be |E|.
+%     
+%     \begin{tcl}
+proc new_ru1e_BE {state lhs rhs feedbacks profile dividedL me merow\
+  when limit} {
+   variable DBCMD
+   variable Count
+   variable coefficient
+   set z [{*}$coefficient 0]
+   foreach row [lrange $dividedL 0 ${limit}-1] {
+      if {[dict get $row num6er] == $me} then {continue}
+      set whole [dict get $row lhs]
+      foreach site [
+         network::wfb::instances\
+           [list [dict get $row lhs] [dict get $row feed6acks]]\
+           [list $lhs $feedbacks]
+      ] {
+         set G [network::pure::detach [dict get $row lhs] $site]
+         set target [dict get $row rhs]
+         dict for {H r} $rhs {
+            set NW [network::pure::canonise\
+              [network::pure::annex $G $H]]
+            dict update target $NW t {
+               if {![info exists t]} then {set t $z}
+               set t [{*}$coefficient - $t $r]
+               if {[{*}$coefficient iszero $t]} then {unset t}
+            }
+         }
+         if {![dict size $target]} then {
+            dict set row st4te e
+            dict set row wh3n2 $when
+            $DBCMD(SetRu1eState) allrows $row
+            incr Count(e)
+            set obj [$DBCMD(DropPairsOf) execute $row]
+            incr Count(p) [$obj rowcount]
+            incr Count(P) [expr {-[$obj rowcount]}]
+            $obj close
+         }
+      }
+   }
+   set dividedL [lrange $dividedL $limit end]
+   if {[llength $dividedL]} then {
+      push_main_task new_ru1e_BE $state $lhs $rhs $feedbacks $profile\
+        $dividedL $me $merow $when 20
+   } else {
+      push_main_task new_ru1e_C $me $merow $when
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{new_ru1e_C}
+%     The final part of |new_ru1e| pushes |overlaps_between| tasks 
+%     for the new rule. Its call syntax is
+%     \begin{displaysyntax}
+%       |new_ru1e_C| \word{me} \word{merow} \word{when}
+%     \end{displaysyntax}
+%     where only \word{me} is really used, but possibly the others 
+%     could become useful if this process is refined later on. The 
+%     most important part right now is however the |commit|.
+%     \begin{tcl}
+proc new_ru1e_C {me merow when} {
+   variable DBCMD
+%<*!lazier>
+   $DBCMD(ActiveRu1e) foreach row {
+      push_main_task overlaps_between [dict get $row num6er] $me
+   }
+%</!lazier>
+%<*lazier>
+   variable Count
+   set obj [$DBCMD(EstimatePairs) execute [dict replace $merow\
+     lhsOrder [expr {[llength [lindex [dict get $merow lhs] 0]]-2}]]]
+   incr Count(P) [$obj rowcount]
+   $obj close
+%</lazier>
+%<trans>   $DBCMD(database) commit
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{proc}
+% 
+% 
+% \begin{proc}{make_ambiguity}
+%   This procedure constructs the database row for a new overlap or 
+%   inclusion ambiguity, and returns it; it is up to the caller to 
+%   add that row to the database. The call syntax is
+%   \begin{displaysyntax}
+%     |make_ambiguity| \word{site} \word{feedbacks} \word{plus-rule} 
+%     \word{plus-region} \word{minus-rule} \word{minus-region}
+%     \word{when}\regopt
+%   \end{displaysyntax}
+%   where \word{site} is the site of the ambiguity (a pure network), 
+%   which together with \word{feedbacks} constitute the $\mu$ of the 
+%   ambiguity $(t_1,\mu,t_2)$. The \word{plus-rule} and 
+%   \word{minus-rule} are dictionaries encoding rows of the |ru1es| 
+%   table, for the items underlying $t_1$ and $t_2$ respectively. The 
+%   \word{plus-region} and \word{minus-region} provide the rest of 
+%   the information defining $t_1$ and $t_2$. The optional 
+%   \word{when} is if provided the value for |wh3n1|, otherwise 
+%   |clock seconds| is called.
+%   
+%   What this procedure has to do is primarily to compute the initial 
+%   |re5olution| and |m0n0mials|.
+%   \begin{tcl}
+proc make_ambiguity {site feedbacks prow pregion mrow mregion args} {
+   set A(si7e) $site
+   set A(feed6acks) $feedbacks
+   set A(m0n0mials) {}
+   set resD [dict create]
+   variable coefficient
+   set z [{*}$coefficient 0]
+   foreach  sign {1 -1}  row [list $prow $mrow] \
+     region [list $pregion $mregion] {
+      set G [network::pure::detach $site $region]
+      foreach {H r} [dict get $row rhs] {
+         set NW [network::pure::canonise [network::pure::annex $G $H]]
+         if {![info exists NWID($NW)]} then {
+            set NWID($NW) [llength $A(m0n0mials)]
+            lappend A(m0n0mials) $NW
+         }
+         dict update resD $NWID($NW) s {
+            if {![info exists s]} then {set s $z}
+            if {$sign>0} then {
+               set s [{*}$coefficient + $s $r]
+            } else {
+               set s [{*}$coefficient - $s $r]
+            }
+            if {[{*}$coefficient iszero $s]} then {unset s}
+         }
+      }
+   }
+   set A(re5olution) [list $resD]
+   set A(vRe5Sum) 0
+   set A(v2Re5Sum) 0
+   dict for {mu r} $resD {
+      set order [expr {[llength [lindex $A(m0n0mials) $mu 0]]-2}]
+      incr A(vRe5Sum) $order
+      incr A(v2Re5Sum) [expr {$order*$order}]
+   }
+   if {[llength $args]} then {
+      set A(wh3n1) [lindex $args 0]
+   } else {
+      set A(wh3n1) [clock seconds]
+   }
+   if {[dict size $resD]} then {
+      set A(st4te) A
+   } else {
+      set A(st4te) 0
+      set A(wh3n2) $A(wh3n1)
+   }
+   set A(wh1ch) {}
+   set A(wh3re) {}
+   set A(p1us) [dict get $prow num6er]
+   set A(m1nus) [dict get $mrow num6er]
+   set A(p1us2eg) $pregion
+   set A(m1nus2eg) $mregion
+   variable DBCMD
+   array set A [network_profile $DBCMD(signature) $site]
+   return [array get A]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{overlaps_between}
+%   This procedure makes new ambiguities out of all overlaps between 
+%   two |ru1es|. The call syntax is
+%   \begin{displaysyntax}
+%     |overlaps_between| \word{plus-rule} \word{minus-rule}
+%   \end{displaysyntax}
+%   where both arguments are |num6er|s of |ru1es|. There is no 
+%   particular return value.
+%   
+%   In the \Module{lazier} setting, this also drops any pair of 
+%   these two rules, and of course it updates the columns used to 
+%   estimate overlap sizes. 
+%   \begin{tcl}
+proc overlaps_between {plus minus} {
+   variable DBCMD
+   $DBCMD(database) transaction {
+      set prow [lindex [
+         $DBCMD(GetRu1e) allrows [dict create num6er $plus]
+      ] 0]
+      set mrow [lindex [
+         $DBCMD(GetRu1e) allrows [dict create num6er $minus]
+      ] 0]
+      variable Count
+      variable am6iguity_top
+      set times 0
+      set overlap_sum 0
+      foreach overlap [
+         network::wfb::groomed_ambiguities\
+           [list [dict get $prow lhs] [dict get $prow feed6acks]]\
+           [list [dict get $mrow lhs] [dict get $mrow feed6acks]]
+      ] {
+         incr times
+         incr overlap_sum [expr {
+            [llength [lindex $overlap 1 0]] +
+            [llength [lindex $overlap 2 0]] -
+            [llength [lindex $overlap 0 0 0]] + 2
+         }]
+         set amb [make_ambiguity [lindex $overlap 0 0]\
+           [lindex $overlap 0 1] $prow [lindex $overlap 1] $mrow\
+           [lindex $overlap 2]]
+%<*vsquare&lazy>
+         if {[dict get $amb v2Re5Sum] <= $am6iguity_top} then {
+            $DBCMD(NewAmbiguity) allrows $amb
+            incr Count(Aa)
+            if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
+         } else {
+            dict set amb pick8y [dict get $amb v2Re5Sum]
+            $DBCMD(AddPair) allrows $amb
+            incr Count(P)
+         }
+%</vsquare&lazy>
+%<*!(vsquare&lazy)>
+         $DBCMD(NewAmbiguity) allrows $amb
+         incr Count(Aa)
+         if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
+%</!(vsquare&lazy)>
+      }
+%<*lazier>
+      if {$times} then {
+         $DBCMD(UpdateOverl4p) allrows\
+           [dict create num6er $plus sum $overlap_sum times $times]
+         $DBCMD(UpdateOverl4p) allrows\
+           [dict create num6er $minus sum $overlap_sum times $times]
+      }
+      set obj [$DBCMD(DropPair) execute\
+        [dict create p1us $plus m1nus $minus]]
+      incr Count(p) [$obj rowcount]
+      incr Count(P) [expr {-[$obj rowcount]}]
+      $obj close
+%</lazier>
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{raise_ambiguity_top}
+%   This procedure raises the |am6iguity_top| variable to a higher 
+%   value, and sees to that everything below the new bound gets moved 
+%   from |pa1rs| to |am6iguities|. The call syntax is
+%   \begin{displaysyntax}
+%     |raise_ambiguity_top| \word{new top}
+%   \end{displaysyntax}
+%   and there is no particular return value, but tasks are pushed 
+%   onto the |main_loop_stack|.
+%   
+%   
+%   
+%   \begin{tcl}
+proc raise_ambiguity_top {newtop} {
+   variable am6iguity_top
+   set oldtop $am6iguity_top
+   set am6iguity_top $newtop
+   variable pair_level $newtop
+   variable DBCMD
+   $DBCMD(database) begintransaction
+   set obj [$DBCMD(PairsUpto) execute [dict create pick8y $newtop]]
+   push_main_task raise_ambiguity_top_B $obj $newtop
+   push_main_task raise_ambiguity_top_A $obj $newtop $oldtop
+}
+%   \end{tcl}
+%   
+%   \begin{proc}{raise_ambiguity_top_B}
+%     This procedure finishes the move of data from |pa1rs| to 
+%     |am6iguities| by closing the result object, deleting the pairs, 
+%     and committing the changes.
+%     \begin{tcl}
+proc raise_ambiguity_top_B {obj newtop} {
+   $obj close
+   variable DBCMD
+   set obj [$DBCMD(DropPairsBelow) execute [dict create pick8y $newtop]]
+   variable Count
+   incr Count(P) [expr {- [$obj rowcount]}]
+   $obj close
+   $DBCMD(database) commit
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{raise_ambiguity_top_A}
+%     This procedure is mostly a variant of |overlaps_between| that 
+%     gets its pairs from the |pa1rs| table, and therefore doesn't 
+%     insert anything there. The call syntax is
+%     \begin{displaysyntax}
+%       |raise_ambiguity_top_A| \word{result-object} 
+%       \word{new top} \word{old top}
+%     \end{displaysyntax}
+%     where the \word{new top} and \word{old top} is the new and old 
+%     respectively values of |am6iguity_top|; an ambiguity not 
+%     between these values should be ignored, as it will still have an 
+%     row in the |pa1rs| table or is already in the |am6iguities| table.
+%     
+%     Another difference to |overlaps_between| is that this procedure 
+%     only does something if the plus and minus rules are still 
+%     active; such a check in |overlaps_between| would however be 
+%     pointless, as it is only called for pairs where both parties 
+%     are known to exist.
+%     \begin{tcl}
+proc raise_ambiguity_top_A {obj newtop oldtop} {
+   if {![$obj nextdict pair]} then {return}
+   push_main_task raise_ambiguity_top_A $obj $newtop $oldtop
+   variable DBCMD
+   variable Count
+   set prow [lindex [
+      $DBCMD(GetRu1e) allrows\
+        [dict create num6er [dict get $pair p1us]]
+   ] 0]
+   if {[dict get $prow st4te] in {r e}} then {
+      incr Count(p) [dict get $pair c0unt]
+      return
+   }
+   set mrow [lindex [
+      $DBCMD(GetRu1e) allrows\
+        [dict create num6er [dict get $pair m1nus]]
+   ] 0]
+   if {[dict get $mrow st4te] in {r e}} then {
+      incr Count(p) [dict get $pair c0unt]
+      return
+   }
+   foreach overlap [
+      network::wfb::groomed_ambiguities\
+        [list [dict get $prow lhs] [dict get $prow feed6acks]]\
+        [list [dict get $mrow lhs] [dict get $mrow feed6acks]]
+   ] {
+      set amb [make_ambiguity [lindex $overlap 0 0]\
+        [lindex $overlap 0 1] $prow [lindex $overlap 1] $mrow\
+        [lindex $overlap 2]]
+%<*vsquare>
+      if {[dict get $amb v2Re5Sum]>$oldtop &&\
+        [dict get $amb v2Re5Sum]<=$newtop} then {
+         $DBCMD(NewAmbiguity) allrows $amb
+         incr Count(Aa)
+         if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
+      }
+%</vsquare>
+%<*!vsquare>
+      $DBCMD(NewAmbiguity) allrows $amb
+      incr Count(Aa)
+      if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
+%</!vsquare>
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{proc}
+% 
+% 
+% \begin{proc}{add_congruence}
+%   This procedure creates a new ambiguity that encodes a given 
+%   congruence. The call syntax is
+%   \begin{displaysyntax}
+%     |add_congruence| \word{feedbacks} \word{lincomb} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{lincomb} is a dictionary mapping networks to 
+%   coefficients, that is interpreted as the expression to make 
+%   congruent to $0$. The supported \word{option}s are:
+%   \begin{ttdescription}
+%     \item[-long] long description text,
+%     \item[-short] short description text;
+%   \end{ttdescription}
+%   
+%   \begin{tcl}
+proc add_congruence {feedbacks dict args} {
+   array set O $args
+   switch -- [info exists O(-long)][info exists O(-short)] {
+     00 {set O(-long) [set O(-short) ""]}
+     01 {set O(-long) $O(-short)}
+     10 {set O(-short) $O(-long)}
+   }
+   set A(feed6acks) $feedbacks
+   set A(m0n0mials) {}
+   set resD [dict create]
+   variable coefficient
+   set z [{*}$coefficient 0]
+   dict for {NW r} $dict {
+      set NW [network::pure::canonise $NW]
+      if {![info exists NWID($NW)]} then {
+         set NWID($NW) [llength $A(m0n0mials)]
+         lappend A(m0n0mials) $NW
+      }
+      dict update resD $NWID($NW) s {
+         if {![info exists s]} then {set s $z}
+         set s [{*}$coefficient + $s $r]
+         if {[{*}$coefficient iszero $s]} then {unset s}
+      }
+   }
+   if {![dict size $resD]} then {return "That's just 0=0"}
+   set A(re5olution) [list $resD]
+   set A(vRe5Sum) 0
+   set A(v2Re5Sum) 0
+   dict for {mu r} $resD {
+      set order [expr {[llength [lindex $A(m0n0mials) $mu 0]]-2}]
+      incr A(vRe5Sum) $order
+      incr A(v2Re5Sum) [expr {$order*$order}]
+   }
+   set A(si7e) [lindex $A(m0n0mials) 0]
+   set A(wh3n1) [clock seconds]
+   set A(st4te) A
+   set A(wh1ch) {}
+   set A(wh3re) {}
+   set A(p1us2eg) $O(-long)
+   set A(m1nus2eg) $O(-short)
+   variable DBCMD
+   array set A [network_profile $DBCMD(signature)]
+   $DBCMD(NewAmbiguity) allrows [array get A]
+   variable Count
+   incr Count(Aa)
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{enter_congruence}
+%   This procedure is a conveniency wrapped around |add_congruence|. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |enter_congruence| \begin{regblock}[\regstar] \word{option} 
+%     \word{value} \end{regblock} \word{feedbacks} 
+%     \begin{regblock}[\regstar] \word{coefficient} \word{scan-list} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{scan-list}s are passed on to 
+%   |network::pure::construct| to make a network, which is then 
+%   paired up with the \word{coefficient}. The \word{option}s can be 
+%   whatever |add_congruence| takes, but they are distinguished from 
+%   the list of \word{feedbacks} by having list length $1$ and 
+%   beginning with `|-|'.
+%   
+%   \begin{tcl}
+proc enter_congruence {args} {
+   variable DBCMD
+   set state "option"
+   set resD [dict create]
+   set optL {}
+   foreach arg $args {
+      switch -- $state "option" {
+         if {[llength $arg]==1 && [string match -* $arg]} then {
+            lappend optL $arg
+            set state "value"
+         } else {
+            set feedbacks $arg
+            set state "coefficient"
+         }
+      } "value" {
+         lappend optL $arg
+         set state "option"
+      } "coefficient" {
+         set c $arg
+         set state "scanlist"
+      } "scanlist" {
+         set NW [network::pure::construct $DBCMD(signature) $arg]
+         dict set resD $NW $c
+         set state "coefficient"
+      }
+   }
+   switch -- $state "option" {
+      error "Expected list of feedbacks"
+   } "value" {
+      error "Expected value for option: $arg"
+   } "scanlist" {
+      error "Expected network scanlist for coefficient: $arg"
+   }
+   add_congruence $feedbacks $resD {*}$optL
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \section{Viewing results}
+% 
+% Having computed something is all well and good, but it doesn't 
+% amount to much if you cannot also get these results out of the 
+% database and into a human-comprehensible format. In the long run, 
+% the way to go is to follow the |mtmtcl| route and export data as 
+% (near-)OpenMath, which in particular means networks are going 
+% to be encoded as some kind of abstract index expression. This does 
+% not mean the graphical presentation of networks will be lost, but 
+% it means it will have to be generated by the renderer of the 
+% OpenMath data rather than the completion utility. This should not 
+% be a problem, as the automatically generated layout is now 
+% perfectly adequate in the cases considered.
+% 
+% Still, there is a place for interactive viewing of what the utility 
+% is up to, so it makes sense to adapt some parts of the previous 
+% utility to view rules in a database.
+% 
+% 
+% \subsection{A rule browser}
+% 
+% The rule browser requires Tk.
+% \begin{tcl}
+%<*Tk>
+package require Tk
+% \end{tcl}
+% As before, it is essentially a window that allows one to browse the 
+% list of rules. It is geared towards binomial identities, but should 
+% provide a fallback mode for viewing rules with more than one term 
+% on the right hand side.
+% 
+% \changes{2}{2007/03/17}{Redesigning rule browser layout. (LH)}
+% 
+% \begin{proc}{rule_browser_layout}
+%   This procedure creates a window for the rule browser and sets up 
+%   the widgets that should reside in it. At the top there is bar of 
+%   controls, below that is a pair of canvases displaying the left 
+%   and right hand sides of the rule, and below that is a canvas 
+%   displaying the rule derivation.
+%   All canvases have vertical and horizontal scroll bars. 
+%   
+%   The control bar has fixed height, but the heights of the other 
+%   parts is under the control of a |panedwindow| widget. Each of the 
+%   three parts of the window are found inside frames called 
+%   |.rulebrowser.fbar|, |.rulebrowser.frule|, and 
+%   |.rulebrowser.fproof| respectively.
+%   \begin{tcl}
+proc rule_browser_layout {} {
+   set t [toplevel .rulebrowser]
+   wm title $t "Rule browser"
+   pack [
+      frame $t.fbar -background grey90
+   ] -expand true -fill x -side top
+   pack [
+      label $t.infoline
+   ] -expand true -fill x -side top
+   pack [
+      panedwindow $t.panes -orient vertical -borderwidth 0
+   ] -expand true -fill both
+   frame $t.frule
+   frame $t.fproof
+%   \end{tcl}
+%   The two frames will eventually be made panes of the 
+%   |panedwindow|, but delaying adding them until the grids inside 
+%   them are complete makes it less likely to run into Tk 
+%   bug~\#1714535. 
+%   The order of widget creations here is important, as the frames 
+%   need to be above the panedwindow in the stacking order.
+%   
+%   Creating the network canvases and their associated scrollbars 
+%   is a highly uniform task, so all three of them are handled by the 
+%   same loop. The widget names all have the form 
+%   \meta{toplevel}|.|\meta{midpart}\meta{suffix} where \meta{suffix} 
+%   is |c|, |h|, or |v| depending on whether this is a 
+%   \texttt{c}anvas, \texttt{h}orizontal scrollbar, or 
+%   \texttt{v}ertical scrollbar, but the \meta{midpart} is 
+%   syntactically different in the rule and derivation parts: in the 
+%   former case it is |frule.left_| or |frule.right_|, but in the 
+%   latter it is |fproof.|.
+%   \begin{tcl}
+   foreach c_ [list $t.frule.left_ $t.frule.right_ $t.fproof.] {
+      scrollbar ${c_}h -orient horiz -command [list ${c_}c xview]
+      scrollbar ${c_}v -command [list ${c_}c yview]
+      canvas ${c_}c -width 200 -height 300 -relief solid -borderwidth 1\
+        -xscrollcommand [list ${c_}h set]\
+        -yscrollcommand [list ${c_}v set]
+      bindtags ${c_}c [linsert [bindtags ${c_}c] 1 Network]
+   }
+%   \end{tcl}
+%   
+%   Geometry inside the the |frule| and |fproof| frames is |grid|ded, 
+%   since this automatically leaves a square of the right size in the 
+%   corner. The |fproof| arrangement is slightly simpler, but the 
+%   |frule| is mostly just a repetition.
+%   \begin{tcl}
+   grid $t.fproof.c -row 0 -column 0 -sticky nsew
+   grid $t.fproof.v -row 0 -column 1 -sticky ns
+   grid $t.fproof.h -row 1 -column 0 -sticky ew
+   grid rowconfigure $t.fproof 0 -weight 1
+   grid columnconfigure $t.fproof 0 -weight 1
+%
+   grid $t.frule.left_c  -row 0 -column 0 -sticky nsew
+   grid $t.frule.left_v  -row 0 -column 1 -sticky ns
+   grid $t.frule.left_h  -row 1 -column 0 -sticky ew
+   grid $t.frule.right_c -row 0 -column 3 -sticky nsew
+   grid $t.frule.right_v -row 0 -column 4 -sticky ns
+   grid $t.frule.right_h -row 1 -column 3 -sticky ew
+   grid rowconfigure $t.frule 0 -weight 1
+   grid columnconfigure $t.frule 0 -weight 1
+   grid columnconfigure $t.frule 3 -weight 1
+%   \end{tcl}
+%   Column 2 is reserved for a canvas with an arrow pointing right.
+%   \begin{tcl}
+   canvas $t.frule.arrow_c -width 20 -height 20
+   $t.frule.arrow_c create line {0 10 20 10} -arrow last -width 2
+   grid $t.frule.arrow_c -row 0 -column 2
+%   \end{tcl}
+%   Now the frame contents are complete, so they are added as panes.
+%   \begin{tcl}
+   $t.panes add $t.frule -sticky nsew -minsize 50
+   $t.panes add $t.fproof -sticky nsew -minsize 50
+%   \end{tcl}
+%   The control bar |fbar| is filled in by a separate procedure, 
+%   since the details of these controls are closely associated with 
+%   the actions that they will perform. Similarly with the bindings 
+%   for hyperlinks.
+%   \begin{tcl}
+   rule_browser_fbar $t
+   hyper_references $t.fproof.c
+   return $t
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% The \describestring[bindtag]{Network}|Network| bindtag is used for 
+% all canvases displaying networks. It offers bindings for grabbing the 
+% network with the mouse and moving it around. The |-cursor| 
+% man\oe uvres are meant to isolate this use of the mouse from that 
+% of clicking hyperlinks.
+% \begin{tcl}
+bind Network <ButtonPress-1> {
+   if {[%W cget -cursor] eq ""} then {
+      %W configure -cursor fleur
+      %W scan mark %x %y
+   }
+}
+bind Network <B1-Motion> {
+   if {[%W cget -cursor] eq "fleur"} then {%W scan dragto %x %y 1}
+}
+bind Network <ButtonRelease-1> {
+   if {[%W cget -cursor] eq "fleur"} then {
+      %W configure -cursor ""
+   }
+}
+bind Network <B1-Leave> {%W configure -cursor ""}
+% \end{tcl}
+% 
+% \begin{proc}{center_network}
+%   This procedure scrolls a canvas so that the contents appear in 
+%   the center of the visible region. The call syntax is
+%   \begin{quote}
+%     |center_network| \word{canvas} \word{itemOrId}\regopt
+%   \end{quote}
+%   where \word{itemOrId} selects the items to center. If not 
+%   specified, then this defaults to |all|.
+%   \begin{tcl}
+proc center_network {c {id all}} {
+   foreach {left top right bottom} {0 0 0 0} break
+   foreach {left top right bottom} [$c bbox $id] break
+   $c scan mark [expr {($right+$left)/2}] [expr {($bottom+$top)/2}]
+   set w [winfo width $c]
+   if {$w < 10} then {set w [winfo reqwidth $c]}
+   set h [winfo height $c]
+   if {$h < 10} then {set h [winfo reqheight $c]}
+   $c scan dragto [
+      expr {round([$c canvasx [expr {$w/2}]])}
+   ] [
+      expr {round([$c canvasy [expr {$h/2}]])}
+   ] 1
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{variable}{vertex_appearances}
+% \begin{variable}{vertex_sizes}
+%   The |vertex_appearances| variable holds the dictionary of 
+%   appearances for the vertex types currently occuring in the rule 
+%   networks. It is used by those procedures that draw or 
+%   redraw networks. The |vertex_sizes| variable is a list patterns 
+%   and vertex sizes for use with |make_level-layout-Tk|.
+%   \begin{tcl}
+set vertex_sizes {* {20 20}}
+%   \end{tcl}
+% \end{variable}\end{variable}
+% 
+% 
+% \begin{proc}{display_rule}
+%   The |display_rule| procedure updates the rule browser window to 
+%   show the specified rule or equality. The syntax is
+%   \begin{quote}
+%     |display_rule| \word{toplevel} \word{ruleno}
+%   \end{quote}
+%   where \word{toplevel} is the name of the browser window and 
+%   \word{ruleno} is the number of the rule to display. It returns 
+%   |1| if there was such a rule and |0| otherwise.
+%   
+%   \begin{tcl}
+proc display_rule {t ruleno} {
+   variable DBCMD
+   set L [$DBCMD(GetRu1e) allrows [dict create num6er $ruleno]]
+   if {![llength $L]} then {return 0}
+   set rule [lindex $L 0]
+   $t.infoline configure -text [
+      switch -- [dict get $rule st4te] "R" {
+         format "Active rule"
+      } "r" {
+         clock format [dict get $rule wh3n2] -format "Rule dropped %+"
+      } "E" {
+         format "Active equality"
+      } "e" {
+         clock format [dict get $rule wh3n2] -format "Equality dropped %+"
+      }
+   ]
+%
+   set tr $t.frule
+   $tr.left_c delete all
+   $tr.right_c delete all
+   $t.fproof.c delete all
+%   \end{tcl}
+%   Drawing the |lhs| network is mostly about calling the proper 
+%   helper procedures, in the proper order.
+%   \begin{tcl}
+   variable vertex_sizes
+   set NW(pure) [dict get $rule lhs]
+   network::rich::make_level-layout-Tk $vertex_sizes -var NW
+   network::rich::vpos-Tk_by_level -var NW
+   variable vertex_appearances
+   network::rich::ecurve-Tk-tt_by_level $vertex_appearances -var NW
+   network::rich::drawit $tr.left_c $vertex_appearances {} -var NW
+   draw_network_feedbacks $tr.left_c [dict get $rule feed6acks]\
+     [array get NW] 1
+   $tr.left_c configure -scrollregion [$tr.left_c bbox all]
+%   \end{tcl}
+%   The |rhs| is trickier, since there are two styles for it. When 
+%   there is only a single term with coefficient $1$, then the 
+%   classical style of just the network can be used, but all other 
+%   cases should be with brackets around the networks and explicit 
+%   coefficients. For the moment though, that is let unimplemented.
+%   \begin{tcl}
+   variable coefficient
+   set rhs [dict get $rule rhs]
+   if {[llength $rhs] == 2 &&\
+     [{*}$coefficient = [lindex $rhs 1] [{*}$coefficient 1]]} then {
+      set NW(pure) [lindex $rhs 0]
+      network::rich::make_level-layout-Tk $vertex_sizes -var NW
+      network::rich::vpos-Tk_by_level -var NW
+      network::rich::ecurve-Tk-tt_by_level $vertex_appearances -var NW
+      network::rich::drawit $tr.right_c $vertex_appearances {} -var NW
+   } else {
+      $tr.right_c create text 0 0 -anchor nw\
+        -text {Not implemented yet (fixme)!}
+   }
+   $tr.right_c configure -scrollregion [$tr.right_c bbox all]
+%   \end{tcl}
+%   Displaying the proof is such a big task that it is handled by a 
+%   separate procedure.
+%   \begin{tcl}
+   if {[dict exists $rule pr00f]} then {
+      display_rule_proof $t.fproof.c [dict get $rule pr00f]\
+        -lhs [dict get $rule lhs]
+   } else {
+      $t.fproof.c create text 0 0 -anchor n -text "Axiom"
+   }
+   $t.fproof.c configure -scrollregion [$t.fproof.c bbox all]
+   center_network $tr.left_c
+   center_network $tr.right_c
+   return 1
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{draw_network_feedbacks}
+%   This procedure draws the feedbacks for a network and optionally 
+%   recenters it in its canvas. The call syntax is
+%   \begin{quote}
+%     |draw_network_feedbacks| \word{canvas} \word{feedback-list} 
+%     \word{rich network} \word{center?} 
+%     \begin{regblock}[\regstar]\word{option} 
+%     \word{value}\end{regblock}
+%   \end{quote}
+%   where \word{center?} is a boolean for whether to center while the 
+%   options and values are passed on to 
+%   |network::rich::draw_feedbacks|. As a special case, the |-tags| 
+%   option is interpreted here (as it is a separate argument to the 
+%   underlying procedure).
+%   
+%   \begin{tcl}
+proc draw_network_feedbacks {c fbL NWval center args} {
+   array set NW $NWval
+   set inL {}
+   foreach item [lindex $NW(level-layout-Tk) 0 end-2] {
+      if {[lindex $item 0] eq "edge"} then {
+         lappend inL [lindex $item 2]
+      }
+   }
+   set outL {}
+   foreach item [lindex $NW(level-layout-Tk) 0 0] {
+      if {[lindex $item 0] eq "edge"} then {
+         lappend outL [lindex $item 2]
+      }
+   }
+   set Opt(-tags) ""
+   array set Opt $args
+   eval [list network::rich::draw_feedbacks $c $Opt(-tags) $fbL\
+     -inx $inL -outx $outL -bbox [lindex $NW(level-layout-Tk) 1]]\
+     $args
+   if {$center} then {center_network $c}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{proc}{display_rule_proof}
+%   This procedure displays the proof of a rule (technically the 
+%   resolution of an ambiguity) in a |canvas| (or approximation 
+%   thereof; only the |create| subcommand is needed). 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |display_rule_proof| \word{canvas-cmd} \word{ambiguity} 
+%     \begin{regblock}[\regstar] \word{option} \word{value}
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{ambiguity} is the number of the ambiguity to draw. 
+%   The return value is the bounding box of all the things drawn, or 
+%   an empty list if there wasn't a \word{derivation} (in which case 
+%   nothing is drawn).
+%   
+%   The \word{option}s are:
+%   \begin{ttdescription}
+%     \item[-lhs]
+%       The left hand side network. This is needed in the monomial 
+%       style, to determine which thing goes to the left and which 
+%       thing goes to the right.
+%     \item[-tags] ?
+%     \item[-eqtext] ?
+%     \item[-eqfont] ?
+%     \item[-eqwidth] ?
+%     \item[-eqhalfheight] ?
+%     \item[-reffont] ?
+%     \item[-refcolour] ?
+%   \end{ttdescription}
+%   
+%   The first step is to retrieve the ambiguity.
+%   \begin{tcl}
+proc display_rule_proof {prefix number args} {
+   variable DBCMD
+   set L [$DBCMD(GetAmbiguity) allrows [dict create num6er $number]]
+   if {![llength $L]} then {return}
+   set arow [lindex $L 0]
+%
+   array set Opt {
+      -tags "" 
+      -eqtext "="
+      -eqfont {Times 24}
+      -eqwidth 36
+      -eqhalfheight 12
+      -reffont {Courier 10 underline}
+      -refcolour blue
+   }
+   array set Opt $args
+%   \end{tcl}
+%   The second step is to see if its resolution can be stated in 
+%   monomial form. If not, the presentation is going to be rather 
+%   different.
+%   \begin{tcl}
+   set bbox [display_monomial_proof $prefix $arow [array get Opt]]
+   if {[llength $bbox]} then {return $bbox}
+   
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{display_monomial_proof}
+%   This procedure checks whether an ambiguity resolution can be 
+%   phrased as a monomial proof. If that is possible then this proof 
+%   is also displayed and a bounding box is returned, otherwise an 
+%   empty list is returned. The call syntax is
+%   \begin{displaysyntax}
+%     |display_rule_proof| \word{canvas-cmd} \word{ambiguity} 
+%     \word{options-dict}
+%   \end{displaysyntax}
+%   where the \word{ambiguity} is the database row dictionary for the 
+%   ambiguity.
+%   
+%   The first part checks if the resolution has the wanted form. The 
+%   idea is to\Ldash for each step\Dash look at the monomials which 
+%   are acted upon and determine whether they belong to the plus or 
+%   minus branch of the proof. The |plusL| and |minusL| lists have 
+%   the form
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regstar] \word{monomial number} \{ \word{rule 
+%     number} \word{region} \} \end{regblock} \word{monomial number}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc display_monomial_proof {prefix arow optD} {
+   variable coefficient
+   set one [{*}$coefficient 1]
+   set mone [{*}$coefficient - $one]
+   set plusL {}
+   set minusL {}
+   foreach  step [lrange [dict get $arow re5olution] 0 end-1] \
+     which [dict get $arow wh1ch]  where [dict get $arow wh3re]  {
+      if {[dict size $step] != 2} then {return 0}
+      set mu [lindex $where 0]
+      if {[{*}$coefficient = $one [dict get $step $mu]]} then {
+         lappend plusL $mu [list $which [lindex $where 1]]
+      } elseif {[{*}$coefficient = $mone [dict get $step $mu]]} then {
+         lappend minusL $mu [list $which [lindex $where 1]]
+      } else {
+         return {}
+      }
+   }
+   dict for {mu r} [lindex [dict get $arow re5olution] end] {
+      if {[{*}$coefficient = $one $r]} then {
+         lappend plusL $mu
+      } elseif {[{*}$coefficient = $mone $r]} then {
+         lappend minusL $mu
+      } else {
+         return {}
+      }
+   }
+   if {[llength $plusL]%2!=1 || [llength $minusL]%2!=1}\
+   then {return {}}
+%   \end{tcl}
+%   Have passed those tests, it is now established that a monomial 
+%   proof is possible, so it now only remains to draw it. There are 
+%   however two things still not determined: whether the middle part 
+%   is the site of the ambiguity or a congruence name, and whether 
+%   the left branch (leading up to the |-lhs|) is the plus or the 
+%   minus branch.
+%   
+%   The next step is to lay out the center of the proof.
+%   \begin{tcl}
+   variable vertex_appearances
+   variable vertex_sizes
+   if {[dict exists $arow p1us]} then {
+      set plusL [linsert $plusL 0 [
+         list [dict get $arow p1us] [dict get $arow p1us2eg]
+      ]]
+      set minusL [linsert $minusL 0 [
+         list [dict get $arow m1nus] [dict get $arow m1nus2eg]
+      ]]
+      set midbox [
+         network::rich::drawit_bracketed $prefix $vertex_appearances\
+           0 0 -anchor center -val [
+            network::rich::Tk_from_pure [dict get $arow si7e]\
+              $vertex_sizes $vertex_appearances
+         ]
+      ]
+   } elseif {[llength $plusL]==1 && [llength $minusL]==1} then {
+%   \end{tcl}
+%   If the proof is only a given congruence, then just give the 
+%   |-long| name of that.
+%   \begin{tcl}
+      return [{*}$prefix bbox [
+         {*}$prefix create text  0 0 \
+           -text "[dict get $arow p1us2eg]" \
+           -font [dict get $optD -eqfont] \
+           -tags [dict get $optD -tags]
+      ]]
+   } else {
+      set item [{*}$prefix create text  0 0 \
+        -text "\{[dict get $arow m1nus2eg]\}" \
+        -font [dict get $optD -eqfont] \
+        -tags [dict get $optD -tags]]
+      set midbox [{*}$prefix bbox $item]
+      set plusL [linsert $plusL 0 {}]
+      set minusL [linsert $minusL 0 {}]
+   }
+%   \end{tcl}
+%   |midbox| is now the bounding box of the middle part.
+%   \begin{tcl}
+   foreach {left top right bottom} $midbox break
+   set monomials [dict get $arow m0n0mials]
+   set plusleft [expr {![dict exists $optD -lhs] ||\
+     [dict get $optD -lhs] eq [lindex $monomials [lindex $plusL end]]}]
+%   \end{tcl}
+%   
+%   \begin{tcl}
+   set tags [dict get $optD -tags]
+   set eqopts [list -text [dict get $optD -eqtext] \
+     -font [dict get $optD -eqfont] -tags $tags]
+   set refopts [list -font [dict get $optD -reffont] \
+     -fill [dict get $optD -refcolour]]
+   set eqwidth [dict get $optD -eqwidth]
+   set yref [expr {-[dict get $optD -eqhalfheight]}]
+   set stepno -1
+   foreach {spec mu} [lindex [list $minusL $plusL] $plusleft] {
+      set stepTagsL [linsert $tags end step${stepno}]
+      incr stepno -1
+      set xeq [expr {$left - 0.5*$eqwidth}]
+      {*}$prefix create text $xeq 0 -anchor center {*}$eqopts
+      if {[llength $spec]} then {
+         {*}$prefix create text $xeq $yref -anchor s\
+           {*}$refopts -tags [linsert $stepTagsL end reference]\
+           -text [format "<(%d)" [lindex $spec 0]]
+      }
+      set left [expr {$left - $eqwidth}]
+      set bbox [
+         network::rich::drawit_bracketed $prefix $vertex_appearances\
+           $left 0 -anchor e -val [
+            network::rich::Tk_from_pure [lindex $monomials $mu]\
+              $vertex_sizes $vertex_appearances
+         ]
+      ]
+      set left [lindex $bbox 0]
+      if {$top > [lindex $bbox 1]} then {set top [lindex $bbox 1]}
+      if {$bottom > [lindex $bbox 3]}\
+        then {set bottom [lindex $bbox 3]}
+   }
+   set stepno 1
+   foreach {spec mu} [lindex [list $plusL $minusL] $plusleft] {
+      set stepTagsL [linsert $tags end step${stepno}]
+      incr stepno 
+      set xeq [expr {$right + 0.5*$eqwidth}]
+      {*}$prefix create text $xeq 0 -anchor center {*}$eqopts
+      if {[llength $spec]} then {
+         {*}$prefix create text $xeq $yref -anchor s\
+           {*}$refopts -tags [linsert $stepTagsL end reference]\
+           -text [format "(%d)>" [lindex $spec 0]]
+      }
+      set right [expr {$right + $eqwidth}]
+      set bbox [
+         network::rich::drawit_bracketed $prefix $vertex_appearances\
+           $right 0 -anchor w -val [
+            network::rich::Tk_from_pure [lindex $monomials $mu]\
+              $vertex_sizes $vertex_appearances
+         ]
+      ]
+      set right [lindex $bbox 2]
+      if {$top > [lindex $bbox 1]} then {set top [lindex $bbox 1]}
+      if {$bottom > [lindex $bbox 3]}\
+        then {set bottom [lindex $bbox 3]}
+   }
+   return [list $left $top $right $bottom]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{variable}{browser_bwL}
+% \begin{variable}{browser_fwL}
+%   The browser backward and forward lists are lists of rule numbers, 
+%   serving as backward and forward stacks. Moving backward means the 
+%   top (last) element is popped off |browser_bwL| and pushed onto 
+%   |browser_fwL|, and vice versa. The top (last) element of 
+%   |browser_fwL| is the current rule.
+%   \begin{tcl}
+set browser_bwL {}
+set browser_fwL {1}
+%   \end{tcl}
+% \end{variable}\end{variable}
+% 
+% 
+% \begin{proc}{go_to_rule}
+%   The |go_to_rule| procedure is the high level handler of going 
+%   from one rule to another. It changes what is displayed in the 
+%   browser window canvases, the rule number displayed in the control 
+%   bar, and updates the backwards\slash forwards lists accordingly. 
+%   The call syntaxes are
+%   \begin{displaysyntax}
+%     |go_to_rule| absolute \word{rule number}\par
+%     |go_to_rule| relative \word{offset}\par
+%     |go_to_rule| backward\par
+%     |go_to_rule| forward
+%   \end{displaysyntax}
+%   where \word{rule number} is the number of the item in |rulesL| to 
+%   display, and \word{style} is the style of movement this is. 
+%   |forward| or |backward| as \word{style} means this is navigation 
+%   using the forward and backward buttons, whereas |normal| means 
+%   this is a normal move.
+%   
+%   \begin{tcl}
+proc go_to_rule {style {data ""}} {
+   global browser_fwL browser_bwL rule_number_var
+   switch -- $style "absolute" {
+      if {![scan $data %d num]} then {bell; return}
+   } "relative" {
+      set num [lindex $browser_fwL end]
+      incr num $data
+   } "backward" {
+      if {![llength $browser_bwL]} then {bell; return}
+      set num [lindex $browser_bwL end]
+   } "forward" {
+      if {[llength $browser_fwL]<2} then {bell; return}
+      set num [lindex $browser_fwL end-1]
+   }
+   if {![
+      display_rule .rulebrowser $num
+   ]} then {bell; return}
+   set rule_number_var $num
+   switch -- $style "backward" {
+      lappend browser_fwL $num
+      set browser_bwL [lreplace $browser_bwL\
+        [set browser_bwL end] end]
+   } "forward" {
+      lappend browser_bwL [lindex $browser_fwL end]
+      set browser_fwL [lreplace $browser_fwL\
+        [set browser_fwL end] end]
+   } default {
+      if {[llength $browser_fwL]} then {
+         lappend browser_bwL [lindex $browser_fwL end]
+      }
+      set browser_fwL [list $num]
+   }
+   .rulebrowser.fbar.back configure -state [lindex {disabled normal}\
+     [expr {[llength $browser_bwL]>0}]]
+   .rulebrowser.fbar.forward configure -state [lindex {disabled normal}\
+     [expr {[llength $browser_fwL]>1}]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{hyper_references}
+%   This procedure makes bindings in a canvas so that all items 
+%   tagged |reference| become hyperlinks. The call syntax is
+%   \begin{quote}
+%     |hyper_references| \word{canvas}
+%   \end{quote}
+%   \begin{tcl}
+proc hyper_references {c} {
+   $c bind reference <Enter> [list $c configure -cursor hand2]
+   $c bind reference <Leave> [list $c configure -cursor {}]
+   $c bind reference <ButtonPress-1> [list\
+     $c itemconfigure current -fill red]
+   $c bind reference <B1-Leave> "
+      [list $c configure -cursor {}]
+      [list $c itemconfigure current -fill blue]
+   "
+   $c bind reference <ButtonRelease-1> [list hyper_jump $c red]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{hyper_jump}
+%   This procedure does the jumping associated with clicking on a 
+%   hyperlink. The call syntax is
+%   \begin{quote}
+%     |hyper_jump| \word{canvas} \word{hot fill}
+%   \end{quote}
+%   It only does anything if the |-fill| of the item is equal to 
+%   \word{hot fill}, since a different value of |-fill| would indicate 
+%   that the mouse was moved in over the hyperlink while being pressed, 
+%   which should not count as clicking the hyperlink.
+%   \begin{tcl}
+proc hyper_jump {c hot} {
+   if {[$c itemcget current -fill] ne $hot} then {return}
+%   \end{tcl}
+%   The number of the rule to jump to is parsed from the text of the 
+%   link.
+%   \begin{tcl}
+   regsub -all -- {[<>()]} [$c itemcget current -text] {} ruleno
+   go_to_rule absolute $ruleno
+}
+%   \end{tcl}
+% \end{proc}
+%
+% 
+% \begin{proc}{rule_browser_fbar}
+%   This procedure fills in the |fbar| child of a specified toplevel 
+%   with the controls for a rule browser window. The call syntax is
+%   \begin{quote}
+%     |rule_browser_fbar| \word{toplevel}
+%   \end{quote}
+%   There is no particular return value.
+%   
+%   ---
+%   
+%   The control bar is a frame, into which the individual controls are 
+%   packed. Its background has a colour.
+%   \begin{tcl}
+proc rule_browser_fbar {t} {
+   set tf $t.fbar
+   set bg [$tf cget -background]
+   pack [
+      button $tf.back -text "Back" -highlightbackground $bg\
+        -command {go_to_rule backward}
+   ] -side left
+   pack [
+      button $tf.forward -text "Forward" -highlightbackground $bg\
+        -command {go_to_rule forward}
+   ] -side left
+   
+   pack [
+      button $tf.go -text "Go" -highlightbackground $bg -command {
+         go_to_rule absolute $rule_number_var
+      }
+   ] -side right
+   pack [
+      entry $tf.go_e -width 4 -textvariable rule_number_var
+   ] -side right
+   bind $tf.go_e <Return> [list $tf.go invoke]
+   pack [label $tf.go_l -text "Rule" -background $bg] -side right
+   pack [
+      button $tf.next -text "+1" -highlightbackground $bg\
+        -command {go_to_rule relative 1}
+   ] -side right
+   pack [
+      button $tf.prev -text "-1" -highlightbackground $bg\
+        -command {go_to_rule relative -1}
+   ] -side right
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Now that this code is completed, it is fitting to also create the 
+% corresponding window.
+% \begin{tcl}
+rule_browser_layout
+%</Tk>
+% \end{tcl}
+% 
+% 
+% \section{Examples}
+% 
+% \subsection{Hopf algebra}
+% 
+% As ever, the motivating example.
+% 
+% \begin{tcl}
+%<*Hopf>
+set vertex_appearances {
+   m {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   unit {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {}
+   }
+   Delta {
+      {oval {square 8} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{0 -8}}
+   }
+   epsilon {
+      {oval {square 8} {}}
+      {}
+      {{0 -8}}
+   }
+   S {
+      {rectangle {square 8} {}} 
+      {{0 8}}
+      {{0 -8}}
+   }
+   twist {
+      {oval {square 8} {}  line {square 5.657} {} \
+        line {offsets {5.657 -5.657} {-5.657 5.657}} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   Re {
+      {rectangle {square 8} {}
+       text {offsets {0 0}} {-font "Times 8" -text R}} 
+      {{0 8}}
+      {}
+   }
+   Im {
+      {rectangle {square 8} {}
+       text {offsets {0 0}} {-font "Times 8" -text I}} 
+      {{0 8}}
+      {}
+   }
+}
+sqlite3_init [tk_getSaveFile -initialdir ~/tmp -initialfile Hopfrules] {
+  Delta {1 2}  epsilon {1 0}  S {1 1}  m {2 1}  unit {0 1}
+%<twist>  twist {2 2}
+%<cocomplex>  Re {0 1}  Im {0 1}
+}
+% \end{tcl}
+% 
+% 
+% \subsubsection{Ordering}
+% 
+% The ordering of choice is by evaluating the network in several 
+% biaffine \PROPs, and taking the flat list of all the components of 
+% these as the comparison key. This amounts to using a pullback to 
+% the free \PROP\ of the order on the biaffine \PROP\ which it 
+% inherits from the corresponding matrix \PROP, namely the cartesian 
+% element-wise comparison. Several such orders are then 
+% lexicographically composed.
+% 
+% \begin{proc}{flatten_biaffine}
+%   This procedure returns a flat list of components from a biaffine 
+%   \PROP\ element. The call syntax is
+%   \begin{displaysyntax}
+%     |flatten_biaffine| \word{PROP} \word{element}
+%   \end{displaysyntax}
+%   where the \word{PROP} is a command prefix supporting the |part| 
+%   method of a |biaffine| \PROP, and \word{element} is an element of 
+%   that \PROP. The return value is the flat list of components in 
+%   that element.
+%   \begin{tcl}
+proc flatten_biaffine {prefix element} {
+   set res [list [{*}$prefix part closed $element]]
+   lappend res {*}[{*}$prefix part end $element]
+   lappend res {*}[{*}$prefix part begin $element]
+   foreach row [{*}$prefix part open $element] {lappend res {*}$row}
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{biaffine_PROP_key}
+%   This procedure constructs a comparison key for networks that 
+%   consists of all the components of one or several |biaffine| 
+%   \PROP\ elements that arise by evaluating the network in some 
+%   specified \PROP. The call syntax is
+%   \begin{displaysyntax}
+%     |biaffine_PROP_key| \word{maps} \word{network}
+%   \end{displaysyntax}
+%   where \word{network} is the network to compute a key for and 
+%   \word{maps} is a list with the structure
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regstar] \word{target \PROP} 
+%     \word{seed dictionary} \word{flatten-cmd} \end{regblock}
+%   \end{displaysyntax}
+%   where \word{target \PROP} is a (v\,2.0) \PROP\ command prefix and 
+%   \word{seed dictionary} maps vertex annotations to elements of 
+%   this \PROP. This seed dictionary is extended to arbitrary 
+%   networks by the universal property. The \word{flatten-cmd} is a 
+%   command prefix which takes an element of the \word{target \PROP} 
+%   as argument and returns a list of components to compare.
+%   
+%   \begin{tcl}
+proc biaffine_PROP_key {maps NW} {
+   set res {}
+   foreach {PROP seed flatten} $maps {
+      set call $PROP
+      lappend call fuse [lindex $NW 0 0 2]
+      foreach v [lrange [lindex $NW 0] 2 end] {
+         lappend call [lindex $v 1]\
+           [dict get $seed [lindex $v 0]] [lindex $v 2]
+      }
+      lappend call [lindex $NW 0 1 1]
+      lappend res {*}[{*}$flatten [eval $call]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tclcommand}{alias}{integer_biaffine_PROP}
+%   The primary ordered \PROP\ used is the biaffine \PROP\ over the 
+%   integers (primarily the natural numbers, to ensure DCC).
+%   \begin{tcl}
+interp alias {} integer_biaffine_PROP {}\
+  mtmtcl::matprop::biaffine ::mtmtcl::rings::integer
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% \begin{tclcommand}{alias}{realmatrix_biaffine_PROP}
+%   The secondary ordered \PROP\ used is the biaffine \PROP\ over 
+%   $\mathrm{M}_2(\mathbb{R})$, i.e., over real $2 \times 2$ 
+%   matrices. Rational numbers (or even dyadic numbers) would work 
+%   too, but I currently don't have an implementation of these.
+%   \begin{tcl}
+interp alias {} realmatrix_biaffine_PROP {}\
+  mtmtcl::matprop::biaffine {
+     ::mtmtcl::matprop::ring 2 ::mtmtcl::rings::float
+  }
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% \begin{proc}{list_select_flatten}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |list_select_flatten| \word{index-list} \word{prefix} 
+%     \word{argument}
+%   \end{displaysyntax}
+%   It starts out making the call
+%   \begin{displaysyntax}
+%     \meta{prefix} \word{argument}
+%   \end{displaysyntax}
+%   which is expected to return a list $L$, whose elements are 
+%   typically themselves lists to some nesting depth. The 
+%   \word{index-list} is a list of indices into elements of $L$, and 
+%   the overall return value is a flattened list of the results one 
+%   gets when each element of the \word{index-list} has been applied 
+%   to each element of $L$.
+%   
+%   The operation is a kind of unshuffling, since the outer loop is 
+%   over the \word{index-list} and the inner loop is over $L$; the 
+%   result has first all selections of one kind from $L$, then all 
+%   selections of the second kind, then all selections of the third 
+%   kind, etc.
+%   \begin{tcl}
+proc list_select_flatten {indexL prefix arg} {
+   set L [{*}$prefix $arg]
+   set res {}
+   foreach index $indexL {
+      foreach l $L {
+         lappend res [lindex $l $index]
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{set_cmpcmds}
+%   The comparison keys command set up by this procedure consists of 
+%   |biaffine_PROP_key| with a hardwired \word{maps} argument. By far 
+%   the largest part of the following is spent constructing this 
+%   \word{maps} argument (but it could in principle be cached since 
+%   that does not depend on the arity or coarity of the network).
+%   
+%   \begin{tcl}
+proc set_cmpcmds {} {
+   variable RS
+%   \end{tcl}
+%   The first comparison level ignores |twist|s (treating them as 
+%   permutations), but takes care of directing most rules in ordinary 
+%   Hopf algebra as one would expect (save only those of 
+%   associativity and coassociativity, since making a left--right 
+%   distinction would mess things up for the rules stating that the 
+%   antipode is an antihomomorphism).
+%   \begin{tcl}
+   set iPROPprefix [list integer_biaffine_PROP]
+   dict set seed1 m\
+     [integer_biaffine_PROP fromparts 0 1 {0 0} {{1 1}}]
+   dict set seed1 unit\
+     [integer_biaffine_PROP fromparts 0 1 {} {}]
+   dict set seed1 Delta\
+     [integer_biaffine_PROP fromparts 0 {0 0} 1 {{1} {1}}]
+   dict set seed1 epsilon\
+     [integer_biaffine_PROP fromparts 0 {} 1 {}]
+   dict set seed1 S\
+     [integer_biaffine_PROP fromparts 0 0 0 2]
+   dict set seed1 twist\
+     [integer_biaffine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
+   dict set seed1 Re [dict get $seed1 unit]
+   dict set seed1 Im [dict get $seed1 unit]
+   set map {}
+   lappend map $iPROPprefix $seed1 [list flatten_biaffine $iPROPprefix]
+%   \end{tcl}
+%   The second comparison level is almost like the first, but 
+%   puts an extra endpoint (beginpoint) in the right branch of |m| 
+%   (|Delta|) to make the right-branching side of the 
+%   (co)associativity axiom larger than the left-branching.
+%   \begin{tcl}
+   lappend map $iPROPprefix [
+      dict replace $seed1 \
+        m [integer_biaffine_PROP fromparts 0 1 {0 1} {{1 1}}] \
+        Delta [integer_biaffine_PROP fromparts 0 {0 1} 1 {{1} {1}}]
+   ] [list flatten_biaffine $iPROPprefix]
+   set blocks 2
+%<*twist>
+%   \end{tcl}
+%   The third comparison level is about making the |twist| behave 
+%   like a crossing in that it can be moved across a product or 
+%   coproduct, from |m . \n twist| to |. twist \n twist . \n . m| 
+%   (and similarly for all its mirror forms). This comparison is 
+%   even trickier than that for the product--coproduct rule, and 
+%   employs as esoteric an object as 
+%   $\mathrm{Baff}(\mathbb{R}^{2 \times 2})$.
+%   
+%   The main problem encountered for this comparison is that a strand 
+%   which used to pass through one |twist| now passes through two, so 
+%   the coefficient for such a passage can be no greater than $1$. On 
+%   the other hand, any coefficient less than $1$ seriously threatens 
+%   to create an infinite descending chain, so we appear to be stuck 
+%   at $1$ as far as the crossing directions are concerned. The 
+%   presence of a |twist| is instead made noticable by putting an $E$ 
+%   such that \(E^2=0\) as coefficient for the same-side branches of 
+%   the |twist|; this has the effect of making the $E$ part of the 
+%   coefficient of a path count how many crossings there were of this 
+%   path. It is however necessary to let surrounding |m| and |Delta| 
+%   bias this count, as we still want two crossings on the input side 
+%   of |m| or output side of |Delta| respectively count as no more 
+%   than one crossing on the other side of it.
+%   
+%   ---
+%   \begin{tcl}
+   set rPROPprefix [list realmatrix_biaffine_PROP]
+   lappend map $rPROPprefix
+   set one  {{1.0  0.0} {0.0 1.0}}
+   set zero {{0.0  0.0} {0.0 0.0}}
+   set up   {{0.5  0.0} {0.0 1.0}}
+   set twoup {{2.0  0.0} {0.0 1.0}}
+   set down {{1.0  0.0} {0.0 0.5}}
+   set E    {{0.0  1.0} {0.0 0.0}}
+   dict set seed3 m [realmatrix_biaffine_PROP fromparts\
+     $zero [list $one] [list $zero $zero] [list [list $up $up]]]
+   dict set seed3 unit [realmatrix_biaffine_PROP fromparts\
+     $zero [list $one] {} {}]
+   dict set seed3 Delta [realmatrix_biaffine_PROP fromparts\
+     $zero [list $zero $zero] [list $one]\
+     [list [list $down] [list $down]]]
+   dict set seed3 epsilon [realmatrix_biaffine_PROP fromparts\
+     $zero {} [list $one] {}]
+   dict set seed3 S [realmatrix_biaffine_PROP fromparts\
+     $zero [list $zero] [list $zero] [list [list $twoup]]]
+   dict set seed3 twist [realmatrix_biaffine_PROP fromparts\
+     $zero [list $zero $zero] [list $zero $zero]\
+     [list [list $E $one] [list $one $zero]]]
+   lappend map $seed3 [list list_select_flatten {{0 0} {1 1} {0 1}}\
+     [list flatten_biaffine $rPROPprefix]]
+   incr blocks 3
+   lappend map $rPROPprefix
+   dict set seed3 twist [realmatrix_biaffine_PROP fromparts\
+     $zero [list $zero $zero] [list $zero $zero]\
+     [list [list $zero $one] [list $one $E]]]
+   lappend map $seed3 [list list_select_flatten {{0 1}}\
+     [list flatten_biaffine $rPROPprefix]]
+   incr blocks
+%   \end{tcl}
+%   The fourth comparison level is about ordering the sides of the 
+%   ``Yang--Baxter equation'':
+%   |. twist \n twist . \n . twist| is less than 
+%   |twist . \n . twist \n twist .|. The difference comes out for the 
+%   middle strand in this braid, as it goes first right and then left 
+%   in the former case, but first left and then right in the latter.
+%   \begin{tcl}
+   dict set seed4 m\
+     [integer_biaffine_PROP fromparts 0 0 {0 0} {{1 1}}]
+   dict set seed4 unit\
+     [integer_biaffine_PROP fromparts 0 1 {} {}]
+   dict set seed4 Delta\
+     [integer_biaffine_PROP fromparts 0 {0 0} 0 {{1} {1}}]
+   dict set seed4 epsilon\
+     [integer_biaffine_PROP fromparts 0 {} 1 {}]
+   dict set seed4 S\
+     [integer_biaffine_PROP fromparts 0 0 0 1]
+   dict set seed4 twist\
+     [integer_biaffine_PROP fromparts 0 {0 0} {1 0} {{0 2} {1 0}}]
+   lappend map $iPROPprefix $seed4 [list flatten_biaffine $iPROPprefix]
+   incr blocks
+%</twist>
+%   \end{tcl}
+%   
+%   Subsequent blocks in the \Module{cocomplex} setting needs to 
+%   address differences between ordinary associative products. 
+%   The first block has already imposed a degree order weighted by 
+%   the antipode power (each antipode applied to a |Re| or |Im| 
+%   doubles the degree). The third block achieves lexicographic 
+%   ordering of products by making each |m| double what comes into 
+%   it, and assigning higher weight to |Im| than to |Re|. A factor as 
+%   high as $5$ is given to the antipode to penalise it (but this 
+%   handling is not as clean as I'd like; maybe a proper 
+%   lexicographic order requires a different underlying ring).
+%   \begin{tcl}
+%<*cocomplex>
+   dict set seed3 m\
+     [integer_biaffine_PROP fromparts 0 0 {0 0} {{2 2}}]
+   dict set seed3 unit\
+     [integer_biaffine_PROP fromparts 0 1 {} {}]
+   dict set seed3 Delta\
+     [integer_biaffine_PROP fromparts 0 {0 0} 0 {{1} {1}}]
+   dict set seed3 epsilon\
+     [integer_biaffine_PROP fromparts 0 {} 1 {}]
+   dict set seed3 S\
+     [integer_biaffine_PROP fromparts 0 0 0 5]
+   dict set seed3 Re\
+     [integer_biaffine_PROP fromparts 0 1 {} {}]
+   dict set seed3 Im\
+     [integer_biaffine_PROP fromparts 0 2 {} {}]
+   lappend map $iPROPprefix $seed3 [list flatten_biaffine $iPROPprefix]
+   incr blocks
+%</cocomplex>
+   set RS(cmpkeycmd) [list [namespace which biaffine_PROP_key] $map]
+   set size [expr {
+     ( 1 + [llength [lindex $RS(si7e) 0 0 2]] ) *
+     ( 1 + [llength [lindex $RS(si7e) 0 1 1]] )
+   }]
+   set RS(cmpcmds)\
+     [lrepeat [expr {$blocks*$size}] [list ::tcl::mathop::-]]
+   set RS(cmpblocks)\
+     [lrepeat $blocks {*}[lrepeat [expr {$size-1}] 0] 1]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{Congruences}
+% 
+% No need to add the basic congruencies again if we're restarting a 
+% completion.
+% \begin{tcl}
+database_counts
+if {$Count(Aa)>0} then {return}
+%<lazy>set am6iguity_top 30
+% \end{tcl}
+% 
+% \begin{tcl}
+enter_congruence -short "Unit&counit" {} 1 {unit \n epsilon} -1 {}
+enter_congruence -short "Left unit" {} 1 {unit . \n m} -1 {.}
+enter_congruence -short "Right unit" {} 1 {. unit \n m} -1 {.}
+enter_congruence -short "Associative" {} 1 {m . \n m} -1 {. m \n m}
+enter_congruence -short "Left counit" {} 1 {Delta \n epsilon .} -1 {.}
+enter_congruence -short "Right counit" {} 1 {Delta \n . epsilon} -1 {.}
+enter_congruence -short "Coassociative" {}\
+  1 {Delta \n . Delta} -1 {Delta \n Delta .}
+enter_congruence -short "Unit&coproduct" {}\
+  1 {unit \n Delta} -1 {unit unit}
+enter_congruence -short "Product&counit" {}\
+  1 {m \n epsilon} -1 {epsilon epsilon}
+%<*!twist>
+enter_congruence -short "Product&coproduct" {}\
+  1 {m \n Delta} -1 {Delta Delta \n . X . \n m m}
+%</!twist>
+%<*twist>
+enter_congruence -short "Product&coproduct with twist" {}\
+  1 {m \n Delta} -1 {Delta Delta \n . twist . \n m m}
+%</twist>
+enter_congruence -short "Left formal inverse" {}\
+  1 {Delta \n S . \n m} -1 {epsilon \n unit}
+enter_congruence -short "Right formal inverse" {}\
+  1 {Delta \n . S \n m} -1 {epsilon \n unit}
+% \end{tcl}
+% 
+% The following are consequences of the above axioms, but adding them 
+% can be useful for testing the program.
+% \begin{tcl}
+%<*twist>
+%<*testequalities>
+enter_congruence -short "Test equality" {}\
+   1 {Delta . \n . twist \n . Delta . \n twist . . \n . m .}\
+  -1 {. Delta \n twist . \n . Delta . \n . . twist \n . m .}
+enter_congruence -short "Test equality" {}\
+   1 {. Delta . \n twist . . \n . m . \n . twist \n m .}\
+  -1 {. Delta . \n . . twist \n . m . \n twist . \n . m}
+%</testequalities>
+%</twist>
+% \end{tcl}
+% 
+% The following is probably an axiom for a bialgebra with twist, but 
+% I hope it is actually a nontrivial consequence of the other axioms 
+% when there is an antipode.
+% \begin{tcl}
+%<*twist>
+%<*moretwist>
+enter_congruence -short "Product and twist" {}\
+   1 {m . \n twist} -1 {. twist \n twist . \n . m}
+%</moretwist>
+%</twist>
+% \end{tcl}
+% 
+% These are the properties of |Re| and |Im| in the trigonometric 
+% coalgebra.
+% \begin{tcl}
+%<*cocomplex>
+enter_congruence -short "Coproduct(Re)" {}\
+   -1 {Re \n Delta} 1 {Re Re} -1 {Im Im}
+enter_congruence -short "Counit(Re)" {}\
+   -1 {Re \n epsilon} 1 {}
+enter_congruence -short "Coproduct(Im)" {}\
+   -1 {Im \n Delta} 1 {Im Re} 1 {Re Im}
+enter_congruence -short "Counit(Im)" {}\
+   -1 {Im \n epsilon}
+%</cocomplex>
+% \end{tcl}
+% 
+% 
+% 
+% \begin{tcl}
+%</Hopf>
+% \end{tcl}
 % 
 \endinput

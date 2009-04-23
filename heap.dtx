@@ -1,0 +1,2527 @@
+% 
+% \iffalse (driver)
+%<*driver>
+\documentclass{tclldoc}
+
+\newcommand{\Tcl}{\Tcllogo}
+
+\newenvironment{procmethod}{%
+   \tclsubcommand{subcommand}{subsubcommand}%
+}{\endtclsubcommand}
+\newenvironment{ttdescription}{%
+  \description
+  \def\makelabel##1{\hspace\labelsep\normalfont\ttfamily ##1}%
+}{\enddescription}
+
+\begin{document}
+\DocInput{heap.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% \title{Heaps as \Tcl\ lists}
+% \author{Lars Hellstr\"om}
+% \date{2006-10-26--}
+% \maketitle
+% 
+% \begin{abstract}
+%   This package implements a heap (as for dynamic allocation of 
+%   memory) as a \Tcl\ variable. Fundamental operations are carried 
+%   out in constant time, just as for traditional pointer-based 
+%   languages.
+% \end{abstract}
+% 
+% 
+% \section{Implementation}
+% 
+% A heap is practically implemented as a \Tcl\ list. Pointers are 
+% indices in this list. `|no|' is the nil\slash null pointer.
+% 
+% Element $0$ in the list is used for keeping track of free items 
+% in the heap. There are two mechanisms for this:
+% \begin{itemize}
+%   \item
+%     Heap element |{0 0}| points to the head of the \emph{free 
+%     list}, which is a singly-linked list (heap element is a pointer 
+%     to the next item in the list) of all free items. This is 
+%     used to make allocation a constant time operation (constant 
+%     amortized time if the heap needs to grow).
+%   \item
+%     Heap element |{0 |$p$|}| for \(p>0\) is $0$ if heap element $p$ 
+%     is free and $1$ if it is allocated. This \emph{state vector} is 
+%     needed to detect double deallocation errors. By using literal 
+%     constants $0$ and $1$ here, the overhead can be kept down to 
+%     $1$ machine pointer per heap element.
+% \end{itemize}
+% \changes{0}{2008/07/08}{Rewrite to also maintain a list of 
+%    `allocated' statuses for the blocks. (LH)}
+%    
+% \changes{1.1}{2016/09/07}{Added docstrip catalogue, for both 
+%    packages. (LH)}
+% 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide heap 1.0 {pkg noprovide}
+%</docstrip.tcl::catalogue>
+%<*pkg>
+package require Tcl 8.4
+%<!noprovide>package provide heap 1.0
+namespace eval heap {}
+% \end{tcl}
+% \setnamespace{heap}
+% 
+% \begin{proc}{core}
+%   The |core| procedure is what actually implements the operations 
+%   on a heap. 
+%   \changes{0}{2008/08/20}{Generalised to allow specifying a level. 
+%     Used to be called \texttt{heap}, but that is now an alias 
+%     to \texttt{core}. (LH)}
+%   The call syntax is
+%   \begin{quote}
+%     |core| \word{heap-level} \word{heap-variable} \word{subcommand} 
+%     \word{argument}\regstar
+%   \end{quote}
+%   where \word{heap-variable} is the (name of the variable in which 
+%   is stored the) heap to operate on and \word{subcommand} determines 
+%   what operation to perform. The \word{heap-level} is the level at 
+%   which this variable is found; in the case of the calling context, 
+%   that should be |1|.
+%   The return value depends on which operation is performed.
+%   
+%   In descriptions of subcommands below, the
+%   \begin{displaysyntax}
+%     |core| \word{heap-level} \word{heap-variable}
+%   \end{displaysyntax}
+%   part is denoted by \meta{cmdbase}, since the package also creates 
+%   other commands (as aliases to |core|) which sport the same set of 
+%   subcommands.
+%   \begin{tcl}
+proc heap::core {heaplevel heapvar subcmd args} {
+   upvar $heaplevel $heapvar heap
+   switch -- $subcmd {
+%   \end{tcl}
+%   \begin{procmethod}{get}
+%     The |get| subcommand retrieves data from an item in the heap. 
+%     It has the syntax
+%     \begin{quote}
+%       \meta{cmdbase} |get| \word{pointer} \word{index}\regstar
+%     \end{quote}
+%     \word{pointer} is the pointer into the heap. If there are 
+%     \word{index} arguments, then the pointed-to item is treated as 
+%     a list and an element is retrieved in the same way as with |lindex|.
+%     \begin{tcl}
+      "get" {
+         return [lindex $heap $args]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{set}
+%     The |set| subcommand sets an item or a part of an item. The 
+%     syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |set| \word{pointer} \word{index}\regstar\ 
+%       \word{value}
+%     \end{quote}
+%     \word{pointer} is the pointer into the heap and \word{value} is 
+%     the value to store in the heap. If there are \word{index} 
+%     arguments, then the pointed-to item is treated as a list which 
+%     is modified in place in the manner of |lset|. 
+%     The return value is an empty string.
+%     \begin{tcl}
+      "set" {
+         eval [list lset heap] $args
+         return
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{new}
+%     The |new| subcommand allocates a new item on the heap. The 
+%     syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |new| \word{value}\regopt
+%     \end{quote}
+%     and the return value is the pointer to the new item. If a 
+%     \word{value} is supplied then the new item is set to that value, 
+%     otherwise the new item will be an empty string.
+%     \begin{tcl}
+      "new" {
+         if {[lindex $heap 0 0]} then {
+            set ptr [lindex $heap 0 0]
+            lset heap 0 0 [lindex $heap $ptr]
+            lset heap 0 $ptr 1
+            lset heap $ptr [lindex $args 0]
+         } else {
+            set ptr [llength $heap]
+            set alloc [lindex $heap 0]
+            lset heap 0 {}
+            lappend alloc 1
+            lset heap 0 $alloc
+            lappend heap [lindex $args 0]
+         }
+         return $ptr
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{dispose}
+%     The |dispose| subcommand frees an item on the heap. The 
+%     syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |dispose| \word{pointer}
+%     \end{quote}
+%     and the return value is the contents of the item freed. An error 
+%     is thrown if the \word{pointer} is not a pointer to an allocated 
+%     element.
+%     \begin{tcl}
+      "dispose" {
+         set ptr [lindex $args 0]
+         if {![string is integer $ptr] || $ptr<=0} then {
+            return -code error "Not a pointer: $ptr"
+         } elseif {[lindex $heap 0 $ptr] != 1} then {
+            return -code error "Item not allocated: $ptr"
+         }
+         set val [lindex $heap $ptr]
+         lset heap $ptr [lindex $heap 0 0]
+         lset heap 0 0 $ptr
+         lset heap 0 $ptr 0
+         return $val
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{nil}
+%   \begin{procmethod}{isnil}
+%     The |nil| subcommand returns the string |no| and the |isnil| 
+%     subcommand tests whether something is a pointer or |no|. Their 
+%     syntaxes are
+%     \begin{displaysyntax}
+%       \meta{cmdbase} nil\par
+%       \meta{cmdbase} isnil \word{pointer or nil}
+%     \end{displaysyntax}
+%     \begin{tcl}
+      "nil" {
+         return no
+      }
+      "isnil" {
+         if {[lindex $args 0] eq "no"} then {return 1}
+         if {![string is integer [lindex $args 0]] ||\
+             [lindex $args 0]<=0 ||\
+             [lindex $args 0]>=[llength $heap]} then {
+            return -code error "Neither pointer nor nil:\
+              [lindex $args 0]"
+         }
+         return 0
+      }
+%     \end{tcl}
+%     The |nil| and |isnil| subcommands are provided for users who 
+%     want a higher level of abstraction in their code than an 
+%     explicit |no| would provide. Using `|no|' as representation for 
+%     \textbf{nil} has the following advantages:
+%     \begin{itemize}
+%       \item
+%         Unlike a numeric $0$, it is not a valid list index, which 
+%         protects against \textbf{nil}-dereferencing in the |get| and 
+%         |set| subcommands. Such dereferencing could otherwise corrupt 
+%         the heap.
+%       \item
+%         Unlike strings such as |nil| and |null|, it \emph{is} a valid 
+%         boolean and will thus permit the idiom
+%         \begin{quote}
+%           |if {|\word{pointer or nil}|}| \dots
+%         \end{quote}
+%         as an alternative to
+%         \begin{quote}
+%           |if {![heap |\word{heap-variable}| isnil\
+%           |\word{pointer or nil}|]}| \dots
+%         \end{quote}
+%         although the latter checks the value also for being 
+%         out-of-bounds.
+%     \end{itemize}
+%   \end{procmethod}\end{procmethod}
+%   
+%   \begin{procmethod}{create}
+%     The |create| subcommand sets the heap variable to a new, empty 
+%     heap, discarding any old heap contents. The syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |create|
+%     \end{quote}
+%     There is no particular return value.
+%     \begin{tcl}
+      "create" {
+         set heap [list [list no]]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{destroy}
+%     The |destroy| subcommand unsets the heap variable, thus 
+%     discarding anything stored in it. The syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |destroy|
+%     \end{quote}
+%     There is no particular return value.
+%     \begin{tcl}
+      "destroy" {
+         unset heap
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{statistics}
+%     The |statistics| subcommand calculates the number of allocated 
+%     and freed respectively items in the heap. The syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |statistics|
+%     \end{quote}
+%     and the return value is a list\slash dictionary
+%     \begin{quote}
+%       |inuse| \word{no.~items} |free| \word{no.~items}
+%     \end{quote}
+%     This subcommand detects if a heap has been corrupted (which can 
+%     happen if you |set| a free entry), and will then throw an error, 
+%     trying to give a hint about what has gone wrong.
+%     
+%     Strictly speaking, this is a $\Theta(n)$ operation where $n$ is 
+%     the number of elements in the heap, but the $n$-proportional 
+%     parts are inside core \Tcl\ commands, so it is more likely that 
+%     experienced performance would be proportional to the number of 
+%     free entries.
+%     \begin{tcl}
+      "statistics" {
+         set visitedL [lindex $heap 0]
+         if {[llength $visitedL] != [llength $heap]} then {
+            return -code error "Corrupted heap; state vector and heap\
+              don't match"
+         }
+         set ptr [lindex $heap 0 0]
+         set free 0
+         while {$ptr} {
+            switch -- [lindex $visitedL $ptr] "1" {
+               return -code error "Corrupted heap; free list\
+                 contains allocated address $ptr"
+            } "2" {
+               return -code error "Corrupted heap; free list\
+                 goes to $ptr twice"
+            }
+            lset visitedL $ptr 2
+            incr free
+            set last $ptr
+            set ptr [lindex $heap $ptr]
+            if {[string is integer $ptr] ?
+               $ptr <= 0 || $ptr >= [llength $heap] :
+               $ptr != "no"
+            } then {
+               return -code error "Corrupted heap; item $last is free\
+                 but has been set"
+            }
+         }
+         if {[lsearch -exact [lrange $visitedL 1 end] 0] != -1} then {
+            return -code error "Corrupted heap; some free address(es)\
+              not in free list."
+         }
+         return [list inuse [expr {[llength $heap] - $free - 1}]\
+           free $free]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{repair}
+%     The |repair| subcommand reconstructs the free list from data in 
+%     the state vector; the resulting free list is ascending, which has 
+%     the effect that low addresses are preferred for allocation of new 
+%     elements. The syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |repair|
+%     \end{quote}
+%     and the return value is a list\slash dictionary
+%     \begin{quote}
+%       |inuse| \word{no.~items} |free| \word{no.~items}
+%       |suspect| \word{dict}
+%     \end{quote}
+%     where the |suspect| part records old contents of items that 
+%     were free according to the state vector but whose contents were 
+%     not consistent with the format of the free list. If the 
+%     \word{dict} list\slash dictionary (mapping pointers to item 
+%     contents) is not empty then there is probably an error in your 
+%     program.
+%     
+%     \begin{tcl}
+      "repair" {
+         if {[llength $heap] != [llength [lindex $heap 0]]} then {
+            return -code error "Corrupted heap; state vector and heap\
+              don't match"
+         }
+         set suspect {}
+         set last {0 0}
+         set free 0
+         set ptr 0
+         foreach state [lrange [lindex $heap 0] 1 end] {incr ptr
+            if {$state} then {continue}
+            incr free
+            lset heap $last $ptr
+            set last $ptr
+            set item [lindex $heap $ptr]
+            if {[string is integer $item] ?
+               $item<0 || $item>=[llength $heap] ||\
+                 [lindex $heap 0 $item] :
+               $item != no
+            } then {lappend suspect $ptr $entry}
+         }
+         lset heap $last no
+         return [list inuse [expr {[llength $heap] - $free - 1}]\
+           free $free suspect $suspect]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   The |repair| subcommand frees items whenever there is a doubt, 
+%   although its main function is to preserve what is allocated. The 
+%   |garbagecollect| subcommand conversely has as main function to 
+%   free allocated (although unreachable) items, but chooses to 
+%   consider items allocated whenever there is a doubt.
+%   
+%   \begin{procmethod}{garbagecollect}
+%     The |garbagecollect| subcommand performs a garbage collection in 
+%     the heap: disposing of all items which can no longer be reached. 
+%     The operation requires that the user can provide a 
+%     \word{scan-cmd} which will find all pointers stored inside a heap 
+%     item, as the heap package itself has no way of knowing whether 
+%     some piece of data is a pointer or not. The call syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |garbagecollect| \word{scan-cmd} 
+%       \word{pointer}\regstar
+%     \end{quote}
+%     where the \word{pointer}s are the pointers to heap items stored 
+%     outside the heap and \word{scan-cmd} is employed to find pointers 
+%     within the heap. Similarly to the last two subcommands, 
+%     the return value is a list\slash dictionary
+%     \begin{displaysyntax}
+%       inuse \word{no.~items} free \word{no.~items}
+%       inuse0 \word{no.~items} free0 \word{no.~items}
+%       forced \word{pointer-list}
+%     \end{displaysyntax}
+%     where the |inuse| and |free| refer to the state of the heap after 
+%     garbage collection, and |inuse0| and |free0| refer to the state of 
+%     it before.
+%     
+%     The |forced| list is the list of pointers to items that were listed 
+%     as free in the state vector, but nontheless pointed to. Having this 
+%     list nonempty indicates there is an error in your program. 
+%     The state of these items will be set to allocated by the garbage 
+%     collector, but they might have been overwritten by previous heap 
+%     operations.
+%     
+%     The call syntax for the \word{scan-cmd} is
+%     \begin{quote}
+%       \meta{scan-cmd} \word{item}
+%     \end{quote}
+%     where \word{item} is an item on the stack. The return value is 
+%     the list of pointers in the \word{item}. Non-pointers (e.g.~|no|) 
+%     are ignored by the garbage collector.
+%     
+%     \begin{tcl}
+      "garbagecollect" {
+         set call [lrange [lindex $args 0] 0 end]
+         set queue [lrange $args 1 end]
+         for {set n 0} {$n<[llength $queue]} {incr n} {
+            set ptr [lindex $queue $n]
+            if {[info exists mark($ptr)]} then {continue}
+            set mark($ptr) {}
+            if {![string is integer $ptr]} then {continue}
+            if {$ptr<=0 || $ptr>=[llength $heap]} then {continue}
+            eval [list lappend queue]\
+              [uplevel 1 $call [lrange $heap $ptr $ptr]]
+         }
+         unset queue
+         foreach n {inuse inuse0 free free0} {set $n 0}
+         set forced {}
+         set ptr -1; foreach state [lindex $heap 0] {incr ptr
+            if {!$ptr} then {set last {0 0}; continue}
+            if {$state} then {incr inuse0} else {incr free0}
+            if {[info exists mark($ptr)]} then {
+               incr inuse
+               if {!$state} then {
+                  lappend forced $ptr
+                  lset heap 0 $ptr 1
+               }
+            } else {
+               incr free
+               lset heap 0 $ptr 0
+               lset heap $last $ptr
+               set last $ptr
+            }
+         }
+         lset heap $last no
+         set res {}
+         foreach n {inuse inuse0 free free0 forced} {
+            lappend res $n [set $n]
+         }
+         return $res
+      }
+%     \end{tcl}
+%     Runtime for |garbagecollect| is $O(n)+O(m)$, where $n$ is the 
+%     size of the heap and $m$ is the number of pointers in the heap.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{compact}
+%     The |compact| subcommand reduces the size of the heap by removing 
+%     all free items from it. This generally requires moving items 
+%     around, and consequently anyone who calls this subcommand is 
+%     expected to be able to update all pointers to items in the heap.
+%     
+%     The call syntax is
+%     \begin{quote}
+%       \meta{cmdbase} |compact| \word{update-cmd}
+%     \end{quote}
+%     where the \word{update-cmd} is responsible for updating pointers 
+%     stored in the heap itself. It is a command prefix which will be 
+%     called as
+%     \begin{quote}
+%       \meta{update-cmd} \word{redirections} \word{item}
+%     \end{quote}
+%     where \word{item} is an item on the heap, which the command 
+%     should return an updated value for. The \word{redirections} is a 
+%     list which when indexed using a pointer will return the new value 
+%     for that pointer. Elements for free heap items are set to 
+%     |false| (not |no|, although changing dangling pointers to 
+%     \textbf{nil} could sometimes repair damaged data structures).
+%     
+%     The return value of the |compact| subcommand is again the 
+%     \word{redirections} list, which must be used to update any 
+%     pointers outside the heap.
+%     \begin{tcl}
+      "compact" {
+%     \end{tcl}
+%     The first step is to build the redirections list. The approach 
+%     used is to walk through the heap with two pointers, one 
+%     starting at |low| addresses and going upwards, the other 
+%     starting at |high| addresses and going downwards. The |low| 
+%     pointer leaves allocated items where they are but stops at free 
+%     items, whereas the |high| pointer steps over free items and 
+%     exchanges allocated items with the free one at which the |low| 
+%     pointer has stopped. There is also a |pickL| list which lists 
+%     old addresses for the heap items, in the order in which they 
+%     will appear in the new heap.
+%     \begin{tcl}
+         set redirL [lreplace [lindex $heap 0] 0 0 false]
+         set pickL {}
+         set low 1
+         set high [expr {[llength $heap]-1}]
+         while {$low <= $high} {
+            if {[lindex $heap 0 $low]} then {
+               lset redirL $low $low
+               lappend pickL $low
+               incr low
+            } elseif {![lindex $heap 0 $high]} then {
+               lset redirL $high false
+               incr high -1
+            } else {
+               lset redirL $high $low
+               lappend pickL $high
+               lset redirL $low false
+               incr low
+               incr high -1
+            }
+         }
+%     \end{tcl}
+%     The second step builds the new heap.
+%     \begin{tcl}
+         set call [lindex $args 0]
+         lappend call $redirL
+         set newheap [list {}]
+         set states [list no]
+         foreach ptr $pickL {
+            lappend states 1
+            lappend newheap [uplevel 1 $call [lrange $heap $ptr $ptr]]
+         }
+         lset newheap 0 $states
+         set heap $newheap
+         return $redirL
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   \begin{tcl}
+      default {
+         return -code error "unknown subcommand \"$subcmd\":\
+           must be compact, create, destroy, dispose, garbagecollect,\
+           get, isnil, new, nil, repair, set, or statistics"
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{heap}
+%   The basic interface to the heap operations is not the |core| 
+%   command, but the |heap| command, which has hardwired |1| as value 
+%   for the heap-level. It is implemented as an alias and exported 
+%   from the |heap| namespace.
+%   \begin{tcl}
+namespace eval heap {
+   interp alias {} [namespace current]::heap {}\
+     [namespace which core] 1
+   namespace export heap
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{makecmd}
+%   This command creates custom heap commands, which can be useful 
+%   (but is not essential) if you need to pass the heap by reference 
+%   to someone. The call syntax is
+%   \begin{displaysyntax}
+%     heap::makecmd \word{heap-variable} \begin{regblock}[\regstar] 
+%     \word{option} \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   and the return value is the fully qualified name of the new 
+%   command (which will be an alias to |heap::core| with the two 
+%   parameters fixed). The command lifetime is (via a trace) tied to 
+%   that of the heap variable, so when the heap is |destroy|ed or 
+%   otherwise unset, then the command is deleted as well.
+%   
+%   The \word{heap-variable} is the name of the variable in which the 
+%   heap will be stored. The supported options are:
+%   \begin{ttdescription}
+%     \item[-command]
+%       Value is the requested name for the command to create. If 
+%       this is not specified, then a unique name in the |heap| 
+%       namespace will be generated.
+%     \item[-local]
+%       The value is a boolean; it defaults to false. Controls 
+%       whether the \word{heap-variable} is considered to be 
+%       local~(true) or global\slash namespace~(false).
+%     \item[-prefix]
+%       The value is a boolean; it defaults to false. When true, 
+%       |makecmd| doesn't actually create a command or associated heap, 
+%       it just returns the command prefix the command would have 
+%       been an alias to.
+%   \end{ttdescription}
+%   Nonlocal \word{heap-variable} names are assumed to be relative to 
+%   the calling namespace, if they are not fully qualified. The same is 
+%   true for specified |-command| names.
+%   
+%   \begin{tcl}
+proc heap::makecmd {varname args} {
+   array set O {-local 0 -prefix 0}
+   array set O $args
+   set ns [uplevel 1 {::namespace current}]
+   if {![info exists O(-command)]} then {
+      while 1 {
+         set cmdname [namespace current]::h[info cmdcount]
+         if {[namespace which -command $cmdname] eq ""} then {break}
+      }
+   } elseif {[string match ::* $O(-command)]} then {
+      set cmdname $O(-command)
+   } else {
+      set cmdname ${ns}::$O(-command)
+   }
+   set prefix [list [namespace which core]]
+   if {$O(-local)} then {
+      lappend prefix \#[expr {[info level]-1}] $varname
+   } else {
+      if {![string match ::* $varname]} then {
+         set varname ${ns}::${varname}
+      }
+      lappend prefix #0 $varname
+   }
+   if {$O(-prefix)} then {return $prefix}
+   set token [eval [list interp alias {} $cmdname {}] $prefix]
+   if {[catch {
+      $cmdname create
+   } res]} then {
+      interp alias {} $token {}
+      return -code error -errorinfo $::errorInfo\
+        -errorcode $:errorCode $res
+   }
+   uplevel 1 [list ::trace add variable $varname unset\
+     "[list ::interp alias {} $token {}]; #"]
+   return $cmdname
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tcl}
+%</pkg>
+% \end{tcl}
+% 
+% 
+% 
+% \section{Cubic tree test}
+% 
+% \begin{tcl}
+%<*cubicTreeTest>
+% \end{tcl}
+% \setnamespace{}
+% 
+% The basic idea for this test is merely to do a lot of things in a 
+% heap, so that all the commands are exercised.
+% 
+% What is put in the heap is a plane cubic tree (hence the name of 
+% the test), i.e., pretty much an ordinary binary tree with parent 
+% pointer, except that no big distinction is made between the parent 
+% and the children---they're simply all neighbours of the node. What 
+% is done in this tree is that a cursor is running around in it along 
+% the exterior ``facet'' (hence plane), and every once in a while it 
+% changes the tree: there is steady growth, internal rotations, and 
+% occational deletions of subtrees. There are also more seldomly 
+% integrity checks, repairs, garbage collecting, and 
+% compactifications.
+% 
+% The basic structure of a node in the tree is
+% \begin{displaysyntax}
+%   \word{neighbour 0} \word{neighbour 1} \word{neighbour 2} 
+% \end{displaysyntax}
+% where the three neighbours are pointers to neighbours (or nil, if 
+% we're at the edge of the tree). Traversal of the tree requires 
+% keeping track not only of the current node, but also a current 
+% direction in that node.
+% 
+% 
+% \subsection{Drawing trees}
+% 
+% For verifying that the test is doing what it is supposed to, it is 
+% useful to be able to draw the trees on a Tk |canvas|.
+% 
+% \begin{proc}{binary_branch}
+%   This procedure serialises a branch of the big cubic tree as a 
+%   nested list binary tree, with coordinates. The call syntax is
+%   \begin{displaysyntax}
+%     |binary_branch| \word{heap-cmd} \word{pointer} 
+%     \word{parent-index} \word{arc-min} \word{arc-max} 
+%     \word{depth}
+%   \end{displaysyntax}
+%   where \word{heap-cmd} is the command for accessing the heap in 
+%   which the tree is stored, \word{pointer} is the pointer to the 
+%   node to convert, \word{parent-index} is the index (|0|, |1|, or 
+%   |2|) of the neighbour of this node that should be regarded as 
+%   parent, \word{arc-min} and \word{arc-max} are the angles (in 
+%   radians) that delimit the sector in which the tree should be put, 
+%   and \word{depth} is the distance to the root of the node to 
+%   convert (this is used to determine the radius of the circle on 
+%   which it is placed).
+%   
+%   The return value is a list
+%   \begin{displaysyntax}
+%     node \word{pointer} \word{parent-index} \word{x} \word{y} 
+%     \word{left} \word{right}
+%   \end{displaysyntax}
+%   where \word{left} and \word{right} are the left and right 
+%   children---either such values themselves, or |nil| for ``no 
+%   child''---\word{pointer} is the pointer, and \word{x} and 
+%   \word{y} are coordinates for the node.
+%   \begin{tcl}
+proc binary_branch {heap ptr index min max depth} {
+   set res [list node $ptr $index]
+   set r [binary_branch_radius $depth]
+   set mid [expr {0.5*($max+$min)}]
+   lappend res [expr {$r*cos($mid)}] [expr {$r*sin($mid)}]
+   incr depth
+   set cP [$heap get $ptr [expr {($index+1)%3}]]
+   if {!$cP} then {
+      lappend res nil
+   } else {
+      set i [lsearch -exact [$heap get $cP] $ptr]
+      lappend res [binary_branch $heap $cP $i $mid $max $depth]
+   }
+   set cP [$heap get $ptr [expr {($index+2)%3}]]
+   if {!$cP} then {
+      lappend res nil
+   } else {
+      set i [lsearch -exact [$heap get $cP] $ptr]
+      lappend res [binary_branch $heap $cP $i $min $mid $depth]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{binary_branch_radius}
+%   This procedure computes a radius suitable for nodes at a 
+%   particular depth in a plane cubic tree. The call syntax is
+%   \begin{displaysyntax}
+%     |binary_branch_radius| \word{depth}
+%   \end{displaysyntax}
+%   and the return value is the radius. It relies heavily on 
+%   memoization to avoid recomputing depths.
+%   \begin{tcl}
+proc binary_branch_radius {d} {
+   variable binary_branch_radius
+   if {[info exists binary_branch_radius($d)]} then {
+      return $binary_branch_radius($d)
+   } elseif {$d<2} then {
+      error "This shouldn't happen: depth is $d."
+   }
+%   \end{tcl}
+%   The idea for the computed radius is that it should put child 
+%   nodes at unit distance from their parent. Hence the child, the 
+%   parent, and the origin form a triangle with sides $r_0$ 
+%   (previous radius), $r_1$ (sought radius), and $1$. Furthermore 
+%   the angle at the origin (i.e., between the $r_0$ and $r_1$ 
+%   sides). This lets one compute the triangle height perpendicular 
+%   to the $r_1$ side, and since that height also splits the triangle 
+%   in to right trangles with two sides known, $r_1$ is easy to 
+%   compute.
+%   \begin{tcl}
+   set r0 [binary_branch_radius [expr {$d-1}]]
+   set alpha [expr {acos(-1)/3*pow(2,1-$d)}]
+   set h [expr {$r0*sin($alpha)}]
+   set r1 [expr {$r0*cos($alpha) + sqrt(1-$h*$h)}]
+   set binary_branch_radius($d) $r1
+   return $r1
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{arrayvar}{binary_branch_radius}
+%   The it is necessary to initialise entry |1| in the array.
+%   \begin{tcl}
+set binary_branch_radius(1) 1.0
+%   \end{tcl}
+% \end{arrayvar}
+% 
+% \begin{tcl}
+namespace eval draw_binary_branch {}
+% \end{tcl}
+% The |draw_binary_branch| namespace houses procedures for drawing 
+% trees such as those returned by |binary_branch|, by evaluating them 
+% with four extra arguments:
+% \begin{displaysyntax}
+%   \meta{binary branch} \word{canvas} \word{parent-x} \word{parent-y} 
+%   \word{scale}
+% \end{displaysyntax}
+% The \word{canvas} is the widget to draw in.
+% The \word{parent-x} and \word{parent-y} are the coordinates of the 
+% parent node, which should be connected to the branch by a |line| 
+% item. The \word{scale} is a scale factor by which all coordinates 
+% are multiplied before they are drawn. The return value is the 
+% bounding box (in canvas coordinates, i.e., with $y$ axis flipped 
+% and \word{scale} applied) of the items drawn by the command.
+% 
+% \begin{proc}[draw_binary_branch]{nil}
+%   The |nil| procedure does nothing other than produces a sensible 
+%   bounding box.
+%   \begin{tcl}
+proc draw_binary_branch::nil {canvas x y s} {
+   set p [list [expr {$x*$s}] [expr {-$y*$s}]]
+   return [concat $p $p]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}[draw_binary_branch]{node}
+%   The |node| procedure does all the actual drawing.
+%   \begin{tcl}
+proc draw_binary_branch::node {ptr index x1 y1 left right canvas x0 y0 s} {
+   set xL [list [expr {$x0*$s}] [expr {$x1*$s}]]
+   set yL [list [expr {-$y0*$s}] [expr {-$y1*$s}]]
+   $canvas create line [lindex $xL 0] [lindex $yL 0] [lindex $xL 1]\
+     [lindex $yL 1] 
+   foreach {x y} [eval $left [list $canvas $x1 $y1 $s]] {
+      lappend xL $x  ;  lappend yL $y
+   }
+   foreach {x y} [eval $right [list $canvas $x1 $y1 $s]] {
+      lappend xL $x  ;  lappend yL $y
+   }
+   set xL [lsort -real $xL]  ;  set yL [lsort -real $yL]
+   return [list [lindex $xL 0] [lindex $yL 0]\
+     [lindex $xL end] [lindex $yL end]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{draw_cubic_tree}
+%   This procedure draws a cubic tree on a canvas, reconfiguring its 
+%   |-scrollregion| to match the bounding box of the tree drawing. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |draw_cubic_tree| \word{canvas} \word{heap-cmd} 
+%     \word{center-ptr} \word{scale}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc draw_cubic_tree {c heap cptr scale} {
+   set xL [list 0]; set yL [list 0]
+   foreach index {0 1 2} {
+      set bP [$heap get $cptr $index]
+      if {!$bP} then {continue}
+      set max [expr {(3-$index)*acos(-0.5)}]
+      set min [expr {(2-$index)*acos(-0.5)}]
+      set i [lsearch -exact [$heap get $bP] $cptr]
+      foreach {x y} [
+         namespace inscope draw_binary_branch [
+            binary_branch $heap $bP $i $min $max 1
+         ] $c 0 0 $scale
+      ] {lappend xL $x; lappend yL $y}
+   }
+   set xL [lsort -real $xL]
+   set yL [lsort -real $yL]
+   $c configure -scrollregion [
+      list [expr {round([lindex $xL 0]) - 2}]\
+        [expr {round([lindex $yL 0]) - 2}]\
+        [expr {round([lindex $xL end]) + 2}]\
+        [expr {round([lindex $yL end]) + 2}]
+   ]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{make_treewindow}
+%   This procedure creates a |toplevel| window |.tree| with a 
+%   scrollable canvas |.tree.c|, and suitable bindings. There are no 
+%   arguments, nor any particular return value.
+%   \begin{tcl}
+proc make_treewindow {} {
+   toplevel .tree
+   grid [label .tree.msg] -row 0 -column 0 -columnspan 2 -sticky wns
+   grid rowconfigure .tree 0 -weight 0
+   grid [canvas .tree.c] -row 1 -column 0 -sticky nsew
+   grid [scrollbar .tree.v -orient vertical -command {.tree.c yview}]\
+     -row 1 -column 1 -sticky ns
+   grid rowconfigure .tree 1 -weight 1
+   grid columnconfigure .tree 0 -weight 1
+   grid columnconfigure .tree 1 -weight 0
+   grid [scrollbar .tree.h -orient horizontal -command {.tree.c xview}]\
+     -row 2 -column 0 -sticky ew
+   grid rowconfigure .tree 2 -weight 0
+   .tree.c configure -width 200 -height 200 -scrollregion {0 0 400 400}\
+     -xscrollcommand {.tree.h set} -yscrollcommand {.tree.v set}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{The actual test}
+% 
+% 
+% \begin{proc}{move_endpoint}
+%   This is a utility procedure to help keep the tree consistent when 
+%   moving edge endpoints. The call syntax is
+%   \begin{displaysyntax}
+%     |move_endpoint| \word{heap} \word{from-ptr} \word{from-index} 
+%     \word{to-pos} \word{to-index}
+%   \end{displaysyntax}
+%   and this moves whatever is at 
+%   \textit{from-ptr}[\textit{from-index}] to 
+%   \textit{to-ptr}[\textit{to-index}].
+%   \begin{tcl}
+proc move_endpoint {heap fP fi tP ti} {
+   set oP [$heap get $fP $fi]
+   if {$oP} then {
+      set oi [lsearch -exact [$heap get $oP] $fP]
+      if {$oi<0 || $oi>2} then {error "Broken edge"}
+      $heap set $oP $oi $tP
+   }
+   $heap set $tP $ti $oP
+   $heap set $fP $fi no
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{rotate_edge}
+%   This procedure rotates an edge in the tree.
+%   \begin{displaysyntax}
+%     |rotate_edge| \word{heap} \word{ptr} \word{index} 
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc rotate_edge {heap aP ai} {
+   set bP [$heap get $aP $ai]
+   if {!$bP} then {return}
+   set bi [lsearch -exact [$heap get $bP] $aP]
+   if {$bi<0 || $bi>2} then {error "Broken edge"}
+   move_endpoint $heap $bP [expr {($bi+1)%3}] $aP $ai
+   move_endpoint $heap $aP [expr {($ai+1)%3}] $bP $bi
+   $heap set $aP [expr {($ai+1)%3}] $bP
+   $heap set $bP [expr {($bi+1)%3}] $aP
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{prune_branch}
+%   This procedure prunes a branch, by deleting all subbranches not 
+%   exceeding a particular depth. It has the call syntax
+%   \begin{displaysyntax}
+%     |prune_branch| \word{heap} \word{ptr} \word{index} \word{depth}
+%   \end{displaysyntax}
+%   where \word{ptr} and \word{index} identify the edge on which the 
+%   other side of which the branch to prune lies, and \word{depth} is 
+%   the number of leves to prune. The return value is a pair
+%   \begin{displaysyntax}
+%     \word{ptr} \word{index}
+%   \end{displaysyntax}
+%   which identify the edge back to the rest of the tree.
+%   \begin{tcl}
+proc prune_branch {heap ptr index depth} {
+   set bP [$heap get $ptr $index]
+   if {!$bP} then {return [list no ""]}
+   set bi [lsearch -exact [$heap get $bP] $ptr]
+   if {$depth<=0} then {return [list $bP $bi]}
+   incr depth -1
+   set L {}
+   foreach i {1 2} {
+      set res [prune_branch $heap $bP [expr {($bi+$i)%3}] $depth]
+      if {[lindex $res 0]} then {lappend L $res}
+   }
+   if {[llength $L]==2} then {
+      foreach res $L {
+         foreach {cP i} $res break
+         $heap set $cP $i $bP
+      }
+      $heap set $bP [list no [lindex $L 0 0] [lindex $L 1 0] 0]
+      return [list $bP 0]
+   }
+   $heap dispose $bP
+   if {[llength $L]} then {
+      return [lindex $L 0]
+   } else {
+      return [list no ""]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{sloppy_prune_branch}
+%   This procedure prunes a branch, by deleting all subbranches not 
+%   exceeding a particular depth, but is ``sloppy'' and drops 
+%   branches every now and then (so that we can get something to 
+%   |garbagecollect|). The call syntax is the same as for 
+%   |prune_branch|, i.e.,
+%   \begin{displaysyntax}
+%     |sloppy_prune_branch| \word{heap} \word{ptr} \word{index} 
+%     \word{depth}
+%   \end{displaysyntax}
+%   where \word{ptr} and \word{index} identify the edge on which the 
+%   other side of which the branch to prune lies, and \word{depth} is 
+%   the number of leves to prune. The return value is a pair
+%   \begin{displaysyntax}
+%     \word{ptr} \word{index}
+%   \end{displaysyntax}
+%   which identify the edge back to the rest of the tree.
+%   
+%   The sloppyness is that at low depths, one of two surviving is 
+%   dropped rather than maintained.
+%   \begin{tcl}
+proc sloppy_prune_branch {heap ptr index depth} {
+   set bP [$heap get $ptr $index]
+   if {!$bP} then {return [list no ""]}
+   set bi [lsearch -exact [$heap get $bP] $ptr]
+   if {$depth<=0} then {return [list $bP $bi]}
+   incr depth -1
+   set L {}
+   foreach i {1 2} {
+      set res [prune_branch $heap $bP [expr {($bi+$i)%3}] $depth]
+      if {[lindex $res 0]} then {lappend L $res}
+   }
+   if {[llength $L]==2 && $depth>=3} then {
+      foreach res $L {
+         foreach {cP i} $res break
+         $heap set $cP $i $bP
+      }
+      $heap set $bP [list no [lindex $L 0 0] [lindex $L 1 0] 0]
+      return [list $bP 0]
+   }
+   $heap dispose $bP
+   if {[llength $L]==2 && $depth==1} then {
+%<debug>      puts "Forgot [lindex $L 0 0]"
+      return [lindex $L 1]
+   } elseif {[llength $L]} then {
+%<debug>      if {[llength $L]==2} then {puts "Forgot [lindex $L 1 0]"}
+      return [lindex $L 0]
+   } else {
+      return [list no ""]
+   }
+}
+%   \end{tcl}
+%   Experiments failed to produce a situation where this procedure 
+%   actually was sloppy however, so a more drastic method of 
+%   forgetting items was deviced: just set a pointer to nil.
+% \end{proc}
+% 
+% \begin{proc}{redirect_cubic_item}
+%   This procedure is an update-command for |compact|ifying the heap.
+%   \begin{tcl}
+proc redirect_cubic_item {redirL ptrL} {
+   set res {}
+   foreach p $ptrL {
+      if {$p} then {
+         lappend res [lindex $redirL $p]
+      } else {
+         lappend res $p
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{cubic_tree_test}
+%   The main parameter for this procedure is the number of iterations.
+%   
+%   \begin{tcl}
+proc cubic_tree_test {iterations} {
+   set heap [heap::makecmd H -local yes]
+   set p [$heap new [list no no no]]
+   set d 0
+%   \end{tcl}
+%   \begin{tcl}
+   set nilcount 0
+   incr iterations 0
+   array set stat {}
+   for {set i 0} {$i<$iterations} {incr i} {
+%   \end{tcl}
+%   The first block of code in the loop periodically checks the 
+%   heap integrity.
+%   \begin{tcl}
+      if {$i % 21 == 0} then {
+         array set stat [$heap statistics]
+         if {$i % 5 == 0} then {
+            array set stat [$heap repair]
+         }
+         if {$i % 31 == 0} then {
+            array set stat [$heap garbagecollect concat $p]
+         }
+         if {$i % 47 == 0} then {
+            set p [lindex [$heap compact redirect_cubic_item] $p]
+         }
+%<*gui>
+         .tree.msg configure -text [array get stat]
+         if {$i % 9 == 0} then {
+            .tree.c delete all
+            draw_cubic_tree .tree.c $heap $p 30
+         }
+%</gui>
+      }
+%<gui>      update
+%   \end{tcl}
+%   This block adds a new node to the tree every second time a nil 
+%   pointer is seen. This makes the tree grow, and grow unevenly.
+%   \begin{tcl}
+      set np [$heap get $p $d]
+      if {!$np} then {
+         incr nilcount
+         if {$nilcount>1} then {
+            set nilcount 0
+            set np [$heap new [list $p no no]]
+            $heap set $p $d $np
+         }
+         set d [expr {($d+1)%3}]
+         continue
+      }
+%   \end{tcl}
+%   This block rotates (on average) every fifth edge stepped over 
+%   that connects two non-nil nodes, so that we can stay put but 
+%   still advance.
+%   \begin{tcl}
+      if {$i%5 == 0} then {
+         rotate_edge $heap $p $d
+         continue
+      }
+%   \end{tcl}
+%   \begin{tcl}
+      if {$i%43 == 0} then {
+         foreach {np nd} [
+            prune_branch $heap $p $d 5
+         ] break
+         if {$np} then {$heap set $np $nd $p}
+         $heap set $p $d $np
+         continue
+      }
+      if {$i%127 == 0} then {
+         $heap set $p $d no
+         continue
+      }
+%   \end{tcl}
+%   \begin{tcl}
+      set nd [lsearch -exact [$heap get $np] $p]
+      set nd [expr {($nd+1)%3}]
+      set d $nd
+      set p $np
+%   \end{tcl}
+%   \begin{tcl}
+   }
+   list $p $d
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Well, that's pretty much it. If the above can run for a while 
+% without errors, then the |heap::core| is probably OK.
+% \begin{tcl}
+cubic_tree_test 20000
+%</cubicTreeTest>
+% \end{tcl}
+% And it did run without errors.
+% 
+% 
+% \section{Skiplists}
+% 
+% The following implements skiplists in a heap. The heap element for 
+% a node in this list has the struture
+% \begin{displaysyntax}
+%   \word{next-list} \word{key-list} \word{value}
+% \end{displaysyntax}
+% where \word{next-list} is the list of forward pointers in the list, 
+% \word{key-list} is the sort key (a list of key components), and 
+% \word{value} is the value corresponding to this key. The 
+% \word{next-list} length varies between nodes, and the step length 
+% for the $i$th element pointer is expected to be $2^i$. Elements of 
+% the \word{next-list} may be \textbf{nil}, in which case there is no 
+% next node at that level of the list.
+% 
+% The keys are compared in lexicographic order (all keys are presumed 
+% to be the same length), and the nodes appear in \emph{descending} 
+% order. Keys where all components compare as equal are regarded as 
+% equal. The head of the list is a node with the structure
+% \begin{displaysyntax}
+%   \word{next-list} \word{cmp-cmd list}
+% \end{displaysyntax}
+% where the \word{cmp-cmd list} is a list of command prefixes, that 
+% are used when comparing key components: the $i$th command prefix 
+% for the $i$th key component. The call syntax for these command 
+% prefixes is
+% \begin{displaysyntax}
+%   \meta{cmp-cmd} \word{left} \word{right}
+% \end{displaysyntax}
+% and the result must be $<0$ when \(\mathit{left} < 
+% \mathit{right}\), $>0$ when \(\mathit{left} > 
+% \mathit{right}\), and $=0$ otherwise. This means |string compare| 
+% and |::tcl::mathop::-| are both valid \word{cmp-cmd}s.
+% 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide heap::skiplist 1.1 {skiplist noprovide}
+%</docstrip.tcl::catalogue>
+%<*skiplist>
+package require Tcl 8.5
+%<!noprovide>package provide heap::skiplist 1.1
+namespace eval heap::skiplist {}
+% \end{tcl}
+% \setnamespace{heap::skiplist}
+% Since we require \Tcllogo\,8.5, there will be an ensemble 
+% collecting the main operations, but that is defined at the end.
+% 
+% 
+% \subsection{List operations}
+% 
+% A skiplist is in one sense a simply linked list with ``high-speed 
+% lanes for fast forward jumping'', so it can be operated upon as if 
+% it was a linked list of key--value pairs. Most of the operations 
+% which take such a prespective are however rather low-level.
+% 
+% 
+% \begin{proc}{create}
+%   This procedure creates a new empty skiplist. The call syntax is
+%   \begin{displaysyntax}
+%     create \word{heap-cmd} \word{cmp-prefix}\regstar
+%   \end{displaysyntax}
+%   where each \word{cmp-prefix} is a command prefix for the 
+%   comparison key. The return value is a pointer to the header node 
+%   of the skiplist.
+%   \begin{tcl}
+proc heap::skiplist::create {H args} {
+   {*}$H new [list [list no] $args]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{contents}
+%   The |contents| procedure returns the key--value list of all entries 
+%   in the skiplist. Its call syntax is
+%   \begin{displaysyntax}
+%     contents \word{heap-cmd} \word{header}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc heap::skiplist::contents {H header} {
+   set res {}
+   set x [{*}$H get $header 0 0]
+   while {$x} {
+      set e [{*}$H get $x]
+      lappend res [lindex $e 1] [lindex $e 2]
+      set x [lindex $e 0 0]
+   }
+   return $res
+}
+%   \end{tcl}
+%   \changes{1.1}{2016/08/31}{This command used to be called 
+%     \texttt{getall}, but that's a better name for a different 
+%     command, and so far there haven't been any users that might 
+%     be affected. (LH, forgetting about cmplutil2's reduce_step!)}
+% \end{proc}
+% 
+% \begin{proc}{size}
+%   The |size| procedure counts the number of entries in the skiplist.
+%   The call syntax is
+%   \begin{displaysyntax}
+%     size \word{heap-cmd} \word{header}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc heap::skiplist::size {H header} {
+   set res 0
+   set x [{*}$H get $header 0 0]
+   while {$x} {
+      incr res
+      set x [{*}$H get $x 0 0]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{destroy}
+%   The |destroy| procedure destroys a skiplist by deallocating its 
+%   header and all nodes. The call syntax is
+%   \begin{displaysyntax}
+%     destroy \word{heap-cmd} \word{header}
+%   \end{displaysyntax}
+%   and there is no particular return value.
+%   \begin{tcl}
+proc heap::skiplist::destroy {H header} {
+   while {$header} {
+      set header [lindex [{*}$H dispose $header] 0 0]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{empty}
+%   The |empty| procedure deallocates all nodes of a skiplist, but 
+%   keeps the header. The call syntax is
+%   \begin{displaysyntax}
+%     empty \word{heap-cmd} \word{header}
+%   \end{displaysyntax}
+%   and there is no particular return value.
+%   \begin{tcl}
+proc heap::skiplist::empty {H header} {
+   set x [{*}$H get $header 0 0]
+   {*}$H set $header 0 [list no]
+   while {$x} {
+      set x [lindex [{*}$H dispose $x] 0 0]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{isempty}
+%   The |isempty| procedure checks whether a skiplist is empty.
+%   The call syntax is
+%   \begin{displaysyntax}
+%     isempty \word{heap-cmd} \word{header}
+%   \end{displaysyntax}
+%   and the return value is |1| for an empty skiplist, |0| for a 
+%   nonempty skiplist.
+%   \begin{tcl}
+proc heap::skiplist::isempty {H header} {
+   expr {![{*}$H get $header 0 0]}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{statistics}
+%   The |statistics| procedure counts, for each occurring height, 
+%   the number of entries in the skiplist at that height.
+%   The call syntax is
+%   \begin{displaysyntax}
+%     statistics \word{heap-cmd} \word{header}
+%   \end{displaysyntax}
+%   The return value is a dictionary, mapping length of next-list to 
+%   the number of nodes that have this length.
+%   \changes{1.1}{2016/09/01}{Commented out an extra entry of unclear 
+%     purpose. (LH)}
+%   \begin{tcl}
+proc heap::skiplist::statistics {H header} {
+%<unclear>   set Res(order) [{*}$H get $header 1]
+   set x [{*}$H get $header 0 0]
+   while {$x} {
+      set next [{*}$H get $x 0]
+      incr Res([llength $next])
+      set x [lindex $next 0]
+   }
+   return [array get Res]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Prioriqueue operations}
+% 
+% One application for skiplists is to maintain priority queues, i.e., 
+% ordered lists of items where it is very fast to remove the first item, 
+% and fast to insert new items in the position given by the sort key. 
+% This kind of operation assumes that there can be several elements 
+% with the same key.
+% 
+% \begin{proc}{pop}
+%   The |pop| procedure removes the first entry from the skiplist, 
+%   and returns it. The call syntax is
+%   \begin{displaysyntax}
+%     pop \word{heap-cmd} \word{header}
+%   \end{displaysyntax}
+%   and the return value is a list
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regopt] \word{key} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   This list is empty if and only if the skiplist was empty already.
+%   \begin{tcl}
+proc heap::skiplist::pop {H header} {
+   set headL [{*}$H get $header 0]
+   set n [lindex $headL 0]
+   if {!$n} then {return}
+   set e [{*}$H get $n]
+   set headL [concat [lindex $e 0]\
+     [lrange $headL [llength [lindex $e 0]] end]]
+   while {![lindex $headL end] && [llength $headL]>1} {
+      set headL [lreplace $headL [set headL end] end]
+   }
+   {*}$H set $header 0 $headL
+   {*}$H dispose $n
+   return [lrange $e 1 2]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{peek}
+%   The |peek| procedure returns the first entry from the skiplist 
+%   without modifying it. The call syntax is
+%   \begin{displaysyntax}
+%     peek \word{heap-cmd} \word{header}
+%   \end{displaysyntax}
+%   and the return value is a list
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regopt] \word{key} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   This list is empty if and only if the skiplist was empty already.
+%   \begin{tcl}
+proc heap::skiplist::peek {H header} {
+   set n [{*}$H get $header 0 0]
+   if {$n} then {
+      return [lrange [{*}$H get $n] 1 2]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{insert}
+%   This procedure inserts a new node into a skiplist. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     insert \word{heap-cmd} \word{header} \word{key} \word{value}
+%   \end{displaysyntax}
+%   The return value is |1| if the new node was the first with key 
+%   \word{key}, and |0| if some other was already present.
+%   
+%   The first part of the algorithm is a search, which locates the 
+%   position of interest using a kind of bisection; the tail of the 
+%   skiplist is split in half at the successor on level $i$, and if 
+%   the sought position is after that node then we advance the 
+%   current position, otherwise we decrease $i$. Throughout the 
+%   process, the current node |x| is before the sought position.
+%   
+%   One complication is that all nodes with a pointer past the sought 
+%   position are remembered in the list |cutL|, the index into which 
+%   is the level of the pointer past the sought position; these are 
+%   the pointers which may need to be updated when inserting a new 
+%   node in the specified position. Elements in the |cutL| list at 
+%   indices $\leq i$ should be regarded as uninitialised.
+%   
+%   Another complication is the composite nature of the sort keys, 
+%   but this permits an optimisation to avoid comparisons whose 
+%   results are known beforehand. There are three variables $j$, 
+%   $j_l$, and $j_r$, where $j$ is index into the sort key to 
+%   currently consider. $j_l$ and $j_r$ are the indices into the sort 
+%   key of the first element where the current and successor 
+%   respectively nodes in the skiplist may be different from the 
+%   \word{key}. When looking at a new node in the search interval, 
+%   there is never a point in making comparisons at indices less than 
+%   $\min\{j_l,j_r\}$, since these would by definition always come up 
+%   equal.
+%   
+%   \begin{tcl}
+proc heap::skiplist::insert {H header key value} {
+   set res 1
+   set x $header
+   set cutL [{*}$H get $header 0]
+   set i [expr {[llength $cutL] - 1}]
+   set jl [set jr [set j 0]]
+   set cmdL [{*}$H get $header 1]
+   while {$i>=0} {
+      set n [{*}$H get $x 0 $i]
+      if {!$n} then {
+         lset cutL $i $x
+         incr i -1
+         continue
+      }
+      while {0 == [
+         set c [{*}[lindex $cmdL $j] [lindex $key $j]\
+           [{*}$H get $n 1 $j]]
+      ]} {
+         incr j
+         if {$j>=[llength $cmdL]} then {
+%   \end{tcl}
+%   In this case, the key of |n| is equal to the specified 
+%   \word{key}, so there is a tie. We want the new node to be 
+%   inserted after the existing one, so we pretend that the key of 
+%   |n| was larger than the specified \word{key}.
+%   \begin{tcl}
+            set res 0
+            set c -1
+            break
+         }
+      }
+      if {$c>0} then {
+         lset cutL $i $x
+         incr i -1
+         set jr $j
+      } else {
+         set x $n
+         set jl $j
+      }
+      set j [::tcl::mathfunc::min $jl $jr]
+   }
+%   \end{tcl}
+%   The second part of the algorithm deals with inserting a node into 
+%   the skiplist. A single (low quality) random number is generated, 
+%   and the number of times it can be doubled without exceeding $1$ 
+%   is taken as the number of successor levels the new node should 
+%   have. 
+%   \begin{tcl}
+   set n [{*}$H new [list "" $key $value]]
+   set r [expr {rand()}]
+   set nextL {}
+   set i 0
+   foreach x $cutL {
+      lappend nextL [{*}$H get $x 0 $i]
+      {*}$H set $x 0 $i $n
+      incr i
+      set r [expr {2*$r}]
+      if {$r>=1} then {break}
+   }
+%   \end{tcl}
+%   Giving the new node the selected number of successor level may in 
+%   fact require increasing the number of successor levels in the 
+%   header.
+%   \begin{tcl}
+   if {$r<1} then {
+      set L [{*}$H get $header 0]
+      while {$r<1} {
+         lappend L $n
+         lappend nextL no
+         set r [expr {2*$r}]
+      }
+      {*}$H set $header 0 $L
+   }
+   {*}$H set $n 0 $nextL
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \subsection{Ordered dictionary operations}
+% 
+% Another usage mode for a skiplist is to treat it as a dictionary 
+% (mapping keys to values) which in addition keeps the entries ordered. 
+% Using these operations on a skiplist with multiple entries for the key 
+% in question typically cause them to operate on one node with that key, 
+% but there is no control over exactly which.
+% 
+% \begin{proc}{existsget}
+%   This procedure combines the basic |get| and |exists| operations; 
+%   check if an entry is present in the skiplist, and if so return 
+%   that entry. The call syntax is
+%   \begin{displaysyntax}
+%     existsget \word{heap-cmd} \word{header} \word{key}
+%   \end{displaysyntax}
+%   and the return value is a list
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regopt] \word{key} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{key} and \word{value} are as found in the skiplist. 
+%   If not found, the list is empty.
+%   
+%   The implementation is aimed at not making more component 
+%   comparisons than necessary, so either the current node $x$ gets 
+%   advanced or the current level $i$ gets decremented as soon as a key 
+%   component is encountered where the next node \(n = x[0,i]\) differs 
+%   from the \word{key}. The index of the current key component is 
+%   $j$.
+%   \begin{tcl}
+proc heap::skiplist::existsget {H header key} {
+   set x $header
+   set i [expr {[llength [{*}$H get $header 0]] - 1}]
+   set jl [set jr [set j 0]]
+%   \end{tcl}
+%   The $j_l$ and $j_r$ variables are the index of the first 
+%   component where the current and (most recently evaluated) next 
+%   nodes may be different from the \word{key}. Since any new next 
+%   node is between these two, it is known that all key components 
+%   with index $<\min\{j_l,j_r\}$ of all nodes that may be visited 
+%   from here on are equal to their counterparts in the \word{key}, 
+%   and therefore there is no need to look at them anymore.
+%   \begin{tcl}
+   set cmdL [{*}$H get $header 1]
+   while {$i>=0} {
+      set n [{*}$H get $x 0 $i]
+      if {!$n} then {incr i -1; continue}
+      while {0==[
+         set c [{*}[lindex $cmdL $j] [lindex $key $j]\
+           [{*}$H get $n 1 $j]]
+      ]} {
+         incr j
+         if {$j>=[llength $cmdL]} then {
+            return [lrange [{*}$H get $n] 1 2]
+         }
+      }
+      if {$c>0} then {
+         incr i -1
+         set jr $j
+      } else {
+         set x $n
+         set jl $j
+      }
+      set j [::tcl::mathfunc::min $jl $jr]
+   }
+   return {}
+}
+%   \end{tcl}
+%   The envisioned use case is that the \word{key} is fairly long, 
+%   whereas the skiplist need not be. Hence the loop above is going 
+%   to be dominated by steps in which $j$ is incremented, and 
+%   increments in $j_l$ or $j_r$ are nice reliefs that soften the 
+%   blow of having to reset $j$.
+% \end{proc}
+% 
+% 
+% \begin{proc}{Set}
+%   This procedure sets an entry in a skiplist, inserting it if it 
+%   wasn't already there. The call syntax is
+%   \begin{displaysyntax}
+%     Set \word{heap-cmd} \word{header} \word{key} \word{value}
+%   \end{displaysyntax}
+%   The return value is |0| if the entry was updated and |1| if it 
+%   was inserted.
+%   
+%   The first part of the algorithm is a search, similar to that of 
+%   the |existsget| procedure, but with the difference that nodes 
+%   with a pointer past the target node are remembered in the 
+%   |cutL|. Elements in this list which are $\leq i$ should be 
+%   regarded as uninitialised.
+%   \begin{tcl}
+proc heap::skiplist::Set {H header key value} {
+   set x $header
+   set cutL [{*}$H get $header 0]
+   set i [expr {[llength $cutL] - 1}]
+   set jl [set jr [set j 0]]
+   set cmdL [{*}$H get $header 1]
+   while {$i>=0} {
+      set n [{*}$H get $x 0 $i]
+      if {!$n} then {
+         lset cutL $i $x
+         incr i -1
+         continue
+      }
+      while {0 == [
+         set c [{*}[lindex $cmdL $j] [lindex $key $j]\
+           [{*}$H get $n 1 $j]]
+      ]} {
+         incr j
+         if {$j>=[llength $cmdL]} then {
+            {*}$H set $n 2 $value
+            return 0
+%   \end{tcl}
+%   In this case, the entry was already in the skiplist, so it only 
+%   needed to be updated.
+%   \begin{tcl}
+         }
+      }
+      if {$c>0} then {
+         lset cutL $i $x
+         incr i -1
+         set jr $j
+      } else {
+         set x $n
+         set jl $j
+      }
+      set j [::tcl::mathfunc::min $jl $jr]
+   }
+%   \end{tcl}
+%   The other, more interesting case is that a new entry is to be 
+%   inserted.
+%   \begin{tcl}
+   set n [{*}$H new [list "" $key $value]]
+   set r [expr {rand()}]
+   set nextL {}
+   set i 0
+   foreach x $cutL {
+      lappend nextL [{*}$H get $x 0 $i]
+      {*}$H set $x 0 $i $n
+      incr i
+      set r [expr {2*$r}]
+      if {$r>=1} then {break}
+   }
+   if {$r<1} then {
+      set L [{*}$H get $header 0]
+      while {$r<1} {
+         lappend L $n
+         lappend nextL no
+         set r [expr {2*$r}]
+      }
+      {*}$H set $header 0 $L
+   }
+   {*}$H set $n 0 $nextL
+   return 1
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{Unset}
+%   This procedure removes an entry from a skiplist, leaving the list 
+%   unchanged if there wasn't such an entry. The call syntax is
+%   \begin{displaysyntax}
+%     Unset \word{heap-cmd} \word{header} \word{key}
+%   \end{displaysyntax}
+%   The return value is |0| if the entry was missing already and |1| 
+%   if it was removed.
+%   
+%   Again the first part of the algorithm is a search similar to that 
+%   of the |existsget| procedure, and unlike the case of inserting 
+%   there is no need to remember nodes with pointers past the node 
+%   to remove (the target node). There is a need to do things to nodes 
+%   which point to the target node, but those are all successors of 
+%   the $x$ that is current when the target node is first 
+%   encountered, so they can be located by searching forward.
+%   
+%   \begin{tcl}
+proc heap::skiplist::Unset {H header key} {
+   set x $header
+   set i [expr {[llength [{*}$H get $header 0]] - 1}]
+   set jl [set jr [set j 0]]
+   set cmdL [{*}$H get $header 1]
+   while {$i>=0} {
+      set n [{*}$H get $x 0 $i]
+      if {!$n} then {
+         incr i -1
+         continue
+      }
+      while {0 == [
+         set c [{*}[lindex $cmdL $j] [lindex $key $j]\
+           [{*}$H get $n 1 $j]]
+      ]} {
+         incr j
+         if {$j>=[llength $cmdL]} then {
+%   \end{tcl}
+%   What is tricky is that the event which marks the switch to the 
+%   second part of the algorithm---detecting a node whose key 
+%   components are all equal to their counterparts in the 
+%   \word{key}---happens within the nested loop of the first part. 
+%   Hence the easiest way to code this second part of the algorithm 
+%   is as a block of code nested within the first part, namely the 
+%   following. The task is to replace every pointer to the target 
+%   node $t$ with the same level pointer in the target node, so 
+%   |cutL| is here going to be the list of those replacement 
+%   pointers. There is no need to do any further key comparisons, 
+%   since it is known that any successor of $x$ (at level $i$ or 
+%   less) which is not $t$ has $t$ as a descendant.
+%   \begin{tcl}
+            set t $n
+            set cutL [{*}$H get $t 0]
+            for {} {$i>=0} {incr i -1} {
+               set n [{*}$H get $x 0 $i]
+               while {$n!=$t} {
+                  set x $n
+                  set n [{*}$H get $x 0 $i]
+               }
+               {*}$H set $x 0 $i [lindex $cutL $i]
+            }
+            {*}$H dispose $t
+            return 1
+%   \end{tcl}
+%   Having completed the removal part, we now return to the `advance 
+%   $x$ or decrement $i$' step in the first part of the algorithm.
+%   \begin{tcl}
+         }
+      }
+      if {$c>0} then {
+         incr i -1
+         set jr $j
+      } else {
+         set x $n
+         set jl $j
+      }
+      set j [::tcl::mathfunc::min $jl $jr]
+   }
+   return 0
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{variable}{result}
+% \begin{variable}{opts}
+%   The |result| and |opts| variables are used for the variable 
+%   arguments of the |catch| around the \word{body} of the |update| 
+%   procedure, below. Putting data in non-local variables is 
+%   necessary, as the |catch| is |uplevel|ed, to stop the |uplevel| 
+%   from appearing in the stack trace upon errors. This does not 
+%   create reentrancy problems, as the variables are only used after 
+%   the body is evaluated, and before the |update| procedure returns.
+% \end{variable}\end{variable}
+% 
+% \begin{proc}{update}
+%   This procedure provides for updating an entry in a skiplist, 
+%   combining the functionalities of |existsget|, |Set|, and |Unset|. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     update \word{heap-cmd} \word{header} \word{key} \word{var-name} 
+%     \word{body}
+%   \end{displaysyntax}
+%   where the \word{body} is a script that will be evaluated, and 
+%   \word{var-name} is the name of a variable in the calling context. 
+%   Before evaluating the \word{body}, this variable is set as the 
+%   \word{key} entry in the skiplist (unset if such an entry does not 
+%   exist), and after evaluating it, the skiplist entry is set as the 
+%   variable (unset if the variable is unset).
+%   
+%   As with the |dict update| command, this reflection happens even 
+%   if the \word{body} throws an error or other exceptional return. 
+%   The return value of the |update| command is that of the 
+%   \word{body}. The \word{body} may read skiplist entries, but it 
+%   must not itself modify the skiplist as the |update| command is 
+%   holding pointers to nodes in it.
+%   
+%   The implementation is basically a combination of |Set| and 
+%   |Unset|.
+%   \begin{tcl}
+proc heap::skiplist::update {H header key varname body} {
+   upvar 1 $varname var
+   set x $header
+   set cutL [{*}$H get $header 0]
+   set i [expr {[llength $cutL] - 1}]
+   set jl [set jr [set j 0]]
+   set cmdL [{*}$H get $header 1]
+   while {$i>=0} {
+      set n [{*}$H get $x 0 $i]
+      if {!$n} then {
+         lset cutL $i $x
+         incr i -1
+         continue
+      }
+      while {0 == [
+         set c [{*}[lindex $cmdL $j] [lindex $key $j]\
+           [{*}$H get $n 1 $j]]
+      ]} {
+         incr j
+         if {$j>=[llength $cmdL]} then {
+%   \end{tcl}
+%   In this ``entry found'' case, the entry is in the skiplist and 
+%   will either be updated or unset.
+%   \begin{tcl}
+            set var [{*}$H get $n 2]
+            uplevel 1 [list ::catch $body ::heap::skiplist::result\
+              ::heap::skiplist::opts]
+            if {[info exists var]} then {
+               {*}$H set $n 2 $var
+            } else {
+               set t $n
+               set cutL [{*}$H get $t 0]
+               for {} {$i>=0} {incr i -1} {
+                  set n [{*}$H get $x 0 $i]
+                  while {$n!=$t} {
+                     set x $n
+                     set n [{*}$H get $x 0 $i]
+                  }
+                  {*}$H set $x 0 $i [lindex $cutL $i]
+               }
+               {*}$H dispose $t
+            }
+            dict incr ::heap::skiplist::opts -level
+            return -options $::heap::skiplist::opts\
+              $::heap::skiplist::result
+         }
+      }
+      if {$c>0} then {
+         lset cutL $i $x
+         incr i -1
+         set jr $j
+      } else {
+         set x $n
+         set jl $j
+      }
+      set j [::tcl::mathfunc::min $jl $jr]
+   }
+%   \end{tcl}
+%   In the other case, the entry is not in the skiplist, so it will 
+%   either be inserted or left alone.
+%   \begin{tcl}
+   unset -nocomplain var
+   uplevel 1 [list\
+     ::catch $body ::heap::skiplist::result ::heap::skiplist::opts]
+   if {[info exists var]} then {
+      set n [{*}$H new [list "" $key $var]]
+      set r [expr {rand()}]
+      set nextL {}
+      set i 0
+      foreach x $cutL {
+         lappend nextL [{*}$H get $x 0 $i]
+         {*}$H set $x 0 $i $n
+         incr i
+         set r [expr {2*$r}]
+         if {$r>=1} then {break}
+      }
+      if {$r<1} then {
+         set L [{*}$H get $header 0]
+         while {$r<1} {
+            lappend L $n
+            lappend nextL no
+            set r [expr {2*$r}]
+         }
+         {*}$H set $header 0 $L
+      }
+      {*}$H set $n 0 $nextL
+   }
+   dict incr ::heap::skiplist::opts -level
+   return -options $::heap::skiplist::opts $::heap::skiplist::result
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Linked list operations}
+% 
+% With a \emph{linked} list, as distiguished from a plain list, one can 
+% keep pointers to specific elements for faster access later. Note, 
+% however, that changing the list risks invalidating these pointers, 
+% so one should not trust them past any list-modifying command.
+% 
+% \changes{1.1}{2016-08-25}{Added linked list operations and 
+%   ensembles. (LH)}
+% 
+% \begin{proc}{key}
+% \begin{proc}{value}
+%   These procedures return the sort key and value respectively of a 
+%   skiplist node, specified by the heap pointer. They have the call 
+%   syntaxes
+%   \begin{displaysyntax}
+%     key \word{heap-cmd} \word{header} \word{ptr}\par
+%     value \word{heap-cmd} \word{header} \word{ptr}
+%   \end{displaysyntax}
+%   where \word{ptr} is the pointer in the heap accessed by 
+%   \word{heap-cmd} to the node in question. The \word{header} is not 
+%   used, but included for syntactic consistency.
+%   \begin{tcl}
+proc heap::skiplist::key {H header ptr} {{*}$H get $ptr 1}
+proc heap::skiplist::value {H header ptr} {{*}$H get $ptr 2}
+%   \end{tcl}
+% \end{proc}\end{proc}
+% 
+% \begin{proc}{succ}
+%   This procedure returns the pointer to a successor of the skiplist 
+%   node specified using a pointer, or \textbf{nil} if there is no 
+%   such successor. The call syntax is
+%   \begin{displaysyntax}
+%     succ \word{heap-cmd} \word{header} \word{ptr} 
+%     \word{level}\regopt
+%   \end{displaysyntax}
+%   where \word{level} (defaulting to 0) is the level of successor 
+%   that should be returned.
+%   
+%   Getting a \textbf{nil} as return value when the \word{level} is 
+%   $0$ means that we're at the end of the list. For higher levels, 
+%   it means either that this is the last node with that level 
+%   \emph{or} that the list of successors for the current node does 
+%   not cover that level.
+%   \begin{tcl}
+proc heap::skiplist::succ {H header ptr {level 0}} {
+   set L [{*}$H get $ptr 0]
+   if {$level >= [llength $L]} then {
+      return no
+   } else {
+      return [lindex $L $level]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{search}
+%   This procedure returns the pointer to a node located using sort 
+%   key. The syntax is
+%   \begin{displaysyntax}
+%     search \word{heap-cmd} \word{header} \word{key} 
+%     \word{from}\regopt
+%   \end{displaysyntax}
+%   where \word{from} is a pointer to a skiplist node, defaulting to 
+%   \textbf{nil}. When this is \textbf{nil}, the search is from the 
+%   start of the list, otherwise the search is from the \word{from} 
+%   node. The return value is the pointer to the first node whose 
+%   sort key is less than or equal to the \word{key}, or \textbf{nil} 
+%   if there is no such node.
+%   
+%   The implementation follows the same basic logic as the 
+%   |existsget| procedure, but some extra twists are needed to deal 
+%   with the possibility that the \word{from} node is the one we're 
+%   looking for. Recall that in the main loop, |x| is a node with key 
+%   strictly greater than that sought. This is given when we start 
+%   from the pseudonode \word{header}, but needs to be checked when 
+%   we start from any other node, and whenever that check fails, 
+%   \word{from} is also the node that was sought.
+%   \begin{tcl}
+proc heap::skiplist::search {H header key {from no}} {
+   set cmdL [{*}$H get $header 1]
+   set jl [set jr [set j 0]]
+   if {$from} then {
+      set fromkey [{*}$H get $from 1]
+      while {0==[
+         set c [{*}[lindex $cmdL $j] [lindex $key $jl]\
+           [lindex $fromkey $jl]]
+      ]} {
+         incr jl
+         if {$jl>=[llength $cmdL]} then {return $from}
+      }
+      if {$c > 0} then {return $from}
+      set x $from
+   } else {
+      set x $header
+   }
+%   \end{tcl}
+%   The $j_l$ and $j_r$ variables are the index of the first sort key 
+%   component where the current and (most recently evaluated) next 
+%   nodes may be different from the \word{key}. Since any new next 
+%   node is between these two, it is known that all key components 
+%   with index $<\min\{j_l,j_r\}$ of all nodes that may be visited 
+%   from here on are equal to their counterparts in the \word{key}, 
+%   and therefore there is no need to look at them anymore.
+%   
+%   The main termination condition is that all successors of the 
+%   current node $x$ have been looked at and found to 
+%   (be \textbf{nil} or) have a sort key strictly less than the 
+%   sought one. In this case \(i<0\), and the sought node is the 
+%   level $0$ successor; since that is what was most recently looked 
+%   at, it will already be stored in the next node variable $n$. This 
+%   is true also in the case that this successor is \textbf{nil}.
+%   
+%   A new complication is that the successor level $i$ is not 
+%   decreasing throughout; there is a high probability that the 
+%   \word{from} node will not be on any of the ``fast lanes'' of the 
+%   skiplist. Therefore there is a boolean |rising| which is 
+%   initially true, but set to false as soon as $i$ needs to 
+%   decrease. While |rising|, $i$ will be reset to the highest level 
+%   of the new current node whenever that is increased; this could 
+%   lead to $+ O(\log N)$ more work when those extra levels all 
+%   jump too far, but will lead to far greater savings when the 
+%   sought node is in fact far away.
+%   \begin{tcl}
+   set i [expr {[llength [{*}$H get $x 0]] - 1}]
+   set rising 1
+   while {$i>=0} {
+      set n [{*}$H get $x 0 $i]
+      if {!$n} then {incr i -1; set rising 0; continue}
+      while {0==[
+         set c [{*}[lindex $cmdL $j] [lindex $key $j]\
+           [{*}$H get $n 1 $j]]
+      ]} {
+         incr j
+         if {$j>=[llength $cmdL]} then {
+            return $n
+         }
+      }
+      if {$c>0} then {
+         incr i -1
+         set rising 0
+         set jr $j
+      } else {
+         set x $n
+         if {$rising} then {
+            set i [expr {[llength [{*}$H get $x 0]] - 1}]
+         }
+         set jl $j
+      }
+      set j [::tcl::mathfunc::min $jl $jr]
+   }
+   return $n
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Multiple entries operations}
+% 
+% In a setting where a key can map to multiple values, it becomes 
+% interesting to alternatively operate on \emph{all} entries with a 
+% specific key.
+% 
+% \begin{proc}{getall}
+%   The |getall| procedure has the call syntax
+%   \begin{displaysyntax}
+%     getall \word{heap-cmd} \word{header} \word{key}
+%   \end{displaysyntax}
+%   and returns the \emph{list} of all \word{value}s associated with 
+%   that key; if there are no such entries then the return value is 
+%   empty.
+%   
+%   The basic idea is to perform two searches: one that locates the 
+%   first node $x$ that is $\geq$ the key and one that locates 
+%   the first node $y$ that is $>$ the key. Then the sought list is 
+%   produced by stepping $x$ until $y$ is reached (comparing pointers 
+%   for equality).
+%   
+%   In principle, the searches for $x$ and $y$ could be completely 
+%   separate, but it will be more efficient to unify the parts which 
+%   are common. This means the search will have three phases. During 
+%   the first phase, no node with the sought key has yet been 
+%   found, so searches for $x$ and $y$ would proceed identically. 
+%   When a node with the sought key is encountered, the searches 
+%   split, so phase two is finding $x$ and phase three is to find 
+%   $y$. The interesting thing is that phase two considers $j_r$ to 
+%   be maxed out and phase three considers $j_l$ to be maxed out, so 
+%   effectively phases two and three only need to update and take 
+%   into account one of them.
+%   
+%   \begin{tcl}
+proc heap::skiplist::getall {H header key} {
+   set cmdL [{*}$H get $header 1]
+   set jl [set jr [set j 0]]
+   set x $header
+   set i [expr {[llength [{*}$H get $x 0]] - 1}]
+%   \end{tcl}
+%   Whereas it technically would be possible to structure phase one 
+%   as in all previous searches, it wouldn't be very intelligible, 
+%   since then the entry point to the other phases comes where the 
+%   loops are most deeply nested. The following implementation of 
+%   phase one instead focuses on reaching the end of the search key, 
+%   which means an element has been encountered with key equal to 
+%   that being sought. The other stopping condition of $i$ dropping 
+%   below $0$ (without having found a matching element) simply means 
+%   that no matching element exists, in which case the correct return 
+%   value is easy to produce.
+%   \begin{tcl}
+   while {![
+      set n [{*}$H get $x 0 $i]
+   ]} {
+      incr i -1
+      if {$i<0} then {return {}}
+   }
+   while {$j < [llength $cmdL]} {
+      set c [{*}[lindex $cmdL $j] [lindex $key $j] [{*}$H get $n 1 $j]]
+      if {$c != 0} then {
+         if {$c>0} then {
+            incr i -1
+            if {$i<0} then {return {}}
+            set jr $j
+         } elseif {$c<0} then {
+            set x $n
+            set jl $j
+         }
+         set j [::tcl::mathfunc::min $jl $jr]
+         while {![
+            set n [{*}$H get $x 0 $i]
+         ]} {
+            incr i -1
+            if {$i<0} then {return {}}
+         }
+      } else {
+         incr j
+      }
+   }
+   set y $n
+   set i0 $i
+%   \end{tcl}
+%   Phase two is again focusing on getting $i$ down to $0$, while 
+%   sometimes stepping forward to stick with the boundary to the key 
+%   elements. A notable fact here is that as soon as an inspected key 
+%   component is nonequal to its counterpart in the \word{key}, then 
+%   it must be larger, and the $x$ pointer can be advanced. Also, 
+%   on iterations where the pointer is advanced, the net change in 
+%   $i$ is~$0$.
+%   \begin{tcl}
+   incr i -1
+   while {$i>=0} {
+      set n [{*}$H get $x 0 $i]
+      incr i -1
+      for {set j $jl} {$j < [llength $cmdL]} {incr j} {
+         if {[{*}[lindex $cmdL $j] [lindex $key $j] [{*}$H get $n 1 $j]]} then {
+            set x $n
+            set jl $j
+            incr i
+            break
+         }
+      }
+   }
+   set x $n
+%   \end{tcl}
+%   Phase three is similar, but needs to take into account the 
+%   possibility that the next node is \textbf{nil}.
+%   \begin{tcl}
+   set i $i0
+   set j $jr
+   while {$i>=0} {
+      set n [{*}$H get $y 0 $i]
+      incr i -1
+      if {!$n} then {continue}
+      while {![{*}[lindex $cmdL $j] [lindex $key $j] [{*}$H get $n 1 $j]]} {
+         incr j
+         if {$j>=[llength $cmdL]} then {
+            set y $n
+            set j $jr
+            incr i
+            break
+         }
+      }
+      set jr $j
+   }
+   set y $n
+%   \end{tcl}
+%   Finally the result is constructed and returned.
+%   \begin{tcl}
+   set res {}
+   while {$x != $y} {
+      set node [{*}$H get $x]
+      lappend res [lindex $node 2]
+      set x [lindex $node 0 0]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{updateall}
+%   The |updateall| procedure has the call syntax
+%   \begin{displaysyntax}
+%     updateall \word{heap-cmd} \word{header} \word{key} \word{varname} 
+%     \word{script}
+%   \end{displaysyntax}
+%   where \word{varname} is the name of a variable in the calling 
+%   context and \word{script} is a script that will be evaluated 
+%   there. |updateall| looks up the range of nodes with key 
+%   \word{key} and sets the \word{varname} variable to the list of 
+%   values for these nodes, similarly to |getall|. Then it evaluates 
+%   the \word{script} to ``update'' that list of values (as stored in 
+%   the variable). Finally the modified list of values is copied back 
+%   into the skiplist, growing or shrinking it as necessary. The return 
+%   value and code are those from the \word{script}; the skiplist is 
+%   updated even if the \word{script} throws an error (provided only 
+%   that the value of the variable is still a list).
+%   
+%   The skiplist may not be otherwise modified while an |updateall| 
+%   is in progress, since this may corrupt it; there is however no 
+%   mechanism enforcing this requirement. Pointers to nodes outside 
+%   the affected range will continue to be valid across the 
+%   |updateall| operation. On the other hand, there is no guarantee 
+%   that an unchanged value inside the affected range continues to 
+%   be stored in the same node.
+%   
+%   The basic idea is, as for |getall|, to perform two searches: one 
+%   that locates the beginning of the range and one that locates the 
+%   end of the range. Both cuts are being kept track of using lists 
+%   of pointers to the nodes that themselves have pointers across the 
+%   range boundary, lists that are indexed by the level of the 
+%   pointer. Call the early (to key values greater than \word{key}) 
+%   range boundary $a$ and the late (to key values less than 
+%   \word{key}) range boundary $b$; the corresponding lists of 
+%   pointers are stored in |aL| and |bL|.
+%   
+%   \begin{tcl}
+proc heap::skiplist::updateall {H header key varname body} {
+   set cmdL [{*}$H get $header 1]
+   set bL [{*}$H get $header 0]
+   set i [expr {[llength $bL] - 1}]
+%   \end{tcl}
+%   Just as in |getall|, it is more efficient to unify the parts of 
+%   the searches which are common, but here it is slightly more 
+%   convenient to continue with the end of the range after the two 
+%   ends split, so phases two and three are reversed. The search 
+%   works with the pointers |x| and |n| as usual, only storing a 
+%   pointer into the |aL| and |bL| lists when the proper pointer at 
+%   that level has been determined.
+%   
+%   In this procedure, phase one has two termination conditions: $i$ 
+%   dropping below $0$ and $j$ reaching the end of the key. In the 
+%   latter, we have located a node that is in the range, which means 
+%   the search will now split. In the former, it has been discovered 
+%   that no node carries the \word{key}, so the search is already 
+%   finished. 
+%   
+%   \begin{tcl}
+   set x $header
+   set jl [set jr [set j 0]]
+   while {![
+      set n [{*}$H get $x 0 $i]
+   ]} {
+      lset bL $i $x
+      incr i -1
+      if {$i<0} then {break}
+   }
+   while {$j < [llength $cmdL] && $i>=0} {
+      set c [{*}[lindex $cmdL $j] [lindex $key $j] [{*}$H get $n 1 $j]]
+      if {$c != 0} then {
+         if {$c>0} then {
+            lset bL $i $x
+            incr i -1
+            set jr $j
+         } elseif {$c<0} then {
+            set x $n
+            set jl $j
+         }
+         set j [::tcl::mathfunc::min $jl $jr]
+         while {$i>=0 && ![
+            set n [{*}$H get $x 0 $i]
+         ]} {
+            lset bL $i $x
+            incr i -1
+         }
+      } else {
+         incr j
+      }
+   }
+   set aL $bL
+   if {$i >= 0} then {
+      set i0 $i
+      lset aL $i0 $x
+%   \end{tcl}
+%   At this point, $x$ points to a node before the range whereas 
+%   $n$ points to a node inside the range, hence $x$ is one of the 
+%   pointers that should go into |aL|. Upon resuming the search for 
+%   the beginning of the range, the value for $x$ will therefore be  
+%   available from |aL|. $n$ is on the other hand \emph{not} 
+%   necessarily a pointer that should go into |bL|, so the search 
+%   continues on that side. Nominally the loop aims to get $i$ down 
+%   to $0$, but note that many iterations rather advance $j$ or $x$, 
+%   and that $i$ is only decremented if we get to the end of the loop 
+%   body.
+%   \begin{tcl}
+      set x $n
+      set j $jr
+      set n [{*}$H get $x 0 $i]
+      while {$i>=0} {
+         if {$n} then {
+            if {$j>=[llength $cmdL]} then {
+               set x $n
+               set n [{*}$H get $x 0 $i]
+               set j $jr
+               continue
+            } elseif {[{*}[lindex $cmdL $j]\
+                 [lindex $key $j] [{*}$H get $n 1 $j]]} then {
+               set jr $j
+            } else {
+               incr j
+               continue
+            }
+         }
+         lset bL $i $x
+         incr i -1
+         if {$i>=0} then {
+            set n [{*}$H get $x 0 $i]
+         }
+      }
+%   \end{tcl}
+%   When locating the beginning of the range, it is easier to just 
+%   store every $x$ pointer considered into the |aL| list, and then 
+%   overwrite the value if it turns out that $x$ should be advanced. 
+%   Likewise, $i$ is first decremented and then incremented if it 
+%   after all turns out that $x$ had to be advanced at that level.
+%   \begin{tcl}
+      set x [lindex $aL $i0]
+      set i [expr {$i0-1}]
+      while {$i>=0} {
+         set n [{*}$H get $x 0 $i]
+         lset aL $i $x
+         incr i -1
+         for {set j $jl} {$j < [llength $cmdL]} {incr j} {
+            if {[{*}[lindex $cmdL $j] [lindex $key $j] [{*}$H get $n 1 $j]]} then {
+               set x $n
+               set jl $j
+               incr i
+               break
+            }
+         }
+      }
+   }
+%   \end{tcl}
+%   Now to get on with the updating of the value.
+%   \begin{tcl}
+   upvar 1 $varname var
+   set var {}
+   set x [lindex $aL 0]
+   while {$x != [lindex $bL 0]} {
+      set x [{*}$H get $x 0 0]
+      lappend var [{*}$H get $x 2]
+   }
+   set before [llength $var]
+   uplevel 1 [list ::catch $body ::heap::skiplist::result\
+     ::heap::skiplist::opts]
+   if {[info exists var]} then {
+%   \end{tcl}
+%   Unsetting the \word{varname} variable is a legitimate method to 
+%   escape updating the skiplist. Setting it to something not a list 
+%   will also have that effect, but cause |updateall| to throw an 
+%   error.
+%   
+%   First phase of storing back an updated value deals with deleting 
+%   superfluous nodes; these are removed from the beginning of the 
+%   range. The implementation removes the nodes one by one, restoring 
+%   the skiplist to a consistent state after each removed node, which 
+%   for a larger number of removed nodes does more writes to the heap 
+%   than strictly necessary; however the number of heap reads is less 
+%   than twice the necessary minimum, and the expected number of heap 
+%   writes are likewise within a constant multiple of that, so the 
+%   asymptotic complexity should not suffer. Conversely, doing it 
+%   like this 
+%   
+%   An extra complication that must be taken into account is that 
+%   some of the nodes removed may appear in |bL|, which in that case 
+%   must be updated.
+%   \begin{tcl}
+      for {} {$before > [llength $var]} {incr before -1} {
+         set x [{*}$H get [lindex $aL 0] 0 0]
+         set i 0
+         foreach n [{*}$H get $x 0] {
+            {*}$H set [lindex $aL $i] 0 $i $n
+            if {$x == [lindex $bL $i]} then {
+               lset bL $i [lindex $aL $i]
+            }
+            incr i
+         }
+         {*}$H dispose $x
+      }
+%   \end{tcl}
+%   Second phase is to use existing nodes, for as long as those last.
+%   \begin{tcl}
+      set x [lindex $aL 0]
+      foreach value $var {
+         if {$before > 0} then {
+            set x [{*}$H get $x 0 0]
+            {*}$H set $x 2 $value
+            incr before -1
+            continue
+         }
+%   \end{tcl}
+%   Third phase is to create new nodes at the range end, which is 
+%   also done one by one (new node for each iteration of the above 
+%   |foreach| over |var|); new nodes are created with the next-list 
+%   empty, while the elements for that list are being collected in 
+%   |nL|. That the value of |rand()| is strictly less than $1$ 
+%   guarantees the first |while| loop sees at least one iteration, 
+%   whereas the fact that the value of |rand()| is strictly greater 
+%   than $0$ guarantees that both loops terminate.
+%   \begin{tcl}
+         set x [{*}$H new [list {} $key $value]]
+         set r [expr {rand()}]
+         set i 0
+         set nL {}
+         while {$r<1 && $i<[llength $bL]} {
+            lappend nL [{*}$H get [lindex $bL $i] 0 $i]
+            {*}$H set [lindex $bL $i] 0 $i $x
+            lset bL $i $x
+            incr i
+            set r [expr {2*$r}]
+         }
+         while {$r<1} {
+            set L [{*}$H get $header 0]
+            lappend L $x
+            {*}$H set $header 0 $L
+            lappend nL no
+            lappend bL $x
+            set r [expr {2*$r}]
+         }
+         {*}$H set $x 0 $nL
+      }
+   }
+   dict incr ::heap::skiplist::opts -level
+   return -options $::heap::skiplist::opts $::heap::skiplist::result
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% 
+% \subsection{Ensembles}
+% 
+% For an ensemble, it is natural that all subcommand names are lower 
+% case, so we need to |-map| the |Set| and |Unset| commands. This means 
+% all command names need to be enumerated.
+% 
+% \begin{tclcommand}{ensemble}[heap]{skiplist}
+%   \begin{tcl}
+namespace eval heap::skiplist {
+   namespace ensemble create -map {
+      create     create
+      contents   contents
+      destroy    destroy
+      empty      empty
+      existsget  existsget
+      insert     insert
+      isempty    isempty
+      getall     getall
+      key        key
+      peek       peek
+      pop        pop
+      search     search
+      set        Set
+      size       size
+      statistics statistics
+      succ       succ
+      unset      Unset
+      update     update
+      updateall  updateall
+      value      value
+   }
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% \begin{tclcommand}{ensemble}{p}
+%   If we're loading into a \Tcllogo\,8.6 interpreter, we can also 
+%   take advantage of ensembles with parameters, since all 
+%   subcommands except |create| have the same first two arguments 
+%   \word{heap-cmd} and \word{header}. This second ensemble has the 
+%   call syntax
+%   \begin{displaysyntax}
+%     heap::skiplist::p \word{heap-cmd} \word{header}
+%     \word{subcommand} \word{argument}\regstar
+%   \end{displaysyntax}
+%   \begin{tcl}
+   catch {
+      namespace ensemble create -command [namespace current]::p -map {
+         contents   contents
+         destroy    destroy
+         empty      empty
+         existsget  existsget
+         getall     getall
+         insert     insert
+         isempty    isempty
+         key        key
+         peek       peek
+         pop        pop
+         search     search
+         set        Set
+         size       size
+         statistics statistics
+         succ       succ
+         unset      Unset
+         update     update
+         updateall  updateall
+         value      value
+      } -parameters {heapcmd header}
+   }
+}
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% 
+% \begin{tcl}
+%</skiplist>
+% \end{tcl}
+% 
+% 
+\endinput

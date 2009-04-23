@@ -1927,6 +1927,8 @@ proc network::canonical::form {NW} {
 %   which has minimal annotation. |compL| is the list of components 
 %   (the exterior component not included) which will eventually be 
 %   sorted to find their canonical order.
+%   \changes{2.3}{2009/03/31}{Bugfix; isolated components were 
+%     being dropped! (LH)}
 %   \begin{tcl}
    set compL {}
    set decL {}
@@ -1934,8 +1936,9 @@ proc network::canonical::form {NW} {
       lappend decL [list [lindex $NW 0 $v 0] $v]
    }
    foreach vertex [lsort -dictionary -index 0 $decL] {
-      if {![info exists moreV($vertex)]} then {continue}
-      set pair [component_SCR $NW $vertex]
+      set start [lindex $vertex 1]
+      if {![info exists moreV($start)]} then {continue}
+      set pair [component_SCR $NW $start]
       set rootL {}
       foreach q [lindex $pair 1] {
          if {[lindex $q 0] eq "vertex"} then {
@@ -7464,11 +7467,11 @@ proc network::wfb::map_to_fbs {prefix nwL} {
 }
 %   \end{tcl}
 % \end{proc}
-
-
-\subsection{\PROP py operations}
-
-
+% 
+% 
+% \subsection{\PROP py operations}
+% 
+% 
 % \begin{proc}{composition}
 %   This procedure computes the composition of a list of networks 
 %   with feedback, i.e., it places them all in sequence (with the 
@@ -7633,8 +7636,8 @@ proc network::wfb::right_action {NW sigma} {
 }
 %   \end{tcl}
 % \end{proc}
-
-
+% 
+% 
 % \subsection{Listing isomorphic subnetworks}
 % 
 % 
@@ -10831,12 +10834,14 @@ proc network::rich::draw_feedbacks {canvas tagL feedbackL args} {
 %     \item[-operation]
 %       This option controls which operation is performed. It 
 %       defaults to |draw|, which means actually draw the brackets, 
-%       but it can also be |width|, in which causes the procedure to 
-%       not draw anything and instead return the width (in 
-%       \word{canvas-cmd} units) of one of the brackets that would 
-%       have been drawn. This can be used to determine how much space 
-%       to reserve for the backets before positioning that which the 
-%       brackets should surround.
+%       but it can also be |width| or |bbox|, in which case nothing 
+%       is drawn but the size of the brackes are determined. In the 
+%       case of the |width| operation, the return value is also 
+%       changed to be the width (in \word{canvas-cmd} units) of one 
+%       of the brackets that would have been drawn. This can be used 
+%       to determine how much space to reserve for the backets before 
+%       positioning that which the brackets should surround.
+%       \changes{2.3}{2009/03/29}{Added \texttt{bbox} operation. (LH)}
 %   \end{ttdescription}
 %   The return value is the bounding box of the brackets, which is 
 %   not tight; bounding boxes for adjacent items should probably 
@@ -10855,9 +10860,9 @@ proc network::rich::draw_feedbacks {canvas tagL feedbackL args} {
 %   20/36\,\mathrm{pt}\); it's easier to introduce this factor in a 
 %   calculation than to incorporate it in a constant list of values.
 %   
-%   Variable names below sometimes have curious names to reflect 
-%   their 
-%   . The main unit for this part of the design is |dh#|, 
+%   Variable names below often have curious names to reflect 
+%   their MetaFont origin. 
+%   The main unit for this part of the design is |dh#|, 
 %   which is specified as ``60\% of the design size'', i.e., 
 %   $6\,\mathrm{pt}$.
 %   \begin{tcl}
@@ -10977,25 +10982,201 @@ proc network::rich::draw_brackets {canvasCmd tagL args} {
 %   position lines with more than pixel precision anyway (an odd 
 %   width line conceptually fills half pixels at the sides).
 %   \begin{tcl}
-   lappend canvasCmd create polygon
-   set optL [list -tags [linsert $tagL end bracket] \
-     -fill black  -outline ""]
-   uplevel 1 $canvasCmd [
-      list [expr {$right+$x4}] $y2  [expr {$right+$x1r}] $y2 \
-        [expr {$right+$x1r}] $y1  [expr {$right+$x4}] $y1 \
-        [expr {$right+$x4}] $y4l  [expr {$right+$x1l}] $y4l \
-        [expr {$right+$x1l}] $y6r [expr {$right+$x4}] $y6r
-   ] $optL
-   uplevel 1 $canvasCmd [
-      list [expr {$left-$x4}] $y2  [expr {$left-$x1r}] $y2 \
-        [expr {$left-$x1r}] $y1  [expr {$left-$x4}] $y1 \
-        [expr {$left-$x4}] $y4l  [expr {$left-$x1l}] $y4l \
-        [expr {$left-$x1l}] $y6r [expr {$left-$x4}] $y6r
-   ] $optL
+   if {$Opt(-operation) eq "draw"} then {
+      lappend canvasCmd create polygon
+      set optL [list -tags [linsert $tagL end bracket] \
+        -fill black  -outline ""]
+      uplevel 1 $canvasCmd [
+         list [expr {$right+$x4}] $y2  [expr {$right+$x1r}] $y2 \
+           [expr {$right+$x1r}] $y1  [expr {$right+$x4}] $y1 \
+           [expr {$right+$x4}] $y4l  [expr {$right+$x1l}] $y4l \
+           [expr {$right+$x1l}] $y6r [expr {$right+$x4}] $y6r
+      ] $optL
+      uplevel 1 $canvasCmd [
+         list [expr {$left-$x4}] $y2  [expr {$left-$x1r}] $y2 \
+           [expr {$left-$x1r}] $y1  [expr {$left-$x4}] $y1 \
+           [expr {$left-$x4}] $y4l  [expr {$left-$x1l}] $y4l \
+           [expr {$left-$x1l}] $y6r [expr {$left-$x4}] $y6r
+      ] $optL
+   }
 %   \end{tcl}
 %   Finally construct the bounding box to return.
 %   \begin{tcl}
    list [expr {$left-$r}] $y1 [expr {$right+$r}] [expr {$y2+1}]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{drawit_bracketed}
+%   This is a conveniency wrapper around the |drawit| and 
+%   |draw_brackets| procedures, which additionally provides the 
+%   feature of anchoring the drawn material to a point, thus making 
+%   the origin of the network's own coordinate system irrelevant. The 
+%   call syntax is
+%   \begin{displaysyntax}
+%     |network::rich::drawit_bracketed| \word{canvas-cmd} 
+%     \word{appearance-dict} \word{x} \word{y} 
+%     \begin{regblock}[\regstar]\word{option} 
+%     \word{value}\end{regblock}
+%   \end{displaysyntax}
+%   where the first two arguments are as for the |drawit| 
+%   procedure, and \word{x} and \word{y} are the coordinates where 
+%   the network should be drawn. The return value is the bounding 
+%   box of the material that was drawn.
+%   
+%   \changes{2.3}{2009/03/29}{Command added. (LH)}
+%   
+%   The primary options supported are:
+%   \begin{ttdescription}
+%     \item[-val] Standard pass-network-by-value option.
+%     \item[-var] Standard pass-network-by-variable option.
+%     \item[-bracket]
+%       Should the network be bracketed (boolean)? Defaults to true.
+%     \item[-anchor]
+%       The anchoring position, i.e., where the given point $(x,y)$ 
+%       should be relative to the network. This is like a standard Tk 
+%       |-anchor| option, and can take the values |n|, |ne|, |e|, 
+%       |se|, |s|, |sw|, |w|, |nw|, and |center|. It also takes the 
+%       nonstandard value |origin| (default), in which case $(x,y)$ 
+%       is at the origin of the network coordinate system.
+%     \item[-uselayout]
+%       This is a boolean and defaults to true. In that case, it 
+%       specifies that the network bounding box can be taken from the 
+%       |level-layout-Tk| entry rather than computed from the 
+%       |vpos-Tk| and |ecurve-Tk-tt| entries, as would anyway be done 
+%       if the |level-layout-Tk| entry is missing.
+%     \item[-tags]
+%       The list of tags to use; defaults to being empty.
+%   \end{ttdescription}
+%   Besides these, all options are passed on to the two underlying 
+%   procedures, although some may be overridden (e.g.~|-var|, |-val|, 
+%   |-origin|, and |-bbox|).
+%   
+%   First, the boilerplate for option handling.
+%   \begin{tcl}
+proc network::rich::drawit_bracketed {canvas appearance x0 y0 args} {
+   array set Opt {
+      -bracket 1  -anchor origin  -uselayout 1  -tags {}
+   }
+   array set Opt $args
+   if {[info exists Opt(-val)]} then {
+      array set NW $Opt(-val)
+      unset Opt(-val)
+   } elseif {[info exists Opt(-var)]} then {
+      upvar 1 $Opt(-var) NW
+   } else {
+      error "Must specify -val or -var"
+   }
+%   \end{tcl}
+%   Second, the computation of a bounding box for anchoring.
+%   \begin{tcl}
+   set xL {}
+   set yL {}
+   if {$Opt(-uselayout) && [info exists NW(level-layout-Tk)]} then {
+      foreach {component bbox} $NW(level-layout-Tk) {
+         lappend xL [lindex $bbox 0] [lindex $bbox 2]
+         lappend yL [lindex $bbox 1] [lindex $bbox 3]
+      }
+   } else {
+      foreach edge $NW(ecurve-Tk-tt) {
+         foreach {x y} $edge {
+            lappend xL $x
+            lappend yL $y
+         }
+      }
+      set ns [namespace parent]::shape
+      array set Look $appearance
+      foreach  pair [lrange $NW(vpos-Tk) 2 end] \
+        vertex [lrange [lindex $NW(pure) 0] 2 end]  {
+         foreach {type cmd opts} [lindex $NW([lindex $vertex 0]) 0] {
+            foreach {x y} [eval $cmd $pair] {
+               lappend xL $x
+               lappend yL $y
+            }
+         }
+      }
+   }
+   if {![llength $xL]} then {lappend xL 0.0 1.0}
+   if {![llength $yL]} then {lappend yL 0.0 1.0}
+   set xL [lsort -real $xL]
+   set yL [lsort -real $yL]
+   set bbox0 [list [lindex $xL 0] [lindex $yL 0] [lindex $xL end]\
+     [lindex $yL end]]
+   if {$Opt(-bracket)} then {
+      foreach {x y} [eval\
+        [list draw_brackets {error "Shouldn't happen"} {}]\
+        [array get Opt] [list -var NW -bbox $bbox0 -operation bbox]] {
+         lappend xL $x
+         lappend yL $y
+      }
+      set xL [lsort -real $xL]
+      set yL [lsort -real $yL]
+      set bbox [list [lindex $xL 0] [lindex $yL 0] [lindex $xL end]\
+        [lindex $yL end]]
+   } else {
+      set bbox $bbox0
+   }
+%   \end{tcl}
+%   With the bounding box in network-coordinates known, it is 
+%   possible to compute the origin of that coordinate system.
+%   \begin{tcl}
+   switch -- $Opt(-anchor) {
+      nw - w - sw {
+         set x0 [expr {$x0 - [lindex $bbox 0]}]
+      }
+      ne - e - se {
+         set x0 [expr {$x0 - [lindex $bbox 2]}]
+      }
+      n - center - s {
+         set x0 [expr {$x0 - 0.5*[lindex $bbox 0] - 0.5*[lindex $bbox 2]}]
+      }
+      origin {}
+      default {
+         return -code error "Unknown -anchor: $Opt(-anchor)"
+      }
+   }
+   switch -- $Opt(-anchor) {
+      nw - n - ne {
+         set y0 [expr {$y0 - [lindex $bbox 1]}]
+      }
+      w - center - e {
+         set y0 [expr {$y0 - 0.5*[lindex $bbox 1] - 0.5*[lindex $bbox 3]}]
+      }
+      sw - s - se {
+         set y0 [expr {$y0 - [lindex $bbox 3]}]
+      }
+      origin {}
+      default {
+         return -code error "Unknown -anchor: $Opt(-anchor)"
+      }
+   }
+%   \end{tcl}
+%   And with that, it's finally time to get drawing.
+%   \begin{tcl}
+   eval [list drawit $canvas $appearance $Opt(-tags)]\
+     [array get Opt] [list -var NW -origin [list $x0 $y0]]
+   set bbox1 {}
+   foreach {x y} $bbox0 {
+      lappend bbox1 [expr {$x+$x0}] [expr {$y+$y0}]
+   }
+   if {$Opt(-bracket)} then {
+      set xL {}
+      set yL {}
+      foreach {x y} [concat $bbox1 [
+         eval [list draw_brackets $canvas $Opt(-tags)]\
+          [array get Opt] [list -var NW -operation draw -bbox $bbox1]
+      ]] {
+         lappend xL $x
+         lappend yL $y
+      }
+      set xL [lsort -real $xL]
+      set yL [lsort -real $yL]
+      return [list [lindex $xL 0] [lindex $yL 0] [lindex $xL end]\
+        [lindex $yL end]]
+   } else {
+      return $bbox1
+   }
 }
 %   \end{tcl}
 % \end{proc}
@@ -11116,6 +11297,38 @@ namespace eval network::rich {variable level-layout-Tk_defaults {
 }}
 %   \end{tcl}
 % \end{variable}
+% 
+% 
+% \begin{proc}{Tk_from_pure}
+%   This procedure takes a pure network as argument and returns a 
+%   corresponding rich network enriched with the Tk-graphical entries 
+%   |level-layout-Tk|, |vpos-Tk|, and |ecurve-Tk-tt|. The procedure 
+%   is basically a conveniency wrapper around the three procedures 
+%   |make_level-layout-Tk|, |vpos-Tk_by_level|, and 
+%   |ecurve-Tk-tt_by_level| typically used to compute these things.
+%   
+%   \changes{2.3}{2009/03/29}{Command added. (LH)}
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |network::rich::Tk_from_pure| \word{pure network}
+%     \word{vertex-sizes} \word{appearance-dict} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{option} \word{value} pairs are passed on to 
+%   |make_level-layout-Tk|, as is the \word{vertex-sizes}. The 
+%   \word{appearance-dict} is passed on to |ecurve-Tk-tt_by_level|.
+%   \begin{tcl}
+proc network::rich::Tk_from_pure {NW vSizes vApp args} {
+   set A(pure) $NW
+   make_level-layout-Tk $vSizes {*}$args -var A
+   vpos-Tk_by_level -var A
+   ecurve-Tk-tt_by_level $vApp -var A
+   return [array get A]
+}
+%   \end{tcl}
+% \end{proc}
 % 
 % \begin{proc}{align_active_midpoints}
 %   This procedure implements the default mode of aligning 
@@ -11904,175 +12117,175 @@ proc network::elastic_edges {NWvar TAvar {minrs 0.6}} {
 % such solutions iteratively, as part of the same process which finds 
 % equilibrium positions for the vertices.
 % 
-
-
-\section{Linear combinations of networks}
-
-The main aim for this rewrite of the \package{network} code is to be 
-able to handle linear combinations of networks (or equivalently, to 
-not be restricted to ``binomial'' identities).
-
-
-\subsection{Analysis of implementation alternatives}
-
-The standard way of implementing formal linear combinations in 
-\Tcl\ is to use a dictionary, where the key is a basis element and 
-the value is the corresponding scalar. This corresponds directly to 
-the formal mathematical construction and allows linear time 
-arithmetical operations, which is reasonably fast. However, it does 
-not tolerate enriched networks as basis elements (since two enriched 
-networks may be equal as pure networks even if they are not 
-|string equal|) and it lends no help with finding leading terms. 
-These may be unacceptable drawbacks.
-
-The natural modification of this would be to use canonical forms of 
-pure networks as keys in the dictionary, while storing the full 
-enriched network and its corresponding scalar in the entry. This 
-solves the enrichment problem, but not necessarily the leading term 
-problem. Leading terms can be found by a basic iteratation over all 
-terms (explicit comparison, linear time operation), or by computing 
-comparison keys for all terms and sorting the list of terms (in 
-principle a superlinear operation, but the actual sort is not likely 
-to be dominant for the sizes in question).
-
-An alternative approach to the problem is to use a non-native 
-dictionary format (e.g., a tree or skip list~\cite{skiplist}) that 
-has support for ordered keys. In this case, the leading term is 
-always apparent and the differences between dictionary key and value 
-are less pronounced, as nothing is hardwired. \Tcl\ has no native 
-support for building such data structures, but the \package{heap} 
-package implements the necessary primitives on top of \Tcl\ lists.
-
-\medskip
-
-In the case of storage, the dictionary implementation is perfectly 
-sufficient (and hence, in view of the native support, preferable), 
-since the ordering of terms is not an important operation. The main 
-design decision here is likely to be whether coefficients should be 
-stored within or just beside the enriched network, but conversions 
-will probably not be expensive and may be necessary for other 
-reasons anyway, so I don't expect this to be a critical issue.
-
-The tricky case is instead that of reduction, since this is where 
-finding the leading term is important. Reduction rules can be stored 
-with a separate principal part, but ordering the terms of the linear 
-combination being reduced is also of interest. Or is it?
-\begin{itemize}
-  \item
-    The basic concern is that checking a network $H$ for being an 
-    induced subnetwork of some network $G$ is an expensive 
-    operation\Ldash probably of complexity around $\card{V(G)} 
-    \card{V(H)} \card{E(H)}$, even though it is probably fairly 
-    often possible to stop early\Dash and it has to be done at 
-    least once for every pair of principal part in a rule and term 
-    in the expression being reduced. The natural way of avoiding 
-    duplicate work in this process is to always work on reducing the 
-    largest term that has not yet been found to be irreducible, as 
-    that means each $G$ is only treated once. It also gives an easy 
-    termination condition.
-  \item
-    Always working on the leading term does however require that one 
-    repeatedly computes which the leading term is, and the cost for 
-    this is not neglible either. The order envisioned for 
-    Hopf-identity calculations (a path-weight-lexicographic order?) 
-    is naturally handled by first computing comparison data for the 
-    networks to compare and then use the computed data. The 
-    comparison data can be cached, so it is essentially a cost 
-    associated with introducing a network to be compared. The 
-    comparison data \emph{can} be structured so that all comparisons 
-    can be performed using |string compare|, hence the bulk of cost 
-    comes for introducing a network into the calculations, which 
-    means it should primarily be compared to the cost for calculating 
-    a canonical representation.
-    
-    As it turns out, the cost for computing comparison data is 
-    probably not that much different from the cost for computing the 
-    canonical representation; it's possible that the arity\slash 
-    coarity comes in as an extra factor, but that's about it. The 
-    problem is instead with the quality of data computed. None of the 
-    envisioned comparison data is able to distinguish e.g.
-    \begin{quote}
-      |network::pure::construct $Hopf_types {|\\
-      |  unit unit \r |\\
-      |  Delta Delta \r |\\
-      |  . X . \r |\\
-      |  . m . \r |\\
-      |  . epsilon .|\\
-      |}|
-    \end{quote}
-    from
-    \begin{quote}
-      |network::pure::construct $Hopf_types {|\\
-      |  unit unit \r |\\
-      |  Delta Delta \r |\\
-      |  . . m \r |\\
-      |  . . epsilon|\\
-      |}|
-    \end{quote}
-    \Dash even though it is possible to follow any path from start to 
-    end and see exactly the sequence of vertices and incidences along 
-    that path, it is not possible to tell for sure whether two paths 
-    intersect or not.
-\end{itemize}
-The conclusion seems to be that the main disadvatage in keeping the 
-networks ordered in the linear combination is that it creates a need 
-to totally order the networks in a way \emph{extending the wanted 
-partial order on the networks}. To device a total order is easy, but 
-to device one that extends a given partial order is not so easy; the 
-user is required to implement both the partial and the total order. 
-As what could be gained from keeping the networks ordered is merely a 
-better run-time (quite possibly not affecting the asymptotic 
-behaviour at all), this wouldn't be worth it; it's too much of a 
-heavy optimisation, and most likely premature.
-
-\medskip
-
-The representation of formal linear combinations of enriched networks 
-should thus use \Tcl-native hashes (arrays and dictionaries), but 
-what should the exact format be? The linear combination is 
-conceptually a collection of terms, which can be realised either as a 
-list of terms or as a dictionary of terms; the memory footprints are 
-likely to be the same (as the keys appear also in the |pure| entry of 
-the keys themselves). A term can be realised either as a pair of 
-coefficient and enriched network, or as an enriched network which has 
-an entry for the coefficient. Which are the advantages and 
-disadvantages of the various representations? Due to the use of 
-dictionaries, the analysis should evaluate their practicality both in 
-a \Tcl\,8.4 and a \Tcl\,8.5 situation.
-\begin{description}
-  \item[list--pair]
-    Since the list indices are not likely to mean anything, accessing 
-    such a structure requires iterating over it. It is perfectly 
-    acceptable as a storage format, but usage has the same complexity 
-    as conversion.
-  \item[list--network]
-    This is similar to the list--pair format, but access to the 
-    coefficient is in 8.4 a bit more roundabout than it is in the 
-    list--pair format. Access to regular enriched network entries is 
-    the same in both formats.
-  \item[dict--pair]
-    In 8.4, this has one advantage over the list--pair format: it can 
-    quickly be unpacked into and recreated from an array; the 
-    conversion\slash iteration access performance is the same as for 
-    the list--pair format. In 8.5, it can be accessed and modified 
-    directly, even though write access to the coefficient is slightly 
-    roundabout, and access to enriched network entires can be very 
-    roundabout.
-  \item[dict--network]
-    In 8.5, this gives perfect and direct access to everything. In 
-    8.4, it performs similarly to the list--network format.
-\end{description}
-So, what should one use?
-
-Considering that 8.5 is leading the way for the future, and that 
-there actually is a \texttt{dict} extension for 8.4, I lean towards 
-the conclusion that a dictionary of rich networks, with the 
-coefficient as an entry in said rich network, is the way to go. 
-Furthermore the code should take advantage of the |dict| command, and 
-use compatibility implementations in 8.4.
-
-
-
+% 
+% 
+% \section{Linear combinations of networks}
+% 
+% The main aim for this rewrite of the \package{network} code is to be 
+% able to handle linear combinations of networks (or equivalently, to 
+% not be restricted to ``binomial'' identities).
+% 
+% 
+% \subsection{Analysis of implementation alternatives}
+% 
+% The standard way of implementing formal linear combinations in 
+% \Tcl\ is to use a dictionary, where the key is a basis element and 
+% the value is the corresponding scalar. This corresponds directly to 
+% the formal mathematical construction and allows linear time 
+% arithmetical operations, which is reasonably fast. However, it does 
+% not tolerate enriched networks as basis elements (since two enriched 
+% networks may be equal as pure networks even if they are not 
+% |string equal|) and it lends no help with finding leading terms. 
+% These may be unacceptable drawbacks.
+% 
+% The natural modification of this would be to use canonical forms of 
+% pure networks as keys in the dictionary, while storing the full 
+% enriched network and its corresponding scalar in the entry. This 
+% solves the enrichment problem, but not necessarily the leading term 
+% problem. Leading terms can be found by a basic iteratation over all 
+% terms (explicit comparison, linear time operation), or by computing 
+% comparison keys for all terms and sorting the list of terms (in 
+% principle a superlinear operation, but the actual sort is not likely 
+% to be dominant for the sizes in question).
+% 
+% An alternative approach to the problem is to use a non-native 
+% dictionary format (e.g., a tree or skip list~\cite{skiplist}) that 
+% has support for ordered keys. In this case, the leading term is 
+% always apparent and the differences between dictionary key and value 
+% are less pronounced, as nothing is hardwired. \Tcl\ has no native 
+% support for building such data structures, but the \package{heap} 
+% package implements the necessary primitives on top of \Tcl\ lists.
+% 
+% \medskip
+% 
+% In the case of storage, the dictionary implementation is perfectly 
+% sufficient (and hence, in view of the native support, preferable), 
+% since the ordering of terms is not an important operation. The main 
+% design decision here is likely to be whether coefficients should be 
+% stored within or just beside the enriched network, but conversions 
+% will probably not be expensive and may be necessary for other 
+% reasons anyway, so I don't expect this to be a critical issue.
+% 
+% The tricky case is instead that of reduction, since this is where 
+% finding the leading term is important. Reduction rules can be stored 
+% with a separate principal part, but ordering the terms of the linear 
+% combination being reduced is also of interest. Or is it?
+% \begin{itemize}
+%   \item
+%     The basic concern is that checking a network $H$ for being an 
+%     induced subnetwork of some network $G$ is an expensive 
+%     operation\Ldash probably of complexity around $\card{V(G)} 
+%     \card{V(H)} \card{E(H)}$, even though it is probably fairly 
+%     often possible to stop early\Dash and it has to be done at 
+%     least once for every pair of principal part in a rule and term 
+%     in the expression being reduced. The natural way of avoiding 
+%     duplicate work in this process is to always work on reducing the 
+%     largest term that has not yet been found to be irreducible, as 
+%     that means each $G$ is only treated once. It also gives an easy 
+%     termination condition.
+%   \item
+%     Always working on the leading term does however require that one 
+%     repeatedly computes which the leading term is, and the cost for 
+%     this is not neglible either. The order envisioned for 
+%     Hopf-identity calculations (a path-weight-lexicographic order?) 
+%     is naturally handled by first computing comparison data for the 
+%     networks to compare and then use the computed data. The 
+%     comparison data can be cached, so it is essentially a cost 
+%     associated with introducing a network to be compared. The 
+%     comparison data \emph{can} be structured so that all comparisons 
+%     can be performed using |string compare|, hence the bulk of cost 
+%     comes for introducing a network into the calculations, which 
+%     means it should primarily be compared to the cost for calculating 
+%     a canonical representation.
+%     
+%     As it turns out, the cost for computing comparison data is 
+%     probably not that much different from the cost for computing the 
+%     canonical representation; it's possible that the arity\slash 
+%     coarity comes in as an extra factor, but that's about it. The 
+%     problem is instead with the quality of data computed. None of the 
+%     envisioned comparison data is able to distinguish e.g.
+%     \begin{quote}
+%       |network::pure::construct $Hopf_types {|\\
+%       |  unit unit \r |\\
+%       |  Delta Delta \r |\\
+%       |  . X . \r |\\
+%       |  . m . \r |\\
+%       |  . epsilon .|\\
+%       |}|
+%     \end{quote}
+%     from
+%     \begin{quote}
+%       |network::pure::construct $Hopf_types {|\\
+%       |  unit unit \r |\\
+%       |  Delta Delta \r |\\
+%       |  . . m \r |\\
+%       |  . . epsilon|\\
+%       |}|
+%     \end{quote}
+%     \Dash even though it is possible to follow any path from start to 
+%     end and see exactly the sequence of vertices and incidences along 
+%     that path, it is not possible to tell for sure whether two paths 
+%     intersect or not.
+% \end{itemize}
+% The conclusion seems to be that the main disadvatage in keeping the 
+% networks ordered in the linear combination is that it creates a need 
+% to totally order the networks in a way \emph{extending the wanted 
+% partial order on the networks}. To device a total order is easy, but 
+% to device one that extends a given partial order is not so easy; the 
+% user is required to implement both the partial and the total order. 
+% As what could be gained from keeping the networks ordered is merely a 
+% better run-time (quite possibly not affecting the asymptotic 
+% behaviour at all), this wouldn't be worth it; it's too much of a 
+% heavy optimisation, and most likely premature.
+% 
+% \medskip
+% 
+% The representation of formal linear combinations of enriched networks 
+% should thus use \Tcl-native hashes (arrays and dictionaries), but 
+% what should the exact format be? The linear combination is 
+% conceptually a collection of terms, which can be realised either as a 
+% list of terms or as a dictionary of terms; the memory footprints are 
+% likely to be the same (as the keys appear also in the |pure| entry of 
+% the keys themselves). A term can be realised either as a pair of 
+% coefficient and enriched network, or as an enriched network which has 
+% an entry for the coefficient. Which are the advantages and 
+% disadvantages of the various representations? Due to the use of 
+% dictionaries, the analysis should evaluate their practicality both in 
+% a \Tcl\,8.4 and a \Tcl\,8.5 situation.
+% \begin{description}
+%   \item[list--pair]
+%     Since the list indices are not likely to mean anything, accessing 
+%     such a structure requires iterating over it. It is perfectly 
+%     acceptable as a storage format, but usage has the same complexity 
+%     as conversion.
+%   \item[list--network]
+%     This is similar to the list--pair format, but access to the 
+%     coefficient is in 8.4 a bit more roundabout than it is in the 
+%     list--pair format. Access to regular enriched network entries is 
+%     the same in both formats.
+%   \item[dict--pair]
+%     In 8.4, this has one advantage over the list--pair format: it can 
+%     quickly be unpacked into and recreated from an array; the 
+%     conversion\slash iteration access performance is the same as for 
+%     the list--pair format. In 8.5, it can be accessed and modified 
+%     directly, even though write access to the coefficient is slightly 
+%     roundabout, and access to enriched network entires can be very 
+%     roundabout.
+%   \item[dict--network]
+%     In 8.5, this gives perfect and direct access to everything. In 
+%     8.4, it performs similarly to the list--network format.
+% \end{description}
+% So, what should one use?
+% 
+% Considering that 8.5 is leading the way for the future, and that 
+% there actually is a \texttt{dict} extension for 8.4, I lean towards 
+% the conclusion that a dictionary of rich networks, with the 
+% coefficient as an entry in said rich network, is the way to go. 
+% Furthermore the code should take advantage of the |dict| command, and 
+% use compatibility implementations in 8.4.
+% 
+% 
+% 
 % 
 % \begin{thebibliography}{8}
 % 
