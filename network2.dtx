@@ -2370,9 +2370,25 @@ proc network::pure::substitute {NW dict} {
 % and (ii)~because regions may include stray edges that go directly 
 % from input to output. \word{vertices} must not contain |0| or |1|.
 % 
-% A complication is the general principle (which AFAICT is a good 
-% one) that a splice map should be possible to express using the 
-% result of said splice map\Dash that there for all \(H \sqsubseteq G\) 
+% A more formal definition of a \word{region} as above would be that 
+% it is a semigraph monomorphism, embedding one network $H$ as a 
+% subnetwork of another network $G$, although that is in two ways an 
+% oversimplification. To begin with, it doesn't give a mapping for 
+% the edges of $H$\Ldash it only says what the boundary edges are 
+% mapped to, and even that only indirectly\Dash but the edge mapping 
+% can be computed as long as the domain $H$ and codomain $G$ networks 
+% are known. Furthermore (and of greater practical importance), knowing 
+% only $G$ still identifies $H$ up to internal isomorphism. The 
+% second issue is trickier: the codomain is technically not the 
+% network $G$ for which the \word{region} is given, but a subdivision 
+% $G'$ of $G$, where edge $e$ of $G$ is subdivided into edges $e$, 
+% $e+m$, $e+2m$, etc.~and $m$ is the number of edges in $G$. This 
+% contortion is motivated as follows.
+% 
+% The naive definition of region (i.e., without subdivision) is 
+% complicated by the general principle (which AFAICT is a good one) 
+% that a splice map should be possible to express using the result of 
+% said splice map\Dash that there for all \(H \sqsubseteq G\) 
 % and \(\partial K = \partial H\) should exist some \(H' \sqsubseteq 
 % (G \div\nobreak H)(K)\) such that \((G \div\nobreak H)(K) \div H' 
 % \simeq G \div H\). Consider first a network like
@@ -10271,6 +10287,13 @@ namespace eval network::rich {}
 % then this is a cache of the canonical form of the |pure| network, to 
 % be used as a unique identifier.
 % 
+% A late addition is the \describestring+[rich entry]{bbox-Tk} entry, 
+% which (if set) holds the (nominal) bounding box of the network. 
+% This is needed since many drawing targets indirectly require the 
+% user to provide this information!
+% \changes{2.4}{2009/05/22}{Introducing \texttt{bbox-Tk} entry. 
+%   Refactoring code accordingly. (LH)}
+% 
 % Two things that are \emph{not} put into rich networks are 
 % corresponding feedback-lists and information about the graphical 
 % representations of vertex types. The reason for this is that these 
@@ -11302,9 +11325,9 @@ namespace eval network::rich {variable level-layout-Tk_defaults {
 % \begin{proc}{Tk_from_pure}
 %   This procedure takes a pure network as argument and returns a 
 %   corresponding rich network enriched with the Tk-graphical entries 
-%   |level-layout-Tk|, |vpos-Tk|, and |ecurve-Tk-tt|. The procedure 
-%   is basically a conveniency wrapper around the three procedures 
-%   |make_level-layout-Tk|, |vpos-Tk_by_level|, and 
+%   |level-layout-Tk|, |bbox-Tk|, |vpos-Tk|, and |ecurve-Tk-tt|. 
+%   The procedure is basically a conveniency wrapper around the three 
+%   procedures |make_level-layout-Tk|, |vpos-Tk_by_level|, and 
 %   |ecurve-Tk-tt_by_level| typically used to compute these things.
 %   
 %   \changes{2.3}{2009/03/29}{Command added. (LH)}
@@ -11380,9 +11403,9 @@ proc network::rich::align_active_midpoints {NW belowL aboveL} {
 % 
 % 
 % \begin{proc}{make_level-layout-Tk}
-%   This procedure constructs a |level-layout-Tk| entry for a network 
-%   from its underlying |pure| network and extra data provided through 
-%   options. The call syntax is
+%   This procedure constructs a |level-layout-Tk| entry, and also a 
+%   |bbox-Tk| entry, for a network from its underlying |pure| network 
+%   and extra data provided through options. The call syntax is
 %   \begin{quote}
 %     |network::rich::make_level-layout-Tk| \word{vertex-sizes} 
 %     \begin{regblock}[\regplus]\word{option} \word{value}\end{regblock}
@@ -11588,6 +11611,7 @@ proc network::rich::make_level-layout-Tk {vsizes args} {
 %   if needed.
 %   \begin{tcl}
    set NW(level-layout-Tk) {}
+   set xL {}; set yL {}
    foreach {tcomp bbox} $layout {dx dy} $wOfsL {
       set dx [expr {$dx+$dx2}]
       set dy [expr {$dy+$dy2}]
@@ -11606,6 +11630,20 @@ proc network::rich::make_level-layout-Tk {vsizes args} {
          lappend L [expr {$x+$dx}] [expr {$y+$dy}]
       }
       lappend NW(level-layout-Tk) $ncomp $L
+      foreach {x y} $L {lappend xL $x; lappend yL $y}
+   }
+   if {[llength $xL]} then {
+      set xL [lsort -real $xL]; set yL [lsort -real $yL]
+      if {[lindex $xL 0] == [lindex $xL end]} then {
+         lappend xL [expr {1 + [lindex $xL end]}]
+      }
+      if {[lindex $yL 0] == [lindex $yL end]} then {
+         lappend yL [expr {1 + [lindex $yL end]}]
+      }
+      set NW(bbox-Tk) [list [lindex $xL 0] [lindex $yL 0]\
+        [lindex $xL end] [lindex $yL end]]
+   } else {
+      set NW(bbox-Tk) {0.0 0.0 1.0 1.0}
    }
    if {[info exists Opt(-val)]} then {
       return [array get NW]
@@ -12110,181 +12148,431 @@ proc network::elastic_edges {NWvar TAvar {minrs 0.6}} {
 % \end{proc}
 % 
 % 
-% ---
+% \subsection{SVG rendering}
 % 
-% Since it in this case is not possible to give a closed form formula 
-% for the curve with minimal energy, it would be most convenient to seek 
-% such solutions iteratively, as part of the same process which finds 
-% equilibrium positions for the vertices.
+% As the complexity of networks and expressions involving networks 
+% increases, the Tk |canvas| is getting less convenient as a drawing 
+% vehicle; it lacks direct support for the higher level presentation 
+% concerns (especially line breaking) that start to appear. 
+% A rendering target which offers better support in that area is SVG, 
+% as it can be embedded into XHTML.
 % 
+% Being an application of XML, it is convenient to return SVG code as a 
+% \Tcl\ data-tree and then rely on e.g.~\textsf{tdom} to convert this 
+% to standard XML code.
+% A \emph{data-tree} is a rooted tree where the nodes carry a type-tag 
+% and optionally attributes, the children of a node are ordered, and 
+% (as a special case) strings may appear as children of a node. The 
+% encoding of these follow the \textsf{tdom} ``list'' format for XML 
+% nodes, i.e., a data-tree is either (i)~a three element list
+% \begin{quote}
+%   \word{tag} \word{attributes} \word{children}
+% \end{quote}
+% where \word{tag} is a string (which must be a valid XML name), 
+% \word{attributes} is a dictionary (mapping attribute name to value), 
+% and \word{children} is a list of data-trees, or a data-tree is (ii)~a 
+% two element list
+% \begin{quote}
+%   |#text| \word{string}
+% \end{quote}
+% encoding the explicit string \word{string}.
 % 
+% Note that all \word{string}s and attribute values are \Tcl\ strings, 
+% not XML encodings of such strings. This means the amperand character 
+% is really `|&|', not `|&amp;|'. Also note that |#text| is not a valid 
+% \word{tag}, since `|#|' is not allowed in XML names. This implies 
+% that \textbf{data-trees can be processed directly using the 
+% data-is-code technique}.
 % 
-% \section{Linear combinations of networks}
+% \begin{proc}{as_SVG}
+%   The |as_SVG| procedure takes a rich network with |vpos-Tk| and 
+%   |ecurve-Tk-tt| entries as argument, and returns the data-tree for 
+%   an SVG drawing of the same. The call syntax is
+%   \begin{displaysyntax}
+%     |network::rich::as_SVG| \word{vertex-object dict} 
+%     \begin{regblock}[\regplus] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{vertex-object dict} maps vertex decorations to 
+%   corresponding graphical appearances, as SVG data-trees with the 
+%   reference point at $(0,0)$. The default XML namespace for these 
+%   is that of SVG, and they occur once for each vertex (if sharing 
+%   is wanted, then use |use| elements or similar for these).
+%   
+%   The available options are
+%   \begin{ttdescription}
+%     \item[-val] Standard pass-network-by-value option.
+%     \item[-var] Standard pass-network-by-variable option.
+%     \item[-class]
+%       The value of the |class| attribute for the top-level |svg| 
+%       element. Defaults to |network|. An empty string means the 
+%       attribute is omitted.
+%     \iffalse
+%     \item[-region]
+%       Takes as value a region which may be highlighted in the 
+%       drawing. Defaults to `|{} {} {}|', i.e., the empty region.
+%     \item[-incolour]
+%       The colour to use for edges on the in-boundary of the region; 
+%       defaults to |blue|.
+%     \item[-outcolour]
+%       The colour to use for edges on the out-boundary of the region; 
+%       defaults to |red|.
+%     \item[-midcolour]
+%       The colour to use for vertices, internal edges, and in\&out 
+%       edges of the region; defaults to |green|.
+%     \fi
+%   \end{ttdescription}
+%   
+%   \begin{tcl}
+proc network::rich::as_SVG {vertexD args} {
+   array set Opt {-class network}
+   array set Opt $args
+   if {[info exists Opt(-val)]} then {
+      array set NW $Opt(-val)
+   } elseif {[info exists Opt(-var)]} then {
+      upvar 1 $Opt(-var) NW
+   } else {
+      error "Must specify -val or -var"
+   }
+   array set SVG $vertexD
+   set attr [dict create xmlns http://www.w3.org/2000/svg]
+   if {$Opt(-class) ne ""} then {dict set attr class $Opt(-class)}
+   if {[info exists NW(bbox-Tk)]} then {
+      dict set attr width\
+        [expr {[lindex $NW(bbox-Tk) 2] - [lindex $NW(bbox-Tk) 0]}]
+      dict set attr height\
+        [expr {[lindex $NW(bbox-Tk) 3] - [lindex $NW(bbox-Tk) 1]}]
+   }
+   set childL {}
+%   \end{tcl}
+%   First the edges are drawn. These are |path| elements.
+%   \begin{tcl}
+   foreach L $NW(ecurve-Tk-tt) {
+      set knotL [lrange $L 0 1]
+      set x1 [lindex $L 2]; set y1 [lindex $L 3]
+      foreach {x y} [lrange $L 4 end-2] {
+         lappend knotL [expr {0.5*($x1+$x)}] [expr {0.5*($y1+$y)}]
+         set x1 $x; set y1 $y
+      }
+      lappend knotL [lindex $L end-1] [lindex $L end]
+      set dataL [list M]
+      lappend dataL [lindex $knotL 0] [lindex $knotL 1]
+      lappend dataL Q [lindex $L 2] [lindex $L 3]\
+        [lindex $knotL 2] [lindex $knotL 3]
+      if {[llength $knotL]>4} then {
+         lappend dataL T
+         foreach {x y} [lrange $knotL 4 end] {lappend dataL $x $y}
+      }
+      lappend childL [list path [
+         list  d [join $dataL]  fill none  stroke currentColor
+      ] {}]
+   }
+%   \end{tcl}
+%   \begin{tcl}
+   set n -1; foreach v [lindex $NW(pure) 0] pos $NW(vpos-Tk) {incr n
+      if {$n<2} then {continue}
+      set shift\
+        [format translate(%g,%g) [lindex $pos 0] [lindex $pos 1]]
+      set vattr [lindex $SVG([lindex $v 0]) 1]
+      if {[dict exists $attr transform]} then {
+         dict set vattr transform "$shift [dict get $attr transform]"
+      } else {
+         dict set vattr transform $shift
+      }
+      lappend childL [lreplace $SVG([lindex $v 0]) 1 1 $vattr]
+   }
+%   \end{tcl}
+%   \begin{tcl}
+   list svg $attr $childL
+}
+%   \end{tcl}
+% \end{proc}
 % 
-% The main aim for this rewrite of the \package{network} code is to be 
-% able to handle linear combinations of networks (or equivalently, to 
-% not be restricted to ``binomial'' identities).
-% 
-% 
-% \subsection{Analysis of implementation alternatives}
-% 
-% The standard way of implementing formal linear combinations in 
-% \Tcl\ is to use a dictionary, where the key is a basis element and 
-% the value is the corresponding scalar. This corresponds directly to 
-% the formal mathematical construction and allows linear time 
-% arithmetical operations, which is reasonably fast. However, it does 
-% not tolerate enriched networks as basis elements (since two enriched 
-% networks may be equal as pure networks even if they are not 
-% |string equal|) and it lends no help with finding leading terms. 
-% These may be unacceptable drawbacks.
-% 
-% The natural modification of this would be to use canonical forms of 
-% pure networks as keys in the dictionary, while storing the full 
-% enriched network and its corresponding scalar in the entry. This 
-% solves the enrichment problem, but not necessarily the leading term 
-% problem. Leading terms can be found by a basic iteratation over all 
-% terms (explicit comparison, linear time operation), or by computing 
-% comparison keys for all terms and sorting the list of terms (in 
-% principle a superlinear operation, but the actual sort is not likely 
-% to be dominant for the sizes in question).
-% 
-% An alternative approach to the problem is to use a non-native 
-% dictionary format (e.g., a tree or skip list~\cite{skiplist}) that 
-% has support for ordered keys. In this case, the leading term is 
-% always apparent and the differences between dictionary key and value 
-% are less pronounced, as nothing is hardwired. \Tcl\ has no native 
-% support for building such data structures, but the \package{heap} 
-% package implements the necessary primitives on top of \Tcl\ lists.
-% 
-% \medskip
-% 
-% In the case of storage, the dictionary implementation is perfectly 
-% sufficient (and hence, in view of the native support, preferable), 
-% since the ordering of terms is not an important operation. The main 
-% design decision here is likely to be whether coefficients should be 
-% stored within or just beside the enriched network, but conversions 
-% will probably not be expensive and may be necessary for other 
-% reasons anyway, so I don't expect this to be a critical issue.
-% 
-% The tricky case is instead that of reduction, since this is where 
-% finding the leading term is important. Reduction rules can be stored 
-% with a separate principal part, but ordering the terms of the linear 
-% combination being reduced is also of interest. Or is it?
-% \begin{itemize}
-%   \item
-%     The basic concern is that checking a network $H$ for being an 
-%     induced subnetwork of some network $G$ is an expensive 
-%     operation\Ldash probably of complexity around $\card{V(G)} 
-%     \card{V(H)} \card{E(H)}$, even though it is probably fairly 
-%     often possible to stop early\Dash and it has to be done at 
-%     least once for every pair of principal part in a rule and term 
-%     in the expression being reduced. The natural way of avoiding 
-%     duplicate work in this process is to always work on reducing the 
-%     largest term that has not yet been found to be irreducible, as 
-%     that means each $G$ is only treated once. It also gives an easy 
-%     termination condition.
-%   \item
-%     Always working on the leading term does however require that one 
-%     repeatedly computes which the leading term is, and the cost for 
-%     this is not neglible either. The order envisioned for 
-%     Hopf-identity calculations (a path-weight-lexicographic order?) 
-%     is naturally handled by first computing comparison data for the 
-%     networks to compare and then use the computed data. The 
-%     comparison data can be cached, so it is essentially a cost 
-%     associated with introducing a network to be compared. The 
-%     comparison data \emph{can} be structured so that all comparisons 
-%     can be performed using |string compare|, hence the bulk of cost 
-%     comes for introducing a network into the calculations, which 
-%     means it should primarily be compared to the cost for calculating 
-%     a canonical representation.
-%     
-%     As it turns out, the cost for computing comparison data is 
-%     probably not that much different from the cost for computing the 
-%     canonical representation; it's possible that the arity\slash 
-%     coarity comes in as an extra factor, but that's about it. The 
-%     problem is instead with the quality of data computed. None of the 
-%     envisioned comparison data is able to distinguish e.g.
-%     \begin{quote}
-%       |network::pure::construct $Hopf_types {|\\
-%       |  unit unit \r |\\
-%       |  Delta Delta \r |\\
-%       |  . X . \r |\\
-%       |  . m . \r |\\
-%       |  . epsilon .|\\
-%       |}|
-%     \end{quote}
-%     from
-%     \begin{quote}
-%       |network::pure::construct $Hopf_types {|\\
-%       |  unit unit \r |\\
-%       |  Delta Delta \r |\\
-%       |  . . m \r |\\
-%       |  . . epsilon|\\
-%       |}|
-%     \end{quote}
-%     \Dash even though it is possible to follow any path from start to 
-%     end and see exactly the sequence of vertices and incidences along 
-%     that path, it is not possible to tell for sure whether two paths 
-%     intersect or not.
-% \end{itemize}
-% The conclusion seems to be that the main disadvatage in keeping the 
-% networks ordered in the linear combination is that it creates a need 
-% to totally order the networks in a way \emph{extending the wanted 
-% partial order on the networks}. To device a total order is easy, but 
-% to device one that extends a given partial order is not so easy; the 
-% user is required to implement both the partial and the total order. 
-% As what could be gained from keeping the networks ordered is merely a 
-% better run-time (quite possibly not affecting the asymptotic 
-% behaviour at all), this wouldn't be worth it; it's too much of a 
-% heavy optimisation, and most likely premature.
-% 
-% \medskip
-% 
-% The representation of formal linear combinations of enriched networks 
-% should thus use \Tcl-native hashes (arrays and dictionaries), but 
-% what should the exact format be? The linear combination is 
-% conceptually a collection of terms, which can be realised either as a 
-% list of terms or as a dictionary of terms; the memory footprints are 
-% likely to be the same (as the keys appear also in the |pure| entry of 
-% the keys themselves). A term can be realised either as a pair of 
-% coefficient and enriched network, or as an enriched network which has 
-% an entry for the coefficient. Which are the advantages and 
-% disadvantages of the various representations? Due to the use of 
-% dictionaries, the analysis should evaluate their practicality both in 
-% a \Tcl\,8.4 and a \Tcl\,8.5 situation.
-% \begin{description}
-%   \item[list--pair]
-%     Since the list indices are not likely to mean anything, accessing 
-%     such a structure requires iterating over it. It is perfectly 
-%     acceptable as a storage format, but usage has the same complexity 
-%     as conversion.
-%   \item[list--network]
-%     This is similar to the list--pair format, but access to the 
-%     coefficient is in 8.4 a bit more roundabout than it is in the 
-%     list--pair format. Access to regular enriched network entries is 
-%     the same in both formats.
-%   \item[dict--pair]
-%     In 8.4, this has one advantage over the list--pair format: it can 
-%     quickly be unpacked into and recreated from an array; the 
-%     conversion\slash iteration access performance is the same as for 
-%     the list--pair format. In 8.5, it can be accessed and modified 
-%     directly, even though write access to the coefficient is slightly 
-%     roundabout, and access to enriched network entires can be very 
-%     roundabout.
-%   \item[dict--network]
-%     In 8.5, this gives perfect and direct access to everything. In 
-%     8.4, it performs similarly to the list--network format.
-% \end{description}
-% So, what should one use?
-% 
-% Considering that 8.5 is leading the way for the future, and that 
-% there actually is a \texttt{dict} extension for 8.4, I lean towards 
-% the conclusion that a dictionary of rich networks, with the 
-% coefficient as an entry in said rich network, is the way to go. 
-% Furthermore the code should take advantage of the |dict| command, and 
-% use compatibility implementations in 8.4.
+% \begin{tcl}
+namespace eval network::rich::tosvg {}
+% \end{tcl}
+% \setnamespace{network::rich::tosvg}
+% The |network::rich::tosvg| namespace houses commands for converting 
+% |canvas| items, as specified in an \word{appearance} dictionary, to 
+% SVG elements\Dash specifically, convert one triplet from a 
+% \word{vertex-items} list. In order to convert a triplet
+% \begin{displaysyntax}
+%   \word{item-type} \word{coordinates-command} \word{options}
+% \end{displaysyntax}
+% one makes the call
+% \begin{displaysyntax}
+%   network::rich::tosvg::\meta{item-type} 
+%   \word{coordinates-command} \word{options} \word{shape-ns}
+% \end{displaysyntax}
+% where the \word{shape-ns} is the namespace in which the 
+% \word{coordinates-command} would be called.
 % 
 % 
+% \begin{proc}{rectangle}
+%   Tk |rectangle| items become SVG |rect| elements. 
+%   \begin{tcl}
+proc network::rich::tosvg::rectangle {coordcmd opts ns} {
+   foreach {attr opts} [_opts2paint $opts 0 1] break
+   set xL {}
+   set yL {}
+   foreach {x y} [namespace eval $ns $coordcmd {0 0}] {
+      lappend xL $x; lappend yL $y
+   }
+   set xL [lsort -real $xL]; set yL [lsort -real $yL]
+   dict set attr x [lindex $xL 0]
+   dict set attr y [lindex $yL 0]
+   dict set attr width [expr {[lindex $xL 1] - [lindex $xL 0]}]
+   dict set attr height [expr {[lindex $yL 1] - [lindex $yL 0]}]
+   list rect $attr {}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{_opts2paint}
+%   The |_opts2paint| procedure converts |canvas| item options 
+%   corresponding to SVG applications of paint to the corresponding 
+%   SVG attributes. The call syntax is
+%   \begin{displaysyntax}
+%     |_opts2paint| \word{opts} \word{fill-is-stroke} 
+%     \word{stroke-by-default}
+%   \end{displaysyntax}
+%   where \word{opts} is the key--value list of options to convert, 
+%   and the other arguments are booleans. The return value is a list
+%   \begin{displaysyntax}
+%     \word{attributes} \word{remaining opts}
+%   \end{displaysyntax}
+%   where \word{attributes} is the attribute dictionary and 
+%   \word{remaining opts} is the key--value list of options that were 
+%   not converted.
+%   
+%   The \word{stroke-by-default} argument is |1| if stroking is the 
+%   default state for this item; this is true for most |canvas| 
+%   items. The \word{fill-is-stroke} argument is |1| for |canvas| 
+%   items (most notably |line|) that uses |-fill| rather than 
+%   |-outline| for what would normally be considered a stroke.
+%   
+%   A difference between Tk and SVG is that most items on the Tk 
+%   |canvas| default to being stroked, whereas the corresponding SVG 
+%   items default to being filled.
+%   \begin{tcl}
+proc network::rich::tosvg::_opts2paint\
+  {allopts fill_is_stroke stroke_by_default} {
+   set opts {}
+   set attr [dict create]
+   if {$stroke_by_default} then {
+      dict set attr fill none
+      dict set attr stroke currentColor
+   }
+%   \end{tcl}
+%   The main loop has a simple |switch| as body. Right now it only 
+%   does |-fill| and |-outline|, but it should be clear how to extend 
+%   it.
+%   \begin{tcl}
+   foreach {opt val} $allopts {
+      switch -- $opt -fill {
+         if {$fill_is_stroke} then {
+            dict set attr stroke [_colour $val]
+         } else {
+            dict set attr fill [_colour $val]
+         }
+      } -outline {
+         dict set attr stroke [_colour $val]
+      } default {
+         lappend opts $opt $val
+      }
+   }
+   return [list $attr $opts]
+}
+%   \end{tcl} 
+% \end{proc}
+% 
+% \begin{proc}{_colour}
+%   The |_colour| command should generally convert a Tk colour to the 
+%   corresponding SCG colour. The bare minimum is to change the empty 
+%   string to |none| and leave everything else as it is:
+%   \begin{tcl}
+proc network::rich::tosvg::_colour {tkcol} {
+   if {$tkcol ne ""} then {return $tkcol} else {return none}
+}
+%   \end{tcl}
+%   However, if one wants this to be foolproof then the operation can 
+%   be very complex indeed, probably requiring extensive conversion 
+%   tables.
+% \end{proc}
+% 
+% \begin{proc}{oval}
+%   Tk |oval| items become SVG |circle| or |ellipse| elements; the 
+%   |square| coordinates command corresponds to the |circle| case.
+%   \begin{tcl}
+proc network::rich::tosvg::oval {coordcmd opts ns} {
+   foreach {attr opts} [_opts2paint $opts 0 1] break
+   if {[lindex $coordcmd 0] eq "square"} then {
+      dict set attr r [format %g [lindex $coordcmd 1]]
+      return [list circle $attr {}]
+   }
+   set xL {}
+   set yL {}
+   foreach {x y} [namespace eval $ns $coordcmd {0 0}] {
+      lappend xL $x; lappend yL $y
+   }
+   set xL [lsort -real $xL]; set yL [lsort -real $yL]
+   dict set attr cx [expr {0.5*([lindex $xL end]+[lindex $xL 0])}]
+   if {[dict get $attr cx]==0} then {dict unset attr cx}
+   dict set attr cy [expr {0.5*([lindex $yL end]+[lindex $yL 0])}]
+   if {[dict get $attr cy]==0} then {dict unset attr cy}
+   dict set attr rx [expr {0.5*([lindex $xL end]-[lindex $xL 0])}]
+   dict set attr ry [expr {0.5*([lindex $yL end]-[lindex $yL 0])}]
+   list ellipse $attr {}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{line}
+%   Tk |line| items become SVG |polyline| elements; one could as a 
+%   special case turn |line| items with two points into |line| 
+%   elements, but the extra complexity (both in processing and 
+%   generated code) just doesn't seem worth it. More principal is the 
+%   catch that |-smooth| items need to be turned into |path| 
+%   elements; this is currently detected but throws an error.
+%   \begin{tcl}
+proc network::rich::tosvg::line {coordcmd opts ns} {
+   foreach {attr opts} [_opts2paint $opts 1 1] break
+   if {[dict exists $opts -smooth] &&\
+     ![string is false [dict get $opts -smooth]]} then {
+       return -code error "The -smooth option is not supported yet"
+   }
+   dict set attr points [join [namespace eval $ns $coordcmd {0 0}]]
+   list polyline $attr {}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{text}
+%   Not surprisingly, Tk |text| items become SVG |text| elements. 
+%   There are two tricky options to handle: |-font| (because the 
+%   values of this option are so varied) and |-anchor| (because SVG 
+%   only supports the horizontal aspect of this!). |-font| is 
+%   therefore delegated to a helper procedure, whereas the effect of 
+%   |-anchor| is emulated using vertical shifts in |ex| units.
+%   
+%   \begin{tcl}
+proc network::rich::tosvg::text {coordcmd opts ns} {
+   foreach {attr opts} [_opts2paint $opts 0 0] break
+   if {[dict exists $opts -font]} then {
+      set attr [dict merge $attr [_Tkfont [dict get $opts -font]]]
+   }
+   foreach {x y} [namespace eval $ns $coordcmd {0 0}] break
+   if {$x!=0 || $y!=0} then {
+      dict set attr transform [format translate(%g,%g)] $x $y]
+   }
+   if {![dict exists $opts -anchor]}\
+   then {dict set opts -anchor center}
+   switch -- [dict get $opts -anchor] {
+      "nw" - "w" - "sw"    {dict set attr text-anchor start}
+      "n" - "center" - "s" {dict set attr text-anchor middle}
+      "ne" - "e" - "se"    {dict set attr text-anchor end}
+%   \end{tcl}
+%   This interpretation is bidi-ignorant, since the values |start|, 
+%   |middle|, and |end| refer to the logical reading order rather 
+%   than the rendering, but Tk is bidi-ignorant too.
+%   \begin{tcl}
+      default {
+         return -code error\
+           "bad anchor position \"[dict get $opts -anchor]\""
+      }
+   }
+   switch -- [dict get $opts -anchor] {
+      "se" - "s" - "sw"    {dict set attr baseline-shift 0.5ex}
+      "e" - "center" - "w" {dict set attr baseline-shift -0.5ex}
+      "ne" - "n" - "nw"    {dict set attr baseline-shift -1.5ex}
+   }
+   if {[dict exists $opts -angle]} then {
+      dict append attr transform [format { rotate(%g)}\
+        [expr {-[dict get $opts -angle]}]]
+   }
+   if {![dict exists $opts -text]} then {dict set opts -text ""}
+   list text $attr [list [list \#text [dict get $opts -text]]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{_Tkfont}
+%   This procedure converts a Tk font description to SVG attributes. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |_Tkfont| \word{font description}
+%   \end{displaysyntax}
+%   and the return value is the dictionary of corresponding 
+%   attributes.
+%   
+%   Since Tk implements several font description formats, matching it 
+%   fully is a bit tricky. Right now only the option--value form is 
+%   supported.
+%   \begin{tcl}
+proc network::rich::tosvg::_Tkfont {descr} {
+   set res [dict create]
+   dict for {opt val} $descr {
+      switch -- $opt -family {
+         dict set res font-family $val
+      } -size {
+         if {$val>0} then {
+            dict set res font-size [format {%g pt} $val]
+         } else {
+            dict set res font-size [format %g [expr {-$val}]]
+         }
+      } -weight {
+         dict set res font-weight $val
+      } -slant {
+         if {$val eq "roman"} then {
+            dict set res font-style normal
+         } else {
+            dict set res font-style $val
+         }
+      } -underline {
+         if {$val} then {dict set res text-decoration underline}
+      } -overstrike {
+         if {$val} then {dict set res text-decoration line-through}
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \setnamespace{network::rich}
+% \begin{proc}{SVG_appearances}
+%   This procedure takes a vertex appearance dictionary as argument 
+%   and generates a corresponding vertex-object dictionary.
+%   \begin{tcl}
+proc network::rich::SVG_appearances {inD} {
+   set resD [dict create]
+   set shape_ns [namespace parent]::shape
+   set tosvg_ns [namespace current]::tosvg
+   dict for {key material} $inD {
+      set itemL {}
+      foreach {type coords opts} [lindex $material 0] {
+         set cmdL [info commands ${tosvg_ns}::${type}*]
+         if {[llength $cmdL] == 1} then {
+            lappend itemL [[lindex $cmdL 0] $coords $opts $shape_ns]
+         } elseif {[llength $cmdL]} then {
+            return -code error "Ambiguous item type '$type'; must be\
+              one of: [join $cmdL ", "]"
+         } else {
+            return -code error "Unknown item type '$type'; must be one\
+              of: [join [info commands ${tosvg_ns}::\[a-zA-Z\]*] ", "]"
+         }
+      }
+      if {[llength $itemL]==1} then {
+         dict set resD $key [lindex $itemL 0]
+      } else {
+         dict set resD $key [list g {} $itemL]
+      }
+   }
+   return $resD
+}
+%   \end{tcl}
+% \end{proc}
 % 
 % 
 % \begin{thebibliography}{8}
