@@ -121,6 +121,167 @@
 %   equalities.
 % \end{abstract}
 % 
+% \tableofcontents
+% 
+% 
+% \subsection*{Docstrip modules}
+% 
+% There is no main delimiter around the code in this file, but 
+% several modules that choose code variants.
+% 
+% 
+% \subsubsection*{Algorithm variants}
+% 
+% The primary point of variance is the 
+% \describestring*+[proc]{pick_next_ambiguity} procedure, which is 
+% called to start processing of the next ambiguity. Not surprisingly 
+% the variability here includes that of selection strategy, but there 
+% is also a more fundamental variance that concerns when (and if) 
+% certain things are done, that may be described as \emph{styles} of the 
+% algorithm.
+% 
+% The basic style is to employ a straightforward implementation 
+% of Buchberger's algorithm, storing the full queue of ``critical pairs'' 
+% as rows with state |A| in the \describestring*+[table]{am6iguities} 
+% table, and weeding it by use of the ``second criterion'' whenever a 
+% new rule is discovered.
+% 
+% The basic style also has a cautious mode of operations, which 
+% is activated by setting the \describestring+[var.]{am6iguity_top} 
+% variable to something else than its default |infinity| value. In 
+% this mode, only ambiguities at or below this top value are allowed 
+% into the |am6iguities| table; larger ambiguities are instead kept 
+% in the more compact |pa1rs| table until a raise in |am6iguity_top| 
+% allows them back into the |am6iguities| table.
+% 
+% A problem with the basic style is that a lot of time is spent 
+% weeding the table of ambiguities\Dash this leads to congestion in 
+% the transfer of data from database to memory. The \Module{lazy} style 
+% is instead that Buchberger's second criterion is applied as the 
+% first step when an ambiguity has been picked for resolution.
+% 
+% The \Module{lazier} style attacks a different problem common to the 
+% basic and lazy styles, namely that overlaps were sought as soon as 
+% a pair of rules could be formed; since the number of pairs is 
+% quadratic in the number of rules, this meant much more time was 
+% spent forming overlaps than was spent using or discovering rules, 
+% which is problematic when the aim is to discover new identities. 
+% The \Module{lazier} style is instead to merely estimate how an 
+% ambiguity between two rules would rank, and delay actually 
+% computing it until it reaches ambiguities of that rank.
+% 
+% In practice this means that both the |am6iguities| and |pa1rs| tables 
+% are treated as queues, and each |pick_next_ambiguity| call picks an 
+% item from the queue whose head has lowest rank. If a pair is picked 
+% then any ambiguities formed from it go into the ambiguity table 
+% (where they will abide their time if the rank turned out to be 
+% higher than expected), whereas if an ambiguity is picked then it 
+% will be resolved.
+% 
+% The \Module{BB2} module guards (in the case of \Module{lazier}) 
+% the code for the `second criterion' prereduction step. It was made 
+% optional since it turned out to almost never apply in that setting.
+% 
+% There are several modules which attempt to control the order in 
+% which ambiguities are processed; not specifying any of them means 
+% they are processed in an arbitrary order. The best supported module 
+% is \Module{vsquare}, since no code variant employing a |pa1rs| 
+% table has been tested with anything else. The full list are:
+% \begin{itemize}
+%   \item 
+%     \Module{classic}\Dash order primarily by |m1nus|, secondarily 
+%     by |p1us|. This was (pretty much) the mode of operation in 
+%     \textsf{cmplutil1}.
+%   \item
+%     \Module{oldnew}\Dash order by the sum of |m1nus| and |p1us|.
+%   \item
+%     \Module{pcols}\Dash order by the sum of all profile columns 
+%     (requires \Module{aprofile}); this is the same as the number of 
+%     inner vertices and edges in the ambiguity site.
+%   \item
+%     \Module{vcols}\Dash order by the sum of all profile columns for 
+%     vertices (requires \Module{aprofile}); this is the same as the 
+%     number of inner vertices in the ambiguity site.
+%   \item
+%     \Module{vsum}\Dash order by the sum, over all terms in the 
+%     first step of the |re5olution|, of the orders of the networks. 
+%     The idea is that the terms of the resolution are more like the 
+%     terms of the rule that it might give rise to than the ambiguity 
+%     site is, so this should help ``small'' rules be discovered more 
+%     quickly.
+%   \item
+%     \Module{vsquare}\Dash order by the sum, over all terms in the 
+%     first step of the |re5olution|, of the \emph{squares} of the 
+%     orders of the networks. The idea is that this provides a better 
+%     balance between the order of the largest term and orders of 
+%     other terms than does a straightforward sum of the orders.
+% \end{itemize}
+% ToDo: Implement ordering by some norm (e.g.~the Frobenius norm) of 
+% the matrix representation of the first biaffine \PROP\ element used 
+% to compare networks; this is probably the closest one can get to 
+% the standard strategy.
+% 
+% 
+% \subsubsection*{Data structure variants}
+% 
+% The \Module{zlib} module causes some data to be compressed before 
+% it is stored in the database; it is independent of other variants.
+% 
+% The \Module{aprofile} module adds profile columns and an index of 
+% those to the \describestring*+[table]{am6iguities} table.
+% 
+% The \Module{pairmap} module adds the |pa1rsMap| table and causes 
+% ``large'' pairs (i.e., those that wouldn't be processed for quite 
+% some time) to go into this more compact table, rather than the 
+% basic |pa1rs| table.
+% 
+% 
+% \subsubsection*{Problem initialisation modules}
+% 
+% The \Module{Hopf} module contains all code initialising the utility 
+% with the axioms of a Hopf algebra or variation thereof.
+% 
+% The \Module{twist} module modifies the definitions to be for 
+% ``Hopf algebra with abstract twist'', i.e., the distributive law 
+% employs an abstract twist vertex rather than an explicit 
+% permutation. In particular this extends the partial order with $4$ 
+% extra blocks.
+% 
+% The \Module{cocomplex} module adds two constant vertices |Re| and 
+% |Im|, and axioms for their interaction with |Delta| and |epsilon| 
+% that give them the behaviour of the real-part and imaginary-part 
+% maps in the coalgebra dual to the complex numbers as a real algebra.
+% 
+% The \Module{testequalities} module adds some congruences that can 
+% be derived anyway, but only after several hundred steps. As the 
+% name hints, they were intended for testing the handling of 
+% equalities, but subsequent refinements of the ordering have 
+% actually made them orientable.
+% 
+% The \Module{moretwist} module adds axioms about the |twist|. It is 
+% hoped that these will actually turn out to be implied by the basic 
+% set of axioms, but if that is true then the proof would have to be 
+% rather large.
+% 
+% 
+% \subsubsection*{Other}
+% 
+% The \Module{stats} module contains code that makes the main loop 
+% keep track of which procedures it calls: how many times and the 
+% accumulated runtime (in microseconds).
+% 
+% The \Module{Tk} module contains code that gives the utility a GUI. 
+% 
+% The \Module{trans} module bracket some code that makes each 
+% creation of a new rule a separate transaction. The primary reason 
+% for this was to speed up the database access (collect many small 
+% transactions in one big), but the transaction overhead seems to 
+% have been rather small.
+% 
+% The \Module{splitnewrule} module splits the basic |new_ru1e| 
+% procedure in smaller pieces, to improve GUI responsiveness.
+% 
+% 
 % 
 % \section{Data structures}
 % 
@@ -382,9 +543,22 @@ proc network_profile {signature {NW {{{"" {} {}} {"" {} {}}} {}}}} {
 % during the resolution of this ambiguity. That list of networks kept 
 % in the \describecolumn+[am6iguities]{m0n0mials} column.
 % \begin{tcl}
-lappend DB_column(am6iguities)\
-  re5olution {NOT NULL} m0n0mials {NOT NULL}
+lappend DB_column(am6iguities) re5olution {NOT NULL}
+%<-zlib>lappend DB_column(am6iguities) m0n0mials {NOT NULL}
+%<+zlib>lappend DB_column(am6iguities) deflated_m0n0mials BLOB
 % \end{tcl}
+% Experience has shown that the size of a |m0n0mials| list for a 
+% resolve ambiguity is typically on the order of a few kilobytes, and 
+% account for a substatial percentage of the overall database size, 
+% so it makes sense to compress them. In the \Module{zlib} setting, 
+% there is not a |m0n0mials| column, but instead a
+% \describecolumn+[am6iguities]{deflated_m0n0mials} column, whose 
+% contents are the result of doing
+% \begin{displaysyntax}
+%   zlib deflate [encoding convertto utf-8 \word{m0n0mials}] 9
+% \end{displaysyntax}
+% where the |encoding convertto| of course doesn't change anything 
+% for ASCII data but provides correctness also for non-ASCII data.
 % 
 % Besides the individual steps in the resolution, it is also 
 % interesting to keep track of which rules were applied, to which
@@ -498,7 +672,7 @@ lappend DB_column(am6iguities) vRe5Sum INTEGER v2Re5Sum INTEGER
 % \subsection{Pairs}
 % 
 % Experience with the first example problem (Hopf with twist) has shown 
-% that the database is around $1.5\,mathrm{GB}$ when the |am6iguities| 
+% that the database is around $1.5\,\mathrm{GB}$ when the |am6iguities| 
 % table reaches half a million rows. Most of these ambiguities are 
 % expected to be irrelevant\Ldash generated from a rule or equality 
 % that is subsequently dropped, and too large to figure in the proofs 
@@ -517,24 +691,9 @@ lappend DB_column(pa1rs)  p1us {INTEGER}  m1nus {INTEGER} \
   pick8y {NUMERIC}
 % \end{tcl}
 % There is also a column \describecolumn+[pa1rs]{pick8y} which holds 
-% whatever is used as criterion when picking ambiguities.
+% whatever rank is used when picking ambiguities.
 % 
-% \begin{variable}{am6iguity_top}
-%   The |am6iguity_top| variable holds the largest value currently 
-%   allowed for the picking criterion for an ambiguity that goes into 
-%   the |am6iguities| table. Ambiguities that get a higher value (and 
-%   thus lower priority) than this will instead go into the |pa1rs| 
-%   table. The value increases over time, as it is always kept a bit 
-%   above the line where full ambiguities are being picked for 
-%   resolution, and when this happens then data should be moved back 
-%   from |pa1rs| to |am6iguities|.
-%   
-%   By default |am6iguity_top| is set to |infinity|, which means 
-%   everything is put in the |am6iguities| table.
-%   \begin{tcl}
-variable am6iguity_top infinity
-%   \end{tcl}
-% \end{variable}
+% \medskip
 % 
 % More experience still has shown that even if the space requirements 
 % are kept in moderation when using pairs, it still takes an awful 
@@ -598,9 +757,43 @@ lappend DB_column(ru1es)  vSum REAL  v2Sum REAL \
   overl4pSum {REAL DEFAULT 0}  overl4pTimes {INTEGER DEFAULT 0}
 %</lazier>
 % \end{tcl}
-% The main reason to make |overl4pSum| a real is that I haven't found 
-% any other way to avoid integer division above. The real 
+% The main reason to make |overl4pSum| a real is that I didn't at the 
+% time find any other way to avoid integer division above (the proper 
+% SQL construct is |CAST (overl4pSum AS REAL)|). The real 
 % declarations could just as well have been integers.
+% 
+% The problem with this set-up is however that a sparse encoding 
+% (|pa1rs| as a set of pairs of integers) is used for what is really 
+% a very dense set. When |ru1es| approaches $8000$ elements, |pa1rs| 
+% is beyond $30$ million elements, and easily using up some gigabyte 
+% of disk area. A more compact representation is called for, but here 
+% the problem arises of how much can be accomplished on the SQL side. 
+% It seems a composite value can reasonably well be taken apart (by 
+% indexing a string) but not so easily put together again, so 
+% assistance from \Tcl\ is necessary. The problem on the \Tcl\ side 
+% would be with retrieving the overlap statistics from the database, 
+% but this is a minor chunk of data and could therefore be fetched 
+% even when just adding pairs for a new rule. Hence the best solution 
+% seems to be to actually perform the above calculations on the \Tcl\ 
+% side.
+% 
+% The dense representation of is therefore kept in a table 
+% \describestring+[table]{pa1rMap} with two columns 
+% \describecolumn+[pa1rMap]{m1nus} and 
+% \describecolumn+[pa1rMap]{plu5es}. The first column contains 
+% integers referencing the |num6er| in |ru1es|, while the second 
+% column contains BLOBs whose binary patterns encode which |p1us| 
+% values would form a pair with the |m1nus|. Each bit corresponds to 
+% one pair, where $1$ means ``pair is in |pa1rMap|'' and $0$ means it 
+% isn't (it might be in |pa1rs|, or it might have been processed 
+% already). The BLOB is to be |binary scan|ned and |format|ted as 
+% |B*|, where the first digit corresponds to |ru1e| $1$.
+% \begin{tcl}
+%<*lazier>
+lappend DB_column(pa1rMap)  m1nus {INTEGER PRIMARY KEY}  plu5es BLOB
+%</lazier>
+% \end{tcl}
+% 
 % 
 % 
 % \subsection{Initialising the database}
@@ -700,11 +893,13 @@ proc prepare_statements {db} {
 %     suspended ambiguities whose |si7e| might contain an instance 
 %     of a network with the provided profile.
 %     \begin{tcl}
+%<*aprofile>
    set L [list {(st4te = 'A' OR st4te = 'S')} {(p1us NOTNULL)}]
    foreach col $pcols {lappend L "($col >= :$col)"}
    set DBCMD(ADividedBy) [$db prepare "
       SELECT num6er FROM am6iguities WHERE ( [join $L " AND "] )
    "]
+%</aprofile>
 %     \end{tcl}
 %     This is used to find ambiguities that can be discarded by 
 %     ``Buchberger's second criterion'', hence the restriction that 
@@ -795,9 +990,8 @@ proc prepare_statements {db} {
 %     The |NewAmbiguity| statement creates a new ambiguity. The 
 %     parameters are all the columns except |num6er|.
 %     \begin{tcl}
-   set L $pcols
-   lappend L {*}[dict keys\
-     [dict remove $DB_column(am6iguities) num6er]]
+   set L [dict keys [dict remove $DB_column(am6iguities) num6er]]
+%<aprofile>   lappend L {*}$pcols
    set DBCMD(NewAmbiguity) [$db prepare "
       INSERT INTO am6iguities ( [join $L ", "] )
       VALUES ( :[join $L ", :"] )
@@ -808,15 +1002,17 @@ proc prepare_statements {db} {
 %   \begin{arrayentry}{DBCMD}{AdvanceAmbiguity}
 %     The |AdvanceAmbiguity| statement updates the columns of an 
 %     ambiguity that may change due to reductions of it, i.e., 
-%     |m0n0mials|, |re5olution|, |st4te|, |wh1ch|, |wh3re|, and 
-%     |wh3n2|. The parameters are |num6er| (which identifies the 
-%     ambiguity to update) and the six new values.
+%     |m0n0mials| or |deflated_m0n0mials|, |re5olution|, |st4te|, 
+%     |wh1ch|, |wh3re|, and |wh3n2|. The parameters are |num6er| 
+%     (which identifies the ambiguity to update) and the six new 
+%     values.
 %     \begin{tcl}
    set DBCMD(AdvanceAmbiguity) [$db prepare {
       UPDATE am6iguities SET 
-        m0n0mials = :m0n0mials, re5olution = :re5olution, 
-        st4te = :st4te, wh1ch = :wh1ch, wh3re = :wh3re, 
-        wh3n2 = :wh3n2
+%<-zlib>        m0n0mials = :m0n0mials, 
+%<+zlib>        deflated_m0n0mials = :deflated_m0n0mials, 
+        re5olution = :re5olution, wh1ch = :wh1ch, wh3re = :wh3re, 
+        st4te = :st4te, wh3n2 = :wh3n2
       WHERE num6er = :num6er
    }]
 %     \end{tcl}
@@ -942,11 +1138,76 @@ proc prepare_statements {db} {
 %     \end{tcl}
 %   \end{arrayentry}
 %   
+%   \begin{arrayentry}{DBCMD}{GetOverl4ps}
+%     The |GetOverl4ps| statement retrieves the |num6er|, |st4te|, 
+%     |overl4pSum|, |overl4pTimes|, |vSum|, |v2Sum| columns of all 
+%     |ru1es|, and additionally the number of inner vertices as 
+%     |lhsOrder|. There are no parameters, but the result is ordered 
+%     by |num6er|.
+%     \begin{tcl}
+   set DBCMD(GetOverl4ps) [$db prepare "
+      SELECT num6er,st4te,overl4pSum,overl4pTimes,vSum,v2Sum,
+        [join [lsearch -all -inline $pcols v*] +] AS lhsOrder
+      FROM ru1es ORDER BY num6er
+   "]
+%</lazier>
+%     \end{tcl}
+%     This is used when estimating pairs in \Tcl.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{ListPairmaps}
+%     The |ListPairmaps| statement retrieves the |m1nus| entries of 
+%     all rows in the |pa1rMap| table. There are no parameters.
+%     \begin{tcl}
+%<*pairmap>
+   set DBCMD(ListPairmaps) [$db prepare {
+      SELECT m1nus FROM pa1rMap
+   }]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{GetPairmap}
+%     The |GetPairmap| statement retrieves the |plu5es| entry from a 
+%     row in the |pa1rMap| table. The only parameter is the |m1nus| 
+%     value.
+%     \begin{tcl}
+   set DBCMD(GetPairmap) [$db prepare {
+      SELECT plu5es FROM pa1rMap WHERE m1nus=:m1nus
+   }]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{SetPairmap}
+%     Conversely, the |SetPairmap| statement sets the |plu5es| entry 
+%     from a row in the |pa1rMap| table. The semantics are the same 
+%     as for the |set| command, i.e., a new entry is created if it 
+%     didn't exist already and the existing entry is updated 
+%     otherwise. The parameters are |m1nus| and |plu5es|.
+%     \begin{tcl}
+   set DBCMD(SetPairmap) [$db prepare {
+      INSERT OR REPLACE INTO pa1rMap (m1nus,plu5es) 
+      VALUES (:m1nus,:plu5es)
+   }]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{UnsetPairmap}
+%     The |UnsetPairmap| statement deletes a row in the |pa1rMap| 
+%     table. The only parameter is the |m1nus| value.
+%     \begin{tcl}
+   set DBCMD(UnsetPairmap) [$db prepare {
+      DELETE FROM pa1rMap WHERE m1nus=:m1nus
+   }]
+%</pairmap>
+%     \end{tcl}
+%   \end{arrayentry}
+%   
 %   \begin{arrayentry}{DBCMD}{UpdateOverl4p}
 %     The |UpdateOverl4p| statement updates the |overl4pSum| and 
 %     |overl4pTimes| columns for a rule. The parameters are |num6er|, 
 %     |sum| and |times|.
 %     \begin{tcl}
+%<*lazier>
    set DBCMD(UpdateOverl4p) [$db prepare {
       UPDATE ru1es SET 
         overl4pSum = overl4pSum + :sum,
@@ -1051,13 +1312,17 @@ proc init_database {db signature} {
 %   tables.
 %   \begin{tcl}
    set nullprofile [network_profile $signature]
-   foreach table {ru1es am6iguities} {
-      set SQL "CREATE TABLE $table "
-      append SQL ( [join [
-         column_defs $DB_column($table) $nullprofile
+   $db allrows "
+      CREATE TABLE ru1es ( [join [
+         column_defs $DB_column(ru1es) $nullprofile
       ] ", "] )
-      $db allrows $SQL
-   }
+   "
+   $db allrows "
+      CREATE TABLE am6iguities ( [join [
+%<aprofile>         column_defs $DB_column(am6iguities) $nullprofile
+%<!aprofile>         column_defs $DB_column(am6iguities)
+      ] ", "] )
+   "
 %   \end{tcl}
 %   The third step is to create indices for the |ru1es| table: one 
 %   on the profile and |st4te| columns called 
@@ -1084,10 +1349,12 @@ proc init_database {db signature} {
 %   |am6iguitiesProfile|).
 %   \begin{tcl}
    lappend L p1us
-   set SQL "( [join $L ", "] )"
+%<*aprofile>
    $db allrows "
-      CREATE INDEX am6iguitiesProfile ON am6iguities $SQL
+      CREATE INDEX am6iguitiesProfile ON am6iguities 
+      ( [join $L ", "] )
    "
+%</aprofile>
    $db allrows {
       CREATE INDEX am6iguitiesTimes ON am6iguities (st4te,wh3n1,wh3n2)
    }
@@ -1109,8 +1376,16 @@ proc init_database {db signature} {
       CREATE INDEX pa1rsPick8y ON pa1rs (pick8y)
    }
    $db allrows {
-      CREATE INDEX pa1rsP1usM1nus ON pa1rs (p1us,m1nus)
+      CREATE INDEX pa1rsP1usM1nus ON pa1rs (m1nus,p1us)
    }
+%   \end{tcl}
+%   The sixth step is to create the |pa1rMap| table. It has no 
+%   indices, but the |m1nus| column is the primary key
+%   \begin{tcl}
+   $db allrows "
+      CREATE TABLE pa1rMap 
+      ( [join [column_defs $DB_column(pa1rMap)] ", "] )
+   "
 }
 %   \end{tcl}
 % \end{proc}
@@ -1236,6 +1511,20 @@ proc halt_main_loop {} {
 %   whereas the |t,|\meta{command} entries count the number of 
 %   microseconds that have been spent doing so.
 % \end{arrayvar}\end{arrayvar}
+% 
+% \begin{proc}{record_stats}
+%   The |record_stats| procedure periodically records the contents of 
+%   the |Stats| array in the |le9end| table. 
+%   \begin{tcl}
+proc record_stats {} {
+   variable DBCMD
+   $DBCMD(database) allrows {
+      INSERT INTO le9end(k3y,va1ue) VALUES (:k3y,:va1ue)
+   } [dict create k3y Stats@[clock seconds] va1ue [array get ::Stats]]
+   after 3600000 record_stats
+}
+%   \end{tcl}
+% \end{proc}
 % 
 % \begin{arrayvar}{Count}
 %   The |Count| array keeps counts of how many things of various 
@@ -1396,117 +1685,6 @@ variable pair_level "" ambiguity_level ""
 %   in the table.
 % \end{arrayvar}
 % 
-% \begin{proc}{pick_next_ambiguity}
-%   This procedure uses the |chooseambiguity| statement to retrieve 
-%   one active ambiguity from the database, prepares the reduction 
-%   machinery to handle it, and pushes |reduce_step| as a task for 
-%   the main loop. In case there are no more active ambiguities in 
-%   the database (hooray!) it pauses the main loop.
-%   \begin{tcl}
-proc pick_next_ambiguity {} {
-   variable DBCMD
-   set resobj [$DBCMD(ChooseAmbiguity) execute]
-   if {[$resobj nextdict amb]} then {
-      $resobj close
-      variable ambiguity_level [dict get $amb v2Re5Sum]
-      if {[check_ambiguity_top $amb]} then {return}
-%<*lazy>
-      if {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
-         push_main_task prereduce_second_criterion $amb
-         return
-      }
-%</lazy>
-      prepare_ambiguity $amb
-      push_main_task reduce_step
-      return
-   } else {
-      $resobj close
-   }
-   set L [$DBCMD(database) allrows {
-      SELECT min(pick8y) AS t0p FROM pa1rs
-   }]
-   if {[dict exists [lindex $L 0] t0p]]} then {
-      push_main_task raise_ambiguity_top [dict get [lindex $L 0] t0p]
-   } else {
-      pause_main_loop
-   }
-}
-%   \end{tcl}
-%   
-%   The \Module{lazier} form of |pick_next_ambiguity| is however 
-%   quite different, as it picks both an ambiguity and a pair, 
-%   processing only the least of the two.
-%   \begin{tcl}
-%<*lazier&vsquare>
-proc pick_next_ambiguity {} {
-   variable DBCMD
-   set aobj [$DBCMD(ChooseAmbiguity) execute]
-   set pobj [$DBCMD(LeastPair) execute]
-   if {[$pobj nextdict pair]} then {
-      if {![$aobj nextdict amb]} then {
-         push_main_task overlaps_between [dict get $pair p1us]\
-           [dict get $pair m1nus]
-      } elseif {[dict get $pair pick8y] <= [dict get $amb v2Re5Sum]} then {
-%   \end{tcl}
-%   The point of processing pairs at a level before ambiguities is to 
-%   gather more data for estimating overlap sizes.
-%   \begin{tcl}
-         push_main_task overlaps_between [dict get $pair p1us]\
-           [dict get $pair m1nus]
-      } elseif {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
-         push_main_task prereduce_second_criterion $amb
-      } else {
-         prepare_ambiguity $amb
-         push_main_task reduce_step
-      }
-   } elseif {[$aobj nextdict amb]} then {
-      if {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
-         push_main_task prereduce_second_criterion $amb
-      } else {
-         prepare_ambiguity $amb
-         push_main_task reduce_step
-      }      
-   } else {
-      pause_main_loop
-   }
-   $aobj close
-   $pobj close
-   variable ambiguity_level\
-     [if {[info exists amb]} then {dict get $amb v2Re5Sum}]
-   variable pair_level\
-     [if {[info exists pair]} then {format %.1f [dict get $pair pick8y]}]
-}
-%<*lazier&vsquare>
-%   \end{tcl}
-% \end{proc}
-% 
-% \begin{proc}{check_ambiguity_top}
-%   This procedure gets called to check whether |am6iguity_top| 
-%   should be raised, and if so arrange that material is moved from 
-%   the |pa1rs| table to the |am6iguities| table. The reason it is a 
-%   separate procedure is that the exact growth condition needs to 
-%   depend on the quantity used for the picking criterion.
-%   
-%   The call syntax is
-%   \begin{displaysyntax}
-%     |check_ambiguity_top| \word{ambiguity}
-%   \end{displaysyntax}
-%   where \word{ambiguity} is an ambiguity just picked. The return 
-%   value is |0| if no raise was needed and |1| if it will be 
-%   performed.
-%   \begin{tcl}
-proc check_ambiguity_top {amb} {
-   variable am6iguity_top
-%<vsquare>   set level [expr {3 + round(1.5*[dict get $amb v2Re5Sum])}]
-%<!vsquare>   set level infinity
-   if {$level<=$am6iguity_top} then {return 0}
-   push_main_task raise_ambiguity_top $level
-   return 1
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% 
 % \begin{arrayentry}{RS}{NWID}
 %   The |m0n0mials| entry in the resultion state is a list mapping 
 %   monomial numbers to concrete networks, as is needed to decode the 
@@ -1624,6 +1802,7 @@ proc compare_keys {left right} {
 %   \end{tcl}
 % \end{proc}
 % 
+% 
 % \begin{proc}{set_cmpcmds}
 %   The |cmpkeycmd|, |cmpcmds|, and |cmpblocks| entries in the |RS| 
 %   arrays need to be initialised anew for every ambiguity processed, 
@@ -1680,6 +1859,10 @@ proc prepare_ambiguity {amb} {
 %   The second step is to initialise the |NWID| dictionary and 
 %   |cmpkey| list for |m0n0mials| already known.
 %   \begin{tcl}
+%<*zlib>
+   set RS(m0n0mials) [encoding convertfrom utf-8 [zlib inflate\
+     $RS(deflated_m0n0mials)]]
+%</zlib>
    set RS(cmpkeys) {}
    foreach NW $RS(m0n0mials) {
       dict set RS(NWID) $NW [llength $RS(cmpkeys)]
@@ -1897,6 +2080,10 @@ proc judge_ambiguity {} {
    }
    variable DBCMD
    set RS(wh3n2) [clock seconds]
+%<*zlib>
+   set RS(deflated_m0n0mials)\
+     [zlib deflate [encoding convertfrom utf-8 $RS(m0n0mials)] 9]
+%</zlib>
    $DBCMD(AdvanceAmbiguity) allrows [array get RS]
    variable Count
    incr Count(a)
@@ -1963,6 +2150,10 @@ proc reduce_equality_B {} {
    }
    variable DBCMD
    set RS(wh3n2) [clock seconds]
+%<*zlib>
+   set RS(deflated_m0n0mials)\
+     [zlib deflate [encoding convertfrom utf-8 $RS(m0n0mials)] 9]
+%</zlib>
    $DBCMD(AdvanceAmbiguity) allrows [array get RS]
    variable Count
    incr Count(a)
@@ -2168,7 +2359,8 @@ proc equality_duplicate? {leading} {
 %   for this approach is that it reduces the amount of data that has 
 %   to flow from disk to RAM, by switching the nesting orders of the 
 %   loop over ambiguities (long) and the loop over rules (not so 
-%   long).
+%   long). \emph{Experience has shown that this criterion rarely 
+%   applies however, so it might in the future be skipped.}
 %   
 %   The call syntax for this procedure is
 %   \begin{displaysyntax}
@@ -2240,6 +2432,303 @@ proc second_criterion_chunk {amb NWFB obj} {
 % \end{proc}
 % 
 % 
+% \subsection{Initial congruences}
+% 
+% Resolving ambiguities may thus lead to the creation of new rules, 
+% but where do the first ambiguities come from? They are added as 
+% explicit congruences.
+% 
+% \begin{proc}{add_congruence}
+%   This procedure creates a new ambiguity that encodes a given 
+%   congruence. The call syntax is
+%   \begin{displaysyntax}
+%     |add_congruence| \word{feedbacks} \word{lincomb} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{lincomb} is a dictionary mapping networks to 
+%   coefficients, that is interpreted as the expression to make 
+%   congruent to $0$. The supported \word{option}s are:
+%   \begin{ttdescription}
+%     \item[-long] long description text,
+%     \item[-short] short description text;
+%   \end{ttdescription}
+%   
+%   \begin{tcl}
+proc add_congruence {feedbacks dict args} {
+   array set O $args
+   switch -- [info exists O(-long)][info exists O(-short)] {
+     00 {set O(-long) [set O(-short) ""]}
+     01 {set O(-long) $O(-short)}
+     10 {set O(-short) $O(-long)}
+   }
+   set A(feed6acks) $feedbacks
+   set A(m0n0mials) {}
+   set resD [dict create]
+   variable coefficient
+   set z [{*}$coefficient 0]
+   dict for {NW r} $dict {
+      set NW [network::pure::canonise $NW]
+      if {![info exists NWID($NW)]} then {
+         set NWID($NW) [llength $A(m0n0mials)]
+         lappend A(m0n0mials) $NW
+      }
+      dict update resD $NWID($NW) s {
+         if {![info exists s]} then {set s $z}
+         set s [{*}$coefficient + $s $r]
+         if {[{*}$coefficient iszero $s]} then {unset s}
+      }
+   }
+   if {![dict size $resD]} then {return "That's just 0=0"}
+   set A(re5olution) [list $resD]
+   set A(vRe5Sum) 0
+   set A(v2Re5Sum) 0
+   dict for {mu r} $resD {
+      set order [expr {[llength [lindex $A(m0n0mials) $mu 0]]-2}]
+      incr A(vRe5Sum) $order
+      incr A(v2Re5Sum) [expr {$order*$order}]
+   }
+   set A(si7e) [lindex $A(m0n0mials) 0]
+   set A(wh3n1) [clock seconds]
+   set A(st4te) A
+   set A(wh1ch) {}
+   set A(wh3re) {}
+   set A(p1us2eg) $O(-long)
+   set A(m1nus2eg) $O(-short)
+   variable DBCMD
+   array set A [network_profile $DBCMD(signature)]
+%<*zlib>
+   set A(deflated_m0n0mials)\
+     [zlib deflate [encoding convertfrom utf-8 $A(m0n0mials)] 9]
+%</zlib>
+   $DBCMD(NewAmbiguity) allrows [array get A]
+   variable Count
+   incr Count(Aa)
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{enter_congruence}
+%   This procedure is a conveniency wrapper around |add_congruence|. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |enter_congruence| \begin{regblock}[\regstar] \word{option} 
+%     \word{value} \end{regblock} \word{feedbacks} 
+%     \begin{regblock}[\regstar] \word{coefficient} \word{scan-list} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{scan-list}s are passed on to 
+%   |network::pure::construct| to make a network, which is then 
+%   paired up with the \word{coefficient}. The \word{option}s can be 
+%   whatever |add_congruence| takes, but they are distinguished from 
+%   the list of \word{feedbacks} by having list length $1$ and 
+%   beginning with `|-|'.
+%   
+%   \begin{tcl}
+proc enter_congruence {args} {
+   variable DBCMD
+   set state "option"
+   set resD [dict create]
+   set optL {}
+   foreach arg $args {
+      switch -- $state "option" {
+         if {[llength $arg]==1 && [string match -* $arg]} then {
+            lappend optL $arg
+            set state "value"
+         } else {
+            set feedbacks $arg
+            set state "coefficient"
+         }
+      } "value" {
+         lappend optL $arg
+         set state "option"
+      } "coefficient" {
+         set c $arg
+         set state "scanlist"
+      } "scanlist" {
+         set NW [network::pure::construct $DBCMD(signature) $arg]
+         dict set resD $NW $c
+         set state "coefficient"
+      }
+   }
+   switch -- $state "option" {
+      error "Expected list of feedbacks"
+   } "value" {
+      error "Expected value for option: $arg"
+   } "scanlist" {
+      error "Expected network scanlist for coefficient: $arg"
+   }
+   add_congruence $feedbacks $resD {*}$optL
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{arrayentry}{RS}{cmpclass}
+%   This list is another sibling of |cmpcmds|, which is not used when 
+%   running the main loop, but which can be used when refining the 
+%   ordering relation. It assigns a ``class'' to each element of the 
+%   comparison key, which is used by |multiway_compare| when it 
+%   examines how networks compare; the idea is that a separate result 
+%   is given for each class of elements within a block, so that one 
+%   might better see what is going wrong when things turn 
+%   incomparable.
+% \end{arrayentry}
+% 
+% 
+% \begin{proc}{multiway_compare}
+%   This procedure produces a report on how a list of monomials 
+%   compare. The call syntax is
+%   \begin{displaysyntax}
+%     |multiway_compare| \word{index}\regstar
+%   \end{displaysyntax}
+%   where each \word{index} is an index into the |cmpkeys| entry 
+%   of the |RS| array. The return value is a dictionary of lists of 
+%   dictionaries, where the innermost dictionaries map classes (as in 
+%   |RS(cmpclass)|) to strings of |<|s and |>|s, where each character 
+%   corresponds to one element in the comparison keys where the items 
+%   being compared are distinct. The lists correspond to the blocks. 
+%   The outer dictionaries map pairs of \word{index}es to what one 
+%   gets for comparing the corresponding comparison keys.
+%   
+%   The procedure assumes the |cmpkeys|, |cmpcmds|, |cmpblocks|, and 
+%   |cmpclass| entries in the |RS| array are all filled in.
+%   \begin{tcl}
+proc multiway_compare {args} {
+   variable RS
+   set res [dict create]
+   set n 0; foreach i $args {incr n
+      foreach j [lrange $args $n end] {
+         set blockL {}
+         set block [dict create]
+         foreach l [lindex $RS(cmpkeys) $i] \
+                 r [lindex $RS(cmpkeys) $j] \
+                 class $RS(cmpclass) \
+                 cmd $RS(cmpcmds)  f $RS(cmpblocks) {
+            set d [{*}$cmd $l $r]
+            if {$d<0} then {
+               dict append block $class <
+            } elseif {$d>0} then {
+               dict append block $class >
+            }
+            if {$f} then {
+               lappend blockL $block
+               set block [dict create]
+            }
+         }
+         dict set res [list $i $j] $blockL
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{MWC_report}
+%   This procedure takes an entry from the result of 
+%   |multiway_compare| and returns a more compact representation of 
+%   the information therein, suitable for a line of text. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     |MWC_report| \word{list-of-dicts} \word{classes} \word{truncate}
+%   \end{displaysyntax}
+%   and the return value is a list of strings. The 
+%   \word{list-of-dicts} is the input data, \word{classes} is the 
+%   list of classes to include, and \word{truncate} is a boolean 
+%   specifying whether the return value should be truncated (true) 
+%   after the first nonequal block or not (false). Each element of 
+%   the result is a string with one character per class; the 
+%   characters are `|0|'~(equal), `|+|'~(second is greater), 
+%   `|-|'~(first is greater), or `|X|'~(incomparable).
+%   
+%   \begin{tcl}
+proc MWC_report {data classL truncate} {
+   set res {}
+   foreach block $data {
+      set str ""
+      foreach c $classL {
+         if {![dict exists $block $c]} then {
+            append str 0
+         } else {
+            switch -regexp -- [dict get $block $c] {
+               {^$} {append str 0}
+               {^<*$} {append str -}
+               {^>*$} {append str +}
+               default {append str X}
+            }
+         }
+      }
+      lappend res $str
+      if {$truncate && ![regexp {^0*$} $str]} then {break}
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{overall_comparison_report}
+%   This procedure writes a report on all ambiguities in 
+%   |thedatabase| which proved something, detailing in particular how 
+%   the final terms compare to each other. The call syntax is
+%   \begin{displaysyntax}
+%     |overall_comparison_report| \word{channel} \word{classes}
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{channel} is the channel to which the report (many 
+%   lines of text) will be written, and \word{classes} is the list of 
+%   classes to include in the report. The supported \word{option}s are:
+%   \begin{ttdescription}
+%     \item[-states]
+%       A string containing letters from the set |[EeRr]|. It is used 
+%       to restrict the report to ambiguities that proved something 
+%       currently having that state. Defaults to |EeRr|.
+%     \item[-truncate]
+%       A boolean, used as \word{truncate} argument of |MVC_report|. 
+%       Defaults to true.
+%   \end{ttdescription}
+%   
+%   \begin{tcl}
+proc overall_comparison_report {F classL args} {
+   variable DBCMD
+   variable RS
+   array set O {-states EeRr -truncate yes}
+   array set O $args
+   set SQL {SELECT pr00f,min(num6er) AS mn FROM ru1es WHERE st4te IN (}
+   set L {}
+   foreach letter [regexp -all -inline {[EeRr]} $O(-states)] {
+      lappend L '$letter'
+   }
+   append SQL [join $L ,] {) GROUP BY pr00f ORDER BY pr00f}
+   thedatabase foreach rrow $SQL {
+      set arow [lindex [
+         $DBCMD(GetAmbiguity) allrows [dict create num6er\
+           [dict get $rrow pr00f]]
+      ] 0]
+      set msg [format {Ambiguity %d (e.g. rule %d)}\
+        [dict get $rrow pr00f] [dict get $rrow mn]]
+      if {[dict exists $arow p1us]} then {
+         append msg [format {, from %d by %d}\
+           [dict get $arow p1us] [dict get $arow m1nus]]
+      }
+      append msg :
+      puts $F $msg
+      prepare_ambiguity $arow
+      heap::skiplist::destroy restheap $RS(rest)
+      dict for {pair blocks} [
+         multiway_compare {*}[dict keys [lindex $RS(re5olution) end]]
+      ] {
+         puts $F "  [join [
+            MWC_report $blocks $classL $O(-truncate)
+         ]]"
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
 % 
 % \subsection{Making new rules}
 % 
@@ -2298,6 +2787,7 @@ proc new_ru1e {state lhs rhs feedbacks args} {
 %   With |me| known, it is possible to discard ambiguities by 
 %   Buchberger's second criterion.
 %   \begin{tcl}
+%<*aprofile>
       foreach row [
          $DBCMD(ADividedBy) allrows $profile
       ] {
@@ -2311,6 +2801,7 @@ proc new_ru1e {state lhs rhs feedbacks args} {
          $DBCMD(AdvanceAmbiguity) allrows $row
          incr Count(a)
       }
+%</aprofile>
 %   \end{tcl}
 %   And with that done, it is possible to deactivate rows in 
 %   |dividedL|. Each deactivation gives rise to an ambiguity, which 
@@ -2477,8 +2968,14 @@ proc new_ru1e_2\
    variable DBCMD
    push_main_task\
 %</splitnewrule>
+%<*aprofile>
    new_ru1e_A $state $lhs $rhs $feedbacks $profile $dividedL $me\
      $merow $when [$DBCMD(ADividedBy) execute $profile] 17
+%</aprofile>
+%<*!aprofile>
+   new_ru1e_B $state $lhs $rhs $feedbacks $profile $dividedL $me\
+     $merow $when $limit
+%</!aprofile>
 }
 %   \end{tcl}
 %   
@@ -2523,6 +3020,10 @@ proc new_ru1e_B {state lhs rhs feedbacks profile dividedL me merow\
       incr Count(p) [$obj rowcount]
       incr Count(P) [expr {-[$obj rowcount]}]
       $obj close
+%<*pairmap>
+      $DBCMD(UnsetPairmap) allrows\
+        [dict create m1nus [dict get $row num6er]]
+%</pairmap>
    }
    set dividedL [lrange $dividedL $limit end]
    if {[llength $dividedL]} then {
@@ -2584,6 +3085,10 @@ proc new_ru1e_BE {state lhs rhs feedbacks profile dividedL me merow\
             incr Count(p) [$obj rowcount]
             incr Count(P) [expr {-[$obj rowcount]}]
             $obj close
+%<*pairmap>
+            $DBCMD(UnsetPairmap) allrows\
+              [dict create m1nus [dict get $row num6er]]
+%</pairmap>
          }
       }
    }
@@ -2615,19 +3120,33 @@ proc new_ru1e_C {me merow when} {
       push_main_task overlaps_between [dict get $row num6er] $me
    }
 %</!lazier>
-%<*lazier>
+%<*lazier&!pairmap>
    variable Count
    set obj [$DBCMD(EstimatePairs) execute [dict replace $merow\
      lhsOrder [expr {[llength [lindex [dict get $merow lhs] 0]]-2}]]]
    incr Count(P) [$obj rowcount]
    $obj close
-%</lazier>
+%</lazier&!pairmap>
+%<*lazier&pairmap>
+   push_main_task estimate_pairs $me\
+     [expr {[llength [lindex [dict get $merow lhs] 0]]-2}]\
+     [dict get $merow vSum] [dict get $merow v2Sum]
+%</lazier&pairmap>
 %<trans>   $DBCMD(database) commit
 }
 %     \end{tcl}
 %   \end{proc}
 % \end{proc}
 % 
+% 
+% \subsection{Pair management}
+% 
+% In the long run, one of the most important issues turns out to be 
+% the proper management of ambiguities and critical pairs, to ensure 
+% good rules are found sooner than later, and to avoid consuming 
+% unreasonable amounts of memory. This has been the fastest mutating 
+% part of the program, which is probably because the bottlenecks here 
+% have been the hardest to predict.
 % 
 % \begin{proc}{make_ambiguity}
 %   This procedure constructs the database row for a new overlap or 
@@ -2705,6 +3224,10 @@ proc make_ambiguity {site feedbacks prow pregion mrow mregion args} {
    set A(m1nus2eg) $mregion
    variable DBCMD
    array set A [network_profile $DBCMD(signature) $site]
+%<*zlib>
+   set A(deflated_m0n0mials)\
+     [zlib deflate [encoding convertfrom utf-8 $A(m0n0mials)] 9]
+%</zlib>
    return [array get A]
 }
 %   \end{tcl}
@@ -2750,6 +3273,11 @@ proc overlaps_between {plus minus} {
          set amb [make_ambiguity [lindex $overlap 0 0]\
            [lindex $overlap 0 1] $prow [lindex $overlap 1] $mrow\
            [lindex $overlap 2]]
+%<*!(vsquare&lazy)>
+         $DBCMD(NewAmbiguity) allrows $amb
+         incr Count(Aa)
+         if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
+%</!(vsquare&lazy)>
 %<*vsquare&lazy>
          if {[dict get $amb v2Re5Sum] <= $am6iguity_top} then {
             $DBCMD(NewAmbiguity) allrows $amb
@@ -2761,11 +3289,6 @@ proc overlaps_between {plus minus} {
             incr Count(P)
          }
 %</vsquare&lazy>
-%<*!(vsquare&lazy)>
-         $DBCMD(NewAmbiguity) allrows $amb
-         incr Count(Aa)
-         if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
-%</!(vsquare&lazy)>
       }
 %<*lazier>
       if {$times} then {
@@ -2786,6 +3309,99 @@ proc overlaps_between {plus minus} {
 % \end{proc}
 % 
 % 
+% \subsubsection{Exact approach}
+% 
+% The exact approach is to immediately enumerate the overlaps of all 
+% pairs that can be formed, and order them by the exact value of the 
+% choice quantity. This turns out to be somewhat slow, as the total 
+% number of pairs that can be formed is (in many cases) much larger 
+% than the number of reasonable pairs, but has not yet hit the bound 
+% beyond which it is unreasonable to keep track of all pairs 
+% (possibly because it hasn't been run as far).
+% 
+% \begin{proc}{pick_next_ambiguity}
+%   This procedure uses the |chooseambiguity| statement to retrieve 
+%   one active ambiguity from the database, prepares the reduction 
+%   machinery to handle it, and pushes |reduce_step| as a task for 
+%   the main loop. In case there are no more active ambiguities in 
+%   the database (hooray!) it pauses the main loop.
+%   \begin{tcl}
+proc pick_next_ambiguity {} {
+   variable DBCMD
+   set resobj [$DBCMD(ChooseAmbiguity) execute]
+   if {[$resobj nextdict amb]} then {
+      $resobj close
+      variable ambiguity_level [dict get $amb v2Re5Sum]
+      if {[check_ambiguity_top $amb]} then {return}
+%<*lazy>
+      if {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
+         push_main_task prereduce_second_criterion $amb
+         return
+      }
+%</lazy>
+      prepare_ambiguity $amb
+      push_main_task reduce_step
+      return
+   } else {
+      $resobj close
+   }
+   set L [$DBCMD(database) allrows {
+      SELECT min(pick8y) AS t0p FROM pa1rs
+   }]
+   if {[dict exists [lindex $L 0] t0p]]} then {
+      push_main_task raise_ambiguity_top [dict get [lindex $L 0] t0p]
+   } else {
+      pause_main_loop
+   }
+}
+%   \end{tcl}
+% \end{proc}
+%   
+% \begin{variable}{am6iguity_top}
+%   The |am6iguity_top| variable holds the largest value currently 
+%   allowed for the picking criterion for an ambiguity that goes into 
+%   the |am6iguities| table. Ambiguities that get a higher value (and 
+%   thus lower priority) than this will instead go into the |pa1rs| 
+%   table. The value increases over time, as it is always kept a bit 
+%   above the line where full ambiguities are being picked for 
+%   resolution, and when this happens then data should be moved back 
+%   from |pa1rs| to |am6iguities|.
+%   
+%   By default |am6iguity_top| is set to |infinity|, which means 
+%   everything is put in the |am6iguities| table.
+%   \begin{tcl}
+variable am6iguity_top infinity
+%   \end{tcl}
+% \end{variable}
+% 
+% \begin{proc}{check_ambiguity_top}
+%   This procedure gets called to check whether |am6iguity_top| 
+%   should be raised, and if so arrange that material is moved from 
+%   the |pa1rs| table to the |am6iguities| table. The reason it is a 
+%   separate procedure is that the exact growth condition needs to 
+%   depend on the quantity used for the picking criterion.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |check_ambiguity_top| \word{ambiguity}
+%   \end{displaysyntax}
+%   where \word{ambiguity} is an ambiguity just picked. The return 
+%   value is |0| if no raise was needed and |1| if it will be 
+%   performed.
+%   \begin{tcl}
+proc check_ambiguity_top {amb} {
+   variable am6iguity_top
+%<vsquare>   set level [expr {3 + round(1.5*[dict get $amb v2Re5Sum])}]
+%<!vsquare>   set level infinity
+   if {$level<=$am6iguity_top} then {return 0}
+   push_main_task raise_ambiguity_top $level
+   return 1
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
 % \begin{proc}{raise_ambiguity_top}
 %   This procedure raises the |am6iguity_top| variable to a higher 
 %   value, and sees to that everything below the new bound gets moved 
@@ -2795,8 +3411,6 @@ proc overlaps_between {plus minus} {
 %   \end{displaysyntax}
 %   and there is no particular return value, but tasks are pushed 
 %   onto the |main_loop_stack|.
-%   
-%   
 %   
 %   \begin{tcl}
 proc raise_ambiguity_top {newtop} {
@@ -2897,126 +3511,333 @@ proc raise_ambiguity_top_A {obj newtop oldtop} {
 % \end{proc}
 % 
 % 
-% \begin{proc}{add_congruence}
-%   This procedure creates a new ambiguity that encodes a given 
-%   congruence. The call syntax is
-%   \begin{displaysyntax}
-%     |add_congruence| \word{feedbacks} \word{lincomb} 
-%     \begin{regblock}[\regstar] \word{option} \word{value} 
-%     \end{regblock}
-%   \end{displaysyntax}
-%   where the \word{lincomb} is a dictionary mapping networks to 
-%   coefficients, that is interpreted as the expression to make 
-%   congruent to $0$. The supported \word{option}s are:
-%   \begin{ttdescription}
-%     \item[-long] long description text,
-%     \item[-short] short description text;
-%   \end{ttdescription}
-%   
+% \subsubsection{Estimating approach}
+% 
+% The estimating approach is instead to only estimate (from 
+% statistics of previous overlaps) how large an overlap for a pair 
+% would be. Pairs are turned into ambiguities when the processing of 
+% ambiguities reach the level at which the pair is estimated to be. 
+% 
+% \begin{variable}{pairs_top}
+%   The |pairs_top| variable keep track of the current boundary 
+%   between sparse pairs and dense pairs. Pairs above this boundary 
+%   are placed in the |pa1rsMap| table, other pairs in the |pa1rs| 
+%   table. The value (arbitrarily) starts at $50$ and is raised in 
+%   steps of $50$.
 %   \begin{tcl}
-proc add_congruence {feedbacks dict args} {
-   array set O $args
-   switch -- [info exists O(-long)][info exists O(-short)] {
-     00 {set O(-long) [set O(-short) ""]}
-     01 {set O(-long) $O(-short)}
-     10 {set O(-short) $O(-long)}
-   }
-   set A(feed6acks) $feedbacks
-   set A(m0n0mials) {}
-   set resD [dict create]
-   variable coefficient
-   set z [{*}$coefficient 0]
-   dict for {NW r} $dict {
-      set NW [network::pure::canonise $NW]
-      if {![info exists NWID($NW)]} then {
-         set NWID($NW) [llength $A(m0n0mials)]
-         lappend A(m0n0mials) $NW
-      }
-      dict update resD $NWID($NW) s {
-         if {![info exists s]} then {set s $z}
-         set s [{*}$coefficient + $s $r]
-         if {[{*}$coefficient iszero $s]} then {unset s}
-      }
-   }
-   if {![dict size $resD]} then {return "That's just 0=0"}
-   set A(re5olution) [list $resD]
-   set A(vRe5Sum) 0
-   set A(v2Re5Sum) 0
-   dict for {mu r} $resD {
-      set order [expr {[llength [lindex $A(m0n0mials) $mu 0]]-2}]
-      incr A(vRe5Sum) $order
-      incr A(v2Re5Sum) [expr {$order*$order}]
-   }
-   set A(si7e) [lindex $A(m0n0mials) 0]
-   set A(wh3n1) [clock seconds]
-   set A(st4te) A
-   set A(wh1ch) {}
-   set A(wh3re) {}
-   set A(p1us2eg) $O(-long)
-   set A(m1nus2eg) $O(-short)
+%<+pairmap>variable pairs_top 50
+%<-pairmap>variable pairs_top infinity
+%   \end{tcl}
+%   ToDo: It would be nice if the scheme for raising |pairs_top| 
+%   could be so that there was a constant bound for the number of 
+%   times a pair might be put in |pa1rsMap|. Find a scheme which 
+%   delivers this.
+% \end{variable}
+% 
+% \begin{proc}{estimate_pairs}
+%   This procedure creates the pairs that can be formed from a new 
+%   rule, estimating their |pick8y| value and placing them into the 
+%   |pa1rs| or |pa1rMap| table accordingly. The call syntax is
+%   \begin{displaysyntax}
+%     |estimate_pairs| \word{minus-number} 
+%     \word{lhs-order} \word{v-sum} \word{$v^2$-sum}
+%   \end{displaysyntax}
+%   where \word{minus-number} is the |num6er| of the rule that should 
+%   be |m1nus| in the new pairs, and the other arguments are the data 
+%   for this rule that are used when estimating the |v2Re5Sum| of the 
+%   corresponding ambiguity.
+%   There is no particular return value, and the procedure pushes tasks 
+%   on the main loop stack.
+%   
+%   In fact, all the procedure does is to start a transaction and 
+%   fetch the |overl4p| data; all the pair generation is handled by 
+%   the iterate procedure |estimate_pairs_A|.
+%   \begin{tcl}
+proc estimate_pairs {minus lhs_order vsum v2sum} {
    variable DBCMD
-   array set A [network_profile $DBCMD(signature)]
-   $DBCMD(NewAmbiguity) allrows [array get A]
-   variable Count
-   incr Count(Aa)
+   $DBCMD(database) begintransaction
+   push_main_task estimate_pairs_A [$DBCMD(GetOverl4ps) allrows] ""\
+     $minus $lhs_order $vsum $v2sum
 }
+%   \end{tcl}
+%   
+%   \begin{proc}{estimate_pairs_A}
+%     The call syntax of |estimate_pairs_A| is
+%     \begin{displaysyntax}
+%       |estimate_pairs_A| \word{overlap-data} \word{pair-map} 
+%       \word{minus-number} \word{lhs-order} \word{v-sum} 
+%       \word{$v^2$-sum}
+%     \end{displaysyntax}
+%     where \word{overlap-data} is (a tail of) the list returned by 
+%     the |GetOverl4ps| statement, \word{pair-map} is the part of the 
+%     |plu5es| that has been computed so far, and remaining arguments 
+%     are as for |estimate_pairs|. This procedure either processes the 
+%     \word{overlap-data} to end, sets the row in |pa1rMap|, and 
+%     commits the transaction, or reschedules itself with the remaining 
+%     \word{overlap-data}; the number of |ru1es| considered in a chunk 
+%     is at most $512$. Either way, it also inserts rows into the 
+%     |pa1rs| table.
+%     
+%     \begin{tcl}
+proc estimate_pairs_A {overlapL plu5es minus lhs_order vsum v2sum} {
+   variable DBCMD
+   variable pairs_top
+   variable Count
+   set bits ""
+   foreach row $overlapL {
+      if {[dict get $row st4te] in {R E}} then {
+         set overlap [expr {[dict get $row overl4pTimes]>0 ? 
+            double([dict get $row overl4pSum]) / 
+              [dict get $row overl4pTimes] 
+            : 1.0
+         }]
+         set annex1 [expr {$lhs_order - $overlap}]
+         set annex2 [expr {[dict get $row lhsOrder] - $overlap}]
+         set pick8y [expr {
+            $annex1*($annex1 + 2*[dict get $row vSum]) +
+            [dict get $row v2Sum] + $annex2*($annex2 + 2*$vsum) +
+            $v2sum
+         }]
+         if {$pick8y > $pairs_top} then {
+            append bits 1
+            incr Count(PP)
+         } else {
+            append bits 0
+            $DBCMD(AddPair) allrows [dict create \
+              p1us [dict get $row num6er] m1nus $minus pick8y $pick8y]
+            incr Count(P)
+         }
+      } else {
+         append bits 0
+      }
+      if {[string length $bits] == 512} then {break}
+   }
+   append plu5es [binary format B* $bits]
+   set tail [lrange $overlapL [string length $bits] end]
+   if {[llength $tail]} then {
+      push_main_task estimate_pairs_A $tail $plu5es $minus\
+        $lhs_order $vsum $v2sum
+   } else {
+      if {![regexp -- {^\0*$} $plu5es]} then {
+         $DBCMD(SetPairmap) allrows\
+           [dict create  m1nus $minus  plu5es $plu5es]
+      }
+      $DBCMD(database) commit
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{proc}
+% 
+% 
+% \begin{proc}{resieve_pairs}
+%   The |resieve_pairs| procedure goes through the |pairMap| table, 
+%   making |pa1rs| out of bits which do not exceed the current 
+%   |pairs_top|, and clearing bits belonging to inactive |ru1es|. 
+%   There are no arguments, nor any particular return value.
+%   
+%   What this procedure primarily does is that it fetches the lists 
+%   of |overl4p| data and (|m1nus| values of) rows in the |pa1rMap| 
+%   table. These are then frozen, and helper tasks are used to 
+%   process them.
+%   \begin{tcl}
+proc resieve_pairs {} {
+   variable Count
+   set Count(PP) 0
+   variable DBCMD
+   set overlapL [$DBCMD(GetOverl4ps) allrows]
+   set minusL [concat {*}[$DBCMD(ListPairmaps) allrows -as lists]]
+   push_main_task resieve_pairs_A $overlapL $minusL
+}
+%   \end{tcl}
+%   
+%   \begin{proc}{resieve_pairs_A}
+%     The |resieve_pairs_A| procedure is the |resieve_pairs| iterate 
+%     at the |pairMap| row level. Its call syntax is
+%     \begin{displaysyntax}
+%       |resieve_pairs_A| \word{overlap-data} \word{minus-list}
+%     \end{displaysyntax}
+%     where \word{overlap-data} is the result of the |GetOverl4ps| 
+%     statement (as dicts) and \word{minus-list} is the list of 
+%     |m1nus| values that still need to be processed.
+%     
+%     The procedure works by popping off the first element of the 
+%     \word{minus-list} and processing this in a manner similar to 
+%     that of the |estimate_pairs| procedure, which includes pushing 
+%     a |resieve_pairs_B| task onto the main loop stack. But first 
+%     this procedure has pushed the task of applying itself to the 
+%     rest of the \word{minus-list}, so that all of that gets 
+%     processed.
+%     \begin{tcl}
+proc resieve_pairs_A {overlapL minusL} {
+   if {[llength $minusL]>1} then {
+      push_main_task resieve_pairs_A $overlapL [lrange $minusL 1 end]
+   }
+   set minus [lindex $minusL 0]
+   set row [lindex $overlapL $minus-1]
+   if {[dict get $row num6er] != $minus} then {
+      error "Assertion failed"
+   }
+   variable DBCMD
+   $DBCMD(database) begintransaction
+   set L [$DBCMD(GetPairmap) allrows -as lists [dict create m1nus $minus]]
+   if {![llength $L]} then {return}
+   push_main_task resieve_pairs_B $overlapL [lindex $L 0 0] "" $row
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{resieve_pairs_B}
+%     The call syntax of |resieve_pairs_B| is
+%     \begin{displaysyntax}
+%       |resieve_pairs_B| \word{overlap-data} \word{pair-map old} 
+%       \word{pair-map new} \word{minus-row}
+%     \end{displaysyntax}
+%     where \word{overlap-data} and \word{pair-map new} are like the 
+%     \word{overlap-data} and \word{pair-map} arguments of 
+%     |estimate_pairs_A|. \word{pair-map old} is the part of the 
+%     old |plu5es| value that hasn't been processed yet, and each bit 
+%     of it corresponds to an element of \word{overlap-data}. The 
+%     \word{minus-row} is the element of the \word{overlap-data} that 
+%     corresponds to the |m1nus| part of the pair.
+%     
+%     The \word{overlap-data} are considered in chunks of $512$ 
+%     elements.
+%     
+%     \begin{tcl}
+proc resieve_pairs_B {overlapL plu5es_old plu5es_new mrow} {
+   variable DBCMD
+   variable pairs_top
+   variable Count
+   if {![binary scan $plu5es_old B512a* bits_old tail_old]} then {
+      binary scan $plu5es_old B* bits_old
+      set bits_old [string trimright $bits_old 0]
+      set tail_old ""
+   }
+   set bits_new ""
+   foreach bit [split $bits_old ""] prow $overlapL {
+      if {$bit eq ""} then {break}
+      if {[dict get $prow st4te] in {R E}} then {
+         set overlapTimes [expr {[dict get $prow overl4pTimes] +\
+           [dict get $mrow overl4pTimes]}]
+         if {$overlapTimes>0} then {
+            set overlap [expr {
+               double( 
+                  [dict get $prow overl4pSum] + 
+                  [dict get $mrow overl4pSum]
+               ) / $overlapTimes
+            }]
+         } else {
+            set overlap 1.0
+         }
+         set annex1 [expr {[dict get $mrow lhsOrder] - $overlap}]
+         set annex2 [expr {[dict get $prow lhsOrder] - $overlap}]
+         set pick8y [expr {
+            $annex1*($annex1 + 2*[dict get $prow vSum]) +
+            [dict get $prow v2Sum] + [dict get $mrow v2Sum] +
+            $annex2*($annex2 + 2*[dict get $mrow vSum])
+         }]
+         if {$pick8y > $pairs_top} then {
+            append bits_new 1
+            incr Count(PP)
+         } else {
+            append bits_new 0
+            $DBCMD(AddPair) allrows [dict create  pick8y $pick8y \
+              p1us [dict get $prow num6er] \
+              m1nus [dict get $mrow num6er]]
+            incr Count(P)
+         }
+      } else {
+         append bits_new 0
+      }
+   }
+   append plu5es_new [binary format B* $bits_new]
+   if {[string length $tail_old]} then {
+      push_main_task resieve_pairs_B\
+        [lrange $overlapL 512 end] $tail_old $plu5es_new $mrow
+   } else {
+      if {[regexp -- {^\0*$} $plu5es_new]} then {
+         $DBCMD(UnsetPairmap) allrows\
+           [dict create  m1nus [dict get $mrow num6er]]
+      } else {
+         $DBCMD(SetPairmap) allrows [dict create \
+           m1nus [dict get $mrow num6er]  plu5es $plu5es_new]
+      }
+      $DBCMD(database) commit
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{proc}
+% 
+% 
+% 
+% \begin{proc}{pick_next_ambiguity}
+%   The estimating approach form of |pick_next_ambiguity| is quite 
+%   different from its exact form, since this picks both a pair and 
+%   an ambiguity, and processes only the smaller of the two. Pairs in 
+%   the |pa1rMap| table are only considered if the |pa1rs| table is 
+%   empty, since the best computed estimate for any of them must be 
+%   larger than the |pairs_top|.
+%   \begin{tcl}
+%<*lazier&vsquare>
+proc pick_next_ambiguity {} {
+   variable DBCMD
+   variable pairs_top
+   set aobj [$DBCMD(ChooseAmbiguity) execute]
+   set pobj [$DBCMD(LeastPair) execute]
+   if {[$pobj nextdict pair]} then {
+      if {![$aobj nextdict amb]} then {
+         push_main_task overlaps_between [dict get $pair p1us]\
+           [dict get $pair m1nus]
+      } elseif {[dict get $pair pick8y] <= [dict get $amb v2Re5Sum]} then {
+%   \end{tcl}
+%   The point of processing pairs at a level before ambiguities is to 
+%   gather more data for estimating overlap sizes.
+%   \begin{tcl}
+         push_main_task overlaps_between [dict get $pair p1us]\
+           [dict get $pair m1nus]
+%<*BB2>
+      } elseif {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
+         push_main_task prereduce_second_criterion $amb
+%</BB2>
+      } else {
+         prepare_ambiguity $amb
+         push_main_task reduce_step
+      }
+   } elseif {[$aobj nextdict amb]} then {
+      if {[dict get $amb v2Re5Sum] >= $pairs_top} then {
+         set pairs_top [expr {$pairs_top + 50}]
+         push_main_task resieve_pairs
+%<*BB2>
+      } elseif {[dict exists $amb p1us] && [dict exists $amb m1nus]} then {
+         push_main_task prereduce_second_criterion $amb
+%</BB2>
+      } else {
+         prepare_ambiguity $amb
+         push_main_task reduce_step
+      }
+%<*pairmap>
+   } elseif {[llength [$DBCMD(ListPairmaps) allrows]]} then {
+      set pairs_top [expr {$pairs_top + 50}]
+      push_main_task resieve_pairs
+%</pairmap>
+   } else {
+      pause_main_loop
+   }
+   $aobj close
+   $pobj close
+   variable ambiguity_level\
+     [if {[info exists amb]} then {dict get $amb v2Re5Sum}]
+   variable pair_level\
+     [if {[info exists pair]} then {format %.1f [dict get $pair pick8y]}]
+}
+%</lazier&vsquare>
 %   \end{tcl}
 % \end{proc}
 % 
-% \begin{proc}{enter_congruence}
-%   This procedure is a conveniency wrapped around |add_congruence|. 
-%   The call syntax is
-%   \begin{displaysyntax}
-%     |enter_congruence| \begin{regblock}[\regstar] \word{option} 
-%     \word{value} \end{regblock} \word{feedbacks} 
-%     \begin{regblock}[\regstar] \word{coefficient} \word{scan-list} 
-%     \end{regblock}
-%   \end{displaysyntax}
-%   where the \word{scan-list}s are passed on to 
-%   |network::pure::construct| to make a network, which is then 
-%   paired up with the \word{coefficient}. The \word{option}s can be 
-%   whatever |add_congruence| takes, but they are distinguished from 
-%   the list of \word{feedbacks} by having list length $1$ and 
-%   beginning with `|-|'.
-%   
-%   \begin{tcl}
-proc enter_congruence {args} {
-   variable DBCMD
-   set state "option"
-   set resD [dict create]
-   set optL {}
-   foreach arg $args {
-      switch -- $state "option" {
-         if {[llength $arg]==1 && [string match -* $arg]} then {
-            lappend optL $arg
-            set state "value"
-         } else {
-            set feedbacks $arg
-            set state "coefficient"
-         }
-      } "value" {
-         lappend optL $arg
-         set state "option"
-      } "coefficient" {
-         set c $arg
-         set state "scanlist"
-      } "scanlist" {
-         set NW [network::pure::construct $DBCMD(signature) $arg]
-         dict set resD $NW $c
-         set state "coefficient"
-      }
-   }
-   switch -- $state "option" {
-      error "Expected list of feedbacks"
-   } "value" {
-      error "Expected value for option: $arg"
-   } "scanlist" {
-      error "Expected network scanlist for coefficient: $arg"
-   }
-   add_congruence $feedbacks $resD {*}$optL
-}
-%   \end{tcl}
-% \end{proc}
+% 
+% 
 % 
 % 
 % \section{Viewing results}
@@ -3036,6 +3857,19 @@ proc enter_congruence {args} {
 % Still, there is a place for interactive viewing of what the utility 
 % is up to, so it makes sense to adapt some parts of the previous 
 % utility to view rules in a database.
+% 
+% \begin{variable}{vertex_appearances}
+% \begin{variable}{vertex_sizes}
+%   The |vertex_appearances| variable holds the dictionary of 
+%   appearances for the vertex types currently occuring in the rule 
+%   networks. It is used by those procedures that draw or 
+%   redraw networks. The |vertex_sizes| variable is a list patterns 
+%   and vertex sizes for use with |make_level-layout-Tk|.
+%   \begin{tcl}
+set vertex_sizes {* {20 20}}
+%   \end{tcl}
+% \end{variable}\end{variable}
+% 
 % 
 % 
 % \subsection{A rule browser}
@@ -3204,19 +4038,6 @@ proc center_network {c {id all}} {
 % 
 % 
 % 
-% \begin{variable}{vertex_appearances}
-% \begin{variable}{vertex_sizes}
-%   The |vertex_appearances| variable holds the dictionary of 
-%   appearances for the vertex types currently occuring in the rule 
-%   networks. It is used by those procedures that draw or 
-%   redraw networks. The |vertex_sizes| variable is a list patterns 
-%   and vertex sizes for use with |make_level-layout-Tk|.
-%   \begin{tcl}
-set vertex_sizes {* {20 20}}
-%   \end{tcl}
-% \end{variable}\end{variable}
-% 
-% 
 % \begin{proc}{display_rule}
 %   The |display_rule| procedure updates the rule browser window to 
 %   show the specified rule or equality. The syntax is
@@ -3343,6 +4164,19 @@ proc draw_network_feedbacks {c fbL NWval center args} {
 % \end{proc}
 % 
 % 
+% \begin{proc}{draw_network_lincomb}
+%   This procedure draws a linear combination of networks and returns 
+%   the bounding box of the material drawn. The call syntax is
+%   \begin{displaysyntax}
+%     |draw_network_lincomb| \word{canvas} \word{lincomb} \word{$x$} 
+%     \word{$y$} \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{canvas} is the thing to draw on, \word{lincomb} is 
+%   the linear combination of networks to draw, and $(x,y)$ is the 
+%   reference point of the material drawn. The options are numerous
+% \end{proc}
+% 
 % 
 % \begin{proc}{display_rule_proof}
 %   This procedure displays the proof of a rule (technically the 
@@ -3381,7 +4215,10 @@ proc display_rule_proof {prefix number args} {
    set L [$DBCMD(GetAmbiguity) allrows [dict create num6er $number]]
    if {![llength $L]} then {return}
    set arow [lindex $L 0]
-%
+%<*zlib>
+   dict set arow m0n0mials [encoding convertfrom utf-8\
+     [zlib inflate [dict get $arow deflated_m0n0mials]]]
+%</zlib>
    array set Opt {
       -tags "" 
       -eqtext "="
@@ -3426,6 +4263,9 @@ proc display_rule_proof {prefix number args} {
 %     \begin{regblock}[\regstar] \word{monomial number} \{ \word{rule 
 %     number} \word{region} \} \end{regblock} \word{monomial number}
 %   \end{displaysyntax}
+%   It is also necessary to verify that there are two terms in each 
+%   step, and that the term with the monomial not acted upon stays 
+%   fixed; otherwise some very incorrect proof displays may follow.
 %   \begin{tcl}
 proc display_monomial_proof {prefix arow optD} {
    variable coefficient
@@ -3434,8 +4274,9 @@ proc display_monomial_proof {prefix arow optD} {
    set plusL {}
    set minusL {}
    foreach  step [lrange [dict get $arow re5olution] 0 end-1] \
+     nextstep [lrange [dict get $arow re5olution] 1 end] \
      which [dict get $arow wh1ch]  where [dict get $arow wh3re]  {
-      if {[dict size $step] != 2} then {return 0}
+      if {[dict size $step] != 2} then {return {}}
       set mu [lindex $where 0]
       if {[{*}$coefficient = $one [dict get $step $mu]]} then {
          lappend plusL $mu [list $which [lindex $where 1]]
@@ -3444,6 +4285,10 @@ proc display_monomial_proof {prefix arow optD} {
       } else {
          return {}
       }
+      set notmu [lindex [dict keys [dict remove $step $mu]] 0]
+      if {![dict exists $nextstep $notmu] ||\
+        ![{*}$coefficient = [dict get $step $notmu]\
+          [dict get $nextstep $notmu]]} then {return {}}
    }
    dict for {mu r} [lindex [dict get $arow re5olution] end] {
       if {[{*}$coefficient = $one $r]} then {
@@ -3747,6 +4592,403 @@ rule_browser_layout
 % \end{tcl}
 % 
 % 
+% \subsection{Rules as SVG}
+% 
+% An alternative means of presentation is to generate an XHTML page 
+% with the rules as SVG (and in the future: coefficients in MathML). 
+% This is slighly experimental, though.
+% 
+% \begin{proc}{rule_as_XHTML}
+%   This procedure basically takes a rule (in the form of a database 
+%   row dictionary) as argument and returns a data-tree representing 
+%   an XHTML paragraph presenting that rule. The call syntax is
+%   \begin{displaysyntax}
+%     |rule_as_XHTML| \word{rule}
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   The supported \word{option}s are:
+%   \begin{ttdescription}
+%     \item[-vertexobjs]
+%       The value is the dictionary of data-trees to use for the 
+%       vertices. If this option is not given, then the 
+%       |SVG_appearances| procedure is called to compute these.
+%   \end{ttdescription}
+%   
+%   \begin{tcl}
+proc rule_as_XHTML {row args} {
+   variable vertex_appearances
+   if {[dict exists $args -vertexobjs]} then {
+      set vobjD [dict get $args -vertexobjs]
+   } else {
+      set vobjD [network::rich::SVG_appearances $vertex_appearances]
+   }
+   variable vertex_sizes
+   set children {}
+   lappend children [
+      network::rich::as_SVG $vobjD -val [
+         network::rich::Tk_from_pure [dict get $row lhs]\
+           $vertex_sizes $vertex_appearances
+      ]
+   ]
+   variable coefficient
+   dict for {mu r} [dict get $row rhs] {
+      set s [{*}$coefficient - $r]
+      if {[string length $s] < [string length $r]} then {
+         lappend children {#text " \u2212 "}
+      } else {
+         lappend children {#text { + }}
+         set s $r
+      }
+      if {$s ne "1"} then {lappend children [list #text $s]}
+      lappend children [
+         network::rich::as_SVG $vobjD -val [
+            network::rich::Tk_from_pure $mu\
+              $vertex_sizes $vertex_appearances
+         ]
+      ]
+   }
+   if {[llength $children] == 1} then {
+      lappend children [list #text " \u2261 0"]
+   } elseif {[lindex $children 1] eq {#text { + }}} then {
+      lset children 1 [list #text " \u2261 "]
+   } else {
+      lset children 1 1 " \u2261[lindex $children 1 1]"
+   }
+   return [list p {} $children]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{resolution_as_XHTML}
+%   This procedure takes an ambiguity (in the form of a database row 
+%   dictionary) as argument and returns a data-tree representing an 
+%   XHTML paragraph presenting the resolution of that ambiguity. It 
+%   is assumed that the ambiguity has |p1us| and |m1nus| elements. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%      |resolution_as_XHTML| \word{row} \begin{regblock}[\regstar]
+%      \word{option} \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   and the supported options are:
+%   \begin{ttdescription}
+%     \item[-vertexobjs]
+%       The value is the dictionary of data-trees to use for the 
+%       vertices. If this option is not given, then the 
+%       |SVG_appearances| procedure is called to compute these.
+%     \item[-rulelink]
+%       If provided, this option signals that rule annotations should 
+%       be links to these rules. The value is a command prefix with 
+%       call syntax
+%       \begin{displaysyntax}
+%         \meta{value} \word{number}
+%       \end{displaysyntax}
+%       that returns the URI for rule \word{number}. The |format| 
+%       command is often useful for this.
+%   \end{ttdescription}
+%   
+%   First generate rich forms of the monomials involved. The site is 
+%   put last.
+%   \begin{tcl}
+proc resolution_as_XHTML {row args} {
+%<*zlib>
+   dict set row m0n0mials [encoding convertfrom utf-8\
+      [zlib inflate [dict get $row deflated_m0n0mials]]]
+%</zlib>
+   variable vertex_appearances
+   variable vertex_sizes
+   set richL {}
+   dict lappend row m0n0mials [dict get $row si7e]
+   foreach NW [dict get $row m0n0mials] {
+      lappend richL [network::rich::Tk_from_pure $NW\
+        $vertex_sizes $vertex_appearances]
+   }
+%   \end{tcl}
+%   The $i$th element of |whichObjL| is the XHTML object for the 
+%   annotation of the relation leading to the $i$th element of the 
+%   |re5olution|. In the future, these may contain links to the rules 
+%   rather than just their numbers.
+%   \begin{tcl}
+   if {[dict exists $args -rulelink]} then {
+      set cmd [dict get $args -rulelink]
+      set L {}
+      foreach step [list [dict get $row p1us] [dict get $row m1nus]] {
+         lappend L [list a [
+            dict create href [{*}$cmd $step]
+         ] [list [list #text $step]]]
+      }
+      set whichObjL [list [
+         list span {class relsince} [linsert $L 1 {#text ", "}]
+      ]]
+      foreach step [dict get $row wh1ch] {
+         lappend whichObjL [
+            list span {class relsince} [list [
+               list a [dict create href [{*}$cmd $step]] [list [
+                  list #text $step
+               ]]
+            ]]
+         ]
+      }
+   } else {
+      set whichObjL [list [
+         list span {class relsince} [list [
+            list #text "[dict get $row p1us], [dict get $row m1nus]"
+         ]]
+      ]]
+      foreach step [dict get $row wh1ch] {
+         lappend whichObjL [
+            list span {class relsince} [list [
+               list #text $step
+            ]]
+         ]
+      }
+   }
+%   \end{tcl}
+%   Now it's time to start generating SVG code.
+%   \begin{tcl}
+   if {[dict exists $args -vertexobjs]} then {
+      set vobjD [dict get $args -vertexobjs]
+   } else {
+      set vobjD [network::rich::SVG_appearances $vertex_appearances]
+   }
+   set children {}
+   lappend children [
+      network::rich::as_SVG $vobjD -val [lindex $richL end]
+   ] [list #text " \u2212 "]
+   lappend children [lindex $children 0]
+   variable coefficient
+   foreach which $whichObjL sum [dict get $row re5olution] {
+      lappend children [list span {class stackrel} [
+         list $which [list span {class stackedrel} {{#text \u2261}}]
+      ]]
+      set first 1
+      dict for {mu r} $sum {
+         set s [{*}$coefficient - $r]
+         if {[string length $s] < [string length $r]} then {
+            lappend children {#text " \u2212 "}
+         } elseif {!$first} then {
+            lappend children {#text { + }}
+            set s $r
+         } else {
+            set s $r
+         }
+         if {$s ne "1"} then {lappend children [list #text $s]}
+         lappend children\
+            [network::rich::as_SVG $vobjD -val [lindex $richL $mu]]
+         set first 0
+      }
+      if {$first} then {lappend children {#text 0}}
+   }
+   return [list p {} $children]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{XHTML_prologue}
+%   This procedure writes a suitable XHTML prologue (up to and 
+%   including the opening |body| tag) to a channel. The call syntax is
+%   \begin{displaysyntax}
+%     |XHTML_prologue| \word{channel} \word{title}
+%   \end{displaysyntax}
+%   where \word{title} is XML code that will be put in the |head|, 
+%   and should include a |title| element.
+%   \begin{tcl}
+proc XHTML_prologue {F title} {
+   puts $F {<?xml version="1.0"?>}
+   puts $F {<!DOCTYPE html PUBLIC\
+    "-//W3C//DTD XHTML 1.1 plus MathML 2.0 plus SVG 1.1//EN"\
+    "http://www.w3.org/2002/04/xhtml-math-svg/xhtml-math-svg.dtd">}
+   puts $F {<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"}
+   puts $F {      xmlns:xlink="http://www.w3.org/1999/xlink">}
+   puts $F {<head>}
+   puts $F $title
+   puts $F {
+    <style type="text/css">
+%   \end{tcl}
+%   The following is the general style for networks.
+%   \begin{tcl}
+       svg.network {
+         border-style: dotted;
+         border-width: thin;
+         vertical-align: middle;
+         margin-top: 1pt;
+         margin-bottom: 1pt;
+       }
+%   \end{tcl}
+%   The following are used to make an XHTML equivalent of |\stackrel|.
+%   \begin{tcl}
+       span.stackrel {
+         display: inline-block;
+         vertical-align: baseline;
+       }
+       span.relsince {
+         display: block;
+         font-size: x-small;
+         text-align: center;
+       }
+       span.stackedrel {
+         display: block;
+         text-align: center;
+       }
+    </style>
+  }
+  puts $F {</head><body>}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{XHTML_rule_file}
+%   This procedure creates a new file, and writes a full XHTML page 
+%   with one or several rules to it. The call syntax is
+%   \begin{displaysyntax}
+%     |XHTML_rule_file| \word{filename} \word{ruleno}\regstar
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc XHTML_rule_file {fname args} {
+   set F [open $fname w]
+   fconfigure $F -encoding utf-8
+   XHTML_prologue $F [mtmtcl::support::xml_from_tree [
+      list title {} [list [list #text "Rules [join $args {, }]"]]
+   ] -nodesep ""]
+%   \end{tcl}
+%   Since vertices are reused over and over again, the following 
+%   establishes objects that can be referenced.
+%   \begin{tcl}
+   set defL {}
+   set refD [dict create]
+   variable vertex_appearances
+   dict for {name obj} [
+      network::rich::SVG_appearances $vertex_appearances
+   ] {
+      if {[regexp {^[A-Za-z0-9_.-]*$} $name]} then {
+         set id "v-$name"
+      } else {
+         set id "tcl_[info cmdcount]"
+      }
+      lappend defL [lreplace $obj 1 1 [
+         dict replace [lindex $obj 1] id $id
+      ]]
+      dict set refD $name [list use [
+         dict create  xlink:href "#$id"
+      ] {}]
+   }
+   puts $F [mtmtcl::support::xml_from_tree [
+      list svg {xmlns http://www.w3.org/2000/svg display none} $defL
+   ]]
+%   \end{tcl}
+%   At first it seemed that it would be natural to wrap up the 
+%   referenced objects in a |symbol| element, but that turned out to 
+%   require setting up a |viewBox| for each and every one of them, 
+%   whereas referencing the objects themselves Just Works.
+%   
+%   Now generate the rules.
+%   \begin{tcl}
+   if {![llength $args]} then {
+      set args [concat {*}[thedatabase allrows -as lists\
+        {SELECT num6er FROM ru1es}]]
+   }
+   variable DBCMD
+   foreach ruleno $args {
+      puts $F [mtmtcl::support::xml_from_tree [
+         list h1 [dict create id "rule-$ruleno"]\
+           [list [list #text "Rule $ruleno"]]
+      ] -nodesep ""]
+      set rrow [lindex\
+        [$DBCMD(GetRu1e) allrows [dict create num6er $ruleno]] 0]
+      set msg [clock format [dict get $rrow wh3n1]\
+        -format "Derived %H:%M:%S %Z, %a %b %d %Y."]
+      if {[dict exists $rrow wh3n2]} then {
+         append msg [clock format [dict get $rrow wh3n2]\
+        -format " Retired %H:%M:%S %Z, %a %b %d %Y."]
+      }
+      puts $F [mtmtcl::support::xml_from_tree [
+         list p {} [list [list #text $msg]]
+      ]]
+      puts $F [mtmtcl::support::xml_from_tree [
+         rule_as_XHTML $rrow -vertexobjs $refD
+      ]]
+      set arow [lindex [$DBCMD(GetAmbiguity) allrows\
+        [dict create num6er [dict get $rrow pr00f]]] 0]
+%   \end{tcl}
+%   \begin{tcl}
+      if {[dict exists $arow p1us]} then {
+         puts $F {<h5 style="display: run-in">Proof.</h5>}
+         puts $F [mtmtcl::support::xml_from_tree [
+            resolution_as_XHTML $arow -vertexobjs $refD\
+              -rulelink {::format {#rule-%d}}
+         ]]
+      } else {
+         puts $F [mtmtcl::support::xml_from_tree [
+            list p {} [list [
+               list #text [dict get $arow p1us2eg]
+            ]]
+         ]]
+      }
+   }
+   puts $F {</body></html>}
+   close $F
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Resolutions as proofs}
+% 
+% Resolutions are the back bones of proofs for rules, but they are 
+% not always optimal as presentations of proofs; even though the rule 
+% is obvious from the last step, each individual step is often a mix 
+% of two separate reduction paths, and it would be clearer (sometimes 
+% also shorter) if these could be separated. The following aims to 
+% transform a resolution to a multistep equation where the left hand 
+% side is the rule left hand side, the right hand side is the rule 
+% right hand side, and each step consists of adding some 
+% $rv(a -\nobreak \mu)$ to the whole thing.
+% 
+% \begin{proc}{standalone_resolution}
+%   This procedure generates a standalone form of a resolution, to be 
+%   used in further processing. The call syntax is
+%   \begin{displaysyntax}
+%     |standalone_resolution| \word{ambiguity}
+%   \end{displaysyntax}
+%   where the \word{ambiguity} is the dictionary for a row in the 
+%   |am6iguity| table (with noncompressed |m0n0mials| entry). The 
+%   return value is a list
+%   \begin{displaysyntax}
+%     \word{resolution} \word{which-list} \word{what-list} 
+%     \word{where-list} \word{coeff-list} \word{monomials}
+%   \end{displaysyntax}
+%   which is similar to an ambiguity, but with some subtle 
+%   differences. The primary differences are that the |p1us| and 
+%   |m1nus| entries have been incorporated into the 
+%   \word{which-list}, and the |wh3re| entry has been split on the 
+%   \word{what-list} and the \word{where-list}, but there are also 
+%   some minor modifications: the |si7e| is in \word{monomials}, it is 
+%   mentioned twice in \word{what-list}, and of course the |p1us2eg| 
+%   and |m1nus2eg| have been inserted into the \word{where-list}. All 
+%   of this aims to make the resolution more self-contained.
+%   
+%   Formally,
+%   \begin{displaymath}
+%     \texttt{[lindex~\word{resolution}~$n$]} =
+%     \sum_{k=0}^n r_k \bigl( t_k(\mu_k) - \mu_k \bigr)
+%   \end{displaymath}
+%   where \(r_k ={}\)\texttt{[lindex \word{coeff-list} $k$]}, 
+%   \(\mu_k={}\)\texttt{[lindex \word{what-list} $k$]}, and $t_k$ is 
+%   the simple reduction which applies {[lindex \word{which-list} 
+%   $k$]} at {[lindex \word{where-list} $k$]} in $\mu_k$. It is 
+%   always the case that \(\mu_0=\mu_1={}\)|si7e|, \(r_0=-1\), and 
+%   \(r_1=1\).
+%   
+%   \begin{tcl}
+proc standalone_resolution {amb} {
+   set monomials [dict get $amb m0n0mials]
+   
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
 % \section{Examples}
 % 
 % \subsection{Hopf algebra}
@@ -3789,13 +5031,13 @@ set vertex_appearances {
    }
    Re {
       {rectangle {square 8} {}
-       text {offsets {0 0}} {-font "Times 8" -text R}} 
+       text {offsets {0 0}} {-font {-size -10} -text R}} 
       {{0 8}}
       {}
    }
    Im {
       {rectangle {square 8} {}
-       text {offsets {0 0}} {-font "Times 8" -text I}} 
+       text {offsets {0 0}} {-font {-size -10} -text I}} 
       {{0 8}}
       {}
    }
@@ -3834,6 +5076,31 @@ proc flatten_biaffine {prefix element} {
    lappend res {*}[{*}$prefix part end $element]
    lappend res {*}[{*}$prefix part begin $element]
    foreach row [{*}$prefix part open $element] {lappend res {*}$row}
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{semiflatten_biaffine}
+%   This procedure returns a dictionary whose entries are flat lists 
+%   of components from a biaffine \PROP\ element. The call syntax is
+%   \begin{displaysyntax}
+%     |flatten_biaffine| \word{PROP} \word{element}
+%   \end{displaysyntax}
+%   where the \word{PROP} is a command prefix supporting the |part| 
+%   method of a |biaffine| \PROP, and \word{element} is an element of 
+%   that \PROP. The return value has entries |A|, |b|, |c|, and |d|, 
+%   each containing a flat list of the components from their respective 
+%   part of the \word{element}.
+%   \begin{tcl}
+proc semiflatten_biaffine {prefix element} {
+   set res [dict create]
+   dict set res d [list [{*}$prefix part closed $element]]
+   dict set res c [{*}$prefix part end $element]
+   dict set res b [{*}$prefix part begin $element]
+   foreach row [{*}$prefix part open $element] {
+      dict lappend res A {*}$row
+   }
    return $res
 }
 %   \end{tcl}
@@ -4044,7 +5311,7 @@ proc set_cmpcmds {} {
    incr blocks
 %   \end{tcl}
 %   The fourth comparison level is about ordering the sides of the 
-%   ``Yang--Baxter equation'':
+%   braiding equation\slash``Yang--Baxter equation'':
 %   |. twist \n twist . \n . twist| is less than 
 %   |twist . \n . twist \n twist .|. The difference comes out for the 
 %   middle strand in this braid, as it goes first right and then left 
@@ -4097,10 +5364,13 @@ proc set_cmpcmds {} {
    incr blocks
 %</cocomplex>
    set RS(cmpkeycmd) [list [namespace which biaffine_PROP_key] $map]
-   set size [expr {
-     ( 1 + [llength [lindex $RS(si7e) 0 0 2]] ) *
-     ( 1 + [llength [lindex $RS(si7e) 0 1 1]] )
-   }]
+   set inputs [llength [lindex $RS(si7e) 0 1 1]]
+   set outputs [llength [lindex $RS(si7e) 0 0 2]]
+   set size [expr { (1+$outputs) * (1+$inputs) }]
+   set L [list d]
+   lappend L {*}[lrepeat $inputs c] {*}[lrepeat $outputs b]
+   lappend L {*}[lrepeat [expr {$inputs*$outputs}] A]
+   set RS(cmpclass) [lrepeat $blocks {*}$L]
    set RS(cmpcmds)\
      [lrepeat [expr {$blocks*$size}] [list ::tcl::mathop::-]]
    set RS(cmpblocks)\
