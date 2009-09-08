@@ -1763,10 +1763,11 @@ proc network::pure::edgeorder {NW {arr ""}} {
 % input edges.
 % 
 % The breadth first search is practically carried out by two commands 
-% \describestring[proc][network::canonical]{vertex}|vertex| and 
-% \describestring[proc][network::canonical]{edge}|edge|, which expect 
-% to be called in a context where a couple of variables to operate on 
-% exist. The first of these is \describestring[var.]{NW}|NW|, which is 
+% \describestring[proc][network::pure::canonise]{vertex}|vertex| and 
+% \describestring[proc][network::pure::canonise]{edge}|edge|, which 
+% expect to be called from a context where a couple of variables 
+% (which can be local) to operate on exist. The first of these is 
+% \describestring[var.]{NW}|NW|, which is 
 % the original network being searched through; it is not modified in 
 % this process. \describestring[var.]{queue}|queue| is a list whose 
 % elements are on one of the two forms
@@ -1791,9 +1792,9 @@ proc network::pure::edgeorder {NW {arr ""}} {
 % is complete when |SCR| and |queue| have the same number of elements.
 % 
 % \begin{tcl}
-namespace eval network {namespace eval canonical {}}
+namespace eval network::pure::canonise {}
 % \end{tcl}
-% \setnamespace{network::canonical}
+% \setnamespace{network::pure::canonise}
 % 
 % \begin{proc}{vertex}
 %   The |vertex| procedure has the syntax
@@ -1805,7 +1806,7 @@ namespace eval network {namespace eval canonical {}}
 %   and |Ecan| with any new edges it discovers. There is no 
 %   particular return value.
 %   \begin{tcl}
-proc network::canonical::vertex {label} {
+proc network::pure::canonise::vertex {label} {
    upvar 1 NW NW SCR SCR Ecan Ecan queue queue
    set me [list [lindex $NW 0 $label 0]]
    foreach i {1 2} {
@@ -1831,10 +1832,10 @@ proc network::canonical::vertex {label} {
 %   \end{quote}
 %   Its task is to append the element for the edge with label 
 %   \word{label} in |NW| to the |SCR| list and update |queue| 
-%   and |Vcan| with any new edges it discovers. There is no 
+%   and |Vcan| with any new vertices it discovers. There is no 
 %   particular return value.
 %   \begin{tcl}
-proc network::canonical::edge {label} {
+proc network::pure::canonise::edge {label} {
    upvar 1 NW NW SCR SCR Vcan Vcan queue queue
    set me [list ""]
    foreach {v i} [lindex $NW 1 $label] {
@@ -1867,7 +1868,7 @@ proc network::canonical::edge {label} {
 %   above (actually the final value of that list) that gives a mapping 
 %   of SCR labels to \word{network} labels.
 %   \begin{tcl}
-proc network::canonical::component_SCR {NW start} {
+proc network::pure::canonise::component_SCR {NW start} {
    set queue [list [list vertex $start]]
    set Vcan($start) 0
    set SCR {}
@@ -1879,13 +1880,17 @@ proc network::canonical::component_SCR {NW start} {
 %   \end{tcl}
 % \end{proc}
 % 
-% \begin{proc}{form}
-%   The |network::canonical::form| procedure is the top-level command 
-%   for computing the canonical form of a network. It has the syntax
-%   \begin{quote}
-%     |network::canonical::form| \word{network}
-%   \end{quote}
-%   and returns an equivalent network, but in canonical form.
+% 
+% \begin{proc}{labelling}
+%   The |labelling| procedure is the top-level command in the 
+%   |network::pure::canonise| namespace. It has the syntax
+%   \begin{displaysyntax}
+%     network::pure::canonise::labelling \word{network}
+%   \end{displaysyntax}
+%   and returns a list of four lists $V_\mathrm{c}$, $E_\mathrm{c}$, 
+%   $V_\mathrm{nc}$, and $E_\mathrm{nc}$, in that order. The c-lists 
+%   map noncanonical labels to canonical labels, whereas the nc-lists 
+%   map canonical labels to noncanonical labels.
 %   
 %   The procedure starts by computing an SCR for the ``exterior 
 %   component'' (i.e., the set of vertices in the same component as 
@@ -1893,7 +1898,7 @@ proc network::canonical::component_SCR {NW start} {
 %   in this work appear in the proper order, even if the labels may 
 %   be a little off (but that can be sorted out later).
 %   \begin{tcl}
-proc network::canonical::form {NW} {
+proc network::pure::canonise::labelling {NW} {
    set queue [list [list vertex 0] [list vertex 1]]
    array set Vcan {0 0 1 1}
    set SCR {}
@@ -1908,8 +1913,8 @@ proc network::canonical::form {NW} {
 %   track of those vertices which have not yet been put into a 
 %   component.
 %   \begin{tcl}
-   for {set v 0} {$v < [llength [lindex $NW 0]]} {incr v} {
-      set moreV($v) {}
+   set n -1; foreach v [lindex $NW 0] {incr n
+      set moreV($n) {}
    }
    foreach pair $queue {
       if {[lindex $pair 0] eq "vertex"} then {
@@ -1979,12 +1984,34 @@ proc network::canonical::form {NW} {
    set n -1; foreach l $ncVL {incr n; lset cVL $l $n}
    set cEL $ncEL
    set n -1; foreach l $ncEL {incr n; lset cEL $l $n}
+   return [list $cVL $cEL $ncVL $ncEL]
+}
 %   \end{tcl}
-%   Finally, the network |NW| is rebuilt with canonical labelling. 
-%   (It might make sense to split this last step off into a separate 
-%   |network::pure::canonise|, so that there is a procedure which 
-%   returns the canonical renumbering as such.)
+% \end{proc}
+% 
+% \setnamespace{network::pure}
+% 
+% \begin{proc}{canonise}
+%   The |network::pure::canonise| procedure is the top-level command 
+%   for computing the canonical form of a network. It has the syntax
+%   \begin{displaysyntax}
+%     network::pure::canonise \word{network} \word{embed-var}\regopt
+%   \end{displaysyntax}
+%   and returns an equivalent network, but in canonical form. If a 
+%   \word{embed-var} is specified, then the variable by that name in 
+%   the calling context is filled in with the embedding 
+%   (see~Subsection~\ref{Ssec:Regionkirurgi}) of the old labelling 
+%   into the canonical network.
+%   
+%   Most of the actual work of finding the canonical labelling is 
+%   done by |canonise::labelling|, so this procedure is mostly about 
+%   rebuilding the network.
 %   \begin{tcl}
+proc network::pure::canonise {NW {embedvar ""}} {
+   foreach {cVL cEL ncVL ncEL} [canonise::labelling $NW] break
+   if {$embedvar ne ""} then {
+      uplevel 1 [list ::set $embedvar [list $cVL $cEL [llength $cEL]]]
+   }
    set V {}
    foreach v $ncVL {
       set L [list [lindex $NW 0 $v 0]]
@@ -2003,29 +2030,9 @@ proc network::canonical::form {NW} {
    }
    return [list $V $E]
 }
-namespace eval network::canonical {namespace export form}
 %   \end{tcl}
 % \end{proc}
 % 
-% \setnamespace{network::pure}
-% 
-% \begin{proc}[network::pure]{canonise}
-%   For practical reasons, it is more convenient to collect all 
-%   high-level operations (such as |network::canonical::form|) that 
-%   operate on pure networks in a |network::pure| namespace. Hence it 
-%   is imported there and renamed appropriately. The call syntax is 
-%   still
-%   \begin{quote}
-%     |network::pure::canonise| \word{network}
-%   \end{quote}
-%   \begin{tcl}
-namespace eval network::pure {
-   namespace import [namespace parent]::canonical::form
-   rename form canonise
-   namespace export canonise
-}
-%   \end{tcl}
-% \end{proc}
 % 
 % 
 % \subsection{\PROP py operations}
@@ -2358,9 +2365,9 @@ proc network::pure::substitute {NW dict} {
 % specific regions within the network as the parts to detach and 
 % replace with new pieces. A \emph{region} in a given network is 
 % technically specified as a list with the structure
-% \begin{quote}
+% \begin{displaysyntax}
 %   \word{vertex-list} \word{output-list} \word{input-list}
-% \end{quote}
+% \end{displaysyntax}
 % where the \word{vertex-list} is the list (in no particular order) 
 % of labels of the vertices in the piece, \word{output-list} is the 
 % list of labels of output edges, and \word{input-list} is the list 
@@ -2368,7 +2375,44 @@ proc network::pure::substitute {NW dict} {
 % may include entire components in the network. The outputs and 
 % inputs are needed (i)~because the order of these must be specified 
 % and (ii)~because regions may include stray edges that go directly 
-% from input to output. \word{vertices} must not contain |0| or |1|.
+% from input to output. The \word{vertex-list} must not include |0| 
+% or~|1|.
+% 
+% A related concept is that of an \emph{embedding} of a network $H$ in 
+% another network $G$. This is encoded as a list
+% \begin{displaysyntax}
+%   \word{vertex-map} \word{edge-map} \word{target-size}
+% \end{displaysyntax}
+% where the \word{vertex-map} is a list indexed by vertex labels in 
+% $H$ giving the label of the corresponding vertex in $G$, the 
+% \word{edge-map} is a list indexed by edge labels in $H$ giving the 
+% label of the corresponding edge in $G$, and \word{target-size} is 
+% the total number of edges in $G$. The first two elements of the 
+% \word{vertex-map} are arbitrary; some procedures set them to |x| to 
+% signal that it would be an error to use them as indices.
+% 
+% The practical difference between the two concepts is in the point 
+% of view they provide of the subnetwork in question. A region 
+% describes the subnetwork from the outside, fixing the boundary so 
+% that another network can replace it. An embedding describes the 
+% subnetwork from the inside, making it possible to speak about parts 
+% of a subnetwork. Embeddings are often computed when a supernetwork 
+% is constructed from a known network, and one wants to keep track of 
+% features from the original network appearing in the supernetwork. 
+% Embeddings and regions are to some extent interchangeable, but 
+% conversions back and forth require knowledge about the networks 
+% that are involved, so they should not be undertaken without good 
+% reason. 
+% 
+% 
+% \paragraph{Edge concatenation}
+% 
+% More formally, one could say an embedding $b$ describes a semigraph 
+% homomorphism \(H \Fpil G\), whereas a region $r$ does the same up 
+% to automorphisms of $H$. These homomorphism are injective on 
+% vertices and inner edges, \emph{but may concatenate legs}.
+% 
+% ---
 % 
 % A more formal definition of a \word{region} as above would be that 
 % it is a semigraph monomorphism, embedding one network $H$ as a 
@@ -2910,6 +2954,59 @@ proc network::pure::replace {G region K} {
       error "Wrong number of inputs in replacement network"
    }
    annex [detach $G $region] $K
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{forward_region}
+%   The |forward_region| procedure pushes a region forward over an 
+%   embedding, returning the corresponding region in the embedding's 
+%   target network. The call syntax is
+%   \begin{displaysyntax}
+%     |network::pure::forward_region| \word{embedding} \word{region}
+%   \end{displaysyntax}
+%   
+%   This is mostly a matter of translating the \word{region} labels 
+%   using the \word{embedding}, but there is a slight complication in 
+%   that an edge may be composed from several segments. Therefore the 
+%   first step collects pairs `\word{embedding-label} 
+%   \word{region-label}' by the real target edge to which they refer 
+%   in the |E| array. Then the |P| array, which maps such pairs to 
+%   final edge-segment labels, is filled in accordingly.
+%   \begin{tcl}
+proc network::pure::forward_region {emb reg} {
+   set mg [lindex $emb 2]
+   set mh [llength [lindex $emb 1]]
+   foreach L [list [lindex $reg 1] [lindex $reg 2]] var {p0L p1L} {
+      set $var {}
+      foreach eh $L {
+         set eg [lindex $emb 1 [expr {$eh % $mh}]]
+         set p [list $eg $eh]
+         lappend E([expr {$eg % $mg}]) $p
+         lappend $var $p
+      }
+   }
+   foreach i [array names E] {
+      set mj 0
+      foreach p [
+         lsort -index 0 -integer [lsort -index 1 -integer\
+           [lsort -unique $E($i)]]
+      ] {
+         set P($p) [expr {$i + $mj}]
+         incr mj $mg
+      }
+   }
+   set L {}
+   foreach v [lindex $reg 0] {lappend L [lindex $emb 0 $v]}
+   set res [list $L]
+   set L {}
+   foreach p $p0L {lappend L $P($p)}
+   lappend res $L
+   set L {}
+   foreach p $p1L {lappend L $P($p)}
+   lappend res $L
+   return $res
 }
 %   \end{tcl}
 % \end{proc}
@@ -10277,10 +10374,15 @@ namespace eval network::rich {}
 % 
 % A similar entry is 
 % \describestring[rich entry]{ecurve-Tk-tt}|ecurve-Tk-tt|, which 
-% contains coordinates for the edge as a Tk canvas |line| item with 
+% contains coordinates for the edges as a Tk canvas |line| item with 
 % |-smooth true| settings. The entry itself is a list with one element 
 % per edge (indexed by edge label) and each element is the actual list 
-% of coordinates.
+% of coordinates. Alternatively, an 
+% \describestring+[rich entry]{ecurve-Tk-raw} entry coordinates for the 
+% edges as a Tk canvas |line| item with |-smooth raw| settings (i.e., 
+% in terms of cubic curves). The curves need not be equivalent if 
+% both entries are present, but both should work for the given vertex 
+% positions.
 % 
 % Of more technical importance is the 
 % \describestring[rich entry]{canonical}|canonical| entry. If present, 
@@ -11781,6 +11883,107 @@ proc network::rich::ecurve-Tk-tt_by_level {dict style val} {
 % \end{proc}
 % 
 % 
+% \begin{proc}{ecurve-Tk-raw_by_level}
+%   This procedure sets the |ecurve-Tk-raw| entry of a network using 
+%   the coordinates found in the |level-layout-Tk| entry and a 
+%   vertex appearance table. The call syntax is
+%   \begin{quote}
+%     |network::rich::ecurve-Tk-raw_by_level| \word{appearance}
+%     \begin{regblock}|-val| \word{network}\regalt
+%     |-var| \word{array-name}\end{regblock}
+%   \end{quote}
+%   where the two options have their standard interpretation and 
+%   \word{appearance} is a dictionary mapping vertex annotations to 
+%   appearances.
+%   \begin{tcl}
+proc network::rich::ecurve-Tk-raw_by_level {dict style val} {
+   switch -- $style "-val" {
+      array set NW $val
+   } "-var" {
+      upvar 1 $val NW
+   } default {
+      error "Must specify -val or -var"
+   }
+   array set Look $dict
+%   \end{tcl}
+%   The procedure first goes through the entire layout and records 
+%   $x$-coordinates, $y$-coordinates, and half-heights in the array 
+%   |Node| that has indices on the forms |vertex |\word{n} and 
+%   |edge |\word{n}. The entries are flat lists with the structure
+%   \begin{quote}
+%     \begin{regblock}[\regstar]\word{$x$} \word{$y$} 
+%     \word{$h/2$}\end{regblock}
+%   \end{quote}
+%   and the first triplet corresponds to the occurrence of this item 
+%   that is closest to the output.
+%   \begin{tcl}
+   foreach {comp bbox} $NW(level-layout-Tk) {
+      foreach {level y h} $comp {
+         foreach item $level {
+            lappend Node([lrange $item 0 1]) [lindex $item 2] $y $h
+         }
+      }
+   }
+%   \end{tcl}
+%   The next step is to compute the actual edge coordinates, for each 
+%   edge in sequence. The curve has one straight line segment for 
+%   each level being passed through, one curve segment with inflexion 
+%   for each space between two levels, and one extra curve segment 
+%   each at the head and tail.
+%   
+%   ---
+%   
+%   that is constructed has one control 
+%   point in each level that the edge encounters and two control 
+%   points between two levels, which are used to determine tangents 
+%   for the curve. The vertical position is $y+h$ for the control 
+%   point below a level at position $y$ that has half-height $h$ and 
+%   similarly $y-h$ for the control point above this level. 
+%   Horizontal positions are chosen to get the wanted tangents.
+%   
+%   The loop first constructs coordinates for levels where the edge 
+%   is mentioned, as if those are levels which the edge pass through. 
+%   Then adjustments are made at the ends, either inserting 
+%   coordinates for the attachment to a vertex, or removing the extra 
+%   coordinate pair just past the end of a leg.
+%   \begin{tcl}
+   set res {}
+   foreach e [lindex $NW(pure) 1] {
+      set L {}
+      foreach {x y h} [lappend "Node(edge [llength $res])"] {
+         lappend L $x [expr {$y+$h}] $x $y $x [expr {$y-$h}]
+      }
+      if {[lindex $e 0] >= 2} then {
+         foreach {x y h} $Node(vertex [lindex $e 0]) break
+         set look $Look([lindex $NW(pure) 0 [lindex $e 0] 0])
+         foreach {dx1 dy1 dx2 dy2} [
+            linsert [lindex $look 2 [lindex $e 1]] end 0 -1
+         ] break
+         set L [linsert $L 0 [expr {$x+$dx1}] [expr {$y+$dy1}]\
+           [expr {$x+$dx1 - $dx2*($dy1+$h)/$dy2}] [expr {$y-$h}]]
+      } else {
+         set L [lreplace $L 0 1]
+      }
+      if {[lindex $e 2] >= 2} then {
+         foreach {x y h} $Node(vertex [lindex $e 2]) break
+         set look $Look([lindex $NW(pure) 0 [lindex $e 2] 0])
+         foreach {dx1 dy1 dx2 dy2} [
+            linsert [lindex $look 1 [lindex $e 3]] end 0 1
+         ] break
+         lappend L [expr {$x+$dx1 + $dx2*($h-$dy1)/$dy2}]\
+           [expr {$y+$h}] [expr {$x+$dx1}] [expr {$y+$dy1}]
+      } else {
+         set L [lreplace $L end-1 end]
+      }
+      lappend res $L
+   }
+   set NW(ecurve-Tk-tt) $res
+   if {$style eq "-val"} then {return [array get NW]}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
 % \subsection{Elastic edges}
 % 
 % [The following was first done in version 1 of the \textsf{network} 
@@ -12207,6 +12410,15 @@ proc network::elastic_edges {NWvar TAvar {minrs 0.6}} {
 %       The value of the |class| attribute for the top-level |svg| 
 %       element. Defaults to |network|. An empty string means the 
 %       attribute is omitted.
+%     \item[-setstroke]
+%       Takes a boolean value, defaults to true. When true, the 
+%       attributes |fill="none" stroke="currentColor"| are applied to 
+%       the top-level SVG element, as that is the most practical 
+%       default by virtue of being the same as in Tk. If these 
+%       attributes are instead supplied through a class, then turning 
+%       |-setstroke| off yields less code.
+%       \changes{2.5}{2009/07/27}{Switching to stroking as default 
+%          paint mode in SVG networks. (LH)}
 %     \iffalse
 %     \item[-region]
 %       Takes as value a region which may be highlighted in the 
@@ -12225,7 +12437,7 @@ proc network::elastic_edges {NWvar TAvar {minrs 0.6}} {
 %   
 %   \begin{tcl}
 proc network::rich::as_SVG {vertexD args} {
-   array set Opt {-class network}
+   array set Opt {-class network -setstroke 1}
    array set Opt $args
    if {[info exists Opt(-val)]} then {
       array set NW $Opt(-val)
@@ -12237,6 +12449,9 @@ proc network::rich::as_SVG {vertexD args} {
    array set SVG $vertexD
    set attr [dict create xmlns http://www.w3.org/2000/svg]
    if {$Opt(-class) ne ""} then {dict set attr class $Opt(-class)}
+   if {$Opt(-setstroke)} then {
+      dict set attr  fill none  stroke currentColor
+   }
    if {[info exists NW(bbox-Tk)]} then {
       dict set attr width\
         [expr {[lindex $NW(bbox-Tk) 2] - [lindex $NW(bbox-Tk) 0]}]
@@ -12263,9 +12478,7 @@ proc network::rich::as_SVG {vertexD args} {
          lappend dataL T
          foreach {x y} [lrange $knotL 4 end] {lappend dataL $x $y}
       }
-      lappend childL [list path [
-         list  d [join $dataL]  fill none  stroke currentColor
-      ] {}]
+      lappend childL [list path [dict create d [join $dataL]] {}]
    }
 %   \end{tcl}
 %   \begin{tcl}
@@ -12353,15 +12566,17 @@ proc network::rich::tosvg::rectangle {coordcmd opts ns} {
 %   
 %   A difference between Tk and SVG is that most items on the Tk 
 %   |canvas| default to being stroked, whereas the corresponding SVG 
-%   items default to being filled.
+%   items default to being filled. Items in networks are however 
+%   assumed to inherit a default of stroking with |currentColor| and 
+%   no filling.
 %   \begin{tcl}
 proc network::rich::tosvg::_opts2paint\
   {allopts fill_is_stroke stroke_by_default} {
    set opts {}
    set attr [dict create]
-   if {$stroke_by_default} then {
-      dict set attr fill none
-      dict set attr stroke currentColor
+   if {!$stroke_by_default} then {
+      dict set attr fill currentColor
+      dict set attr stroke none
    }
 %   \end{tcl}
 %   The main loop has a simple |switch| as body. Right now it only 

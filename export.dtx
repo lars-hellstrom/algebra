@@ -61,6 +61,115 @@
 % \stringtypeheading{attribute}{Data-tree attributes:}
 % 
 % 
+% \subsection{XML generation}
+% 
+% Since the data-tree format was taken over from \textsf{tdom}, the 
+% basic approach would be to use that for generating XML, but there 
+% is also a need for more lightweight generators in cases where 
+% readability is not an issue but employing extensions is.
+% 
+% \begin{tcl}
+%<*xmlgen>
+namespace eval mtmtcl::support {}
+% \end{tcl}
+% \setnamespace{mtmtcl::support}
+% 
+% \begin{proc}{xml_from_tree}
+%   This procedure is the toplevel generator of XML code from a 
+%   data-tree. The call syntax is
+%   \begin{displaysyntax}
+%     |mtmtcl::support::xml_from_tree| \word{tree} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{tree} of course is the tree to convert and the return 
+%   value is the converted tree as XML code. The supported options 
+%   are:
+%   \begin{ttdescription}
+%     \item[-nodesep]
+%       Basic separator inserted between nodes of the tree; defaults 
+%       to a newline. Setting it to empty reduces the output size, 
+%       but may well have the effect of making the entire result a 
+%       single very long line.
+%     \item[-indentstep]
+%       An indentation step, defaults to being empty. Some repetition 
+%       (corresponding to nesting depth) of this string follows the 
+%       |-nodesep|.
+%     \item[-charmap]
+%       A dictionary of character to entity mappings used with 
+%       |string map| to quote problematic characters in XML character 
+%       data. Defaults to being empty. The five syntax characters 
+%       `|<|', `|>|', `|&|', `|'|', and `|"|' are automatically 
+%       inserted into this dictionary if they are not already there.
+%   \end{ttdescription}
+%   \begin{tcl}
+proc mtmtcl::support::xml_from_tree {tree args} {
+   array set Opt {
+      -nodesep    \n
+      -indentstep ""
+      -charmap    {}
+   }
+   array set Opt $args
+   if {![dict size $Opt(-charmap)]} then {
+      set Opt(-charmap) {< &lt; > &gt; & &amp; ' &apos; \" &quot;}
+   } else {
+      foreach char {< > & ' \"} entity {&lt; &gt; &amp; &apos; &quot;} {
+         if {![dict exists $O(-charmap) $char]} then {
+            dict set $O(-charmap) $char $entity
+         }
+      }
+   }
+   xml_from_treenode $tree $Opt(-nodesep) $Opt(-indentstep)\
+     $Opt(-charmap)
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{xml_from_treenode}
+%   This is a more internal procedure that generates the XML fragment 
+%   for a particular branch of the tree. The call syntax is
+%   \begin{displaysyntax}
+%     |xml_from_treenode| \word{branch} \word{node-sep} 
+%     \word{indent-step} \word{char-map}
+%   \end{displaysyntax}
+%   
+%   Not surprisingly, it relies on recursion to convert the tree as a 
+%   whole.
+%   \begin{tcl}
+proc mtmtcl::support::xml_from_treenode {tree sep indent map} {
+   switch -- [lindex $tree 0] "#text" - "#cdata" {
+      return [string map $map [lindex $tree 1]]
+   } "#comment" {
+      return "<!--[lindex $tree 1]-->"
+   } "#pi" {
+      return "<?[lindex $tree 1] [lindex $tree 2]?>"
+   }
+   set res "<[lindex $tree 0]"
+   dict for {key val} [lindex $tree 1] {
+      append res { } $key =\" [string map $map $val] \"
+   }
+   if {[llength [lindex $tree 2]]} then {
+      set subsep $sep$indent
+      append res ">"
+      foreach child [lindex $tree 2] {
+         append res $subsep\
+           [xml_from_treenode $child $subsep $indent $map]
+      }
+      append res $sep "</[lindex $tree 0]>"
+   } else {
+      append res "/>"
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{tcl}
+%</xmlgen>
+% \end{tcl}
+% 
+% 
 % \subsection{Near-OpenMath}
 % 
 % The basic format of data-trees encoding \mtl\ structure elements 

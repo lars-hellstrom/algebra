@@ -4629,7 +4629,7 @@ proc rule_as_XHTML {row args} {
       network::rich::as_SVG $vobjD -val [
          network::rich::Tk_from_pure [dict get $row lhs]\
            $vertex_sizes $vertex_appearances
-      ]
+      ] -setstroke 0
    ]
    variable coefficient
    dict for {mu r} [dict get $row rhs] {
@@ -4706,8 +4706,8 @@ proc resolution_as_XHTML {row args} {
 %   \end{tcl}
 %   The $i$th element of |whichObjL| is the XHTML object for the 
 %   annotation of the relation leading to the $i$th element of the 
-%   |re5olution|. In the future, these may contain links to the rules 
-%   rather than just their numbers.
+%   |re5olution|. Depending on the presence of a |-rulelink| option, 
+%   these may contain links to the rules or just their numbers.
 %   \begin{tcl}
    if {[dict exists $args -rulelink]} then {
       set cmd [dict get $args -rulelink]
@@ -4753,7 +4753,7 @@ proc resolution_as_XHTML {row args} {
    }
    set children {}
    lappend children [
-      network::rich::as_SVG $vobjD -val [lindex $richL end]
+      network::rich::as_SVG $vobjD -val [lindex $richL end] -setstroke 0
    ] [list #text " \u2212 "]
    lappend children [lindex $children 0]
    variable coefficient
@@ -4774,7 +4774,8 @@ proc resolution_as_XHTML {row args} {
          }
          if {$s ne "1"} then {lappend children [list #text $s]}
          lappend children\
-            [network::rich::as_SVG $vobjD -val [lindex $richL $mu]]
+            [network::rich::as_SVG $vobjD -val [lindex $richL $mu]\
+              -setstroke 0]
          set first 0
       }
       if {$first} then {lappend children {#text 0}}
@@ -4813,6 +4814,8 @@ proc XHTML_prologue {F title} {
          vertical-align: middle;
          margin-top: 1pt;
          margin-bottom: 1pt;
+         fill: none;
+         stroke: currentColor;
        }
 %   \end{tcl}
 %   The following are used to make an XHTML equivalent of |\stackrel|.
@@ -4968,10 +4971,10 @@ proc XHTML_rule_file {fname args} {
 %   of this aims to make the resolution more self-contained.
 %   
 %   Formally,
-%   \begin{displaymath}
+%   \begin{equation} \label{Eq:StandaloneResolution}
 %     \texttt{[lindex~\word{resolution}~$n$]} =
 %     \sum_{k=0}^n r_k \bigl( t_k(\mu_k) - \mu_k \bigr)
-%   \end{displaymath}
+%   \end{equation}
 %   where \(r_k ={}\)\texttt{[lindex \word{coeff-list} $k$]}, 
 %   \(\mu_k={}\)\texttt{[lindex \word{what-list} $k$]}, and $t_k$ is 
 %   the simple reduction which applies {[lindex \word{which-list} 
@@ -4979,14 +4982,175 @@ proc XHTML_rule_file {fname args} {
 %   always the case that \(\mu_0=\mu_1={}\)|si7e|, \(r_0=-1\), and 
 %   \(r_1=1\).
 %   
+%   The first complication for this is that the |si7e| is not 
+%   guaranteed to be canonical; it has to be canonised and the two 
+%   regions modified accordingly.
 %   \begin{tcl}
 proc standalone_resolution {amb} {
    set monomials [dict get $amb m0n0mials]
-   
+   set mu0 [llength $monomials]
+   lappend monomials\
+     [network::pure::canonise [dict get $amb si7e] relabel]
+   set whatL [set whichL [set whereL [set coeffL {}]]]
+   lappend whatL $mu0 $mu0
+   lappend whichL [dict get $amb m1nus] [dict get $amb p1us]
+   lappend whereL\
+     [network::pure::forward_region $relabel [dict get $amb m1nus2eg]]\
+     [network::pure::forward_region $relabel [dict get $amb p1us2eg]]
+   variable coeff
+   set one [{*}$coeff 1]
+   set mone [{*}$coeff - $one]
+   lappend coeffL $mone $one
+%   \end{tcl}
+%   The second complication is that the argument does not contain 
+%   sufficient information for reconstructing the first step of the 
+%   \word{resolution} (although it is usually possible to make a good 
+%   guess), since terms from the respective |rhs|'s of the |p1us| and 
+%   |m1nus| rules could have cancelled. Therefore the |m1nus| rule 
+%   underlying $t_0$ is fetched from the database, and the
+%   $-\bigl( t_0(\mu_0) -\nobreak \mu_0 \bigr)$ term is recomputed.
+%   \begin{tcl}
+   set D [dict create $mu0 $one]
+   variable DBCMD
+   set rule [lindex [
+      $DBCMD(GetRu1e) allrows [dict create num6er [lindex $which 0]]
+   ] 0]
+   set NWG [network::pure::detach [lindex $monomials end]\
+     [lindex $whereL 0]]
+   dict for {NWH r} [dict get $rule rhs] {
+      set NW [network::pure::canonise\
+        [network::pure::annex $NWG $NWH]]
+      set nu [lsearch -exact $monomials $NW]
+      if {$nu<0} then {
+         set nu [llength $monomials]
+         lappend monomials $NW
+      }
+      dict update D $nu s {
+         if {[info exists s]} then {
+            set s [{*}$coeff - $s $r]
+         } else {
+            set s [{*}$coeff - $r]
+         }
+         if {[{*}$coeff iszero $s]} then {unset s}
+      }
+   }
+%   \end{tcl}
+%   Finally the rest of the various lists are built up; this does not 
+%   require any calculations.
+%   \begin{tcl}
+   set resL [list $D {*}[dict get $amb re5olution]]
+   lappend whichL {*}[dict get $amb wh1ch]
+   foreach pair [dict get $amb wh3re] step [dict get $amb re5olution] {
+      if {![llength $pair]} then {break}
+      lappend whatL [lindex $pair 0]
+      lappend whereL [lindex $pair 1]
+      lappend coeffL [dict get $step [lindex $pair 0]]
+   }
+   return [list $resL $whichL $whatL $whereL $coeffL $monomials]
 }
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% \begin{proc}{solve_SAR_for}
+%   This procedure takes a standalone resolution (as returned by 
+%   |standalone_resolution|) and a monomial in the final step as 
+%   argument. It returns a list on the same general form as a 
+%   standalone resolution, and in particular applying the same rules 
+%   as in the input resolution, but with the difference that all the 
+%   steps are congruent to the given monomial; each step is thus a 
+%   ``right hand side'' to this ``left hand side''. This is used to 
+%   turn a resolution into a more narrative proof of a rule, by 
+%   treating it as a multistep equation that is solved for the given 
+%   monomial.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |solve_SAR_for| \word{standalone res.} \word{lhs} 
+%     \word{factor}\regopt\ \word{start}\regopt
+%   \end{displaysyntax}
+%   where the \word{lhs} is an index into the \word{monomials} 
+%   element of the \word{standalone res.}. It is presumed that an 
+%   \word{lhs} term appears in the final step of the resolution. It 
+%   is also required that each \word{what} (except the zeroeth) has 
+%   a nonzero term in the previous step of the resolution; this 
+%   condition will typically not be fulfilled by the result.
+%   
+%   The optional \word{factor} argument is the coefficient for 
+%   \word{lhs} in the implicit left hand side; it defaults to $1$. 
+%   The optional \word{start} argument is what to use as starting 
+%   point for the resolution. It defaults to \word{factor} times 
+%   \word{lhs}, which generally corresponds to solving for this. If 
+%   that was only a term in a larger sum, it may instead be 
+%   appropriate to use the full sum as \word{start}.
+%   
+%   There are three loops in the procedure. The first of these 
+%   decomposes the \word{resolution}~\eqref{Eq:StandaloneResolution} 
+%   into individual terms, as a preparation for rearranging them. 
+%   Arithmetic with linear combinations of monomials is provided by 
+%   the |mtmtcl::rings::semigroup_algebra| ensemble, a prefix for 
+%   which is kept in the |M| variable. The first loop also computes 
+%   a table (in the |S| array) of in which steps in the input 
+%   resolution each particular monomial appears.
+%   \begin{tcl}
+proc solve_SAR_for {SAR lhs args} {
+   variable coeff
+   set M [list ::mtmtcl::rings::semigroup_algebra\
+     ::mtmtcl::rings::integer $coeff]
+   set termL {}
+   set sum [{*}$M 0]
+   foreach partial [lindex $SAR 0] {
+      dict for {mu r} $partial {lappend S($mu) [llength $termL]}
+      lappend termL [{*}$M - $partial $sum]
+      set sum $partial
+   }
+%   \end{tcl}
+%   The second loop constructs the first half of the output 
+%   resolution, which goes from \word{lhs} to $\mu_0$ through a 
+%   series of monomials such that the previous one is introduced by a 
+%   reduction acting on the next.
+%   \begin{tcl}
+   if {[llength $args]>0} then {
+      set factor [lindex $args 0]
+   } else {
+      set factor [{*}$coeff 1]
+   }
+   set scale [{*}$coeff - [{*}$coeff / $factor [dict get $sum $lhs]]]
+   if {[llength $args]>1} then {
+      set sum [lindex $args 1]
+   } else {
+      set sum [dict create $lhs $factor]
+   }
+   set sumL {}; set coeffL {}
+   set whatL {}; set whichL {}; set whereL {}
+   while {[set n [lindex $S($lhs) 0]]} {
+      lappend whichL [lindex $SAR 1 $n]
+      lappend whatL  [lindex $SAR 2 $n]
+      lappend whereL [lindex $SAR 3 $n]
+      lappend coeffL [{*}$coeff * $scale [lindex $SAR 4 $n]]
+      set sum [{*}$M + $sum [{*}$M . $scale [lindex $termL $n]]]
+      lappend sumL $sum
+      lset $termL $n {}
+      set lhs [lindex $whatL end]
+   }
+%   \end{tcl}
+%   The second loop clears the |termL| entries for the steps it has 
+%   processed. The third loop processes remaining terms.
+%   \begin{tcl}
+   foreach term $termL  which [lindex $SAR 1]  what [lindex $SAR 2] \
+     where [lindex $SAR 3]  r [lindex $SAR 4] {
+      if {![dict size $term]} then {continue}
+      set sum [{*}$M + $sum [{*}$M . $scale $term]]
+      lappend sumL $sum
+      lappend whichL $which
+      lappend whatL  $what
+      lappend whereL $where
+      lappend coeffL [{*}$coeff * $scale $r]
+   }
+   return [list $sumL $whichL $whatL $whereL $coeffL [lindex $SAR 5]]
+}
+%   \end{tcl}
+% \end{proc}
 % 
 % 
 % \section{Examples}
