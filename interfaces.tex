@@ -163,12 +163,12 @@ lower level structures.
   $\mathbb{Z}$.
   
   Consider next the ring of $n \times n$ matrices over $\mathbb{Q}$. 
-  Addition in this ring is repeated addition in $\mathbb{Q}$. 
-  Multiplication in this ring requires both the multiplication and 
-  addition operations in $\mathbb{Q}$. Going further, one can 
-  consider the subgroup $\mathrm{SO}_n(\mathbb{Q})$, and even the 
+  One addition in this ring is $n^2$ separate additions in $\mathbb{Q}$. 
+  Multiplication in the matrix ring requires both the multiplication 
+  and addition operations in $\mathbb{Q}$. Going further, one can 
+  consider the subgroup $\mathrm{SL}_n(\mathbb{Q})$, and even the 
   corresponding group algebra $\mathbb{Q}\bigl[ 
-  \mathrm{SO}_n(\mathbb{Q}) \bigr]$. There are now four different 
+  \mathrm{SL}_n(\mathbb{Q}) \bigr]$. There are now four different 
   multiplication operations involved in this definition, so the 
   computer would have a lot to choose from if we didn't tell it which 
   one of these we mean in each case.
@@ -602,7 +602,7 @@ is a valid boolean.
 \paragraph{Integers}
 Any string matching the regular expression \verb"0|-?[1-9][0-9]*" is 
 a valid integer, and two such strings are equal as integers if and 
-only if they are equal as string. (Hence these are \emph{proper} 
+only if they are equal as strings. (Hence these are \emph{proper} 
 integers, not machine-integers.) These are the canonical 
 representations of integers. There are also some valid noncanonical 
 representations, e.g.~hexadecimal notation as strings matching 

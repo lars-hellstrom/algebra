@@ -287,7 +287,7 @@
 % 
 % The main data structures are the list of rules and the list of 
 % ambiguities. Both of these are for size reasons kept in a database 
-% (any TDBC-compatible database can be used), as experience has shown 
+% (accessed through the TDBC interface), as experience has shown 
 % that they have a tendency to grow beyond what is practical for 
 % \Tcl\ to keep in memory. It turns out that also certain search 
 % operations benefit from this arrangement, as the database machinery 
@@ -297,7 +297,7 @@
 % the use of SQL, as implementations of this language are rather 
 % varied; in particular any English word \emph{might} turn out to 
 % have been seized for syntactic purposes, and thus not work as the 
-% name of column. Therefore the names which really \emph{are} English 
+% name of a column. Therefore the names which really \emph{are} English 
 % words have been obfuscated through the substitution of digits for 
 % one or several letters, as one sometimes sees in Leet orthography.
 % 
@@ -4785,6 +4785,159 @@ proc resolution_as_XHTML {row args} {
 %   \end{tcl}
 % \end{proc}
 % 
+% \begin{proc}{raw_XHTML_coefficient}
+%   This procedure performs a trivial conversion of coefficients (as 
+%   understood by the |$coefficient| ring) to XHTML. The call syntax 
+%   is
+%   \begin{displaysyntax}
+%     |raw_XHTML_coefficient| \word{coefficient}
+%   \end{displaysyntax}
+%   and the return value is a pair
+%   \begin{displaysyntax}
+%     \word{sign} \word{data-tree-list}
+%   \end{displaysyntax}
+%   where \word{sign} is a character (plus or minus: |+| or U+2212) 
+%   and \word{data-tree-list} is a list of data-trees that together 
+%   express the ``unsigned'' part of the coefficient. The 
+%   \word{data-tree-list} is empty when the \word{coefficient} is 
+%   just $\pm 1$.
+%   
+%   That the conversion is raw means the result actually uses the 
+%   same representation for coefficients as the input, albeight 
+%   wrapped up in a |#text| node. It does however check whether 
+%   changing the sign would result in a shorter representation, and 
+%   if so considers the original coefficient to have been 
+%   ``negative''; this works very well for coefficients that are 
+%   integers modulo some constant, and is probably no worse than 
+%   doing nothing for everything else.
+%   \begin{tcl}
+proc raw_XHTML_coefficient {r} {
+   variable coefficient
+   set u [{*}$coefficient - $r]
+   if {[string length $u] < [string length $r]} then {
+      set res [list \u2212]
+   } else {
+      set res [list +]
+      set u $r
+   }
+   lappend res [
+      if {$u ne "1"} then {list [list #text $u]}
+   ]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{SAR_as_XHTML}
+%   This procedure takes a ``standalone resolution'' (see description 
+%   of |standalone_resolution|) as argument and returns a data-tree 
+%   representing an XHTML paragraph presenting that multirelation. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%      |SAR_as_XHTML| \word{start} \word{SAR} 
+%      \begin{regblock}[\regstar]\word{option} \word{value} 
+%      \end{regblock}
+%   \end{displaysyntax}
+%   where \word{start} is the missing $-1$th step of \word{SAR}---the 
+%   left hand side to which all the \word{SAR} steps are right hand 
+%   sides. The supported options are:
+%   \begin{ttdescription}
+%     \item[-vertexobjs]
+%       The value is the dictionary of data-trees to use for the 
+%       vertices. If this option is not given, then the 
+%       |SVG_appearances| procedure is called to compute these.
+%     \item[-rulelink]
+%       If provided, this option signals that rule annotations should 
+%       be links to these rules. The value is a command prefix with 
+%       call syntax
+%       \begin{displaysyntax}
+%         \meta{value} \word{number}
+%       \end{displaysyntax}
+%       that returns the URI for rule \word{number}. The |format| 
+%       command is often useful for this.
+%     \item[-coeffconv]
+%       This option specifies the command prefix to use for 
+%       converting coefficients. It defaults to 
+%       |raw_XHTML_coefficient|.
+%   \end{ttdescription}
+%   
+%   First generate rich forms of the monomials involved. The site is 
+%   put last.
+%   \begin{tcl}
+proc SAR_as_XHTML {start SAR args} {
+   variable vertex_appearances
+   variable vertex_sizes
+   foreach {res whichL whatL whereL coeffL monomials} $SAR break
+   set richL {}
+   foreach NW $monomials {
+      lappend richL [network::rich::Tk_from_pure $NW\
+        $vertex_sizes $vertex_appearances]
+   }
+%   \end{tcl}
+%   The $i$th element of |whichObjL| is the XHTML object for the 
+%   annotation of the relation leading to the $i$th element of the 
+%   |re5olution|. Depending on the presence of a |-rulelink| option, 
+%   these may contain links to the rules or just their numbers.
+%   \begin{tcl}
+   set whichObjL {}
+   if {[dict exists $args -rulelink]} then {
+      set cmd [dict get $args -rulelink]
+      foreach step $whichL c $coeffL {
+         lappend whichObjL [
+            list span {class relsince} [list [
+               list a [dict create href [{*}$cmd $step]] [list [
+                  list #text \[$step\]
+               ]]
+            ]]
+         ]
+      }
+   } else {
+      foreach step $whichL c $coeffL {
+         lappend whichObjL [
+            list span {class relsince} [list [
+               list #text \[$step\]
+            ]]
+         ]
+      }
+   }
+%   \end{tcl}
+%   Now it's time to start generating SVG code.
+%   \begin{tcl}
+   if {[dict exists $args -vertexobjs]} then {
+      set vobjD [dict get $args -vertexobjs]
+   } else {
+      set vobjD [network::rich::SVG_appearances $vertex_appearances]
+   }
+   if {[dict exists $args -coeffconv]} then {
+      set cccmd [dict get $args -coeffconv]
+   } else {
+      set cccmd [list raw_XHTML_coefficient]
+   }
+   set children {}
+   foreach which [linsert $whichObjL 0 ""] sum [linsert $res 0 $start] {
+      if {[llength $which]} then {
+         lappend children [list span {class stackrel} [
+            list $which [list span {class stackedrel} {{#text \u2261}}]
+         ]]
+      }
+      set first 1
+      dict for {mu r} $sum {
+         lassign [${*}$cccmd $r] sign objL
+         if {$sign ne "+" || !$first} then {
+            lappend children [list #text " $sign "]
+         }
+         lappend children {*}$objL
+         lappend children\
+            [network::rich::as_SVG $vobjD -val [lindex $richL $mu]\
+              -setstroke 0]
+         set first 0
+      }
+      if {$first} then {lappend children {#text 0}}
+   }
+   return [list p {} $children]
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % \begin{proc}{XHTML_prologue}
 %   This procedure writes a suitable XHTML prologue (up to and 
 %   including the opening |body| tag) to a channel. The call syntax is
@@ -4935,6 +5088,110 @@ proc XHTML_rule_file {fname args} {
 % \end{proc}
 % 
 % 
+% \begin{proc}{XHTML_rule_document}
+%   This procedure writes a full XHTML page with one or several rules 
+%   to an open channel. The call syntax is
+%   \begin{displaysyntax}
+%     |XHTML_rule_document| \word{channel} \word{linkcmd} 
+%     \word{ruleno}\regstar
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc XHTML_rule_document {F linkcmd args} {
+   XHTML_prologue $F [mtmtcl::support::xml_from_tree [
+      list title {} [list [list #text "Rules [join $args {, }]"]]
+   ] -nodesep ""]
+%   \end{tcl}
+%   Since vertices are reused over and over again, the following 
+%   establishes objects that can be referenced.
+%   \begin{tcl}
+   set defL {}
+   set refD [dict create]
+   variable vertex_appearances
+   dict for {name obj} [
+      network::rich::SVG_appearances $vertex_appearances
+   ] {
+      if {[regexp {^[A-Za-z0-9_.-]*$} $name]} then {
+         set id "v-$name"
+      } else {
+         set id "tcl_[info cmdcount]"
+      }
+      lappend defL [lreplace $obj 1 1 [
+         dict replace [lindex $obj 1] id $id
+      ]]
+      dict set refD $name [list use [
+         dict create  xlink:href "#$id"
+      ] {}]
+   }
+   puts $F [mtmtcl::support::xml_from_tree [
+      list svg {xmlns http://www.w3.org/2000/svg display none} $defL
+   ]]
+%   \end{tcl}
+%   At first it seemed that it would be natural to wrap up the 
+%   referenced objects in a |symbol| element, but that turned out to 
+%   require setting up a |viewBox| for each and every one of them, 
+%   whereas referencing the objects themselves Just Works.
+%   
+%   Now generate the rules.
+%   \begin{tcl}
+   if {![llength $args]} then {
+      set args [concat {*}[thedatabase allrows -as lists\
+        {SELECT num6er FROM ru1es}]]
+   }
+   variable coefficient
+   set one [{*}$coefficient 1]
+   variable DBCMD
+   foreach ruleno $args {
+      puts $F [mtmtcl::support::xml_from_tree [
+         list h1 [dict create id "rule-$ruleno"]\
+           [list [list #text "Rule $ruleno"]]
+      ] -nodesep ""]
+      set rrow [lindex\
+        [$DBCMD(GetRu1e) allrows [dict create num6er $ruleno]] 0]
+      set msg [clock format [dict get $rrow wh3n1]\
+        -format "Derived %H:%M:%S %Z, %a %b %d %Y."]
+      if {[dict exists $rrow wh3n2]} then {
+         append msg [clock format [dict get $rrow wh3n2]\
+        -format " Retired %H:%M:%S %Z, %a %b %d %Y."]
+      }
+      puts $F [mtmtcl::support::xml_from_tree [
+         list p {} [list [list #text $msg]]
+      ]]
+      puts $F [mtmtcl::support::xml_from_tree [
+         rule_as_XHTML $rrow -vertexobjs $refD
+      ]]
+      set arow [lindex [$DBCMD(GetAmbiguity) allrows\
+        [dict create num6er [dict get $rrow pr00f]]] 0]
+%   \end{tcl}
+%   \begin{tcl}
+      if {[dict exists $arow p1us]} then {
+         puts $F {<h5 style="display: run-in">Proof.</h5>}
+%<*zlib>
+         dict set arow m0n0mials [encoding convertfrom utf-8\
+           [zlib inflate [dict get $arow deflated_m0n0mials]]]
+%</zlib>
+         set SAR0 [standalone_resolution $arow]
+         set mu0 [lsearch -exact [lindex $SAR0 5]\
+           [dict get $rrow lhs]]
+         if {$mu0<0} then {error "Couldn't find lhs in m0n0mials."}
+         set SAR [solve_SAR_for $SAR0 $mu0]
+         puts $F [mtmtcl::support::xml_from_tree [
+            SAR_as_XHTML [list $mu0 $one] $SAR -vertexobjs $refD\
+              -rulelink $linkcmd
+         ]]
+      } else {
+         puts $F [mtmtcl::support::xml_from_tree [
+            list p {} [list [
+               list #text [dict get $arow p1us2eg]
+            ]]
+         ]]
+      }
+   }
+   puts $F {</body></html>}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
 % \subsection{Resolutions as proofs}
 % 
 % Resolutions are the back bones of proofs for rules, but they are 
@@ -4977,10 +5234,10 @@ proc XHTML_rule_file {fname args} {
 %   \end{equation}
 %   where \(r_k ={}\)\texttt{[lindex \word{coeff-list} $k$]}, 
 %   \(\mu_k={}\)\texttt{[lindex \word{what-list} $k$]}, and $t_k$ is 
-%   the simple reduction which applies {[lindex \word{which-list} 
-%   $k$]} at {[lindex \word{where-list} $k$]} in $\mu_k$. It is 
-%   always the case that \(\mu_0=\mu_1={}\)|si7e|, \(r_0=-1\), and 
-%   \(r_1=1\).
+%   the simple reduction which applies \texttt{[lindex 
+%   \word{which-list} $k$]} at \texttt{[lindex \word{where-list} $k$]} 
+%   in $\mu_k$. It is always the case that \(\mu_0=\mu_1={}\)|si7e|, 
+%   \(r_0=-1\), and \(r_1=1\).
 %   
 %   The first complication for this is that the |si7e| is not 
 %   guaranteed to be canonical; it has to be canonised and the two 
@@ -4997,9 +5254,9 @@ proc standalone_resolution {amb} {
    lappend whereL\
      [network::pure::forward_region $relabel [dict get $amb m1nus2eg]]\
      [network::pure::forward_region $relabel [dict get $amb p1us2eg]]
-   variable coeff
-   set one [{*}$coeff 1]
-   set mone [{*}$coeff - $one]
+   variable coefficient
+   set one [{*}$coefficient 1]
+   set mone [{*}$coefficient - $one]
    lappend coeffL $mone $one
 %   \end{tcl}
 %   The second complication is that the argument does not contain 
@@ -5013,7 +5270,7 @@ proc standalone_resolution {amb} {
    set D [dict create $mu0 $one]
    variable DBCMD
    set rule [lindex [
-      $DBCMD(GetRu1e) allrows [dict create num6er [lindex $which 0]]
+      $DBCMD(GetRu1e) allrows [dict create num6er [lindex $whichL 0]]
    ] 0]
    set NWG [network::pure::detach [lindex $monomials end]\
      [lindex $whereL 0]]
@@ -5027,11 +5284,11 @@ proc standalone_resolution {amb} {
       }
       dict update D $nu s {
          if {[info exists s]} then {
-            set s [{*}$coeff - $s $r]
+            set s [{*}$coefficient - $s $r]
          } else {
-            set s [{*}$coeff - $r]
+            set s [{*}$coefficient - $r]
          }
-         if {[{*}$coeff iszero $s]} then {unset s}
+         if {[{*}$coefficient iszero $s]} then {unset s}
       }
    }
 %   \end{tcl}
@@ -5094,9 +5351,9 @@ proc standalone_resolution {amb} {
 %   resolution each particular monomial appears.
 %   \begin{tcl}
 proc solve_SAR_for {SAR lhs args} {
-   variable coeff
-   set M [list ::mtmtcl::rings::semigroup_algebra\
-     ::mtmtcl::rings::integer $coeff]
+   variable coefficient
+   set M [list ::mtmtcl::rings::semigroup_algebra $coefficient\
+     ::mtmtcl::rings::integer]
    set termL {}
    set sum [{*}$M 0]
    foreach partial [lindex $SAR 0] {
@@ -5113,9 +5370,9 @@ proc solve_SAR_for {SAR lhs args} {
    if {[llength $args]>0} then {
       set factor [lindex $args 0]
    } else {
-      set factor [{*}$coeff 1]
+      set factor [{*}$coefficient 1]
    }
-   set scale [{*}$coeff - [{*}$coeff / $factor [dict get $sum $lhs]]]
+   set scale [{*}$coefficient - [{*}$coefficient / $factor [dict get $sum $lhs]]]
    if {[llength $args]>1} then {
       set sum [lindex $args 1]
    } else {
@@ -5127,10 +5384,10 @@ proc solve_SAR_for {SAR lhs args} {
       lappend whichL [lindex $SAR 1 $n]
       lappend whatL  [lindex $SAR 2 $n]
       lappend whereL [lindex $SAR 3 $n]
-      lappend coeffL [{*}$coeff * $scale [lindex $SAR 4 $n]]
+      lappend coeffL [{*}$coefficient * $scale [lindex $SAR 4 $n]]
       set sum [{*}$M + $sum [{*}$M . $scale [lindex $termL $n]]]
       lappend sumL $sum
-      lset $termL $n {}
+      lset termL $n {}
       set lhs [lindex $whatL end]
    }
 %   \end{tcl}
@@ -5145,7 +5402,7 @@ proc solve_SAR_for {SAR lhs args} {
       lappend whichL $which
       lappend whatL  $what
       lappend whereL $where
-      lappend coeffL [{*}$coeff * $scale $r]
+      lappend coeffL [{*}$coefficient * $scale $r]
    }
    return [list $sumL $whichL $whatL $whereL $coeffL [lindex $SAR 5]]
 }
