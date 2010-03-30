@@ -894,22 +894,25 @@ proc mtmtcl::matprop::trivial::+ {shape ring A B} {
 %     \end{tcl}
 %   \end{ensproc}
 %   
-%   \begin{ensproc}{-}
-%     This is just ordinary matrix subtraction or negation.
+%   \begin{ensproc}{neg}
+%     This is just ordinary matrix negation.
 %     \begin{tcl}
-proc mtmtcl::matprop::trivial::- {shape ring A args} {
-   if {[llength $args]>1} then {
-      return -code error "Too many terms"
-   } elseif {[llength $args]==0} then {
-      set res {}
-      foreach Arow $A {
-         set row {}
-         foreach a $Arow {lappend row [{*}$ring - $a]}
-         lappend res $row
-      }
-      return $res
+proc mtmtcl::matprop::trivial::neg {shape ring A} {
+   set res {}
+   foreach Arow $A {
+      set row {}
+      foreach a $Arow {lappend row [{*}$ring neg $a]}
+      lappend res $row
    }
-   set B [lindex $args 0]
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{-}
+%     This is just ordinary matrix subtraction.
+%     \begin{tcl}
+proc mtmtcl::matprop::trivial::- {shape ring A B} {
    if {[llength $A] != [llength $B] ||\
        [llength [lindex $A 0]] != [llength [lindex $B 0]]} then {
       return -code error "Matrix sides do not match"
@@ -953,7 +956,7 @@ proc mtmtcl::matprop::trivial::scalar {shape ring args} {
 %   \end{ensproc}
 %   
 %   \begin{ensproc}{0}
-%     A |0| method needed for the \APIref{ring-module}{1.1} interface 
+%     A |0| method needed for the \APIref{ring-module}{2.1} interface 
 %     cannot be defined in the PROP, since every nonempty component 
 %     has a separate zero element, but the \word{shape} parameter will 
 %     in a specific matrix ring (or bimodule) provide the necessary 
@@ -992,9 +995,9 @@ proc mtmtcl::matprop::trivial::iszero {shape ring A} {
 %   \end{ensproc}
 %   
 %   \begin{ensproc}{1}
-%     A |1| method needed for the \APIref{ring-module}{1.1} interface 
-%     cannot be defined in the PROP, since every nonempty component 
-%     has a separate zero element, but the \word{shape} parameter will 
+%     A |1| method needed for the \APIref{monoid}{1.0} interface 
+%     cannot be defined in the PROP, since every arity has a separate 
+%     identity element, but the \word{shape} parameter will 
 %     in a specific matrix ring (or bimodule) provide the necessary 
 %     information.
 %     \begin{tcl}
@@ -1024,8 +1027,8 @@ proc mtmtcl::matprop::trivial::1 {shape ring args} {
 }
 %     \end{tcl}
 %     Even when the \word{shape} is not fixed, it is straightfoward 
-%     to multiply an existing element by the |scalar 0| to produce a 
-%     same-size zero.
+%     to use the |fuse| method to produce the matrix corresponding to 
+%     an identity permutation.
 %   \end{ensproc}
 %   
 %   \begin{ensproc}{export}
@@ -1214,7 +1217,7 @@ namespace eval mtmtcl::matprop::trivial {
    namespace ensemble create\
      -command [namespace parent]::ring\
      -parameters {shape ring}\
-     -subcommands {= * + - . scalar 0 1 export}
+     -subcommands {= * + neg - . scalar 0 1 export}
 }
 %   \end{tcl}
 % \end{ensemble}
@@ -1706,15 +1709,19 @@ proc mtmtcl::matprop::homfdpower::fuse {d ring args} {
 %   \end{ensproc}
 %   
 %   \begin{ensproc}{+}
+%   \begin{ensproc}{neg}
 %   \begin{ensproc}{-}
-%     The addition and subtraction operations are again equal to 
-%     their |trivial| counterparts.
+%     The addition, negation, and subtraction operations are again 
+%     equal to their |trivial| counterparts.
 %     \begin{tcl}
 proc mtmtcl::matprop::homfdpower::+ {d ring args} {
    trivial::+ "" $ring {*}$args
 }
-proc mtmtcl::matprop::homfdpower::- {d ring args} {
-   trivial::- "" $ring {*}$args
+proc mtmtcl::matprop::homfdpower::neg {d ring A} {
+   trivial::neg "" $ring $A
+}
+proc mtmtcl::matprop::homfdpower::- {d ring A B} {
+   trivial::- "" $ring $A $B
 }
 %     \end{tcl}
 %   \end{ensproc}\end{ensproc}
@@ -2274,9 +2281,10 @@ proc mtmtcl::matprop::biaffine::fuse {ring args} {
 %   
 %   \begin{ensproc}{+}
 %   \begin{ensproc}{-}
+%   \begin{ensproc}{neg}
 %   \begin{ensproc}{.}
-%     Element-wise addition, subtraction, and scalar multiple of the 
-%     PROP elements make sense, but note that composition isn't 
+%     Element-wise addition, subtraction, negation, and scalar multiple 
+%     of the PROP elements make sense, but note that composition isn't 
 %     distributive or linear.
 %     \begin{tcl}
 proc mtmtcl::matprop::biaffine::+ {ring L R} {
@@ -2323,6 +2331,24 @@ proc mtmtcl::matprop::biaffine::- {ring L R} {
    return $res
 }
 % \medskip
+proc mtmtcl::matprop::biaffine::neg {ring element} {
+   set res {}
+   foreach depth {0 1 1 2} part $element {
+      switch -- $depth 0 {
+         lappend res [{*}$ring neg $part]
+      } 1 {
+         set subres {}
+         foreach p $part {
+            lappend subres [{*}$ring neg $p]
+         }
+         lappend res $subres
+      } 2 {
+         lappend res [trivial::neg "" $ring $part]
+      }
+   }
+   return $res
+}
+% \medskip
 proc mtmtcl::matprop::biaffine::. {ring scalar element} {
    set res {}
    foreach depth {0 1 1 2} part $element {
@@ -2341,7 +2367,7 @@ proc mtmtcl::matprop::biaffine::. {ring scalar element} {
    return $res
 }
 %     \end{tcl}
-%   \end{ensproc}\end{ensproc}\end{ensproc}
+%   \end{ensproc}\end{ensproc}\end{ensproc}\end{ensproc}
 % 
 %   \begin{ensproc}{export}
 %     The question of how to express an element \(\left[ 

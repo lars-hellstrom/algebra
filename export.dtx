@@ -479,6 +479,197 @@ proc mtmtcl::openmath::stricten::OMFOREIGN {attr children clean} {
 %   \end{ensproc}
 % \end{ensemble}
 % 
+% \begin{ensemble}{OM}
+%   While it is possible to construct (near-)OpenMath objects using 
+%   nothing but |list|, it is more convenient to have a specialised 
+%   constructor that takes care of the double nesting arising from 
+%   having both the data-is-code list and the list-of-children list; 
+%   forgetting one is a common typo, especially when there is exactly 
+%   one child. The |OM| ensemble has subcommands for constructing the 
+%   basic types of node, with names generally formed by dropping the 
+%   |OM| prefix from the corresponding OpenMath tag. This ensemble is 
+%   exported by the |mtmtcl::openmath| namespace.
+%   \begin{tcl}
+namespace eval mtmtcl::openmath {
+   namespace eval OM {
+      namespace export *
+      namespace ensemble create
+   }
+   namespace export OM
+}
+%   \end{tcl}
+%   
+%   \begin{ensproc}{S}
+%     The |OM S| command is thus for constructing |OMS| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM S \word{cd} \word{name} \begin{regblock}[\regstar] 
+%       \word{attribute} \word{value} \end{regblock}
+%     \end{displaysyntax}
+%     where the content dictionary \word{cd} and symbol name 
+%     \word{name} are mandatory arguments. Additional attributes 
+%     (e.g. |cdbase|) can be specified in additional key--value pairs 
+%     of arguments.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::S {cd name args} {
+   list OMS [dict create cd $cd name $name {*}$args] {}
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{mS}
+%     The |OM mS| command is again for constructing |OMS| nodes, but 
+%     this time to conform to the \APIref*{export}{2.0} interface 
+%     handling of the |mtmtcl:path| attribute. It has the syntax
+%     \begin{displaysyntax}
+%       OM mS \word{cd} \word{name} \word{common attributes} 
+%       \word{suffix} \begin{regblock}[\regstar] 
+%       \word{attribute} \word{value} \end{regblock}
+%     \end{displaysyntax}
+%     where the content dictionary \word{cd} and symbol name 
+%     \word{name} are as for |OM S|. The \word{common attributes} is 
+%     an inherited dictionary of attributes which is getting 
+%     overridden, and the \word{suffix} is a list of elements to 
+%     append to the |mtmtcl:path|. Further attributes (e.g. |cdbase|) 
+%     can be specified in additional key--value pairs of arguments, 
+%     and will override those in the \word{common attributes}.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::mS {cd name attr suffix args} {
+   dict lappend attr mtmtcl:path {*}$suffix
+   list OMS [dict replace $attr cd $cd name $name {*}$args] {}
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{A}
+%     The |OM A| command is for constructing |OMA| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM A \word{child}\regplus
+%     \end{displaysyntax}
+%     where each \word{child} should be a near-OpenMath data-tree, 
+%     the first of which will be the head (``function'') of the 
+%     application.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::A {args} {
+   list OMA {} $args
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{AS}
+%     The |OM AS| command is for constructing |OMA| nodes whose first 
+%     childs are |OMS| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM AS \word{cd} \word{name} \word{child}\regstar
+%     \end{displaysyntax}
+%     where each \word{child} should be a near-OpenMath data-tree to 
+%     be made an argument of the |OMS| node with the specified 
+%     \word{cd} and \word{name}.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::AS {cd name args} {
+   list OMA {} [linsert $args 0 [S $cd $name]]
+}
+%     \end{tcl}
+%     This command does not cover the case where the |OMS| child has 
+%     a |cdbase| attribute, but that could be covered with a separate 
+%     |OM| subcommand.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{I}
+%     The |OM I| command is for constructing |integer| nodes (rather 
+%     than |OMI| nodes). It has the syntax
+%     \begin{displaysyntax}
+%       OM I \word{value}
+%     \end{displaysyntax}
+%     where the \word{value} is the integer value to encode.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::I {value} {
+   list integer [dict create value $value] {}
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{STR}
+%     The |OM STR| command is for constructing |OMSTR| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM STR \word{value}
+%     \end{displaysyntax}
+%     where the \word{value} is the string to encode.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::STR {value} {
+   list OMSTR {} [list [list \#text $value]]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{V}
+%     The |OM V| command is for constructing |OMV| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM STR \word{name}
+%     \end{displaysyntax}
+%     where the \word{name} is the name of the OM variable.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::V {name} {
+   list OMV [dict create name $name] {}
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{US}
+%     The |OM US| command constructs an |OMS| element from the 
+%     URI for the symbol. The call syntax is
+%     \begin{displaysyntax}
+%       OM US \word{uri}
+%     \end{displaysyntax}
+%     where the \word{uri} is one of
+%     \begin{displaysyntax}
+%       \meta{cd}\#\meta{name}\par
+%       \meta{cdbase}/\meta{cd}\#\meta{name}
+%     \end{displaysyntax}
+%     depending on whether the |OMS| element should include a 
+%     |cdbase| attribute.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::US {uri} {
+   if {[
+      regexp -- {^(.*)/([^/#]*)#([^/#]*)$} $uri "" base cd name
+   ]} then {
+      list OMS [dict create cdbase $base cd $cd name $name] {}
+   } elseif {[
+      regexp -- {^([^/#]*)#([^/#]*)$} $uri "" cd name
+   ]} then {
+      list OMS [dict create cd $cd name $name] {}
+   } else {
+      error "Bad symbol URI: $uri"
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{UATTR}
+%     The |OM UATTR| command is for attaching attributions to a given 
+%     object, while specifying the attribution symbols through URIs. 
+%     The syntax is
+%     \begin{displaysyntax}
+%       OM UATTR \word{core} \begin{regblock}[\regstar] \word{URI} 
+%       \word{object} \end{regblock}
+%     \end{displaysyntax}
+%     where the \word{core} is the object that will be put in an 
+%     |OMATTR| node. Each \word{object} is the value of an OM 
+%     attribution, and the corresponding \word{URI} is the URI of the 
+%     annotation symbol.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::UATTR {core args} {
+   set L {}
+   foreach {uri obj} $args {lappend L [US $uri] $obj}
+   list OMATTR {} [list [list OMATP {} $L] $core]
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
 % 
 % 
 % \subsection{The \texttt{export} interface}
@@ -3095,7 +3286,7 @@ namespace eval mtmtcl::latex {}
 %   \word{post-line} is the line of text (again with indentation) 
 %   which comes \emph{after} the breakpoint but before the current 
 %   position in the tree. When a new breakpoint is created by 
-%   appending a line to path of a previous breakpoint, the old
+%   appending a line to the path of a previous breakpoint, the old
 %   \word{post-line} becomes the last \word{pre-line} and a new 
 %   \word{post-line} consisting only of indentation is appended. 
 %   The \word{demerits} is incremented by the level of this 
@@ -3150,7 +3341,7 @@ namespace eval mtmtcl::latex::fold {
 %     Text nodes update the active breakpoints by appending their 
 %     \word{string} and a space to their \word{post-line}. They also 
 %     drop breakpoints which do not fit within the given line 
-%     \word{width} afterwards, but an if that would result in 
+%     \word{width} afterwards, but if that would result in 
 %     dropping all breakpoints then those are kept which attain the 
 %     minimum \word{post-line} width.
 %     
@@ -3238,7 +3429,6 @@ proc mtmtcl::latex::fold::mrow {attrD childL bkpL level width} {
             lappend bkpL [lreplace $bkp 2 2 $level]
          }
       }
-      
    }
 %     \end{tcl}
 %     Row nodes construct new normal breakpoints in front of each 
@@ -3320,6 +3510,150 @@ proc mtmtcl::latex::fold::expand {attrD childL state level width} {
 %     This works because an |mrow| operates on the state before each 
 %     child, this operator depends only on the |level| value, and it 
 %     is an idempotent.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{unindent}
+%     Carrying that idea even further, one might arrive at a node 
+%     type that places its children at the level \emph{below} a 
+%     surrounding |mrow|. What use could there possibly be for that? 
+%     Well, it turns out to be rather good at reproducing the 
+%     traditional formatting of an environment, with the |\begin| and 
+%     |\end| on separate lines one indentation step lower than the 
+%     environment body: the environment in full can then be wrapped 
+%     up in an |mrow|, and the special indentation of some children 
+%     can be achieved through an |unindent| wrapper of those 
+%     children; this is much easier than making up a syntax for 
+%     selecting children to unindent.
+%     
+%     The first step is to adjust the position in the last line of 
+%     the material being unindented; this is thus also a place where 
+%     the indentation step size is hardcoded. |unindent| nodes may 
+%     have a \describestring[attribute]{amount} attribute, which 
+%     takes an integer value and defaults to |1|. It is the number of 
+%     indentation steps that are undone.
+%     \begin{tcl}
+proc mtmtcl::latex::fold::unindent {attrD childL state0 level width} {
+   if {[dict exists $attrD amount]} then {
+      set prevlevel [expr {$level-[dict get $attrD amount]-1}]
+   } else {
+      set prevlevel [expr {$level-2}]
+   }
+   if {$prevlevel<0} then {set prevlevel 0}
+   set indent [string repeat {  } $prevlevel]
+   set state {}
+   foreach bkp $state0 {
+%     \end{tcl}
+%     If the last line is only whitespace, then that line can of 
+%     course be replaced with one with a different amount of 
+%     indentation; this is the main case. Note that the demerits and 
+%     line indentation level must be adjusted accordinly.
+%     \begin{tcl}
+      if {[regexp {^\s*$} [lindex $bkp end]]} then {
+         lset bkp end $indent
+         lset bkp 1 [expr {[lindex $bkp 1] - [lindex $bkp 0] + $prevlevel}]
+         lset bkp 0 $prevlevel
+%     \end{tcl}
+%     Discard breakpoints where the last line is nonempty and has a 
+%     higher indentation level than wanted; since the parent should 
+%     be an |mrow|, every breakpoint discarded by this condition has 
+%     a counterpart which is adjusted by the previous branch and thus 
+%     kept.
+%     \begin{tcl}
+      } elseif {[lindex $bkp 0] > $prevlevel} then {
+         continue
+%     \end{tcl}
+%     Finally, there is a slight possibility that the last line is 
+%     nonempty but shorter than the unindented |indent|; this could 
+%     be the case if several |mrow|s are nested. Here, spaces are 
+%     appended to that last line until it has be basic |indent| 
+%     length, since it is typically important that a |\begin| aligns 
+%     with its |\end|.
+%     \begin{tcl}
+      } else {
+         set line [lindex $bkp end]
+         while {[string length $line] < [string length $indent]} {
+            append line " "
+         }
+         lset bkp end $line
+      }
+      lappend state $bkp
+   }
+%     \end{tcl}
+%     If there are several children, then the |state| is passed 
+%     verbatim from one to the next; if linebreaks are to be allowed, 
+%     then wrap the children up in another |mrow|. Note that the |level| 
+%     passed to the children is unchanged; this has the effect that 
+%     continuations of an unindented line are still indented more 
+%     than the normal siblings of the unindented node would be.
+%     \begin{tcl}
+   foreach child $childL {
+      set state ["" {*}$child $state $level $width]
+   }
+%     \end{tcl}
+%     |unindent| nodes can have a 
+%     \describestring+[attribute]{linebreak} attribute, which takes a 
+%     boolean value. When true, a linebreak is forced after the item 
+%     by pretending the indentation level of the last line is greater 
+%     than the pre-unindent level. The default is false, i.e., the 
+%     actual indentation level shines through.
+%     \begin{tcl}
+   if {[dict exists $attrD linebreak] && [dict get $attrD linebreak]}\
+   then {
+      set nextlevel [expr {$level+1}]
+      set res {}
+      foreach bkp $state {
+         if {[lindex $bkp 0] < $level} then {lset bkp 0 $nextlevel}
+         lappend res $bkp
+      }
+      set state $res
+   }
+   return $state
+}
+%     \end{tcl}
+%     
+%     Now what does all that mean in practice? A code block such as
+%\begin{verbatim}
+%   f(x) = \begin{cases}
+%     1 & x > 0 \\
+%     0 & x \leqslant 0
+%   \end{cases}
+%\end{verbatim}
+%     could be encoded as (in TDL, for clarity)
+%\begin{verbatim}
+%   mrow {
+%     / f(x) 
+%     / =
+%     mrow {
+%       unindent linebreak 1 {
+%         / {\begin{cases}}
+%       }
+%       mrow {
+%         / 1
+%         / &
+%         mrow {
+%           / x
+%           / >
+%           / 0
+%         }
+%       }
+%       unindent linebreak 1 amount 0 {
+%         / {\\}
+%       }
+%       mrow {
+%         / 0
+%         / &
+%         mrow {
+%           / x
+%           / {\leqslant}
+%           / 0
+%         }
+%       }
+%       unindent {
+%         / {\end{cases}}
+%       }
+%     }
+%   }
+%\end{verbatim}
 %   \end{ensproc}
 % \end{ensemble}
 % 
@@ -3445,7 +3779,7 @@ proc mtmtcl::latex::metax::maybewrap {attr children} {
    }
 %     \end{tcl}
 %     If that's not it, then put the braces in an |mrow|. In case the 
-%     child already was an |mrow|, then merge it with the new onw.
+%     child already was an |mrow|, then merge it with the new one.
 %     \begin{tcl}
    if {[llength $children] == 1 && [lindex $children 0 0] eq "mrow"}\
    then {
@@ -4116,7 +4450,7 @@ namespace eval mtmtcl {
 %   where the \word{value} is the value of the 
 %   \OMSref{altenc}{LaTeX_encoding} attribution (an OM object) and 
 %   the \word{nucleus} is the node to which it was applied. The 
-%   return value is the \mtl-\LaTeX data-tree.
+%   return value is the \mtl-\LaTeX\ data-tree.
 %   
 %   If the \word{value} format is not recognised then this defaults 
 %   to formatting the \word{nucleus} instead. The result is not 
@@ -4645,6 +4979,25 @@ proc mtmtcl::latex::convertto {tree} {
    ] 70 2 ; # width, level
 }
 %   \end{tcl}
+%   Some timing results for formatting a polynomial with ?? terms 
+%   (66585~characters):
+%   \begin{center}
+%     \begin{tabular}{l r@{}l}
+%       \textbf{Operation}& \mutlicolumn{2}{c}{\textbf{Time} (s)}\\
+%       \meta{ring}| export|& 6&222223\\
+%       \texttt{mtmtcl::present::typography}& 23&.990825\\
+%       \texttt{mtmtcl::present::decorate}& 8&.300743\\
+%       \texttt{mtmtcl::present::fence::tool::fence}&
+%         7&084628\\
+%       \texttt{mtmtcl::latex::make::tool::make}& 17&.474231\\
+%       \texttt{mtmtcl::latex::metax::}& 9&.936303\\
+%       \texttt{mtmtcl::latex::fold}& $>5000
+%     \end{tabular}
+%   \end{center}
+%   Apparently it is folding that is the bottleneck here. For massive 
+%   data generation, it might be good to have a simpler alternative, 
+%   but it is also not clear \emph{why} it is so slow---for fixed 
+%   line width, its runtime should be linear!
 % \end{proc}
 % 
 % \begin{arrayvar}{phrasebook}

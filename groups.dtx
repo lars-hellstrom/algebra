@@ -192,10 +192,66 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 % extensions of additive semigroups or monoids, but these aren't all 
 % that common, so it is probably easier to do it all in one go.
 % 
-% \begin{APIspec}{additive group}{1.0}
+% \begin{APIspec}{additive group}{2.0}
 %   In the additive notation for a group, the binary operation is $+$, 
-%   the identity element is $0$, and the inversion operation is $-$.
+%   the identity element is $0$, and the inversion operation is 
+%   written |neg|.
 %   
+%   \changes{0.1}{2010/03/25}{Introduced version 2.0 and friends of 
+%     \texttt{additive group}. Deprecating 1.0. (LH)}
+%   
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies version~1.0 of the \texttt{equality} 
+%       interface.
+%       
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |+| operation is binary group operation. By 
+%       associativity, the two expressions
+%       \begin{displaysyntax}
+%         [$G$ + [$G$ + $a$ $b$] $c$]\par
+%         [$G$ + $a$ [$G$ + $b$ $c$]]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$, $b$, and $c$ of a 
+%       \meta{group} $G$.
+%     
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%       The |0| method returns the identity element of the 
+%       group. The relevant axiom says that the three expressions
+%       \begin{displaysyntax}
+%         [$G$ + [$G$ 0] $a$]\par
+%         [$G$ + $a$ [$G$ 0]]\par
+%         $a$
+%       \end{displaysyntax}
+%       are |=|-equal for each element $a$ of a \meta{group} $G$.
+%       
+%     \begin{APImethod}{neg}
+%       \word{element}
+%     \end{APImethod}
+%       The inversion operation |neg| has the property that
+%       \begin{displaysyntax}
+%         [$G$ + $a$ [$G$ neg $a$]]\par
+%         [$G$ + [$G$ neg $a$] $a$]\par
+%         [$G$ 0]
+%       \end{displaysyntax}
+%       are |=|-equal for each element $a$ of a \meta{group} $G$.
+%   \end{APIdescription}
+%   All methods are congruent. Note that |additive group| does 
+%   \emph{not} require the group to be abelian.
+% \end{APIspec}
+% 
+% Version~1.0 of |additive group| was the same as version~2.0, 
+% except that the inversion operation was named |-|. It turns out 
+% that it is more practical to reserve |-| as the name for 
+% subtraction, as implementations would have to determine at runtime 
+% which is wanted if they both have the same name.
+%   
+% \begin{APIspec}{additive group}{1.0}
 %   \begin{APIdescription}{group}
 %     \begin{APImethod}{=}
 %       \word{element} \word{element}
@@ -1051,6 +1107,105 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 % 
 % 
 % 
+% \begin{APIspec}{additive group}{2.1}
+%   Version 2.1 of \texttt{additive group} extends the syntax of 
+%   addition to be variadic, introduces |-| for subtraction, and 
+%   |iszero| for testing whether something is $0$.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{+}
+%       \word{element}\regstar
+%     \end{APImethod}
+%       The general identity for the variadic form is that the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$G$ + [$G$ + \meta{$L_a$}] [$G$ + \meta{$L_b$}]]
+%         \par
+%         [$G$ + \meta{$L_a$} \meta{$L_b$}]
+%       \end{displaysyntax}
+%       are |=|-equal for any two lists of elements $L_a$ and $L_b$. 
+%       In particular this implies that \texttt{[$G$ +]} returns 
+%       the identity element and that $a$ is |=|-equal to 
+%       \texttt{[$G$ + $a$]} for every element $a$.
+%       
+%     \begin{APImethod}{-}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The defining property of |-| is that the two expressions
+%       \begin{displaysyntax}
+%         [$G$ - $a$ $b$]\par
+%         [$G$ + $a$ [$G$ neg $b$]]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$ and $b$.
+%       
+%     \begin{APImethod}{iszero}
+%       \word{element}
+%     \end{APImethod}
+%       This method is a shorthand for testing equality to zero, i.e., 
+%       the two expressions
+%       \begin{displaysyntax}
+%         [$G$ iszero $a$]\par
+%         [$G$ = [$G$ 0] $a$]
+%       \end{displaysyntax}
+%       are equal as booleans for all elements $a$ of the 
+%       \meta{group}~$G$.
+%   \end{APIdescription}
+%   All methods are congruent. 
+% \end{APIspec}
+% 
+% \begin{APIspec}{additive group}{2.2}
+%   Version 2.2 of \texttt{additive group} parallels version 1.2 of 
+%   \texttt{group} by adding an integer multiple method.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{integer.}
+%       \word{integer} \word{element} 
+%     \end{APImethod}
+%       The value of \texttt{[\meta{group} integer. $n$ $a$]} is 
+%       $\sum_{i=1}^n a$.
+%       
+%       The notation is chosen to on one hand make it easy to turn an 
+%       additive group into a $\mathbb{Z}$-module, but on the other 
+%       hand stay distinct so that it does not conflict with the scalar 
+%       multiple of modules of other rings.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% \begin{APIspec}{additive group}{2.3}
+%   Version 2.3 of \texttt{additive group} improves on v\,2.2 by adding 
+%   a linear combination extension of the integer multiple method.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{+integer.}
+%       \begin{regblock}[\regstar] \word{integer} \word{element} 
+%       \end{regblock}
+%     \end{APImethod}
+%       The value of
+%       \begin{displaysyntax}
+%         [\meta{group} *\^{} $n_1$ $a_1$ $\dots$ $n_k$ $a_k$]
+%       \end{displaysyntax}
+%       is $\sum_{i=1}^k n_1 a_1$, i.e., on one hand
+%       \begin{displaysyntax}
+%         [$G$ +integer. $a$ $n$]\par
+%         [$G$ integer. $a$ $n$]
+%       \end{displaysyntax}
+%       are |=|-equal for every element $a$ and integer $n$, and on the 
+%       other,
+%       \begin{displaysyntax}
+%         [$G$ +integer. \meta{$L_a$} \meta{$L_b$}]\par
+%         [$G$ + [$G$ +integer. \meta{$L_a$}] 
+%           [$G$ +integer. \meta{$L_b$}]]
+%       \end{displaysyntax}
+%       for all lists $L_a$ and $L_b$ with the structure
+%       \begin{quote}
+%         \begin{regblock}[\regstar] \word{integer} \word{element} 
+%         \end{regblock}
+%       \end{quote}
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% There is also a parallel list of \APIref{additive group}{1.0} 
+% versions~1.x which build upon 1.0.
+% 
 % \begin{APIspec}{additive group}{1.1}
 %   Version 1.1 of \texttt{additive group} extends the syntaxes of 
 %   addition to be variadic and the syntax of |-| to provide 
@@ -1218,6 +1373,225 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %   argument representation could well be unreasonably expensive. 
 % \end{APIspec}
 % 
+% \begin{ensemble}{free_abelian_group}
+%   The |free_abelian_group| ensemble implements a free abelian group 
+%   on top of a structure with \APIref{canonise}{1.0}. Unlike 
+%   |power_product_monoid_1.3|, it uses a sparse representation 
+%   (dictionary mapping generator to exponent), so it is better 
+%   suited in cases with many generators. It is expected that 
+%   combining this with |semigroup_algebra| will be the main way of 
+%   implementing polynomial-like expressions.
+%   
+%   The full call syntax of the ensemble is
+%   \begin{displaysyntax}
+%     |mtmtcl::groups::free_abelian_group| \word{generator-structure} 
+%     \word{sorter} \word{subcommand} \meta{arguments}
+%   \end{displaysyntax}
+%   where \word{generator-structure} is the underlying structure of 
+%   generators. The \word{sorter} is a command prefix with the 
+%   structure
+%   \begin{displaysyntax}
+%     \meta{sorter} \word{generator-list}
+%   \end{displaysyntax}
+%   which, when given a list of elements from the generator 
+%   structure, returns a sorted list of those elements.
+%   \begin{tcl}
+namespace eval mtmtcl::groups::free_abelian_group {
+   namespace ensemble create -parameters {set sorter}
+   namespace export {[!-^`-~]*}
+   interp alias {} [namespace current]::_OM {}\
+     [namespace parent [namespace parent]]::openmath::OM
+}
+%   \end{tcl}
+%   In practice, the \word{sorter} can often be an |lsort| with some 
+%   options. The reason to make it a separate parameter, rather than 
+%   an API supported by the generator structure, is that one often 
+%   wishes to customise the sorting of factors in products---needing 
+%   to bundle that with a structure can be rather awkward. 
+%   Conversely, it is trivial to build a \word{sorter} when given a 
+%   sorting or comparing subcommand of a structure.
+%   
+%   As hinted above, the representation will use a dictionary mapping 
+%   generators to their exponents (integers). Since this requires 
+%   the generators to be canonised, there isn't much extra effort in 
+%   always keeping the representations canonical: no exponent is $0$, 
+%   and dictionary keys are in sorted order. In fact, it makes sense 
+%   to \emph{only} acknowledge these canonical representations as 
+%   correct.
+%   
+%   \begin{ensproc}{=}
+%     Because of the decision to keep group elements canonised, 
+%     equality testing can be made a simple matter of 
+%     |string equal|ity.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::= {X sorter {first ""} args} {
+   foreach second $args {
+      if {![string equal $first $second]} then {return 0}
+   }
+   return 1
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{named}
+%     The |named| subcommand is used to provide the canonical mapping 
+%     (as figuring in the universal property) from the generator 
+%     structure to the group. Since this explicitly |canonise|s its 
+%     argument, it is not necessary for the generator structure to be 
+%     |onlycanonical|.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::named {X sorter name} {
+   dict create [$X canonise $name] 1
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{canonise}
+%     Because this is an \APIref{onlycanonical}{1.0} structure, the 
+%     |canonise| subcommand could in principle just return its 
+%     argument (not canonical for noncanonical key orderings, but 
+%     by specification such things are not proper representations, so 
+%     behaviour is undefined), but it it more useful to do a full 
+%     canonisation; this can for example be used to recanonise 
+%     elements after switching \word{sorter}.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::canonise {X sorter elem} {
+   set D [dict create]
+   dict for {k v} $elem {
+      dict incr D [{*}$X canonise $k] $v
+   }
+   set res [dict create]
+   foreach k [{*}$sorter [dict keys $D]] {
+      if {[dict get $D $k]} then {
+         dict set res $k [format %lld [dict get $D $k]]
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{*}
+%     The multiplication operation is what is needed to additionally 
+%     support \APIref{semigroup}{1.1}. Implementation-wise it is 
+%     similar to |canonise|, but it doesn't |format| the exponents 
+%     since it is only expected to operate on canonical 
+%     representations.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::* {X sorter args} {
+   set D [dict create]
+   foreach elem $args {
+      dict for {k v} $elem {dict incr D $k $v}
+   }
+   set res [dict create]
+   foreach k [{*}$sorter [dict keys $D]] {
+      if {[dict get $D $k]} then {
+         dict set res $k [dict get $D $k]
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{1}
+%     A unit operation is what is needed to additionally 
+%     support \APIref{monoid}{1.1}.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::1 {X sorter} {
+   dict create
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{inverse}
+%     An inverse operation is what is needed to additionally 
+%     support \APIref{group}{1.1}. It does not have to resort or 
+%     check exponents for being zero, as that should already be in 
+%     order.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::inverse {X sorter elem} {
+   set res [dict create]
+   dict for {k v} $elem {
+      dict set res $k [expr {-$v}]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{^}
+%     The power operation is what is needed to additionally 
+%     support \APIref{group}{1.2}. It is implementation-wise similar 
+%     to |inverse|, except in the case that the exponent $n$ is $0$.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::inverse {X sorter elem n} {
+   set res [dict create]
+   if {$n == 0} then {return $res}
+   dict for {k v} $elem {
+      dict set res $k [expr {$n*$v}]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   A power product method would be possible, but I don't need it at 
+%   the moment, so it can be a project for another day. Similarly, 
+%   one could implement \APIref{division}{1.0}, but I can do without 
+%   that one too.
+%   
+%   \begin{ensproc}{generators}
+%     The |generators| subcommand gives access to the generator 
+%     structure.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::generators {X sorter args} {
+   tailcall {*}$X {*}$args
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{export}
+%     Of practical importance is the |export| subcommand required by  
+%     the \APIref*{export}{2.0} interface.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::export {X sorter elem attr} {
+   set root [list OMA $attr]
+   set L [list [_OM mS arith1 times $attr *]]
+   set gattr $attr
+   dict lappend gattr mtmtcl:path generators
+   set power [_OM mS arith1 power $attr ^] 
+   dict for {k v} $elem {
+      set base [{*}$X export $k $gattr]
+      if {$v != 1} then {
+         set base [list OMA $attr [list $power $base [_OM I $v]]]
+      }
+      lappend L $base
+   }
+   lappend root $L
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{API}
+%     This doesn't test the |export| preconditions properly, but it's 
+%     good enough for now.
+%     \begin{tcl}
+proc mtmtcl::groups::free_abelian_group::API {X sorter args} {
+   ::APIutil::API [lindex {{} {
+      equality 1.1
+      onlycanonical 1.0
+      canonise 1.1
+      "named element" 1.0
+      semigroup 1.1
+      monoid 1.1
+      group 1.2
+      export 2.0
+   }} [{*}$X API canonise 1.0]] {*}$args
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
 % 
 % \begin{APIspec}{generated group}{1.0}
 %   If a group is generated by a known subset of elements, then it 
@@ -1266,7 +1640,7 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 % \end{APIspec}
 % 
 % 
-% \begin{APIspec}{generated additive group}{1.0}
+% \begin{APIspec}{generated additive group}{2.0}
 %   If a group is generated by a known subset of elements, then it 
 %   can be useful to have an operation which produces an expression 
 %   in terms of those generators for arbitrary elements of the group. 
@@ -1281,12 +1655,12 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %     \end{APImethod}
 %     \begin{APImethod}{0}
 %     \end{APImethod}
-%     \begin{APImethod}{-}
+%     \begin{APImethod}{neg}
 %       \word{element}
 %     \end{APImethod}
-%       First of all, the |additive group| interface version~1.0 must 
+%       First of all, the |additive group| interface version~2.0 must 
 %       be satisfied. Denote by $G$ the upgrade of \meta{group} to 
-%       version~1.3 of this interface.
+%       version~2.3 of this interface.
 %       
 %     \begin{APImethod}{named}
 %       \word{name}
@@ -1312,7 +1686,10 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %   \end{APIdescription}
 % \end{APIspec}
 % 
-% 
+% \begin{APIspec}{generated additive group}{1.0}
+%   This is the same as version~2.0, except that it incorporates 
+%   version 1.0 of \APIref{additive group}{1.0} rather than~2.0.
+% \end{APIspec}
 % 
 % 
 % 

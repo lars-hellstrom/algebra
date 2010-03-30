@@ -18,6 +18,10 @@
 \CodelineNumbered
 \setcounter{IndexColumns}{2}
 
+\providecommand{\marg}[1]{\textnormal{%
+   \texttt{\symbol{123}}\meta{#1}\texttt{\symbol{125}}%
+}}
+
 \newenvironment{ttdescription}{%
   \description
   \def\makelabel##1{\hspace\labelsep\normalfont\ttfamily ##1}%
@@ -150,1235 +154,7 @@
 % 
 % \section{Theory and introduction}
 % 
-% \subsection{\PROPs}
-% 
-% A \PROP\ is an algebraic structure, just like a ring or group, but 
-% a bit more advanced than these (hopefully) familiar structures. 
-% Elementary examples of \PROPs\ tend to be a bit degenerate, but one 
-% that is good to think about is that there is a \PROP\ consisting of 
-% \emph{all matrices} (over some given element ring) \emph{regardless 
-% of shape} where the composition operation is precisely matrix 
-% multiplication; in other words there are 
-% restrictions on how the ``shapes'' of \PROP\ elements must match 
-% in order to be composeable. Further like matrices, one usually 
-% collects the elements of a \PROP\ $\mc{P}$ according to shape, so 
-% $\mc{P}(m,n)$ is the set of all $m$-out-$n$-in elements of 
-% $\mc{P}$. 
-% 
-% In the hierarchy of higher algebraic concepts, \PROPs\ are 
-% generalisations of operads and special cases of symmetric monoidal 
-% categories. The name \PROP~\cite{MacLane} is an abbreviation of 
-% \emph{PROducts and Permutations category}, and in order to formally 
-% state the definition, it is necessary to first recall some things 
-% concerning permutations.
-% 
-% \begin{definition}
-%   For all \(n \in \N\), let $[n]$ denote the set $\{1,\dotsc,n\}$, 
-%   and in particular \([0] = \varnothing\). Then define the 
-%   \DefOrd{permutation group} $\Sigma_n$\index{Sigma n@$\Sigma_n$} to 
-%   be the group of all bijections \([n] \Fpil [n]\). In particular, 
-%   $\Sigma_0$ is considered to be a group with one element.
-%   
-%   Explicit permutations will typically be written in \DefOrd{cycle 
-%   notation}, where $(k_1\,k_2\,\ldots\,k_r)$ denotes the permutation 
-%   $\sigma$ which satisfies \(\sigma(k_1) = k_2\), \(\sigma(k_2) = 
-%   k_3\), \dots, \(\sigma(k_{r-1}) = k_r\), \(\sigma(k_r) = k_1\) 
-%   and leaves all other elements fixed. 
-%   A few other families of permutations are however also important. 
-%   I will follow \c{S}tef\u{a}nescu~\cite{Stefanescu} and write 
-%   \index{X@$\cross{k}{m}$}$\cross{k}{m}$ for the element of 
-%   \(\Sigma_{k+m}\) which exchanges a left block of $k$ things 
-%   with a right block of $m$ things, i.e.,
-%   \begin{equation}
-%     \cross{k}{m} (i) = \begin{cases}
-%       i+m& \text{if \(i \leqslant k\),}\\
-%       i-k& \text{if \(i > k\).}
-%     \end{cases}
-%   \end{equation}
-%   One may think of this as a crossing of two ``cables'', one 
-%   containing $k$ wires and the other containing $m$ wires. 
-%   Similarly the identity element in $\Sigma_n$ will be written as 
-%   \index{I@$\same{n}$ (identity permutation)}$\same{n}$.
-%   
-%   The \PROP\ axioms also use the permutation juxtaposition 
-%   product \((\sigma,\tau) \mapsto \sigma \star \tau : 
-%   \Sigma_m \times \Sigma_n \Fpil \Sigma_{m+n}\), which is 
-%   defined by
-%   \begin{equation}
-%     (\sigma \star \tau)(i) = \begin{cases}
-%       \sigma(i)& \text{if \(i \leqslant m\),}\\
-%       \tau(i-m)+m& \text{if \(i>m\).}
-%     \end{cases}
-%   \end{equation}
-%   The group product of permutations, i.e., the function composition, 
-%   will be written as $\circ$ if there is a need to emphasise this 
-%   operation, but usually the permutations are just written next to 
-%   each other.
-% \end{definition}
-% 
-% \begin{definition} \label{Def:PROP}
-%   A \DefOrd{PROP} $\mc{P}$ is a family $\bigl\{ \mc{P}(m,n) 
-%   \bigr\}_{m,n\in\N}\) of sets with a family \(\bigl\{\phi_n \colon 
-%   \Sigma_n \Fpil \mc{P}(n,n) \bigr\}_{n\in\N}\) of maps and two 
-%   operations
-%   \begin{align*}
-%     \circ :{}& \mc{P}(l,m) \times \mc{P}(m,n) \Fpil \mc{P}(l,n)
-%        && \text{(composition)}\\
-%     \otimes :{}& \mc{P}(k,l) \times \mc{P}(m,n) \Fpil \mc{P}(k+m,l+n)
-%        && \text{(tensor product)}
-%   \end{align*}
-%   that satisfy the following axioms:
-%   \begin{description}
-%     \item[compsition associativity]
-%       \((a \circ b) \circ c = a \circ (b \circ c)\) for all \(a \in 
-%       \mc{P}(k,l)\), \(b \in \mc{P}(l,m)\), and \(c \in \mc{P}(m,n)\).
-%     \item[composition identity]
-%       \(\phi_m(\same{m}) \circ a = a = a \circ \phi_n(\same{n})\) 
-%       for all \(a \in \mc{P}(m,n)\).
-%     \item[tensor associativity]
-%       \((a \otimes b) \otimes c = a \otimes (b \otimes c)\) for all 
-%       \(a \in \mc{P}(k,l)\), \(b \in \mc{P}(m,n)\), and \(c \in 
-%       \mc{P}(r,s)\).
-%     \item[tensor identity]
-%       \(\phi_0(\same{0}) \otimes a = a = a \otimes \phi_0(\same{0})\) 
-%       for all \(a \in \mc{P}(m,n)\).
-%     \item[permutation composition]
-%       \(\phi_n(\sigma) \circ \phi_n(\tau) = \phi_n(\sigma\tau)\) for 
-%       all \(\sigma,\tau \in \Sigma_n\). In other words, each $\phi_n$ 
-%       is a group homomorphism.
-%     \item[permutation juxtaposition]
-%       \(\phi_m(\sigma) \otimes \phi_n(\tau) = \phi_{m+n}(\sigma \star 
-%       \tau)\) for all \(\sigma \in \Sigma_m\) and \(\tau \in \Sigma_n\). 
-%     \item[composition--tensor compatibility]
-%       \((a \circ b) \otimes (c \circ d) = (a \otimes c) \circ (b 
-%       \otimes d)\) for all \(a \in \mc{P}(l,m)\), \(b \in 
-%       \mc{P}(m,n)\), \(c \in \mc{P}(k,r)\), and \(d \in \mc{P}(r,s)\).
-%     \item[tensor permutation]
-%       \(\phi_{k+m}(\cross{k}{m}) \circ (a \otimes b) = (b \otimes a) 
-%       \circ \phi_{l+n}(\cross{l}{n})\) for all \(a \in \mc{P}(k,l)\) 
-%       and \(b \in \mc{P}(m,n)\).
-%   \end{description}
-%   Since the index $n$ is clear from the permutation fed into a $\phi_n$ 
-%   map, this part of the notation is often omitted. (In practical 
-%   applications, it is common to leave the $\phi_n$ maps out 
-%   altogether.) The $\otimes$ operation is considered to have higher 
-%   precedence (binding strength) than the $\circ$ operation.
-%   
-%   If a \PROP\ $\mc{P}$ is used in a context where one expects a 
-%   set, then it denotes the union $\bigcup_{m,n\in\N} \mc{P}(m,n)$.
-%   
-%   A \PROP\ $\mc{P}$ is said to be 
-%   \DefOrd[{linear PROP}{linear \PROP}]{$\mc{R}$-linear} for some 
-%   ring $\mc{R}$ if every $\mc{P}(m,n)$ is an $\mc{R}$-module and 
-%   the two operations $\circ$ and $\otimes$ are $\mc{R}$-bilinear.
-%   
-% \end{definition}
-% 
-% \begin{example}
-%   For every associative unital semiring $\mc{R}$, there is a \PROP\ 
-%   $\mathrm{Mat}_{\mc{R}}$ such that:
-%   \begin{itemize}
-%     \item
-%       \(\mathrm{Mat}_{\mc{R}}(m,n) = \mc{R}^{m \times n}\) 
-%       ($m$-by-$n$ matrices whose entries are elements of $\mc{R}$). 
-%       In particular, each of the degenerate sets $\mc{R}^{0 \times 
-%       n}$ and $\mc{R}^{m \times 0}$ is considered to have exactly 
-%       one element, which is denoted $0$.
-%     \item
-%       The composition \(\circ\colon \mathrm{Mat}_{\mc{R}}(l,m) 
-%       \times \mathrm{Mat}_{\mc{R}}(m,n) \Fpil 
-%       \mathrm{Mat}_{\mc{R}}(l,n)\) is multiplication of an 
-%       $l$-by-$m$ matrix with an $m$-by-$n$ matrix. In the case that 
-%       \(m=0\), the result is the $l$-by-$n$ all zeroes matrix.
-%     \item
-%       The tensor product $\otimes$ is the block matrix constructor
-%       \begin{equation*}
-%         A \otimes B = \begin{pmatrix} A & 0 \\ 0 & B \end{pmatrix}
-%         \text{.}
-%       \end{equation*}
-%     \item
-%       The $\phi_n$ maps map permutation to corresponding 
-%       permutation matrices, i.e.,
-%       \begin{equation*}
-%         \phi_n(\sigma)_{i,j} = \begin{cases}
-%           1& \text{if \(i = \sigma(j)\),}\\
-%           0& \text{otherwise.}
-%         \end{cases}
-%       \end{equation*}
-%   \end{itemize}
-%   The \PROP\ axioms are either well-known properties (e.g.~matrix 
-%   multiplication is associative) or immediately clear. The 
-%   $\mathrm{Mat}_{\mc{R}}$ \PROP\ is however typically not 
-%   $\mc{R}$-linear, because the $\otimes$ operation is not bilinear. 
-% \end{example}
-% 
-% Examples of general $\mc{R}$-linear \PROPs\ are a bit hard to come 
-% by without resorting to higher algebra, but one that can be 
-% constructed using matrices is to take \(\mc{P}(m,n) = 
-% \mc{R}^{2^m \times 2^n}\) and use the Haramard product as 
-% $\otimes$. In this case, the permutations exchange digits in the 
-% binary expansions of the row\slash column indices (counted from $0$). 
-% 
-% The more general example of which this is a special case is called 
-% the $\mc{H}\mathit{om}$ \PROP. Given an $\mc{R}$-module $\mc{V}$, 
-% this \PROP\ has \(\mc{H}\mathit{om}_{\mc{V}}(m,n) = 
-% \mathrm{Hom}_{\mc{R}}(\mc{V}^{\otimes n},\mc{V}^{\otimes m}\)\Dash 
-% the set of $\mc{R}$-linear maps from the $n$-fold tensor product of 
-% $\mc{V}$ by itself to the $m$-fold tensor product of $\mc{V}$ by 
-% itself. The composition and tensor product are the ordinary 
-% compositions and tensor products of maps. Permutations rearrange 
-% components in tensor products, i.e.,
-% \begin{equation*}
-%   \phi_n(\sigma)(a_1 \otimes \dotsb \otimes a_n) =
-%   a_{\sigma(1)} \otimes \dotsb \otimes a_{\sigma(n)}
-%   \qquad\text{for all \(a_1,\dotsc,a_n \in \mc{V}\).}
-% \end{equation*}
-% The $\mc{R}$-linear matrix \PROP\ $\mc{P}$ above is merely the case 
-% \(\mc{V}=\mc{R}^2\) of $\mc{H}\mathit{om}_{\mc{V}}$ (since tensor 
-% products multiply dimensions of the factors, the sides of the 
-% matrix representations of the $\mc{H}\mathit{om}$ \PROP\ really 
-% grows that fast).
-% 
-% A method of manufacturing an $\mc{R}$-linear \PROP\ $\mc{Q}$ is to 
-% start with any \PROP\ $\mc{P}$ and then let $\mc{Q}(m,n)$ be the 
-% free $\mc{R}$-module with basis $\mc{P}(m,n)$, extending $\circ$ 
-% and $\otimes$ to general elements by assuming them bilinear. This 
-% works well for discrete \PROPs\ (such as the one considered next) 
-% but is rather unintuitive if there already exists some action of 
-% $\mc{R}$ on the basis \PROP\ $mc{P}$, since this will then not take 
-% part in the $\mc{R}$-linear structure of $\mc{Q}$.
-% 
-% A \PROP\ that is not immediately mathematical, but very 
-% illustrative, is the ``IC chip \PROP''. The elements of this \PROP\ 
-% are ``curcuits'' (electrical, logical, or whatever) that can be 
-% built from wiring and some set of elementary ``gates'' or 
-% ``IC chips''. A typical element $a$ of this \PROP\ may therefore be 
-% illustrated as
-% \begin{equation*}
-%   \begin{mpgraphics*}{network2.1}
-%<*mpfigs>
-beginfig(1);
-  % A simple PROP element
-  IC_equations1(7,8)();
-  z1.ll = (1in,1in);
-  draw_IC1(
-    btex $\scriptstyle 1$ etex, btex $\scriptstyle n$ etex,
-    btex $a$ etex,
-    btex $\scriptstyle 1$ etex, btex $\scriptstyle m$ etex
-  );
-  for i := 1 upto 7:
-     drawarrow z1b[i] -- z1b[i] - (0,0.7cm);
-  endfor
-  for i := 1 upto 8:
-     drawarrow z1t[i] + (0,0.7cm) -- z1t[i];
-  endfor
-endfig;
-%</mpfigs>
-%   \end{mpgraphics*}
-% \end{equation*}
-% 
-% 
-% 
-% 
-% \subsection{Graphic \PROP\ expressions}
-% 
-% As in quite a lot of universal algebra, the right way to get a grip 
-% on an algebraic structure is to construct a useful model of 
-% expressions for that structure, and then conclude that this model is 
-% in fact the free object for this kind of structure.
-% 
-% \begin{definition}
-%   A \DefOrd{\PROP\ signature} is a tuple $(X,\alpha,\omega)$, where 
-%   $X$ is a set (the set of symbols) and \(\alpha,\omega\colon X \Fpil 
-%   \N\) are functions. $\alpha(x)$ is called the \DefOrd{arity} of the 
-%   symbol \(x \in X\) and $\omega(x)$ is called the \DefOrd{coarity} 
-%   of the symbol \(x \in X\).
-%   
-%   A \DefOrd{graphic \PROP\ expression} on the signature 
-%   $(X,\alpha,\omega)$ is a tuple
-%   \begin{equation}
-%     G = (V,E,h,g,t,s,D)
-%   \end{equation}
-%   where
-%   \begin{itemize}
-%     \item
-%       $V$ is a finite set, called the set of \emDefOrd{vertices}. \(V 
-%       \owns 0,1\), where $0$ is called the \emDefOrd{output vertex} 
-%       and $1$ is called the \emDefOrd{input vertex}. Elements of \(V 
-%       \setminus \{0,1\}\) are called \emDefOrd{inner vertices}.
-%     \item
-%       $E$ is a finite set, called the set of \emDefOrd{edges}.
-%     \item
-%       \(h\colon E \Fpil V \setminus \{1\}\) is called the 
-%       \emDefOrd{head} map. \(t\colon E \Fpil V \setminus \{0\}\) is 
-%       called the \emDefOrd{tail} map. Define the input $d^-(v)$ and 
-%       output $d^+(v)$ valencies of a vertex $v$ by
-%       \begin{align*}
-%         d^-(v) ={}& 
-%           \card[\Big]{ \setOf[\big]{ e \in E }{ h(e) = v } }
-%           \text{,}\\
-%         d^+(v) ={}& 
-%           \card[\Big]{ \setOf[\big]{ e \in E }{ t(e) = v } }
-%           \text{.}
-%       \end{align*}
-%     \item
-%       \(g,s\colon E \Fpil \Zp\) are 
-%       called the \emDefOrd{head index} and \emDefOrd{tail index} 
-%       maps.
-%     \item
-%       \(D\colon V \setminus \{0,1\} \Fpil X\) is called the 
-%       \emDefOrd{annotation}.
-%   \end{itemize}
-%   and these satisfy
-%   \begin{enumerate}
-%     \item
-%       The tuple $(V,E,h,t)$ is a directed acyclic graph, i.e., there 
-%       is no sequence \(e_1,\dotsc,e_n \in E\) such that 
-%       \(h(e_i)=t(e_{i+1})\) for \(i=1,\dotsc,n-1\) and 
-%       \(h(e_n)=t(e_1)\).
-%     \item
-%       Head and head index uniquely identifies an edge, as does the 
-%       combination of tail and tail index; if \(e_1,e_2 \in E\) satisfy 
-%       \(h(e_1)=h(e_2)\) and \(g(e_1) = g(e_2)\) then \(e_1=e_2\); 
-%       similarly if \(e_1,e_2 \in E\) satisfy \(t(e_1)=t(e_2)\) and 
-%       \(s(e_1) = s(e_2)\) then \(e_1=e_2\).
-%     \item
-%       Head indices are assigned from $1$ and up; if \(e_1 \in E\) is 
-%       such that \(g(e_1)>1\) then there exists some \(e_2 \in E\) such 
-%       that \(h(e_2)=h(e_1)\) and \(g(e_2) = g(e_1)-1\). Similarly 
-%       tail indices are assigned from $1$ and up; if \(e_1 \in E\) is 
-%       such that \(s(e_1)>1\) then there exists some \(e_2 \in E\) such 
-%       that \(t(e_2)=t(e_1)\) and \(s(e_2) = s(e_1)-1\).
-%     \item
-%       Arities and coarities of the annotations agree with the 
-%       in-valencies and out-valencies respectively of the inner vertices; 
-%       \(d^-(v) = \alpha\bigl( D(v) \bigr)\) and 
-%       \(d^+(v) = \omega\bigl( D(v) \bigr)\) for every \(v \in V 
-%       \setminus \{0,1\}\).
-%   \end{enumerate}
-%   The valency $d^+(1)$ of the input vertex $1$ is called the 
-%   \DefOrd{arity} of the expression $G$ and is denoted $\arity(G)$. The 
-%   valency \(d^-(0)\) of the output vertex $0$ is called the 
-%   \DefOrd{coarity} of the expression $G$ and is denoted $\coarity(G)$.
-%       
-%   Denote by \(\mc{GPE}_{(X,\alpha,\omega)}(m,n)\) the set of all 
-%   graphic \PROP\ expressions on the signature $(X,\alpha,\omega)$ 
-%   which have \(V,E \subset \N\), coarity $m$, and arity $n$.
-% \end{definition}
-% 
-% 
-% The most elementary expressions are those corresponding to just one 
-% operation, with inputs and outputs connected to the input and output 
-% vertices in the same order as to the operation vertex. It will turn 
-% out these are the only expressions which one explicitly needs to 
-% assign a value to, so it is useful to have a name for them.
-% 
-% \begin{definition}
-%   A graphic \PROP\ expression \(G = (V,E,h,g,t,s,D)\) said to be 
-%   \DefOrd{elementary} if \(V = \{0,1,v\}\) and it for all \(e \in E\) 
-%   holds that
-%   \begin{gather*}
-%     g(e)=s(e)\text{,}\\
-%     h(e)=0 \iff t(e)=v\text{,}\\
-%     h(e)=v \iff t(e)=1\text{.}
-%   \end{gather*}
-%   The annotation $D(v)$ is called the \DefOrd{nucleus} of $G$.
-%   
-%   A graphic \PROP\ expression \(G = (V,E,h,g,t,s,D)\) said to be a 
-%   \DefOrd{permutation expression} if \(V = \{0,1\}\). The 
-%   permutation \DefOrd{expressed by $G$} is the \(\sigma \in 
-%   \Sigma_{\card{E}}\) which satisfies \(g = \sigma \circ s\).
-%   
-%   For any \(v \in V\), the restriction of $g$ to $\setOf[\big]{ 
-%   e \in E }{ h(e) = v }$ will be denoted $g^G_v$ and the restriction 
-%   of $s$ to $\setOf[\big]{ e \in E }{ t(e) = v }$ will be denoted 
-%   $s^G_v$.
-% \end{definition}
-% 
-% The point of naming particular restrictions of the head and tail 
-% index maps is that the \emph{inverses} of these maps are frequently 
-% useful in explicit expressions, e.g.~for various permutations. The 
-% point of having the graphic \PROP\ expression be a part of the symbol 
-% is that an argument may involve several such expressions.
-% 
-% Values for more composite expressions can be assigned by decomposing 
-% them into elementary expressions. The most important decomposition is 
-% the \emph{cut}, which goes across edges.
-% 
-% \begin{definition}
-%   A \DefOrd{cut} in a graphic \PROP\ expression \(G = 
-%   (V,E,h,g,t,s,D)\) is a bipartition \(W_0 \cup W_1\) of $V \setminus 
-%   \{0,1\}$ such that no \(e \in E\) satisfies \(h(e) \in W_1\) and 
-%   \(t(e) \in W_0\). The cut is said to be \DefOrd{non-trivial} if 
-%   $W_0$ and $W_1$ are both nonempty.
-%   
-%   An edge \(e \in E\) is said to be a \emDefOrd{cut edge} if \(h(e) 
-%   \in W_0 \cup \{0\}\) and \(t(e) \in W_1 \cup \{1\}\). Let $E_c$ be 
-%   the set of all cut edges. A cut is said to be 
-%   \DefOrd[*{ordered cut}]{ordered} if it is given as $(W_0,W_1,p)$ 
-%   where \(p\colon E_c \Fpil \bigl[ \card{E_c} \bigr]\) is a bijection. 
-%   The \emDefOrd[*{graphic expression decomposition}]{decomposition} 
-%   of $G$ induced by the ordered cut $(W_0,W_1,p)$ is $(G',G'')$, 
-%   where \(G' = (V',E',h',g',t',s',D')\) and 
-%   \(G'' = (V'',E'',h'',g'',t'',s'',D'')\) are defined by
-%   \begin{align*}
-%     V' ={}& W_0 \cup \{0,1\} &   V'' ={}& W_1 \cup \{0,1\}\\
-%     E' ={}& \setOf[\big]{e \in E}{h(e) \in W_0 \cup \{0\}} &
-%     E'' ={}& \setOf[\big]{e \in E}{t(e) \in W_1 \cup \{1\}} 
-%       \displaybreak[0]\\
-%     h' ={}& \restr{h}{E'} & t'' ={}& \restr{t}{E''}\\
-%     t'(e) ={}& \begin{cases}
-%       1& \text{if \(e \in E_c\),}\\
-%       t(e)& \text{otherwise,}
-%     \end{cases} &
-%     h''(e) ={}& \begin{cases}
-%       0& \text{if \(e \in E_c\),}\\
-%       h(e)& \text{otherwise,}
-%     \end{cases} \displaybreak[0]\\
-%     g' ={}& \restr{g}{E'} & s'' ={}& \restr{s}{E''} 
-%       \displaybreak[0]\\
-%     s'(e) ={}& \begin{cases}
-%       p(e)& \text{if \(e \in E_c\),}\\
-%       s(e)& \text{otherwise,}
-%     \end{cases} &
-%     g''(e) ={}& \begin{cases}
-%       p(e)& \text{if \(e \in E_c\),}\\
-%       g(e)& \text{otherwise,}
-%     \end{cases} \\
-%     D' ={}& \restr{D}{W_0} & 
-%     D'' ={}& \restr{D}{W_1} \text{.}
-%   \end{align*}
-% \end{definition}
-% 
-% Obseve that a decomposition is such that \(V' \cap V'' = \{0,1\}\) 
-% and \(E' \cap E'' = E_c\). What happens is effectively that the cut 
-% edges are ordered according to $p$, cut in half, and a new input and 
-% output vertex is created for the edges to attach to.
-% 
-% An alternative method of decomposing a \PROP\ expression is to split 
-% the existing input and output vertices in half, provided that there 
-% then are no other connections between the resulting halves. This is 
-% the idea behind the next concept.
-% 
-% 
-% \begin{definition}
-%   A \DefOrd{split} in a graphic \PROP\ expression \(G = 
-%   (V,E,h,g,t,s,D)\) is a tuple $(F_l,F_r,W_l,W_r)$, where \(F_l \cup 
-%   F_r\) is a bipartition of $E$ and \(W_l \cup W_r\) is a bipartition 
-%   of $V \setminus \{0,1\}$, such that:
-%   \begin{enumerate}
-%     \item
-%       if \(e \in F_l\) then \(h(e) \in W_l \cup \{0\}\) and \(t(e) 
-%       \in W_l \cup\{1\}\),
-%     \item
-%       if \(e \in F_r\) then \(h(e) \in W_r \cup \{0\}\) and \(t(e) 
-%       \in W_r \cup\{1\}\),
-%     \item
-%       if \(e_l \in F_l\) and \(e_r \in F_r\) are such that \(h(e_l) = 
-%       h(e_r) = 0\) then \(g(e_l) < g(e_r)\), and
-%     \item
-%       if \(e_l \in F_l\) and \(e_r \in F_r\) are such that \(t(e_l) = 
-%       t(e_r) = 0\) then \(s(e_l) < s(e_r)\).
-%   \end{enumerate}
-%   Let \(k = \card[\big]{\setOf{e \in F_l}{h(e)=0}}\) and 
-%   \(l = \card[\big]{\setOf{e \in F_l}{t(e)=1}}\). The 
-%   \emDefOrd[*{graphic expression decomposition}]{decomposition} 
-%   of $G$ induced by the split $(F_l,F_r,W_l,W_r)$ is $(G',G'')$, 
-%   where \(G' = (V',F_l,h',g',t',s',D')\) and 
-%   \(G'' = (V'',F_r,h'',g'',t'',s'',D'')\) are defined by
-%   \begin{align*}
-%     V' ={}& W_0 \cup \{0,1\} &   V'' ={}& W_1 \cup \{0,1\}\\
-%     h' ={}& \restr{h}{F_l} & h'' ={}& \restr{h}{F_r}
-%       \displaybreak[0]\\
-%     t' ={}& \restr{t}{F_l} & t'' ={}& \restr{t}{F_r}
-%       \displaybreak[0]\\
-%     g' ={}& \restr{g}{F_l} & 
-%       g''(e) ={}& \begin{cases}
-%         g(e)-k& \text{if \(h''(e)=0\),}\\
-%         g(e)& \text{otherwise,}
-%       \end{cases}
-%       \displaybreak[0]\\
-%     s' ={}& \restr{s}{F_l} & 
-%       s''(e) ={}& \begin{cases}
-%         s(e)-l& \text{if \(t''(e)=1\),}\\
-%         s(e)& \text{otherwise,}
-%       \end{cases}\\
-%     D' ={}& \restr{D}{W_l} & 
-%     D'' ={}& \restr{D}{W_r} \text{.}
-%   \end{align*}
-% \end{definition}
-% 
-% In other words, all that happens in the decomposition induced by a 
-% split, apart from the fact that the underlying graph is split into 
-% two, is that the head indices at the output vertex and tail indices 
-% at the input vertex are adjusted in the right component to assure 
-% that they start at $0$.
-% 
-% 
-% \begin{lemma} \label{L:UppdelningOrdning3}
-%   Let $G$ be an arbitrary graphic \PROP\ expression on the form 
-%   $\bigl( \{0,1,v\}, E,h,g,t,s,D \bigr)$. Let \(m = \coarity(G)\), 
-%   \(n = \arity(G)\), and \(k = m - d^+(v) = n - d^-(v)\). Then there 
-%   exist unique \(\sigma \in \Sigma_m\) and \(\tau \in \Sigma_n\) such 
-%   that:
-%   \begin{enumerate}
-%     \item \label{C1:L:UppdelningOrdning3}
-%       If \(e \in E\) is such that \(h(e)=0\) and \(t(e)=1\) then 
-%       \(g(e) = \sigma( \tau( s(e) ) )\).
-%     \item \label{C2:L:UppdelningOrdning3}
-%       If \(e \in E\) is such that \(h(e)=0\) and \(t(e)=v\) then 
-%       \(g(e) = \sigma\bigl( s(e) +\nobreak k \bigr)\).
-%     \item \label{C3:L:UppdelningOrdning3}
-%       If \(e \in E\) is such that \(h(e)=v\) and \(t(e)=1\) then 
-%       \(g(e) = \tau\bigl( s(e) \bigr) - k\).
-%     \item \label{C4:L:UppdelningOrdning3}
-%       $\sigma$ is strictly increasing on $[k]$.
-%   \end{enumerate}
-%   Moreover, these data determine a decomposition
-%   \begin{equation*}
-%     \fbox{\(\begin{array}{ccc}
-%       G_0 & \fbox{\(\begin{array}{c} G_2 \\ G_3 \end{array}\)} & G_1
-%     \end{array}\)}
-%   \end{equation*}
-%   of $G$ where $G_0$ is a permutation expression for $\sigma$, $G_1$ 
-%   is a permutation expression for $\tau$, $G_2$ is a permutation 
-%   expression for $\same{k}$, and $G_3$ is an elementary expression 
-%   with nucleus $D(v)$.
-%   
-%   Concretely, let \(p_0 = \sigma^{-1} \circ g^G_0\) and \(p_1 = \tau 
-%   \circ s^G_1\). 
-%   Let \(F_l = \setOf[\big]{ e \in E }{ \text{\(h(e)=0\) and 
-%   \(t(e)=1\)} }\), and let \(F_r = E \setminus F_l\). Then 
-%   $\bigl( \varnothing, \{v\}, p_0 \bigr)$ is an ordered cut in $G$ 
-%   which induces a decomposition $(G_0,G_{231})$ and $\bigl( \{v\}, 
-%   \varnothing, p_1 \bigr)$ is an ordered cut in $G$ which induces a 
-%   decomposition $(G_{023},G_1)$. The same $\bigl( \varnothing, \{v\}, 
-%   p_0 \bigr)$ is an ordered cut in $G_{023}$ which induces a 
-%   decomposition $(G_0,G_{23})$ and $\bigl( \{v\}, \varnothing, p_1 
-%   \bigr)$ is an ordered cut in $G_{231}$ which induces the 
-%   decomposition $(G_{23},G_1)$. Finally this $G_{23}$ has a split 
-%   $\bigl( F_l, F_r, \varnothing, \{v\} \bigr)$ which induces a 
-%   decomposition $(G_2,G_3)$.
-% \end{lemma}
-% \begin{proof}
-%   By the acyclicity of $G$, every \(e \in E\) with \(t(e)=v\) has 
-%   \(h(e) = 0\) and thus condition~\ref{C2:L:UppdelningOrdning3} 
-%   defines $\sigma(i)$ for all \(i>k\). 
-%   Condition~\ref{C4:L:UppdelningOrdning3} then completes the 
-%   definition of $\sigma$. Condition~\ref{C1:L:UppdelningOrdning3} can 
-%   then be restated as: if \(e \in E\) is such that \(h(e) \neq v\) and 
-%   \(t(e)=1\) then \(\sigma^{-1}\bigl( g(e) \bigr) = \tau\bigl( s(e) 
-%   \bigr)\). Together with condition~\ref{C3:L:UppdelningOrdning3} 
-%   this completes the definition of $\tau$, and the piecewise 
-%   definition cannot make the function noninjective since 
-%   \(\sigma^{-1}\bigl( g(e) \bigr) \leqslant k\) for all \(e \in E\) 
-%   with \(h(e) = 0\) and \(t(e) = 1\).
-%   
-%   Let the graphic \PROP\ expressions $G_0$, $G_{231}$, $G_{023}$, and 
-%   $G_1$ be defined by the decompositions $(G_0,G_{231})$ and 
-%   $(G_{023},G_1)$ induced by the cuts $\bigl( \varnothing, \{v\}, p_0 
-%   \bigr)$ and $\bigl( \{v\}, \varnothing, p_1 \bigr)$ respectively. 
-%   It is then obvious that $G_0$ is a permutation expression 
-%   corresponding to $\sigma$ and $G_1$ is a permutation expression 
-%   corresponding to $\tau$. Furthermore $G_{231}$ differs from $G$ 
-%   only in the value of $g$ and $G_{023}$ differs from $G$ only in the 
-%   value of $s$, so $\bigl( \varnothing, \{v\}, p_0 \bigr)$ is an 
-%   ordered cut also in $G_{023}$ and $\bigl( \{v\}, \varnothing, p_1 
-%   \bigr)$ is an ordered cut also in $G_{231}$. Let $(G_0',G_{23})$ 
-%   and $(G_{23}',G_1')$ be the corresponding decompositions. A 
-%   comparison using the definition immediately shows \(G_0' = G_0\) 
-%   and \(G_1' = G_1\), as claimed. Since cutting away $G_0$ only 
-%   changes $g$ to conform with $p_0$ and cutting away $G_1$ only 
-%   changes $s$ to conform with $p_1$, it follows that these operations 
-%   commute and \(G_{23} = G_{23}' = \bigl( \{0,1,v\}, E, h, g', t, s', 
-%   D \bigr)\), where
-%   \begin{align*}
-%     g'(e) ={}& \begin{cases}
-%       p_0(e)& \text{if \(h(e) = 0\),}\\
-%       p_1(e) - k& \text{if \(h(e) = v\),}
-%     \end{cases} \\
-%     s'(e) ={}& \begin{cases}
-%       p_1(e)& \text{if \(t(e) = 1\),}\\
-%       p_0(e) - k& \text{if \(t(e) = v\).}
-%     \end{cases}
-%   \end{align*}
-%   Observe that \(p_0(e) = p_1(e)\) for all \(e \in F_l\) and that 
-%   \(p_0(e) \leqslant k\) if and only if \(e \in F_l\). Hence $G_{23}$ 
-%   has a split $\bigl( F_l, F_r, \varnothing, \{v\} \bigr)$ and the  
-%   induced decomposition $(G_2,G_3)$ is such that $G_2$ is a 
-%   permutation expression where head and tail indices are always 
-%   equal, i.e., it expresses $\same{k}$. Furthermore \(\GV(G_3) = 
-%   \{0,1,v\}\), an edge in it goes from $1$ to $v$ or from $v$ to $0$, 
-%   and the head index of an edge is always equal to the tail index. 
-%   Hence $G_3$ is an elementary expression, and the nucleus is $D(v)$.
-% \end{proof}
-% 
-% 
-% \begin{definition}
-%   Let a signature $\Omega$ and a \PROP\ $\mc{P}$ be given. A relation 
-%   $\propto$ which relates $\mc{GPE}_\Omega(m,n)$ to $\mc{P}(m,n)$ for 
-%   all \(m,n \in \N\) is said to be an \DefOrd{evaluation relation} if 
-%   it satisfies the following conditions:
-%   \begin{enumerate}
-%     \item
-%       If $G$ has a decomposition $(G_0,G_1)$ induced by some 
-%       cut, \(G_0 \propto a_0\), and \(G_1 \propto a_1\) then 
-%       \(G \propto a_0 \circ a_1\).
-%     \item
-%       If $G$ has a decomposition $(G_l,G_r)$ induced by some 
-%       split, \(G_l \propto a_l\), and \(G_r \propto a_r\) then 
-%       \(G \propto a_l \otimes a_r\).
-%     \item \label{Villk:Permutation}
-%       If $G$ is a permutation expression then \(G \propto 
-%       \phi_n(\sigma)\), where $\sigma$ is the permutation expressed 
-%       by $G$.
-%   \end{enumerate}
-%   
-%   A function \(f\colon X \Fpil \mc{P}\) such that 
-%   \(f(x) \in \mc{P}\bigl( \omega(x), \alpha(x) \bigr)\) for all 
-%   \(x \in X\) is called an \DefOrd{evaluation seed}. For any 
-%   evaluation seed $f$, denote by $\stackrel{f}{\propto}$ the minimal 
-%   evaluation relation which satisfies \(G \stackrel{f}{\propto} 
-%   f(x)\) for every elementary \(G \in \mc{GPE}_\Omega\) with nucleus 
-%   \(x \in X\).
-% \end{definition}
-% 
-% The purpose of these definitions is to define an evaluation 
-% \emph{function} which assigns a value to every graphic \PROP\ 
-% expression, and as it happens that evaluation function will be 
-% $\stackrel{f}{\propto}$, but since the univocality of this function 
-% is not obvious from its definition, it is for the time being 
-% necessary to view it as possibly multivalued, and then it is a mere 
-% relation from $\mc{GPE}_\Omega(m,n)$ to $\mc{P}(m,n)$. What is 
-% obvious from the definition is however that the intersection of a 
-% family of evaluation relations is again an evaluation relation, and 
-% from this follows that $\stackrel{f}{\propto}$ exists and is unique. 
-% The next step is to show that it assigns at least one value to every 
-% graphical \PROP\ expression.
-% 
-% 
-% \begin{lemma}
-%   If the domain of an evaluation relation contains all elementary 
-%   expressions, then all graphic \PROP\ expressions are in the domain 
-%   of that relation.
-% \end{lemma}
-% \begin{proof}
-%   The proof is by induction on the number of vertices. Let \(G = 
-%   (V,E,h,g,t,s,D)\) be an arbitrary graphic \PROP\ expression. If 
-%   \(\card{V}=2\) then $G$ is a permutation expression and as such 
-%   by condition~\ref{Villk:Permutation} related to a \PROP\ element.
-%   
-%   If \(\card{V} = 3\) then \(V = \{0,1,v\}\) for some $v$. Let
-%   \begin{align*}
-%     E_0 ={}& \setOf[\big]{ e \in E }{ 
-%       \text{\(h(e)=0\) and \(t(e)=v\)} }\text{,}\\
-%     E_1 ={}& \setOf[\big]{ e \in E }{ 
-%       \text{\(h(e)=v\) and \(t(e)=1\)} }\text{,}\\
-%     E_2 ={}& \setOf[\big]{ e \in E }{ 
-%       \text{\(h(e)=0\) and \(t(e)=1\)} }\text{.}
-%   \end{align*}
-%   Also let \(n_i = \card{E_i}\) for \(i=0,1,2\). Then \(d^-(0) = 
-%   n_2+n_0\), \(d^+(1) = n_2+n_1\), \(d^+(v) = n_0\), and 
-%   \(d^-(v)=n_1\). Let \(p_0 \colon E_2 \cup E_0 \Fpil [n_2 +\nobreak 
-%   n_0]\) and \(p_1 \colon E_2 \cup E_1 \Fpil [n_2 +\nobreak n_1]\) be 
-%   the bijections which satisfy:
-%   \begin{enumerate}
-%     \item
-%       If \(e_1,e_2 \in E_2\) are such that \(s(e_1)<s(e_2)\) then 
-%       \(p_1(e_1)<p_1(e_2)\).
-%     \item
-%       If \(e_1,e_2 \in E_1\) are such that \(g(e_1)<g(e_2)\) then 
-%       \(p_1(e_1)<p_1(e_2)\).
-%     \item
-%       If \(e_1 \in E_1\) and \(e_2 \in E_2\) then 
-%       \(p_1(e_1)>p_1(e_2)\).
-%     \item
-%       \(p_1(e)=p_2(e)\) for all \(e \in E_2\).
-%     \item
-%       If \(e_1,e_2 \in E_0\) are such that \(s(e_1)<s(e_2)\) then 
-%       \(p_2(e_1)<p_2(e_2)\).
-%   \end{enumerate}
-%   Now $(\{v\},\varnothing,p_1)$ is an ordered cut in $G$ and thus it 
-%   induces a decomposition $(G_1,G_2)$, where $G_2$ is a permutation 
-%   expression and thus related to the \PROP\ element 
-%   $\phi_{n_2+n_1}(\sigma)$ for \(\sigma^{-1} = s \circ p_1^{-1}\). 
-%   Furthermore \((\varnothing,\{v\},p_2)$ is an ordered cut in $G_1$ 
-%   and thus it induces a decomposition $(G_3,G_4)$, where $G_3$ is a 
-%   permutation expression and thus related to the \PROP\ element 
-%   $\phi_{n_2+n_0}(\tau)$ for \(\tau = g \circ p_2^{-1}\). 
-%   Finally, $(E_2, E_0 \cup\nobreak E_1, \varnothing, \{v\})$ is a 
-%   split in $G_4$ and thus it induces a decomposition $(G_5,G_6)$ of 
-%   that expression. \(G_5 \propto \phi_{n_2}(\same{n_2})\) by 
-%   construction, whereas $G_6$ is elementary and thus \(G_6 \propto a\) 
-%   for some element $a$ by assumption. Hence \(G_4 \propto \id_{n_2} 
-%   \otimes a\) and \(G \propto \tau \cdot (\id_{n_2} \otimes\nobreak 
-%   a) \cdot \sigma\).
-%   
-%   If \(\card{V} > 3\) then we enter the induction step. Let 
-%   $(W_0,W_1)$ be a nontrivial cut in $G$\Ldash such a cut always 
-%   exist, because the acyclicity of $G$ always makes it possible to 
-%   pick \(W_0 = \{v\}\), where \(v \in V\) is such that if \(t(e)=v\) 
-%   for some \(e \in E\) then \(h(e)=0\)\Dash and let $(G_0,G_1)$ be 
-%   some decomposition induced by this cut. Then by the induction 
-%   hypothesis there exists \PROP\ elements $a_0$ and $a_1$ such that 
-%   \(G_0 \propto a_0\) and \(G_1 \propto a_1\), and hence \(G \propto 
-%   a_0 \circ a_1\). This completes the induction.
-% \end{proof}
-% 
-% The next couple of lemmas are about proving univocality of 
-% $\stackrel{f}{\propto}$. This is done step by step, considering one 
-% specific class of expressions after another. The typical method used 
-% is to define a $\propto'$ relation which is exactly like 
-% $\stackrel{f}{\propto}$ except in the particular class one considers 
-% at this step, where instead an alternative definition is given 
-% approximates $\stackrel{f}{\propto}$ from below. Then it is shown that 
-% $\propto'$ is also an evaluation relation, from which follows that it 
-% actually is equal to $\stackrel{f}{\propto}$.
-% 
-% 
-% \begin{lemma} \label{L:EntydighetOrdning2}
-%   Let a signature \(\Omega = (X,\alpha,\omega)\), and \PROP\ 
-%   $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
-%   given. If \(G = (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega\) and 
-%   \(a \in \mc{P}\) are such that \(G \stackrel{f}{\propto} a\) and 
-%   \(\card{V}=2\) then \(a = \phi_{\card{E}}(g \circ\nobreak s^{-1})\).
-% \end{lemma}
-% \begin{proof}
-%   Define the relation $\propto'$ from $\mc{GPE}_\Omega$ to $\mc{P}$ by
-%   \begin{equation*}
-%     (V,E,h,g,t,s,D) \propto' a \quad\Longrightarrow\quad \begin{cases}
-%       (V,E,h,g,t,s,D) \stackrel{f}{\propto} a&
-%         \text{if \(\card{V}>2\),}\\
-%       a = \phi_{\card{E}}(g \circ s^{-1})&
-%         \text{if \(\card{V}=2\).}
-%     \end{cases}
-%   \end{equation*}
-%   Since the definition of $\propto'$ for \(\card{V}=2\) is exactly 
-%   what is required for an evaluation relation, it follows that the 
-%   permutation condition is fulfilled. Since furthermore $\propto'$ 
-%   for \(\card{V}>2\) is equal to $\stackrel{f}{\propto}$, it follows 
-%   that also the cut and split conditions for an evaluation condition 
-%   are fulfilled for decompositions of expressions with more than two 
-%   vertices. What remains is therefore to verify these for expressions 
-%   with exactly two vertices, i.e., for permutation expressions.
-%   
-%   Let \(G = \bigl( \{0,1\}, E,h,g,t,s,D) \in \mc{GPE}_\Omega(n,n)\) and 
-%   an ordered cut $(\varnothing,\varnothing,p)$ of $G$ be given. The 
-%   corresponding decomposition is $(G_0,G_1)$ where \(G_0 = 
-%   \bigl( \{0,1\}, E,h,g,t,p,D)\) and \(G_1 = \bigl( \{0,1\}, 
-%   E,h,p,t,s,D)\). The only solution to \(G_0 \propto' a_0\) is \(a_0 
-%   = \phi_n(g \circ\nobreak p^{-1})\) and the only solution to 
-%   \(G_1 \propto' a_1\) is \(a_1 = \phi_n(p \circ\nobreak s^{-1})\). 
-%   Hence \(G \propto \phi_n(g \circ\nobreak s^{-1}) = 
-%   \phi_n(g \circ\nobreak p^{-1} \circ\nobreak p \circ\nobreak s^{-1}) = 
-%   \phi_n(g \circ\nobreak p^{-1}) \circ \phi_n(p \circ\nobreak s^{-1}) 
-%   = a_0 \circ a_1\) by the permutation composition \PROP\ axiom, and 
-%   thus $\propto'$ fulfils the cut condition.
-%   
-%   Let \(G = \bigl( \{0,1\}, E,h,g,t,s,D) \in \mc{GPE}_\Omega(n,n)\) 
-%   and a split $(F_l, F_r, \varnothing, \varnothing)$ of $G$ be given. 
-%   Let \(k = \card{F_l}\). Then \(g(e),s(e) \leqslant k\) for all \(e 
-%   \in F_l\) and \(g(e),s(e) > k\) for all \(e \in F_r\). Let \(\sigma 
-%   \in \Sigma_k\) be defined by \(g(e) = \sigma\bigl( s(e) \bigr)\) 
-%   for all \(e \in F_l\), and let \(\tau \in \Sigma_{n-k}\) be defined 
-%   by \(g(e) = \tau\bigl( s(e) -\nobreak k \bigr) + k\) for all \(e 
-%   \in F_r\). The permutation expressed by $G$ is then $\sigma \star 
-%   \tau$ and hence \(G \propto' \phi_n(\sigma \star\nobreak \tau) = 
-%   \phi_k(\sigma) \otimes \phi_{n-k}(\tau)\) by the permutation 
-%   juxtaposition \PROP\ axiom. The decomposition $(G_l,G_r)$ induced by 
-%   the split is by definition such that \(G_l = \bigl( \{0,1\}, F_l, 
-%   0, g_l, 1, s_l, D \bigr)\) and \(G_r = \bigl( \{0,1\}, F_r, 0, g_r, 1, 
-%   s_r, D \bigr)\), where \(g_l(e) = g(e)\) for all \(e \in F_l\), 
-%   \(s_l(e) = s(e)\) for all \(e \in F_l\), \(g_r(e) = g(e)-k\) for all 
-%   \(e \in F_r\), and \(s_r(e) = s(e)-k\) for all \(e \in F_r\). Hence 
-%   \(g_l \circ s_l^{-1} = \sigma\) and \(a_l = \phi_k(\sigma)\) is the 
-%   only solution to \(G_l \propto' a_l\). Similarly \(g_r \circ s_r^{-1} 
-%   = \tau\) and \(a_r = \phi_{n-k}(\tau)\) is the only solution to 
-%   \(G_r \propto' a_r\). Thus $\propto'$ fulfils the split condition.
-% \end{proof}
-% 
-% 
-% \begin{lemma}
-%   Let a signature \(\Omega = (X,\alpha,\omega)\), a \PROP\ 
-%   $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
-%   given. The minimial evaluation relation $\stackrel{f}{\propto}$ is 
-%   univocal for all \(G \in \mc{GPE}_\Omega\) which have 
-%   \(\card[\big]{\GV(G)} = 3\).
-% \end{lemma}
-% 
-% An interesting thing about this proof is that it employs all \PROP\ 
-% axioms.
-% 
-% \begin{proof}
-%   By Lemma~\ref{L:UppdelningOrdning3}, every graphic \PROP\ 
-%   expression \(G = (V,E,h,g,t,s,D)\) with \(\card{V} = 3\) uniquely 
-%   determine two permutations \(\sigma_G \in \Sigma_{\coarity(G)}\) 
-%   and \(\tau_G \in \Sigma_{\arity(G)}\) with various properties. Also 
-%   define \(x_G = D(v)\) and \(k_G = \arity(G) - \alpha(x_G) = 
-%   \coarity(G) - \omega(x_G)\). Define the relation $\propto'$ from 
-%   $\mc{GPE}_\Omega$ to $\mc{P}$ by
-%   \begin{equation*}
-%     G \propto' a \quad\iff\quad \begin{cases}
-%       G \stackrel{f}{\propto} a&
-%         \text{if \(\card[\big]{\GV(G)} \neq 3\),}\\
-%       a = \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) 
-%         \circ \phi(\tau_G)&
-%         \text{if \(\card[\big]{\GV(G)} = 3\).}
-%     \end{cases}
-%   \end{equation*}
-%   If $G$ is elementary then \(G \propto' \phi(\same{\omega(x_G)}) 
-%   \circ \phi(\same{0}) \otimes f(x_G) \circ \phi(\same{\alpha(x_G)}) 
-%   = \phi(\same{\omega(x_G)}) \circ f(x_G) \circ 
-%   \phi(\same{\alpha(x_G)}) = f(x_G)\). By the decomposition part of 
-%   Lemma~\ref{L:UppdelningOrdning3}, it thus follows that \(G \propto' 
-%   a\) implies \(G \stackrel{f}{\propto} a\). Since it also works the 
-%   other way round if \(\card[\big]{\GV(G)} \neq 3\), it follows that 
-%   $\propto'$ satisfies the cut and split conditions of evaluation 
-%   relations for all $G$ with \(\card[\big]{\GV(G)} \neq 3\). It 
-%   remains only to prove them for \(\card[\big]{\GV(G)} = 3\).
-%   
-%   Let \(G \in \mc{GPE}_\Omega\) with \(\card[\big]{\GV(G)} = 3\) be 
-%   given. An ordered cut in $G$ either has the form $\bigl( \{v\}, 
-%   \varnothing, p \bigr)$ or $\bigl( \varnothing, \{v\}, p \bigr)$, 
-%   depending on which part the inner vertex $v$ goes to. If the 
-%   decomposition $(G_0,G_1)$ is induced by the first type of cut then 
-%   the only solution to \(G_0 \propto' a_0\) is \(a_0 = 
-%   \phi(\sigma_{G_0}) \circ  \phi(\same{k_{G_0}}) \otimes 
-%   f(x_{G_0})  \circ \phi(\tau_{G_1})\) and the only solution to 
-%   \(G_1 \propto' a_1\) is \(a_1 = \phi\bigl( g^{G_1}_0 \circ\nobreak 
-%   (s^{G_1}_1)^{-1} \bigr)\) by Lemma~\ref{L:EntydighetOrdning2}. 
-%   \(\sigma_{G_0} = \sigma_G\), \(x_{G_0} = D(v) = x_G\), and 
-%   \(k_{G_0} = k_G\) since these are all defined from the same data, 
-%   so what remains is to prove that \(\tau_G = \tau_{G_0} \circ 
-%   g^{G_1}_0 \circ (s^{G_1}_1)^{-1}\). For \(e \in E\) with \(h(e)=0\) 
-%   and \(t(e)=1\), the defining property of $\tau_G$ is that 
-%   \(\sigma_G( \tau_G( s(e) ) ) = g(e)\), and indeed
-%   \begin{multline*}
-%     \sigma_G\Bigl( 
-%       \bigl( \tau_{G_0} \circ g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr)
-%       \bigl( s(e) \bigr) \Bigr) =
-%     \sigma_G\Bigl( \tau_{G_0}\bigl( g^{G_1}_0(e) \bigr) \Bigr) 
-%       = \\ =
-%     \sigma_{G_0}\Bigl( \tau_{G_0}\bigl( s^{G_0}_1(e) \bigr) \Bigr) =
-%     g^{G_0}_0(e) = g(e) 
-%     \text{.}
-%   \end{multline*}
-%   For \(e \in E\) with \(h(e)=v\) and \(t(e)=1\), the defining property 
-%   of $\tau_G$ is that \(\tau_G( s(e) ) = g(e) + k_G\), so similarly
-%   \begin{multline*}
-%     \bigl( \tau_{G_0} \circ g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr)
-%       \bigl( s(e) \bigr) \Bigr) =
-%     \tau_{G_0}\bigl( g^{G_1}_0(e) \bigr) = \\ =
-%     \tau_{G_0}\bigl( s^{G_0}_1(e) \bigr) =
-%     g^{G_0}_v(e) + k_G = g(e) + k_G
-%     \text{.}
-%   \end{multline*}
-%   Together these imply \(\tau_G = \tau_{G_0} \circ g^{G_1}_0 \circ 
-%   (s^{G_1}_1)^{-1}\) and hence
-%   \begin{multline*}
-%     G \propto'
-%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-%       \phi(\tau_G) = \\ =
-%     \phi(\sigma_{G_0}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-%       \phi(\tau_{G_0}) \circ 
-%       \phi\bigl( g^{G_1}_0 \circ (s^{G_1}_1)^{-1} \bigr) =
-%     a_0 \circ a_1
-%     \text{.}
-%   \end{multline*}
-%   
-%   In the second type of cut decomposition $(G_0,G_1)$, the only 
-%   solution to \(G_0 \propto' a_0\) is \(a_0 = \phi(g^G_0 \circ\nobreak 
-%   p^{-1})\) by Lemma~\ref{L:EntydighetOrdning2} and the only solution to 
-%   \(G_1 \propto' a_1\) is \(a_1 = \phi(\sigma_{G_1}) \circ 
-%   \phi(\same{k_{G_1}}) \otimes f(x_{G_1}) \bigr) \circ 
-%   \phi(\tau_{G_1})\). Clearly \(x_{G_1} = x_G\) and hence \(k_{G_1} = 
-%   k_G\), but it need not be the case that \(\tau_{G_1} = \tau_G\) since 
-%   these $\tau$s depend on the corresponding $\sigma$s. Let \(\rho \in 
-%   \Sigma_{k_G}\) be such that \(\rho \star \same{\omega(x_G)} = 
-%   \sigma_G^{-1} \circ (g^{G_0}_0 \circ\nobreak p^{-1}) \circ 
-%   \sigma_{G_1}\); that the right hand side permutation really is on 
-%   this form follows from the fact that \(\sigma_G^{-1}\bigl( 
-%   g^{G_0}_0(e) \bigr) = \sigma_G^{-1}\bigl( g(e) \bigr) = s(e) + k_G 
-%   = \sigma_{G_1}^{-1}\bigl( g^{G_1}_0(e) \bigr)\) for all \(e \in E\) 
-%   with \(h(e)=0\) and \(t(e) = v\). Furthermore
-%   \begin{align*}
-%     a_0 \circ a_1 ={}&
-%     \phi(g^{G_0}_0 \circ p^{-1}) \circ 
-%       \phi(\sigma_{G_1}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-%       \phi(\tau_{G_1}) = \\ ={}&
-%     \phi( g^{G_0}_0 \circ p^{-1} \circ \sigma_{G_1} ) \circ
-%       \phi(\sigma_{G_1}) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-%       \phi(\tau_{G_1}) = \\ ={}&
-%     \phi\bigl( \sigma_G \circ (\rho \star \same{\omega(x_G)}) \bigr) 
-%       \circ \phi(\same{k_G}) \otimes f(x_G) \circ \phi(\tau_{G_1}) 
-%       = \\ ={}&
-%     \phi(\sigma_G) \circ \phi(\rho) \otimes \phi(\same{\omega(x_G)}) 
-%       \circ \phi(\same{k_G}) \otimes f(x_G) \circ \phi(\tau_{G_1}) 
-%       = \\ ={}&
-%     \phi(\sigma_G) \circ \bigl( \phi(\rho) \circ \phi(\same{k_G}) 
-%       \bigr) \otimes \bigl( \phi(\same{\omega(x_G)}) \circ f(x_G) 
-%       \bigr) \circ \phi(\tau_{G_1}) = \\ ={}&
-%     \phi(\sigma_G) \circ \bigl( \phi(\same{k_G}) \circ \phi(\rho) 
-%       \bigr) \otimes \bigl( f(x_G) \circ \phi(\same{\alpha(x_G)}) 
-%       \bigr) \circ \phi(\tau_{G_1}) = \\ ={}&
-%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-%       \phi(\rho) \otimes \phi(\same{\alpha(x_G)}) \circ 
-%       \phi(\tau_{G_1}) = \\ ={}&
-%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-%       \phi\bigl( (\rho \star \same{\alpha(x_G)}) \circ \tau_{G_1} 
-%       \bigr)
-%   \end{align*}
-%   and it will therefore follow that \(G \propto' a_0 \circ a_1\) once 
-%   it has been shown that \(\tau_G = (\rho \star\nobreak 
-%   \same{\alpha(x_G)}) \circ \tau_{G_1}\). As before, one finds for 
-%   \(e \in E\) with \(h(e)=v\) and \(t(e)=1\) that
-%   \begin{equation*}
-%     \bigl( (\rho \star \same{\alpha(x_G)}) \circ \tau_{G_1} \bigr)
-%       \bigl( s(e) \bigr) =
-%     (\rho \star \same{\alpha(x_G)})\bigl( g(e) + k_G \bigr) =
-%     g(e) + k_G = 
-%     \tau_G\bigl( s(e) \bigr)
-%   \end{equation*}
-%   whereas for \(e \in E\) with \(h(e)=0\) and \(t(e)=1\),
-%   \begin{multline*}
-%     \sigma_G\Bigl( \bigl( (\rho \star \same{\alpha(x_G)}) \circ 
-%       \tau_{G_1} \bigr)\bigl( s(e) \bigr) \Bigr) =
-%     \sigma_G \Bigl( \rho\bigl( (\tau_{G_1} \circ s)(e) \bigr) \Bigr) 
-%       = \\ =
-%     (g^{G_0}_0 \circ p^{-1} \circ \sigma_{G_1})\bigl( 
-%       (\tau_{G_1} \circ s)(e) \bigr) =
-%     (g^{G_0}_0 \circ p^{-1})\bigl( g^{G_1}_0(e) \bigr) =
-%     g^{G_0}_0(e) = g(e) \text{,}
-%   \end{multline*}
-%   and hence \(\tau_G = (\rho \star\nobreak \same{\alpha(x_G)}) \circ 
-%   \tau_{G_1}\). Thus \(G \propto' a_0 \circ a_1\).
-%   
-%   A split in $G$ has the form $\bigl( F_l, F_r, \varnothing, \{v\} 
-%   \bigr)$ or $\bigl( F_l, F_r, \{v\}, \varnothing \bigr)$. If 
-%   $(G_l,G_r)$ is the decomposition induced by a split of the first 
-%   kind then \(h(e)=0\) and \(t(e)=1\) for all \(e \in F_l\). Let \(l 
-%   = \card{F_l}\), \(m = \coarity(G_r)\), \(n = \arity(G_r)\), and 
-%   \(a_r \in \mc{P}(m,n)\) be such that \(G_r \propto' a_r\). 
-%   Since \(g(F_l) = [l]\), it follows that \(\sigma_G = \same{l} \star 
-%   \sigma_{G_r}\) and hence \(\tau_G = \rho \star \tau_{G_r}\) for 
-%   \(\rho = g^{G_l}_0 \circ (s^{G_l}_1)^{-1}\). Thus
-%   \begin{align*}
-%     G \propto' {}&
-%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-%       \phi(\tau_G) = \\ ={}&
-%     \phi(\same{l} \star \sigma_{G_r}) \circ 
-%       \phi(\same{l} \star \same{k_{G_r}}) \otimes f(x_G) \circ 
-%       \phi(\rho \star \tau_{G_r}) = \\ ={}&
-%     \phi(\same{l}) \otimes \phi(\sigma_{G_r}) \circ 
-%       \phi(\same{l}) \otimes \phi(\same{k_{G_r}}) \otimes f(x_G) \circ 
-%       \phi(\rho) \otimes \phi(\tau_{G_r}) = \\ ={}&
-%     \bigl( \phi(\same{l}) \circ \phi(\same{l}) \circ \phi(\rho) 
-%       \bigr) \otimes \bigl( \phi(\sigma_{G_r}) \circ 
-%       \phi(\same{k_{G_r}}) \otimes f(x_G) \circ \phi(\tau_{G_r}) 
-%       \bigr) = \\ ={}&
-%     \phi(\rho) \otimes a_r \text{.}
-%   \end{align*}
-%   
-%   If $(G_l,G_r)$ is the decomposition induced by a split of the second 
-%   kind then \(h(e)=0\) and \(t(e)=1\) for all \(e \in F_r\). Let \(r 
-%   = \card{F_r}\), \(m = \coarity(G_l)\), \(n = \arity(G_l)\), and 
-%   \(a_l \in \mc{P}(m,n)\) be such that \(G_l \propto' a_l\). Clearly 
-%   \(x_{G_l} = x_G\) and \(k_{G_l} = k_G - r\). Since \(g(e) > m\) for 
-%   all \(e \in F_r\), it follows that \(k_G-r < \sigma_G^{-1}\bigl( 
-%   g(e) \bigr) \leqslant k_G\) for \(e \in F_r\), and hence
-%   \begin{equation*}
-%     \sigma_G \circ ( \same{k_G-r} \star \cross{\omega(x_G)}{r} ) =
-%     \sigma_{G_l} \star \same{r} \text{.}
-%   \end{equation*}
-%   Therefore
-%   \begin{align*}
-%     G \propto'{}&
-%     \phi(\sigma_G) \circ \phi(\same{k_G}) \otimes f(x_G) \circ 
-%       \phi(\tau_G) = \\ ={}&
-%     \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ
-%       \phi(\same{k_{G_l}}) \otimes \phi(\cross{r}{\omega(x_G)}) \circ
-%       \phi(\same{k_{G_l}}) \otimes \phi(\same{r}) \otimes f(x_G) \circ 
-%       \phi(\tau_G) = \\ ={}&
-%     \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ \Bigl( 
-%       \phi(\same{k_{G_l}}) \circ \phi(\same{k_{G_l}}) \Bigr) \otimes 
-%       \Bigl( \phi(\cross{r}{\omega(x_G)}) \circ \phi(\same{r}) \otimes 
-%       f(x_G) \Bigr) \circ \phi(\tau_G) 
-%       = \\ ={}&
-%     \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ \Bigl( 
-%       \phi(\same{k_{G_l}}) \circ \phi(\same{k_{G_l}}) \Bigr) \otimes 
-%       \Bigl( f(x_G) \otimes \phi(\same{r}) \circ 
-%       \phi(\cross{r}{\omega(x_G)}) \Bigr) \circ \phi(\tau_G) 
-%       = \\ ={}&
-%     \phi(\sigma_{G_l}) \otimes \phi(\same{r}) \circ
-%       \phi(\same{k_{G_l}}) \otimes f(x_G) \otimes \phi(\same{r}) \circ 
-%       \phi(\same{k_{G_l}}) \otimes \phi(\cross{r}{\omega(x_G)}) \circ 
-%       \phi(\tau_G) 
-%       = \\ ={}&
-%     \Bigl( \phi(\sigma_{G_l}) \circ \phi(\same{k_{G_l}}) \otimes f(x_G) 
-%       \Bigr) \otimes \phi(\same{r}) \circ \phi\Bigl( (\same{k_{G_l}} 
-%       \star \cross{r}{\omega(x_G)}) \circ \tau_G \Bigr) 
-%   \end{align*}
-%   and the wanted result follows once it has been shown that 
-%   \((\same{k_{G_l}} \star\nobreak \cross{r}{\omega(x_G)}) \circ 
-%   \tau_G = \tau_{G_l} \star \bigl( g^{G_r}_0 \circ\nobreak 
-%   (s^{G_r}_1)^{-1} \bigr)\). 
-%   
-%   To that end, one can as usual prove that
-%   \begin{equation*}
-%     \tau' = (\same{k_{G_l}} \star \cross{\omega(x_G)}{r}) \circ 
-%     \Bigl( \tau_{G_l} \star \bigl( g^{G_r}_0 \circ 
-%     (s^{G_r}_1)^{-1} \bigr) \Bigr)
-%   \end{equation*}
-%   fulfills the condition defining $\tau_G$. If \(e \in F_l\) is such 
-%   that \(h(e)=0\) and \(t(e)=1\) then \(s(e) \leqslant n\) and \(g(e) 
-%   \leqslant m\), hence \(\sigma_{G_l}^{-1}\bigl( g(e) \bigr) \leqslant 
-%   k_{G_l}\). It follows that
-%   \begin{equation*}
-%     \sigma_G\Bigl( \tau'\bigl( s(e) \bigr) \Bigr) =
-%     \sigma_{G_l}\Bigl( \tau_{G_l}\bigl( s(e) \bigr) \Bigr) = g(e)
-%     \text{.}
-%   \end{equation*}
-%   If \(e \in F_l\) is such that \(h(e)=v\) and \(t(e)=1\) then
-%   \begin{multline*}
-%     \tau'\bigl( s(e) \bigr) =
-%     (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\Bigl(
-%       \tau_{G_l}\bigl( s(e) \bigr) \Bigr) =
-%     (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})
-%       \bigl( g(e) + k_{G_l} \bigr) = \\ =
-%     \cross{\omega(x_G)}{r}\bigl( g(e) \bigr) + k_{G_l} =
-%     g(e) + r + k_{G_l} = g(e) + k_G
-%     \text{.}
-%   \end{multline*}
-%   Finally if \(e \in F_r\) then \(s(e)>n\) and hence
-%   \begin{multline*}
-%     \sigma_G\Bigl( \tau'\bigl( s(e) \bigr) \Bigr) =
-%     \sigma_G\biggl( (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\Bigl(
-%       n + \bigl( g^{G_r}_0 \circ (s^{G_r}_1)^{-1} \bigr)\bigl( s(e)-n 
-%       \bigr) \Bigr) \biggr) = \\ =
-%     \sigma_G\Bigl( (\same{k_{G_l}} \star \cross{\omega(x_G)}{r})\bigl(
-%       n + g^{G_r}_0(e) \bigr) \Bigr) =
-%     \sigma_G\bigl( k_{G_l} + g^{G_r}_0(e) \bigr) = \\ =
-%     (\sigma_{G_l} \star \same{r}) \Bigl(
-%       ( \same{k_{G_l}} \star \cross{r}{\omega(x_G)} )
-%       \bigl( k_{G_l} + g^{G_r}_0(e) \bigr) \Bigr) = \\ =
-%     (\sigma_{G_l} \star \same{r}) \bigl( m + g^{G_r}_0(e) \bigr) =
-%     m + g^{G_r}_0(e) = g(e)
-%    \text{.}
-%   \end{multline*}
-%   Therefore \(\tau' = \tau_G\) and the split axiom for an evaluation 
-%   relation is fulfulled also for the second kind of split 
-%   decomposition.
-% \end{proof}
-% 
-% 
-% \begin{lemma} \label{L:EvaluationProperCut}
-%   Let a signature \(\Omega = (X,\alpha,\omega)\), and \PROP\ 
-%   $\mc{P}$, and an evaluation seed \(f\colon X \Fpil \mc{P}\) be 
-%   given. If \(G = (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega\) and \(a \in 
-%   \mc{P}\) are such that \(G \stackrel{f}{\propto} a\) and 
-%   \(\card{V}>3\) then there exists a decomposition $(G_0,G_1)$ of $G$ 
-%   induced by a proper cut, and \(a_0,a_1 \in \mc{P}\), such that 
-%   \(G_0 \stackrel{f}{\propto} a_0\), \(G_1 \stackrel{f}{\propto} 
-%   a_1\), and \(a = a_0 \circ a_1\).
-% \end{lemma}
-% \begin{proof}
-%   \relax
-%   [Define a relation $\propto'$ to be equal to 
-%   $\stackrel{f}{\propto}$ for graphic \PROP\ expressions that don't 
-%   have the same number of vertices as $G$, and define it by 
-%   composition over proper cuts for those with the same number of 
-%   vertices as $G$. Then show $\propto'$ is an evaluation relation. It 
-%   follows that the two evaluation relations are equal.]
-% \end{proof}
-% 
-% 
-% \begin{theorem}
-%   For every evaluation seed \(f\colon X \Fpil \mc{P}\), the 
-%   corresponding evaluation relation $\stackrel{f}{\propto}$ is univocal.
-% \end{theorem}
-% \begin{proof}
-%   \relax
-%   [By induction on $\card{V}$. By Lemma~\ref{L:EvaluationProperCut}, 
-%   there are decompositions $(G_0,G_1)$ and $(G_0',G_1')$ of $G$ 
-%   giving rise to the values $a$ and $a'$. Use the values on the 
-%   intersections.]
-% \end{proof}
-% 
-% 
-% 
-% ---
-% 
-% \iffalse
-% 
-% M\"ojliga symboler f\"or evalueringsrelation:
-% \vdash
-% \dashv
-% \models
-% \propto
-% \leadsto (ringlande pil)
-% 
-% \(G \vdash \sigma \cdot a\)
-% 
-% \(G \dashv \sigma \cdot a\)
-% 
-% \(G \models \sigma \cdot a\)
-% 
-% \(G \propto \sigma \cdot a\)
-% 
-% \(G \leadsto \sigma \cdot a\)
-% 
-% 
-% De tv\r{a} b\"asta verkar vara $\models$ och $\propto$.
-% 
-% \fi
-% 
-% 
-% ---
-% 
-% 
-% 
-% \begin{lemma}
-%   Let \(\Omega = (X,\alpha,\omega)\) be a signature, let $\mc{P}$ 
-%   be a \PROP, and let \(f\colon X \Fpil \mc{P}\) be a map such that 
-%   \(f(x) \in \mc{P}\bigl( \omega(x), \alpha(x) \bigr)\) for all 
-%   \(x \in X\). Then the identities
-%   \begin{enumerate}
-%     \item \label{GrafIdent:Sammans.}
-%       \(f_{l,n}(G) = f_{l,m}(G') \circ f_{m,n}(G'')\) for every 
-%       decomposition $G' \circ G''$ of \(G \in \mc{GPE}_\Omega(l,n)\).
-%     \item \label{GrafIdent:Perm.}
-%       \(f_{n,n}(G) = \sigma\) if \(G = (V,E,h,g,t,s,D) \in 
-%       \mc{GPE}_\Omega(n,n)\) is such that \(V = \{0,1\}\), 
-%       where \(\sigma\in\Sigma_n\) is the premutation which satisfies 
-%       \(\sigma\bigl( s(e) \bigr) = g(e)\) for all \(e \in E\).
-%     \item \label{GrafIdent:Horn.}
-%       \(f_{m,n}(G) = \id_l \otimes f\bigl( D(v) \bigr)\) if \(G = 
-%       (V,E,h,g,t,s,D) \in \mc{GPE}_\Omega(m,n)\) is such that:
-%       \begin{enumerate}
-%         \item \(V = \{0,1,v\}\),
-%         \item \(g(e) = s(e) \leqslant l\) for all \(e \in E\) such 
-%           that \(h(e)=0\) and \(t(e)=1\),
-%         \item \(g(e) = s(e) + l\) for all \(e \in E\) such that 
-%           \(t(e)=v\),
-%         \item \(s(e) = g(e) + l\) for all \(e \in E\) such that 
-%           \(h(e)=v\)
-%       \end{enumerate}
-%       where \(l = n - \alpha\bigl( D(v) \bigr) = m - \omega\bigl( 
-%       D(v) \bigr)\).
-%   \end{enumerate}
-%   uniquely define a family \(\{f_{m,n}\colon \mc{GPE}_\Omega(m,n) 
-%   \Fpil \mc{P}(m,n) \}_{m,n\in\N}\) of maps. The element 
-%   $f_{\coarity(G),\arity(G)}(G)$ is called the \DefOrd{value} of $G$ 
-%   under the assignment $f$.
-% \end{lemma}
-% \begin{proof}
-%   The proof that $f_{m,n}$ is uniquely defined on \(G = 
-%   (V,E,h,g,t,s,D)\) with \(m = \coarity(G)\) and \(n = \arity(G)\) is 
-%   by induction on $\card{V}$. Note that the number of vertices in a 
-%   part of a decomposition is less than or equal to the number of 
-%   vertices in the whole, and that equality holds only when the cut is 
-%   trivial.
-%   
-%   There are two base cases. The first is the minimal \(\card{V} = 
-%   2\), in which identity~\ref{GrafIdent:Perm.} uniquely defines 
-%   the value of $G$ and it only needs to be checked that 
-%   identity~\ref{GrafIdent:Sammans.} is satisfied. Thus let \(G' \circ 
-%   G''\) be a decomposition of $G$. It follows from the definition of 
-%   decomposition that
-%   \begin{align*}
-%     G' ={}& \bigl( \{0,1\}, E, h, g', t, s', \varnothing \bigr) \\
-%     G''={}& \bigl( \{0,1\}, E, h, g'', t, s'', \varnothing \bigr)
-%   \end{align*}
-%   where \(h\colon E \Fpil \{0\}\) and \(t\colon E \Fpil \{1\}\) are 
-%   constant functions, and furthermore \(s' = g''\). The permutations 
-%   to which $G$, $G'$, and $G''$ are mapped according to 
-%   identity~\ref{GrafIdent:Perm.} are \(\sigma,\sigma',\sigma'' \in 
-%   \Sigma_n\) defined for all \(e \in E\) by
-%   \begin{align*}
-%     \sigma\bigl( s''(e) \bigr) ={}& g'(e) \text{,}\\
-%     \sigma'\bigl( s'(e) \bigr) ={}& g'(e) \text{,}\\
-%     \sigma''\bigl( s''(e) \bigr) ={}& g''(e) = s'(e)
-%   \end{align*}
-%   and thus \(f_{n,n}(G) = \sigma = \sigma' \circ \sigma'' = 
-%   f_{n,n}(G') \circ f_{n,n}(G'')\), as claimed.
-%   
-%   The second base case is that \(\card{V} = 3\), in which
-%   
-%   ---
-%   
-%   The induction step is used in the case \(\card{V} > 3\), for which 
-%   it should be assumed that the identities hold for all expressions 
-%   with fewer that $\card{V}$ vertices. 
-%   
-%   ---
-% \end{proof}
-% 
-% 
-% 
-% \subsection{The free \PROP}
-% 
-% ---
-% 
-% The graph underlying one of these expressions is for convenience 
-% labelled (each vertex and edge has a ``name''), but usually one only 
-% cares about the corresponding unlabelled structures. These can be 
-% constructed as isomorphism classes of labelled expressions.
-% 
-% \begin{definition}
-%   Two graphic \PROP\ expressions \(G = (V,E,h,g,t,s,D)\) and 
-%   \(H = (V',E',h',g',t',s',D')\) are said to be 
-%   \DefOrd{isomorphic}, symbolically \(G \simeq H\), if there exists 
-%   bijections \(\phi\colon V \Fpil V'\) and \(\psi\colon E \Fpil E'\) 
-%   such that
-%   \begin{align*}
-%     \phi(0) ={}& 0  &  \phi(1) ={}& 1 \\
-%     h' \circ \psi ={}& \phi \circ h \text{,}&
-%     g' \circ \psi ={}& g \text{,}\\
-%     t' \circ \psi ={}& \phi \circ t \text{,}&
-%     s' \circ \psi ={}& s \text{,}\\
-%     D' \circ \phi ={}& D \text{.}
-%   \end{align*}
-%   Denote by \(\widetilde{\mc{GPE}}_\Omega(m,n)\) the set of 
-%   isomorphism classes of \(\mc{GPE}_\Omega(m,n)\).
-% \end{definition}
-% 
-% ---
-% 
-% When drawing these (unlabelled) graphic expressions, some additional 
-% simplifications are often possible. First, one may express the head 
-% and tail indices at inner vertices using the cyclic order of edges 
-% around these vertices. Following the pattern from 
-% page~\ref{Sid:PROP-diagram}ff, one would divide the circumference of 
-% each vertex into two parts, where one is for incoming (incident at 
-% the head) edges and the other part is for outgoing (incixent at the 
-% tail) edges, such that the index of incoming edges increases in the 
-% clockwise direction and the index of outgoing edges increases in the 
-% counterclockwise direction. 
-% % Second, one may similarly imagine a frame 
-% % around the diagram and divide its circumference in one 
-% % incoming and one outgoing part, place the input and output 
-% % vertices on this circumflerence, and order them after increasing 
-% % indices. 
-% Second, 
-% thanks to the acyclicity one can fix a main arrow direction in the 
-% diagram (right to left in the examples above) and arrange the 
-% vertices so that edges follow this direction; this lets one skip 
-% drawing arrowheads on edges. Third, it is possible to use vertex 
-% shapes rather than explicit annotations to encode the $D$ map into 
-% the diagram, and symbols with different arity or coarity may share 
-% the same shape as one can anyway tell them apart by the number of 
-% incoming and outgoing edges.
-% 
-% % ATT G\"ORA:
-% % Rita diagram som visar de olika f\"orenklingsstegen.
-% 
-% As it turns out, operations can be defined on 
-% $\widetilde{\mc{GPE}}_\Omega$ that turn it into the free \PROP\ on 
-% the signature $\Omega$. Graphic expressions give a clearer presentation 
-% than traditional formulae in terms of products and composition do, 
-% because the redundancy in the representation is more regular and 
-% easier to factor out.
-% 
+% Best current reference for this is the Hopf-rules paper.
 % 
 % ---
 % 
@@ -11889,19 +10665,24 @@ proc network::rich::ecurve-Tk-tt_by_level {dict style val} {
 %   vertex appearance table. The call syntax is
 %   \begin{quote}
 %     |network::rich::ecurve-Tk-raw_by_level| \word{appearance}
-%     \begin{regblock}|-val| \word{network}\regalt
-%     |-var| \word{array-name}\end{regblock}
+%     \begin{regblock}[\regplus] \word{option} \word{value} 
+%     \end{regblock}
 %   \end{quote}
-%   where the two options have their standard interpretation and 
-%   \word{appearance} is a dictionary mapping vertex annotations to 
-%   appearances.
+%   where \word{appearance} is a dictionary mapping vertex 
+%   annotations to appearances. The supported options are |-val| and 
+%   |-var| with their standard interpretations, and |-hscale| which 
+%   takes a numeric factor as value. That factor is multiplied by the 
+%   height of a pass-through level, so it can be used to control the 
+%   length of the line segments there; it defaults to |0.5|.
 %   \begin{tcl}
-proc network::rich::ecurve-Tk-raw_by_level {dict style val} {
-   switch -- $style "-val" {
-      array set NW $val
-   } "-var" {
-      upvar 1 $val NW
-   } default {
+proc network::rich::ecurve-Tk-raw_by_level {dict args} {
+   array set Opt {-hscale 0.5}
+   array set Opt $args
+   if {[info exists Opt(-val)]} then {
+      array set NW $Opt(-val)
+   } elseif {[info exists Opt(-var)]} then {
+      upvar 1 $Opt(-var) NW
+   } else {
       error "Must specify -val or -var"
    }
    array set Look $dict
@@ -11920,65 +10701,227 @@ proc network::rich::ecurve-Tk-raw_by_level {dict style val} {
    foreach {comp bbox} $NW(level-layout-Tk) {
       foreach {level y h} $comp {
          foreach item $level {
-            lappend Node([lrange $item 0 1]) [lindex $item 2] $y $h
+            lappend Node([lrange $item 0 1]) [lindex $item 2] $y\
+              [expr {$h*$Opt(-hscale)}]
          }
       }
    }
 %   \end{tcl}
 %   The next step is to compute the actual edge coordinates, for each 
 %   edge in sequence. The curve has one straight line segment for 
-%   each level being passed through, one curve segment with inflexion 
-%   for each space between two levels, and one extra curve segment 
-%   each at the head and tail.
+%   each level being passed through and one curve segment for each 
+%   space between two levels.
+%   The basic approach for the curve segments is to use the MetaFont 
+%   formula for the case that knots and tangents at knots are given, 
+%   though with some extra tension to avoid certain inflexions. This 
+%   is computed by the |MetaFont_controls| helper procedure.
 %   
-%   ---
-%   
-%   that is constructed has one control 
-%   point in each level that the edge encounters and two control 
-%   points between two levels, which are used to determine tangents 
-%   for the curve. The vertical position is $y+h$ for the control 
-%   point below a level at position $y$ that has half-height $h$ and 
-%   similarly $y-h$ for the control point above this level. 
-%   Horizontal positions are chosen to get the wanted tangents.
-%   
-%   The loop first constructs coordinates for levels where the edge 
-%   is mentioned, as if those are levels which the edge pass through. 
-%   Then adjustments are made at the ends, either inserting 
-%   coordinates for the attachment to a vertex, or removing the extra 
-%   coordinate pair just past the end of a leg.
+%   Internal edges have one curve segment more than they got 
+%   pass-through levels (i.e., triplets in their |Node| entry), so 
+%   one can compute most segments in a loop over the |Node| entry, 
+%   and then compute the final segment outside the loop. This is 
+%   basically what is done, but a number of complications have to be 
+%   dealt with:
+%   \begin{itemize}
+%     \item
+%       Each |Node| entry contributes both to the end of the previous 
+%       segment and to the beginning of the next, so it is necessary 
+%       to remember some data (|x0|, |y0|, and |ofs0|) from the 
+%       previous iteration. This data is initialised according to the 
+%       head vertex, and the extra segment uses data about the tail 
+%       vertex.
+%     \item
+%       Between two segments, there is a straight line segment which 
+%       is generated by repeating the last pair of coordinates from 
+%       the previous curve segment and the first pair of coordinates 
+%       from the next curve segment. However, that repetition should 
+%       only take place when there was a previous curve segment (|L| 
+%       is nonempty).
+%     \item
+%       When the head vertex is $0$ or the tail vertex is $1$, then 
+%       the first or last respectively curve segment is missing, so 
+%       it is necessary to check for those cases explicitly.
+%   \end{itemize}
 %   \begin{tcl}
    set res {}
    foreach e [lindex $NW(pure) 1] {
       set L {}
+      set v [lindex $e 0]
+      if {$v>1} then {
+         foreach {x0 y0} $Node(vertex $v) break
+         set ofs0 [lindex $Look([lindex $NW(pure) 0 $v 0]) 2 [lindex $e 1]]
+         lappend ofs0 0 -1
+      }
       foreach {x y h} [lappend "Node(edge [llength $res])"] {
-         lappend L $x [expr {$y+$h}] $x $y $x [expr {$y-$h}]
+         if {$v<=1} then {
+            set v 2
+         } else {
+            set seg\
+              [MetaFont_controls $x0 $y0 $ofs0 $x $y [list 0 $h 0 1] 1 1]
+            if {[llength $L]} then {
+               set seg [concat\
+                 [lrange $L end-1 end] [lrange $seg 0 1] $seg]
+            }
+            eval [list lappend L] $seg
+         }
+         set x0 $x; set y0 $y
+         set ofs0 [list 0 [expr {-$h}] 0 -1]
       }
-      if {[lindex $e 0] >= 2} then {
-         foreach {x y h} $Node(vertex [lindex $e 0]) break
-         set look $Look([lindex $NW(pure) 0 [lindex $e 0] 0])
-         foreach {dx1 dy1 dx2 dy2} [
-            linsert [lindex $look 2 [lindex $e 1]] end 0 -1
-         ] break
-         set L [linsert $L 0 [expr {$x+$dx1}] [expr {$y+$dy1}]\
-           [expr {$x+$dx1 - $dx2*($dy1+$h)/$dy2}] [expr {$y-$h}]]
-      } else {
-         set L [lreplace $L 0 1]
-      }
-      if {[lindex $e 2] >= 2} then {
-         foreach {x y h} $Node(vertex [lindex $e 2]) break
-         set look $Look([lindex $NW(pure) 0 [lindex $e 2] 0])
-         foreach {dx1 dy1 dx2 dy2} [
-            linsert [lindex $look 1 [lindex $e 3]] end 0 1
-         ] break
-         lappend L [expr {$x+$dx1 + $dx2*($h-$dy1)/$dy2}]\
-           [expr {$y+$h}] [expr {$x+$dx1}] [expr {$y+$dy1}]
-      } else {
-         set L [lreplace $L end-1 end]
+      set v [lindex $e 2]
+      if {$v>1} then {
+         foreach {x y} $Node(vertex $v) break
+         set ofs [lindex $Look([lindex $NW(pure) 0 $v 0])\
+           1 [lindex $e 3]]
+         lappend ofs 0 1
+         set seg [MetaFont_controls $x0 $y0 $ofs0 $x $y $ofs 1 1]
+         if {[llength $L]} then {
+            set seg [concat [lrange $L end-1 end] [lrange $seg 0 1] $seg]
+         }
+         eval [list lappend L] $seg
       }
       lappend res $L
    }
-   set NW(ecurve-Tk-tt) $res
-   if {$style eq "-val"} then {return [array get NW]}
+   set NW(ecurve-Tk-raw) $res
+   if {[info exists Opt(-val)]} then {return [array get NW]}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{MetaFont_controls}
+%   This procedure computes knot and control points for a cubic curve 
+%   segment, when the endpoints and tangents at those points are given. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |MetaFont_controls| \word{$X_0$} \word{$Y_0$} \word{offset-0}
+%     \word{$X_3$} \word{$Y_3$} \word{offset-3} \word{atleast} 
+%     \word{no-$y$-stationary}
+%   \end{displaysyntax}
+%   and the return value is the list
+%   \begin{displaysyntax}
+%     \word{$x_0$} \word{$y_0$} \word{$x_1$} \word{$y_1$}
+%     \word{$x_2$} \word{$y_2$} \word{$x_3$} \word{$y_3$}
+%   \end{displaysyntax}
+%   of coordinates for the curve segment.
+%   
+%   The two \word{offset-$k$} arguments are lists that contain most 
+%   of the information defining the curve; they have the structure
+%   \begin{displaysyntax}
+%     \word{$\Delta x$} \word{$\Delta y$} \word{$v_x$} \word{$v_y$}
+%   \end{displaysyntax}
+%   where $(\Delta x,\Delta y)$ is the offset to the knot point 
+%   $(x_k,y_k)$ from the \emph{reference point} $(X_k,Y_k)$. 
+%   $(v_x,v_y)$ is a tangent vector (at the knot in question) to 
+%   the curve segment; its length is irrelevant. The \word{atleast} 
+%   argument is a boolean for whether the curve tension should be 
+%   `atleast $1$' rather than just~$1$. The \word{no-$y$-stationary} 
+%   argument is another boolean which causes the tensions to be 
+%   increased to avoid stationary points for the $y$-component of the 
+%   curve parametrisation.
+%   
+%   (\textit{set\_controls} procedure)
+%   \begin{tcl}
+proc network::rich::MetaFont_controls {X0 Y0 ofs0 X3 Y3 ofs3 atleast\
+  nostationary} {
+   set x0 [expr {$X0 + [lindex $ofs0 0]}]
+   set y0 [expr {$Y0 + [lindex $ofs0 1]}]
+   set x3 [expr {$X3 + [lindex $ofs3 0]}]
+   set y3 [expr {$Y3 + [lindex $ofs3 1]}]
+%   \end{tcl}
+%   The knots are straightforward, but the control points are 
+%   tricky. Basically, the points chosen by MetaFont at tension~$1$ 
+%   are
+%   \begin{align*}
+%     (x_1,y_1) ={}& (x_0,y_0) + 
+%       \mathbf{e}_0 f(\theta,\phi) \lvert\mathbf{z}\rvert 
+%       \text{,}\\
+%     (x_2,y_2) ={}& (x_3,y_3) + 
+%       \mathbf{e}_3 f(\phi,\theta) \lvert\mathbf{z}\rvert 
+%   \end{align*}
+%   where $\mathbf{e}_0$ is the inward unit tangent vector at 
+%   $(x_0,y_0)$, $\mathbf{e}_3$ is the inward unit tangent vector at 
+%   $(x_3,y_3)$, \(\mathbf{z} = (x_3,y_3) - (x_0,y_0)\), and the 
+%   factors $f(\theta,\phi)$ and $f(\phi,\theta)$ respectively are 
+%   heuristics developed by John Hobby to make the curves look as 
+%   good as possible.
+%   \begin{tcl}
+   set v0 [expr {hypot( [lindex $ofs0 2], [lindex $ofs0 3] )}]
+   set e0x [expr { [lindex $ofs0 2] / $v0 }]
+   set e0y [expr { [lindex $ofs0 3] / $v0 }]
+   set v3 [expr {hypot( [lindex $ofs3 2], [lindex $ofs3 3] )}]
+   set e3x [expr { [lindex $ofs3 2] / $v3 }]
+   set e3y [expr { [lindex $ofs3 3] / $v3 }]
+   set zx [expr {$x3 - $x0}] ; set zy [expr {$y3 - $y0}]
+   set z [expr {hypot($zx,$zy)}]
+%   \end{tcl}
+%   The numbers $\theta$ and $\phi$ are the angles from $\mathbf{z}$ 
+%   to $\mathbf{e}_0$ and from $\mathbf{e}_3$ to $-\mathbf{z}$ 
+%   respectively. The definition of $f$ is
+%   $$
+%     f(\theta,\phi) = \frac{
+%       2 + \sqrt{2}\,(\sin\theta - \frac{1}{16}\sin\phi)
+%         (\sin\phi-\frac{1}{16}\sin\theta) (\cos\theta-\cos\phi)
+%     }{
+%       3\,\bigl(1 + \frac{1}{2}(\sqrt{5}-1)\cos\theta + 
+%         \frac{1}{2}(3-\sqrt{5}\,)\cos\phi\bigr)
+%     }
+%     \text{.}
+%   $$
+%   
+%   \begin{tcl}
+   set pt [expr {$zx*$e0x + $zy*$e0y}]
+   set ct [expr {$pt / $z}]
+   set pp [expr {-($zx*$e3x + $zy*$e3y)}]
+   set cp [expr {$pp / $z}]
+   set st [expr {($zx*$e0y - $zy*$e0x) / $z}]
+   set sp [expr {($zx*$e3y - $zy*$e3x) / $z}]
+   set numer1 [expr {sqrt(2)*($st-$sp/16)*($sp-$st/16)*($ct-$cp)}]
+   set ftpz [expr {$z * (2+$numer1) /\
+     (1.5*( 2 + (sqrt(5)-1)*$ct + (3-sqrt(5))*$cp ))}]
+   set fptz [expr {$z * (2-$numer1) /\
+     (1.5*( 2 + (sqrt(5)-1)*$cp + (3-sqrt(5))*$ct ))}]
+%   \end{tcl}
+%   Since |ftpz| and |fptz| are actual lengths, their bounds in the 
+%   `atleast' case can be computed using the sine theorem:
+%   \[
+%     \frac{\sin Z}{z} = 
+%     \frac{\sin \lvert\theta\rvert}{t} = 
+%     \frac{\sin \lvert\phi\rvert}{p}
+%   \]
+%   where \(Z = \pi - \lvert\theta\rvert - \lvert\phi\rvert\), $t$ is 
+%   the bound for |fptz|, and $p$ is the bound for |ftpz|.
+%   \begin{tcl}
+   if {$atleast && ($st>0 && $sp>0 || $st<0 && $sp<0)} then {
+      set sinZ [expr {abs($st)*$cp + $ct*abs($sp)}]
+      set t [expr {$z/$sinZ*abs($st)}]
+      set p [expr {$z/$sinZ*abs($sp)}]
+      if {$ftpz > $p} then {set ftpz $p}
+      if {$fptz > $t} then {set fptz $t}
+   }
+%   \end{tcl}
+%   The no-$y$-stationary feature is based on the observation that
+%   $$
+%     y(t) = 3a (1-t)^2 t + 3(b-a) (1-t) t^2 + b t^3
+%   $$
+%   which goes from \(y(0)=0\) to \(y(1)=b\) lacks stationary points 
+%   for \(0 < a < b\) but develops one at \(t=\frac{1}{2}\) when 
+%   \(a=b\) and goes non-increasing if \(a>b\). The curve computed 
+%   above may well venture outside the \(0<a<b\) domain if the angles 
+%   $\theta$ and $\phi$ get large enough.
+%   
+%   The idea is to constrain \(q = a/b\) to the range 
+%   $\mathopen{]}-1,1\mathclose{[}$ by changing this factor to 
+%   $\tanh q$; this has minimal effect for \(\lvert q\rvert < 0.5\), 
+%   and is nicely monotonous.
+%   \begin{tcl}
+   if {$nostationary && abs($zy)>1} then {
+      set q [expr {$e0y*$ftpz / $zy}]
+      set ftpz [expr {$ftpz * tanh($q)/$q}]
+      set q [expr {$e3y*$fptz / $zy}]
+      set fptz [expr {$fptz * tanh($q)/$q}]
+   }
+   set x1 [expr {$x0 + $e0x*$ftpz}] ; set y1 [expr {$y0 + $e0y*$ftpz}] 
+   set x2 [expr {$x3 + $e3x*$fptz}] ; set y2 [expr {$y3 + $e3y*$fptz}] 
+   list $x0 $y0 $x1 $y1 $x2 $y2 $x3 $y3
 }
 %   \end{tcl}
 % \end{proc}
@@ -12786,9 +11729,608 @@ proc network::rich::SVG_appearances {inD} {
    }
    return $resD
 }
+%</pkg>
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% \subsection{\LaTeX\ (PGF) rendering}
+% 
+% The basic approach for the \LaTeX\ rendering is to build on the PGF 
+% package, since this provides better coverage of PS \emph{and} PDF 
+% than anything else I've encountered. Unfortunately, raw PGF code is 
+% rather verbose, so it seems a good idea to create a new frontend 
+% that permits more compact code.
+% 
+%    \begin{macrocode}
+%<*sdpgf>
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{sdpgf}[2009/12/02 Space-delimited PGF pictures]
+\ProcessOptions
+\RequirePackage{pgfcore}
+%    \end{macrocode}
+% 
+% The characteristic trait of this frontend is that it uses \TeX\ 
+% commands with \emph{space-delimited} arguments. First, this is more 
+% compact than brace-delimiting (one delimiter character per argument 
+% instead of two. Second, it permits ordinary text wrapping commands 
+% to reflow the code; this can do wonders for reducing the number of 
+% lines a picture takes to draw, and is thus also of great help for 
+% keeping the code visually compact (without appearing rigid).
+% 
+% \begin{macro}{\sdpgfunit}
+%   Another trait is that all coordinates are expressed as multiples 
+%   of |\sdpgfunit| rather than as explicit lengths (which is the 
+%   normal case in PGF). This saves at least two characters per 
+%   coordinate (no \TeX\ unit is shorter than two characters) and 
+%   gives a ``coordinate transformation'' scaling capability, which 
+%   can be useful since the ``quick'' PGF commands used operate at 
+%   the level below PGF's coordinate transformations.
+%    \begin{macrocode}
+\newdimen\sdpgfunit
+%    \end{macrocode}
+%   By choosing the |\sdpgfunit| carefully, it can furthermore be 
+%   possible to make all coordinates integers, which saves another 
+%   character for the decimal point.
+% \end{macro}
+% 
+% \begin{macro}{\SDPGF@x}
+% \begin{macro}{\SDPGF@y}
+%   A third trait is that many SDPGF commands use relative 
+%   coordinates rather than absolute; again to squeeze another 
+%   character or two from many arguments. Since PGF doesn't seem to 
+%   provide an easy method of retrieving the coordinates of the 
+%   current point however, it becomes necessary to allocate two extra 
+%   registers to keep track of this within the frontend.
+%    \begin{macrocode}
+\newdimen\SDPGF@x
+\newdimen\SDPGF@y
+%    \end{macrocode}
+% \end{macro}\end{macro}
+% 
+% \begin{macro}{\SDPGF@@L}
+%   An example of this is the |\L| command, which corresponds to PS's 
+%   \textsf{rlineto} operator (except the arguments come after, since 
+%   this is still \TeX).
+%    \begin{macrocode}
+\def\SDPGF@@L #1 #2 {%
+   \advance \SDPGF@x #1\sdpgfunit
+   \advance \SDPGF@y #2\sdpgfunit
+   \pgfpathqlineto{\the\SDPGF@x}{\the\SDPGF@y}%
+}
+%    \end{macrocode}
+%   The commands are normally kept in control sequences with a 
+%   |\SDPGF@@| prefix, and only switched to ``user'' names inside the 
+%   \texttt{sdpgf} environment (see below).
+% \end{macro}
+% 
+% \begin{macro}{\SDPGF@@m}
+% \begin{macro}{\SDPGF@@M}
+%   The current position is usually initialised using the |\m| 
+%   command, which takes absolute coordinates (thus corresponding to 
+%   PS's \textsf{moveto}). For completeness, there is also an |\M| 
+%   command which takes relative coordinates (thus corresponding to 
+%   PS's \textsf{rmoveto}).
+%    \begin{macrocode}
+\def\SDPGF@@m #1 #2 {%
+   \SDPGF@x=#1\sdpgfunit
+   \SDPGF@y=#2\sdpgfunit
+   \pgfpathqmoveto{\the\SDPGF@x}{\the\SDPGF@y}%
+}
+\def\SDPGF@@M #1 #2 {%
+   \advance \SDPGF@x #1\sdpgfunit
+   \advance \SDPGF@y #2\sdpgfunit
+   \pgfpathqmoveto{\the\SDPGF@x}{\the\SDPGF@y}%
+}
+%    \end{macrocode}
+% \end{macro}\end{macro}
+% 
+% \begin{macro}{\SDPGF@@C}
+%   The |\C| command corresponds to the Type~1 charstring 
+%   \textsf{rrcurveto} command, i.e., the coordinates of each new 
+%   point (whether control point or knot) are relative to those of 
+%   the point before.
+%   
+%   This is slightly more complicated than the previous commands, 
+%   because the control point coordinates needs to be saved away as 
+%   tokens.
+%    \begin{macrocode}
+\def\SDPGF@@C #1 #2 #3 #4 #5 #6 {%
+   \advance \SDPGF@x #1\sdpgfunit
+   \advance \SDPGF@y #2\sdpgfunit
+   \edef\@tempa{{\the\SDPGF@x}{\the\SDPGF@y}}%
+   \advance \SDPGF@x #3\sdpgfunit
+   \advance \SDPGF@y #4\sdpgfunit
+   \edef\@tempa{%
+     \noexpand\pgfpathqcurveto\@tempa{\the\SDPGF@x}{\the\SDPGF@y}%
+   }%
+   \advance \SDPGF@x #5\sdpgfunit
+   \advance \SDPGF@y #6\sdpgfunit
+   \@tempa{\the\SDPGF@x}{\the\SDPGF@y}%
+}
+%    \end{macrocode}
+% \end{macro}
+% 
+% \begin{macro}{\SDPGF@@h}
+%   As in PDF, the |\h| command closes the current path, but does not 
+%   change the current point (just like its Type~1 charstring 
+%   counterpart).
+%    \begin{macrocode}
+\def\SDPGF@@h{\pgfsyssoftpath@closepath}
+%    \end{macrocode}
+% \end{macro}
+% 
+% \begin{macro}{\SDPGF@@S}
+%   Also as in PDF, the |\S| command strokes the current path without 
+%   closing it first, i.e., it is an alias for |\pgfusepathqstroke|. 
+%   Some experiments showed that occurrencies of |\pgfusepathqstroke| 
+%   tended to account for a third of all characters in an image!
+%    \begin{macrocode}
+\def\SDPGF@@S{\pgfusepathqstroke}
+%    \end{macrocode}
+% \end{macro}
+% 
+% \begin{macro}{\SDPGF@@re}
+%   The |\re| command constructs a rectangle, like the PDF operator 
+%   \textsf{re}. It has the syntax
+%   \begin{quote}
+%     |\re| \meta{left} \meta{bottom} \meta{width} \meta{height}
+%   \end{quote}
+%   Implementation-wise, it maps directly to the 
+%   |\pgfsyssoftpath@rect| command. It might be argued that it should 
+%   also update |\SDPGF@x| and |\SDPGF@y|, but this didn't seem 
+%   necessary.
+%    \begin{macrocode}
+\def\SDPGF@@re #1 #2 #3 #4 {%
+   \pgfsyssoftpath@rect{#1\sdpgfunit}{#2\sdpgfunit}%
+     {#3\sdpgfunit}{#4\sdpgfunit}%
+}
+%    \end{macrocode}
+% \end{macro}
+% 
+% \begin{macro}{\SDPGF@@ov}
+%   The |\ov| (for `oval') command constructs an ellipse inscribed in 
+%   and with axes parallel to the corresponding |\re| rectangle. It 
+%   thus has the syntax
+%   \begin{quote}
+%     |\ov| \meta{min-x} \meta{min-y} \meta{width} \meta{height}
+%   \end{quote}
+%   although the two coordinates can technically be for any corner of 
+%   the bounding box, if the signs of \meta{width} and \meta{height} 
+%   are adjusted accordingly.
+%   
+%    \begin{macrocode}
+\def\SDPGF@@ov #1 #2 #3 #4 {%
+   \SDPGF@x=#1\sdpgfunit    \SDPGF@y=#2\sdpgfunit
+   \pgf@x=#3\sdpgfunit      \pgf@y=#4\sdpgfunit
+   \pgf@xa=0.224\pgf@x      \pgf@ya=0.224\pgf@y
+   \pgf@xb=0.5\pgf@x        \pgf@yb=0.5\pgf@y
+   \pgf@xc=0.776\pgf@x      \pgf@yc=0.776\pgf@y
+   \advance\pgf@x\SDPGF@x   \advance\pgf@y\SDPGF@y
+   \advance\pgf@xa\SDPGF@x  \advance\pgf@ya\SDPGF@y
+   \advance\pgf@xb\SDPGF@x  \advance\pgf@yb\SDPGF@y
+   \advance\pgf@xc\SDPGF@x  \advance\pgf@yc\SDPGF@y
+   \edef\@tempa{%
+      \noexpand\pgfpathqmoveto{\the\pgf@x}{\the\pgf@yb}%
+      \noexpand\pgfpathqcurveto{\the\pgf@x}{\the\pgf@yc}%
+        {\the\pgf@xc}{\the\pgf@y}{\the\pgf@xb}{\the\pgf@y}%
+      \noexpand\pgfpathqcurveto{\the\pgf@xa}{\the\pgf@y}%
+        {\the\SDPGF@x}{\the\pgf@yc}{\the\SDPGF@x}{\the\pgf@yb}%
+      \noexpand\pgfpathqcurveto{\the\SDPGF@x}{\the\pgf@ya}%
+        {\the\pgf@xa}{\the\SDPGF@y}{\the\pgf@xb}{\the\SDPGF@y}%
+      \noexpand\pgfpathqcurveto{\the\pgf@xc}{\the\SDPGF@y}%
+        {\the\pgf@x}{\the\pgf@ya}{\the\pgf@x}{\the\pgf@yb}%
+   }%
+   \@tempa
+   \h %\pgfsyssoftpath@closepath 
+}
+%    \end{macrocode}
+% \end{macro}
+% 
+% 
+% \begin{environment}{sdpgf}
+%   The |sdpgf| environment is a |pgfpicture| environment with some 
+%   extra initialisation, particularly the switching-in of |\SDPGF@@| 
+%   commands. The syntax is
+%   \begin{quote}
+%     |\begin{sdpgf}|\marg{left}\marg{top}\marg{right}\marg{bottom}^^A
+%     \marg{unit}\\
+%     \vadjust{}\quad\meta{graphics}\\
+%     |\end{sdpgf}|
+%   \end{quote}
+%   where \meta{unit} (a length) is the |\sdpgfunit| value used in 
+%   the environment. The \meta{left}, \meta{top}, \meta{right}, and 
+%   \meta{bottom} (all factors) define the bounding box for the 
+%   environment.
+%   
+%   The baseline of the picture is initialised so that the picture 
+%   is positioned as if it had been |\vcenter|ed.
+%   To that end, it is necessary to record the length of |-1ex| 
+%   before the |\pgfpicture| command, as the latter apparently 
+%   switches to |\nullfont|.
+%    \begin{macrocode}
+\newenvironment{sdpgf}[5]{%
+   \SDPGF@y=-1ex%
+   \setlength\sdpgfunit{#5}%
+   \pgfpicture
+%    \end{macrocode}
+%   From the PGF manual, the kosher way of setting the bounding box 
+%   seems to be to say \verb*"\pgfusepath{use as bounding box}", but 
+%   the actual effect of that rather appears to be to turn 
+%   bbox-checking \emph{off}! Any contribution to the bbox would come 
+%   from the path construction phase, which in turn means quick paths 
+%   are ignored\dots
+%   
+%   Some source-diving turned up four |\dimen| registers that 
+%   actually keep track of the bounding box. Setting them directly is 
+%   much easier, but apparently one has to do so globally.
+%    \begin{macrocode}
+   \global\pgf@picminx=#1\sdpgfunit
+   \global\pgf@picminy=#4\sdpgfunit
+   \global\pgf@picmaxx=#3\sdpgfunit
+   \global\pgf@picmaxy=#2\sdpgfunit
+%    \end{macrocode}
+%   Setting the baseline has another surprise in store: apparently 
+%   the value has to be expanded in order to be recorded correctly.
+%    \begin{macrocode}
+   \advance \SDPGF@y #2\sdpgfunit
+   \advance \SDPGF@y #4\sdpgfunit
+   \advance \SDPGF@y -1ex
+   \divide \SDPGF@y \tw@
+   \expandafter\pgfsetbaseline\expandafter{\the\SDPGF@y}%
+   \let\m\SDPGF@@m
+   \let\M\SDPGF@@M
+   \let\L\SDPGF@@L
+   \let\C\SDPGF@@C
+   \let\h\SDPGF@@h
+   \let\S\SDPGF@@S
+   \let\re\SDPGF@@re
+   \let\ov\SDPGF@@ov
+}{\endpgfpicture}
+%    \end{macrocode}
+% \end{environment}
+% 
+%    \begin{macrocode}
+%</sdpgf>
+%    \end{macrocode}
+% 
+% \setnamespace{network::rich}
+% 
+% \begin{proc}{as_PGF}
+%   The |as_PGF| procedure takes a rich network with |vpos-Tk|, 
+%   |ecurve-Tk-raw|, and |bbox-Tk| entries as argument, and returns 
+%   \LaTeX\ code (using the \texttt{sdpgf} environment) for drawing 
+%   the same. The call syntax is
+%   \begin{displaysyntax}
+%     |network::rich::as_PGF| \word{appearance-dict} 
+%     \begin{regblock}[\regplus] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{appearance-dict} maps vertex decorations to 
+%   vertex appearances.
+%   
+%   The available options are
+%   \begin{ttdescription}
+%     \item[-val] Standard pass-network-by-value option.
+%     \item[-var] Standard pass-network-by-variable option.
+%     \item[-unit]
+%       \LaTeX\ length corresponding to the unit in the network.
+%     \item[-division]
+%       The unit actually used in the result will be the value of 
+%       |-unit| divided by the value of |-division|; setting 
+%       |-division| to $2$ can avoid making a lot of coordinates 
+%       ending in |.5|. Defaults to |1|.
+%     \iffalse
+%     \item[-round]
+%       Boolean to control whether coordinates being output should be 
+%       rounded to integers. Defaults to true.
+%     \item[-region]
+%       Takes as value a region which may be highlighted in the 
+%       drawing. Defaults to `|{} {} {}|', i.e., the empty region.
+%     \item[-incolour]
+%       The colour to use for edges on the in-boundary of the region; 
+%       defaults to |blue|.
+%     \item[-outcolour]
+%       The colour to use for edges on the out-boundary of the region; 
+%       defaults to |red|.
+%     \item[-midcolour]
+%       The colour to use for vertices, internal edges, and in\&out 
+%       edges of the region; defaults to |green|.
+%     \fi
+%   \end{ttdescription}
+%   
+%   \begin{tcl}
+%<*pkg>
+proc network::rich::as_PGF {vertexD args} {
+   array set Opt {-unit 1pt -division 1 -round 1}
+   array set Opt $args
+   if {[info exists Opt(-val)]} then {
+      array set NW $Opt(-val)
+   } elseif {[info exists Opt(-var)]} then {
+      upvar 1 $Opt(-var) NW
+   } else {
+      error "Must specify -val or -var"
+   }
+   array set Look $vertexD
+   set factor 1.0; set unit pt
+   scan $Opt(-unit) %f%s factor unit
+   set factor [expr {$factor/$Opt(-division)}]
+   set res {\begin{sdpgf}}
+   foreach {x y} $NW(bbox-Tk) {
+      append res [format "{%d}{%d}" [expr {round($x*$Opt(-division))}]\
+        [expr {round(-$y*$Opt(-division))}]]
+   }
+   append res [format "{%s%s}" $factor $unit] \n
+%   \end{tcl}
+%   First the edges are drawn.
+%   \begin{tcl}
+   foreach L $NW(ecurve-Tk-raw) {
+      set dataL {}
+      foreach {x y} $L {
+         lappend dataL [expr {round($x*$Opt(-division))}]\
+           [expr {round(-$y*$Opt(-division))}]
+      }
+      foreach {x0 y0} $dataL break
+      append res [format {  \m %d %d} $x0 $y0] \n
+      foreach {x1 y1 x2 y2 x3 y3} [lrange $dataL 2 end] {
+         set a [expr {$x3 - $x0}]
+         set b [expr {$y3 - $y1}]
+         set c [expr {$x1 - $x0}]
+         set d [expr {$y1 - $y0}]
+         set e [expr {$x2 - $x3}]
+         set f [expr {$y2 - $y3}]
+         set bound [expr {0.00002 * (abs($a) + abs($b))}]
+         if {abs( $a*$d - $b*$c ) > $bound ||\
+           abs( $a*$f - $b*$e ) > $bound ||\
+           !($a||$b) && ($c||$d||$e||$f)
+         } then {
+            append res {  \C}
+            foreach {x y} [list $x1 $y1 $x2 $y2 $x3 $y3] {
+               append res [format { %d %d} [expr {$x-$x0}]\
+                 [expr {$y-$y0}]]
+               set x0 $x; set y0 $y
+            }
+            append res \n
+         } elseif {$x3 != $x0 || $y3 != $y0} then {
+            append res [format {  \L %d %d} [expr {$x3-$x0}]\
+              [expr {$y3-$y0}]] \n
+            set x0 $x3; set y0 $y3
+         }
+      }
+      append res {  \S} \n
+   }
+%   \end{tcl}
+%   Then the vertices are drawn, using code in the |topgf| namespace.
+%   \begin{tcl}
+   set shape_ns [namespace parent]::shape
+   set to_ns [namespace current]::topgf
+   set n -1; foreach v [lindex $NW(pure) 0] pos $NW(vpos-Tk) {incr n
+      if {$n<2} then {continue}
+      foreach {type coords opts} [lindex $Look([lindex $v 0]) 0] {
+         set cmdL [info commands ${to_ns}::${type}*]
+         if {[llength $cmdL] == 1} then {
+            foreach {state draw} [
+               [lindex $cmdL 0] $coords $opts $shape_ns $pos\
+                 $Opt(-division)
+            ] break
+            if {[llength $state]} then {
+               append res {  \begin{pgfscope}} \n
+               append res {    } [join $state "\n    "] \n
+               append res {    } [join $draw "\n    "] \n
+               append res {  \end{pgfscope}} \n
+            } else {
+               append res {  } [join $draw] \n
+            }
+         } elseif {[llength $cmdL]} then {
+            return -code error "Ambiguous item type '$type'; must be\
+              one of: [join $cmdL ", "]"
+         } else {
+            return -code error "Unknown item type '$type'; must be one\
+              of: [join [info commands ${to_ns}::\[a-zA-Z\]*] ", "]"
+         }
+      }
+      
+   }
+%   \end{tcl}
+%   A more optimised implementation could be to collect |draw| 
+%   fragments with equal |state| settings, to reduce the amount of 
+%   code that is required.
+%   \begin{tcl}
+   append res {\end{sdpgf}}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{tcl}
+namespace eval network::rich::topgf {}
+% \end{tcl}
+% \setnamespace{network::rich::topgf}
+% The |network::rich::topgf| namespace houses commands for converting 
+% |canvas| items, as specified in an \word{appearance} dictionary, to 
+% PGF code\Dash specifically, convert one triplet from a 
+% \word{vertex-items} list. In order to convert a triplet
+% \begin{displaysyntax}
+%   \word{item-type} \word{coordinates-command} \word{options}
+% \end{displaysyntax}
+% one makes the call
+% \begin{displaysyntax}
+%   network::rich::topgf::\meta{item-type} 
+%   \word{coordinates-command} \word{options} \word{shape-ns}
+%   \word{center} \word{division}
+% \end{displaysyntax}
+% where the \word{shape-ns} is the namespace in which the 
+% \word{coordinates-command} would be called, \word{center} is the 
+% reference point for the item, and \word{division} is the number of 
+% \texttt{sdpgf} units per Tk unit. The return value is a list
+% \begin{displaysyntax}
+%   \word{settings} \word{drawing}
+% \end{displaysyntax}
+% where both arguments are lists of \LaTeX\ commands that might 
+% appear within a \texttt{sdpgf} environment.
+% 
+% 
+% \begin{proc}{rectangle}
+%   Tk |rectangle| items become |\re| commands. 
+%   \begin{tcl}
+proc network::rich::topgf::rectangle {coordcmd opts ns center div} {
+   foreach {state use opts} [_opts2state $opts 0 1] break
+   set xL {}
+   set yL {}
+   foreach {x y} [namespace eval $ns $coordcmd $center] {
+      lappend xL [expr {round($x*$div)}]
+      lappend yL [expr {-round($y*$div)}]
+   }
+   set xL [lsort -real $xL]; set yL [lsort -real $yL]
+   set rect [format {\re %d %d %d %d} [lindex $xL 0] [lindex $yL 0]\
+     [expr {[lindex $xL 1] - [lindex $xL 0]}]\
+     [expr {[lindex $yL 1] - [lindex $yL 0]}]]
+   list $state [list $rect $use]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{_opts2state}
+%   The |_opts2state| procedure parses |canvas| item options 
+%   corresponding to changes in the PGF graphics state, and generates 
+%   the corresponding code for setting these parameters. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     |_opts2state| \word{opts} \word{fill-is-stroke} 
+%     \word{stroke-by-default}
+%   \end{displaysyntax}
+%   where \word{opts} is the key--value list of options to convert, 
+%   and the other arguments are booleans. The return value is a list
+%   \begin{displaysyntax}
+%     \word{state-changes} \word{use-code} \word{remaining opts}
+%   \end{displaysyntax}
+%   where \word{code} is the settings code, \word{use-code} is the 
+%   |\pgfusepathq|\dots\ command, and \word{remaining opts} 
+%   is the key--value list of options that were not converted.
+%   
+%   The \word{stroke-by-default} argument is |1| if stroking is the 
+%   default state for this item; this is true for most |canvas| 
+%   items. The \word{fill-is-stroke} argument is |1| for |canvas| 
+%   items (most notably |line|) that uses |-fill| rather than 
+%   |-outline| for what would normally be considered a stroke.
+%   
+%   \begin{tcl}
+proc network::rich::topgf::_opts2state\
+  {allopts fill_is_stroke stroke_by_default} {
+   set opts {}
+   set state {}
+   set stroke $stroke_by_default
+   set fill [expr {!$stroke_by_default}]
+%   \end{tcl}
+%   The main loop has a simple |switch| as body. Right now it only 
+%   does |-fill| and |-outline|, but it should be clear how to extend 
+%   it.
+%   \begin{tcl}
+   foreach {opt val} $allopts {
+      switch -- $opt -fill {
+         if {$fill_is_stroke} then {
+            foreach {stroke val} [_colour $val] break
+            if {$stroke} then {
+               lappend state "\\pgfsetstrokecolor{$val}"
+            }
+         } else {
+            foreach {fill val} [_colour $val] break
+            if {$fill} then {
+               lappend state "\\pgfsetfillcolor{$val}"
+            }
+         }
+      } -outline {
+         foreach {stroke val} [_colour $val] break
+         if {$stroke} then {
+            lappend state "\\pgfsetstrokecolor{$val}"
+         }
+      } default {
+         lappend opts $opt $val
+      }
+   }
+   return [list $state [
+      lindex {{"" {\S}} {{\pgfusepathqfill}\
+        {\pgfusepathqfillstroke}}} $fill $stroke
+   ] $opts]
+}
+%   \end{tcl} 
+% \end{proc}
+% 
+% \begin{proc}{_colour}
+%   The |_colour| command should generally convert a Tk colour to a 
+%   pair
+%   \begin{displaysyntax}
+%     \word{use} \word{\LaTeX\ colour}
+%   \end{displaysyntax} 
+%   where \word{use} is |0| or |1| (where |0| is only used for the 
+%   empty Tk colour), and \word{\LaTeX\ colour} is the \LaTeX\ colour 
+%   (technically \textsf{xcolor} colour) corresponding to the Tk 
+%   colour. The bare minimum is to leave all colour names as they are.
+%   \begin{tcl}
+proc network::rich::topgf::_colour {tkcol} {
+   list [expr {$tkcol ne ""}] $tkcol
+}
+%   \end{tcl}
+%   However, if one wants this to be foolproof then the operation can 
+%   be very complex indeed, probably requiring extensive conversion 
+%   tables.
+% \end{proc}
+% 
+% \begin{proc}{oval}
+%   Tk |oval| items become |\ov| commands (that command was added 
+%   primarily for this reason).
+%   \begin{tcl}
+proc network::rich::topgf::oval {coordcmd opts ns pos div} {
+   foreach {state use opts} [_opts2state $opts 0 1] break
+   set xL {}
+   set yL {}
+   foreach {x y} [namespace eval $ns $coordcmd $pos] {
+      lappend xL [expr {round($x*$div)}]
+      lappend yL [expr {-round($y*$div)}]
+   }
+   set xL [lsort -real $xL]; set yL [lsort -real $yL]
+   set rect [format {\ov %d %d %d %d} [lindex $xL 0] [lindex $yL 0]\
+     [expr {[lindex $xL 1] - [lindex $xL 0]}]\
+     [expr {[lindex $yL 1] - [lindex $yL 0]}]]
+   list $state [list $rect $use]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{line}
+%   Tk |line| items are expressed using |\m| and |\L| commands; the 
+%   |-smooth| option is currently not supported
+%   \begin{tcl}
+proc network::rich::topgf::line {coordcmd opts ns pos div} {
+   foreach {state use opts} [_opts2paint $opts 1 1] break
+   if {[dict exists $opts -smooth] &&\
+     ![string is false [dict get $opts -smooth]]} then {
+       return -code error "The -smooth option is not supported yet"
+   }
+   set draw {}
+   set x0 ""; set y0 ""
+   foreach {x y} [namespace eval $ns $coordcmd $pos] {
+      if {$x0 eq ""} then {
+         set x0 [expr {round($x*$div)}]
+         set y0 [expr {round(-$y*$div)}]
+         lappend draw [format {\m %d %d} $x0 $y0]
+      } else {
+         set x [expr {round($x*$div)}]
+         set y [expr {round(-$y*$div)}]
+         lappend draw [format {\L %d %d} [expr {$x-$x0}] [expr {$y-$y0}]]
+         set x0 $x; set y0 $y
+      }
+   }
+   lappend draw $use
+   list $state $draw
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tcl}
+%</pkg>
+% \end{tcl}
 % 
 % \begin{thebibliography}{8}
 % 

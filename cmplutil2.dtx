@@ -1382,10 +1382,12 @@ proc init_database {db signature} {
 %   The sixth step is to create the |pa1rMap| table. It has no 
 %   indices, but the |m1nus| column is the primary key
 %   \begin{tcl}
+%<*pairmap>
    $db allrows "
       CREATE TABLE pa1rMap 
       ( [join [column_defs $DB_column(pa1rMap)] ", "] )
    "
+%</pairmap>
 }
 %   \end{tcl}
 % \end{proc}
@@ -2068,7 +2070,7 @@ proc judge_ambiguity {} {
    } elseif {1 == [llength $RS(leading)]} then {
       set RS(st4te) r
       set lhs [lindex $RS(m0n0mials) [lindex $RS(leading) 0]]
-      set s [{*}$coefficient - [dict get $RS(irr) [lindex $RS(leading) 0]]]
+      set s [{*}$coefficient neg [dict get $RS(irr) [lindex $RS(leading) 0]]]
       set rhs {}
       dict for {nu r} [dict remove $RS(irr) [lindex $RS(leading) 0]] {
          lappend rhs [lindex $RS(m0n0mials) $nu] [{*}$coefficient / $r $s]
@@ -2140,7 +2142,7 @@ proc reduce_equality_B {} {
       variable coefficient
       foreach mu $RS(leading) {
          set lhs [lindex $RS(m0n0mials) $mu]
-         set s [{*}$coefficient - [dict get $RS(irr) $mu]]
+         set s [{*}$coefficient neg [dict get $RS(irr) $mu]]
          set rhs {}
          dict for {nu r} [dict remove $RS(irr) $mu] {
             lappend rhs [lindex $RS(m0n0mials) $nu] [{*}$coefficient / $r $s]
@@ -2974,7 +2976,7 @@ proc new_ru1e_2\
 %</aprofile>
 %<*!aprofile>
    new_ru1e_B $state $lhs $rhs $feedbacks $profile $dividedL $me\
-     $merow $when $limit
+     $merow $when 20
 %</!aprofile>
 }
 %   \end{tcl}
@@ -3348,7 +3350,7 @@ proc pick_next_ambiguity {} {
    set L [$DBCMD(database) allrows {
       SELECT min(pick8y) AS t0p FROM pa1rs
    }]
-   if {[dict exists [lindex $L 0] t0p]]} then {
+   if {[dict exists [lindex $L 0] t0p]} then {
       push_main_task raise_ambiguity_top [dict get [lindex $L 0] t0p]
    } else {
       pause_main_loop
@@ -3647,7 +3649,9 @@ proc resieve_pairs {} {
    variable DBCMD
    set overlapL [$DBCMD(GetOverl4ps) allrows]
    set minusL [concat {*}[$DBCMD(ListPairmaps) allrows -as lists]]
-   push_main_task resieve_pairs_A $overlapL $minusL
+   if {[llength $minusL]} then {
+      push_main_task resieve_pairs_A $overlapL $minusL
+   }
 }
 %   \end{tcl}
 %   
@@ -4270,7 +4274,7 @@ proc display_rule_proof {prefix number args} {
 proc display_monomial_proof {prefix arow optD} {
    variable coefficient
    set one [{*}$coefficient 1]
-   set mone [{*}$coefficient - $one]
+   set mone [{*}$coefficient neg $one]
    set plusL {}
    set minusL {}
    foreach  step [lrange [dict get $arow re5olution] 0 end-1] \
@@ -4633,7 +4637,7 @@ proc rule_as_XHTML {row args} {
    ]
    variable coefficient
    dict for {mu r} [dict get $row rhs] {
-      set s [{*}$coefficient - $r]
+      set s [{*}$coefficient neg $r]
       if {[string length $s] < [string length $r]} then {
          lappend children {#text " \u2212 "}
       } else {
@@ -4763,7 +4767,7 @@ proc resolution_as_XHTML {row args} {
       ]]
       set first 1
       dict for {mu r} $sum {
-         set s [{*}$coefficient - $r]
+         set s [{*}$coefficient neg $r]
          if {[string length $s] < [string length $r]} then {
             lappend children {#text " \u2212 "}
          } elseif {!$first} then {
@@ -4813,7 +4817,7 @@ proc resolution_as_XHTML {row args} {
 %   \begin{tcl}
 proc raw_XHTML_coefficient {r} {
    variable coefficient
-   set u [{*}$coefficient - $r]
+   set u [{*}$coefficient neg $r]
    if {[string length $u] < [string length $r]} then {
       set res [list \u2212]
    } else {
@@ -4921,7 +4925,7 @@ proc SAR_as_XHTML {start SAR args} {
       }
       set first 1
       dict for {mu r} $sum {
-         lassign [${*}$cccmd $r] sign objL
+         lassign [{*}$cccmd $r] sign objL
          if {$sign ne "+" || !$first} then {
             lappend children [list #text " $sign "]
          }
@@ -5089,17 +5093,46 @@ proc XHTML_rule_file {fname args} {
 % 
 % 
 % \begin{proc}{XHTML_rule_document}
-%   This procedure writes a full XHTML page with one or several rules 
-%   to an open channel. The call syntax is
+%   This procedure writes a full XHTML page with one rule to an open 
+%   channel. The call syntax is
 %   \begin{displaysyntax}
-%     |XHTML_rule_document| \word{channel} \word{linkcmd} 
-%     \word{ruleno}\regstar
+%     |XHTML_rule_document| \word{channel} \word{ruleno}
+%     \begin{regblock}[\regstar] \word{option} \word{value}
+%     \end{regblock}
 %   \end{displaysyntax}
+%   The supported options are:
+%   \begin{ttdescription}
+%     \item[-head]
+%       This option is used to supply a page head, which will be the 
+%       first thing after the |<body>| tag. Its value is a string 
+%       (XHTML code).
+%     \item[-foot]
+%       This option is used to supply a page footer, which will be 
+%       the last thing before the |</body>| tag. Its value is a string 
+%       (XHTML code).
+%     \item[-rulelink]
+%       This option is passed on to |SAR_as_XHTML|. 
+%       If provided, it option signals that rule annotations should 
+%       be links to these rules. The value is a command prefix with 
+%       call syntax
+%       \begin{displaysyntax}
+%         \meta{value} \word{number}
+%       \end{displaysyntax}
+%       that returns the URI for rule \word{number}. The |format| 
+%       command is often useful for this.
+%     \item[-coeffconv]
+%       This option is passed on to |SAR_as_XHTML|. It specifies the 
+%       command prefix to use for converting coefficients, and 
+%       effectively defaults to |raw_XHTML_coefficient|.
+%   \end{ttdescription}
 %   \begin{tcl}
-proc XHTML_rule_document {F linkcmd args} {
+proc XHTML_rule_document {F ruleno args} {
    XHTML_prologue $F [mtmtcl::support::xml_from_tree [
-      list title {} [list [list #text "Rules [join $args {, }]"]]
+      list title {} [list [list #text "Rule $ruleno"]]
    ] -nodesep ""]
+   if {[dict exists $args -head]} then {
+      puts $F [dict get $args -head]
+   }
 %   \end{tcl}
 %   Since vertices are reused over and over again, the following 
 %   establishes objects that can be referenced.
@@ -5131,66 +5164,138 @@ proc XHTML_rule_document {F linkcmd args} {
 %   require setting up a |viewBox| for each and every one of them, 
 %   whereas referencing the objects themselves Just Works.
 %   
-%   Now generate the rules.
+%   Now generate the rule.
 %   \begin{tcl}
-   if {![llength $args]} then {
-      set args [concat {*}[thedatabase allrows -as lists\
-        {SELECT num6er FROM ru1es}]]
-   }
-   variable coefficient
-   set one [{*}$coefficient 1]
    variable DBCMD
-   foreach ruleno $args {
-      puts $F [mtmtcl::support::xml_from_tree [
-         list h1 [dict create id "rule-$ruleno"]\
-           [list [list #text "Rule $ruleno"]]
-      ] -nodesep ""]
-      set rrow [lindex\
-        [$DBCMD(GetRu1e) allrows [dict create num6er $ruleno]] 0]
-      set msg [clock format [dict get $rrow wh3n1]\
-        -format "Derived %H:%M:%S %Z, %a %b %d %Y."]
-      if {[dict exists $rrow wh3n2]} then {
-         append msg [clock format [dict get $rrow wh3n2]\
-        -format " Retired %H:%M:%S %Z, %a %b %d %Y."]
+   puts $F [mtmtcl::support::xml_from_tree [
+      list h1 [dict create id "rule-$ruleno"]\
+        [list [list #text "Rule $ruleno"]]
+   ] -nodesep ""]
+   set rows [$DBCMD(GetRu1e) allrows [dict create num6er $ruleno]]
+   if {![llength $rows]} then {
+      puts $F "<p>Not found in database!</p>"
+      if {[dict exists $args -foot]} then {
+         puts $F [dict get $args -foot]
       }
-      puts $F [mtmtcl::support::xml_from_tree [
-         list p {} [list [list #text $msg]]
-      ]]
-      puts $F [mtmtcl::support::xml_from_tree [
-         rule_as_XHTML $rrow -vertexobjs $refD
-      ]]
-      set arow [lindex [$DBCMD(GetAmbiguity) allrows\
-        [dict create num6er [dict get $rrow pr00f]]] 0]
-%   \end{tcl}
-%   \begin{tcl}
-      if {[dict exists $arow p1us]} then {
-         puts $F {<h5 style="display: run-in">Proof.</h5>}
+      puts $F {</body></html>}
+   }
+   set rrow [lindex $rows 0]
+   set msg [clock format [dict get $rrow wh3n1]\
+     -format "Derived %H:%M:%S %Z, %a %b %d %Y."]
+   if {[dict exists $rrow wh3n2]} then {
+      append msg [clock format [dict get $rrow wh3n2]\
+     -format " Retired %H:%M:%S %Z, %a %b %d %Y."]
+   }
+   puts $F [mtmtcl::support::xml_from_tree [
+      list p {} [list [list #text $msg]]
+   ]]
+   variable coefficient
+   puts $F [mtmtcl::support::xml_from_tree [
+      rule_as_XHTML $rrow -vertexobjs $refD
+   ]]
+   set arow [lindex [$DBCMD(GetAmbiguity) allrows\
+     [dict create num6er [dict get $rrow pr00f]]] 0]
+   if {[dict exists $arow p1us]} then {
+      puts $F {<h5 style="display: run-in">Proof.</h5>}
 %<*zlib>
-         dict set arow m0n0mials [encoding convertfrom utf-8\
-           [zlib inflate [dict get $arow deflated_m0n0mials]]]
+      dict set arow m0n0mials [encoding convertfrom utf-8\
+        [zlib inflate [dict get $arow deflated_m0n0mials]]]
 %</zlib>
-         set SAR0 [standalone_resolution $arow]
-         set mu0 [lsearch -exact [lindex $SAR0 5]\
-           [dict get $rrow lhs]]
-         if {$mu0<0} then {error "Couldn't find lhs in m0n0mials."}
-         set SAR [solve_SAR_for $SAR0 $mu0]
-         puts $F [mtmtcl::support::xml_from_tree [
-            SAR_as_XHTML [list $mu0 $one] $SAR -vertexobjs $refD\
-              -rulelink $linkcmd
+      set SAR0 [standalone_resolution $arow]
+      set mu0 [lsearch -exact [lindex $SAR0 5]\
+        [dict get $rrow lhs]]
+      if {$mu0<0} then {error "Couldn't find lhs in m0n0mials."}
+      set SAR [solve_SAR_for $SAR0 $mu0]
+      puts $F [mtmtcl::support::xml_from_tree [
+         SAR_as_XHTML [list $mu0 [{*}$coefficient 1]] $SAR\
+           {*}$args -vertexobjs $refD
+      ]]
+   } else {
+      puts $F [mtmtcl::support::xml_from_tree [
+         list p {} [list [
+            list #text [dict get $arow p1us2eg]
          ]]
-      } else {
-         puts $F [mtmtcl::support::xml_from_tree [
-            list p {} [list [
-               list #text [dict get $arow p1us2eg]
-            ]]
-         ]]
-      }
+      ]]
+   }
+   if {[dict exists $args -foot]} then {
+      puts $F [dict get $args -foot]
    }
    puts $F {</body></html>}
 }
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% \subsubsection{Embedded server}
+% 
+% \begin{proc}{Log}
+%   This is a small helper called by event-loop code to record errors 
+%   and such.
+%   \begin{tcl}
+proc Log {msg} {puts stdout $msg}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{HTTP_accept}
+%   This is a |server -socket| and |fileevent readable| callback that 
+%   responds with the rule whose number is the beginning of the last 
+%   path component of the URL. The \word{incoming} argument is used 
+%   for material that has already been |read| but didn't constitute a 
+%   full line; it should be an empty string in the |socket -server| 
+%   callback prefix.
+%   \begin{tcl}
+proc HTTP_accept {incoming sock ip port} {
+   if {[catch {
+      if {$incoming eq ""} then {
+         fconfigure $sock -blocking 0 -translation binary
+      } else {
+         fileevent $sock readable {}
+      }
+      append incoming [read $sock]
+      if {[
+         regexp -- {^([A-Za-z]+) ([^\r\n]+) ([^\r\n ]+)\r\n} $incoming\
+           "" method url version
+      ]} then {
+         scan [lindex [split $url /] end] %d ruleno
+         fconfigure $sock -translation crlf
+         puts $sock "HTTP/1.0 200 OK"
+         puts $sock "Content-Type: application/xhtml+xml; charset=UTF-8"
+         puts $sock "Connection: close\n"
+         fconfigure $sock -encoding utf-8
+         XHTML_rule_document $sock $ruleno -head [
+            format {<p><a href="%d.xhtml">Prev</a>\
+              <a href="%d.xhtml">Next</a></p>}\
+              [expr {$ruleno-1}] [expr {$ruleno+1}]
+         ] -rulelink {::format %d.xhtml}
+         close $sock
+      } elseif {[string length $incoming]<5000} {
+         fileevent $sock readable [list\
+           [namespace which HTTP_accept] $incoming $sock $ip $port]
+      } else {
+         Log "$ip has written [string length $incoming] bytes,\
+           but still no CRLF; I give up."
+         close $sock
+      }
+   } msg]} {
+      Log "Error: $msg"
+      catch {close $sock}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{navigation_head}
+%   This procedure returns XHTML code (raw string) for a ``navigation 
+%   page head'' relative to a particular rule.
+%   
+%   ---
+% \end{proc}
+% 
+% \begin{tcl}
+%<*testserver>
+set servsock [socket -server [namespace code {HTTP_accept ""}] 9090]
+%</testserver>
+% \end{tcl}
 % 
 % \subsection{Resolutions as proofs}
 % 
@@ -5256,7 +5361,7 @@ proc standalone_resolution {amb} {
      [network::pure::forward_region $relabel [dict get $amb p1us2eg]]
    variable coefficient
    set one [{*}$coefficient 1]
-   set mone [{*}$coefficient - $one]
+   set mone [{*}$coefficient neg $one]
    lappend coeffL $mone $one
 %   \end{tcl}
 %   The second complication is that the argument does not contain 
@@ -5286,7 +5391,7 @@ proc standalone_resolution {amb} {
          if {[info exists s]} then {
             set s [{*}$coefficient - $s $r]
          } else {
-            set s [{*}$coefficient - $r]
+            set s [{*}$coefficient neg $r]
          }
          if {[{*}$coefficient iszero $s]} then {unset s}
       }
@@ -5372,7 +5477,8 @@ proc solve_SAR_for {SAR lhs args} {
    } else {
       set factor [{*}$coefficient 1]
    }
-   set scale [{*}$coefficient - [{*}$coefficient / $factor [dict get $sum $lhs]]]
+   set scale [{*}$coefficient neg\
+     [{*}$coefficient / $factor [dict get $sum $lhs]]]
    if {[llength $args]>1} then {
       set sum [lindex $args 1]
    } else {
@@ -5405,6 +5511,240 @@ proc solve_SAR_for {SAR lhs args} {
       lappend coeffL [{*}$coefficient * $scale $r]
    }
    return [list $sumL $whichL $whatL $whereL $coeffL [lindex $SAR 5]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Export to \LaTeX}
+% 
+% \begin{proc}{rule_as_LaTeX}
+%   This procedure formats a rule (with proof, if any) as \LaTeX\ 
+%   code, using the \texttt{sdpgf} environment for the networks. The 
+%   call syntax is
+%   \begin{displaysyntax}
+%     |rule_as_LaTeX| \word{ruleno} \begin{regblock}[\regstar] 
+%     \word{option} \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   where the supported options are
+%   \begin{ttdescription}
+%     \item[-labelprefix]
+%       A string which is used as prefix for |\label|s of rule 
+%       equations.
+%   \end{ttdescription}
+%   
+%   \begin{tcl}
+proc rule_as_LaTeX {ruleno args} {
+%   \end{tcl}
+%   \begin{tcl}
+   variable DBCMD
+   set rows [$DBCMD(GetRu1e) allrows [dict create num6er $ruleno]]
+   if {![llength $rows]} then {
+      error "No rule $ruleno found in database"
+   }
+   set rrow [lindex $rows 0]
+   set res {\begin{equation}}
+   if {[dict exists $args -labelprefix]} then {
+      append res " \\label{[dict get $args -labelprefix]$ruleno}"
+   }
+   append res "\n  " [string map {\n "\n  "} [
+     network_as_LaTeX [dict get $rrow lhs] {*}$args
+   ]] \n
+   set arow [lindex [$DBCMD(GetAmbiguity) allrows\
+     [dict create num6er [dict get $rrow pr00f]]] 0]
+   if {![dict exists $arow p1us]} then {
+      append res {  \equiv} \n
+      append res {  } [
+        lincomb_as_LaTeX [dict get $rrow rhs] {*}$args
+      ] \n
+   } else {
+%<*zlib>
+      dict set arow m0n0mials [encoding convertfrom utf-8\
+        [zlib inflate [dict get $arow deflated_m0n0mials]]]
+%</zlib>
+      set SAR0 [standalone_resolution $arow]
+      set mu0 [lsearch -exact [lindex $SAR0 5]\
+        [dict get $rrow lhs]]
+      if {$mu0<0} then {error "Couldn't find lhs in m0n0mials."}
+      set SAR [solve_SAR_for $SAR0 $mu0]
+      foreach lincomb [lindex $SAR 0] rule [lindex $SAR 1] {
+         if {[dict exists $args -labelprefix]} then {
+            append res "  \\stackrel{\\eqref{[
+               dict get $args -labelprefix
+            ]$rule}}{\\equiv}\n"
+         } else {
+            append res {  \equiv} \n
+         }
+         append res {  } [
+           lincomb_as_LaTeX $lincomb -networks [lindex $SAR 5]\
+             {*}$args
+         ] \n
+      }
+   }
+   append res {\end{equation}}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{network_as_LaTeX}
+%   This procedure takes a pure network as argument and returns 
+%   \LaTeX\ code for drawing that network (in a math mode context). 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |network_as_LaTeX| \word{network} \begin{regblock}[\regstar] 
+%     \word{option} \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   Notable options are:
+%   \begin{ttdescription}
+%     \item[-unit]
+%       Passed on to |network::rich::as_PGF|.
+%     \item[-division]
+%       Passed on to |network::rich::as_PGF|.
+%   \end{ttdescription}
+%   
+%   \begin{tcl}
+proc network_as_LaTeX {NW args} {
+   set A(pure) $NW
+   variable vertex_appearances
+   variable vertex_sizes
+   network::rich::make_level-layout-Tk $vertex_sizes {*}$args -var A
+   network::rich::vpos-Tk_by_level -var A
+   network::rich::ecurve-Tk-raw_by_level $vertex_appearances {*}$args -var A
+   return "\\left\[ [
+     network::rich::as_PGF $vertex_appearances {*}$args -var A
+   ] \\right\]"
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{network_as_OMLaTeX}
+%   This procedure takes a pure network as argument and returns a 
+%   near-OpenMath object for that network, that is suitable for 
+%   conversion to \LaTeX\ code. The call syntax is
+%   \begin{displaysyntax}
+%     |network_as_OMLaTeX| \word{network} \begin{regblock}[\regstar] 
+%     \word{option} \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   Notable options are:
+%   \begin{ttdescription}
+%     \item[-unit]
+%       Passed on to |network::rich::as_PGF|.
+%     \item[-division]
+%       Passed on to |network::rich::as_PGF|.
+%   \end{ttdescription}
+%   
+%   Currently, the OM object returned is just an |OMFOREIGN| 
+%   (containing the \word{network} verbatim, without even specifying 
+%   an |encoding|) equipped with an \OMSref{altenc}{LaTeX_encoding} 
+%   attribution. 
+%   
+%   \begin{tcl}
+proc network_as_OMLaTeX {NW args} {
+   set A(pure) $NW
+   variable vertex_appearances
+   variable vertex_sizes
+   network::rich::make_level-layout-Tk $vertex_sizes {*}$args -var A
+   network::rich::vpos-Tk_by_level -var A
+   network::rich::ecurve-Tk-raw_by_level $vertex_appearances {*}$args -var A
+   set lineL [split [
+     network::rich::as_PGF $vertex_appearances {*}$args -var A
+   ] \n]
+   set L [list {usepackage {name sdpgf} {}}]
+   lappend L [list unindent {linebreak 1} [list {#text \\left\[}\
+     [list \#text [lindex $lineL 0]] ] ]
+   foreach line [lrange $lineL 1 end-1] {
+      foreach word [split [string trim $line]] {
+         lappend L [list \#text $word]
+      }
+   }
+   lappend L [list unindent {} [list\
+     [list \#text [lindex $lineL end]] {#text \\right\]} ] ]
+   list OMATTR {} [list [
+      list OMATP {} [list\
+        {OMS {cd altenc name LaTeX_encoding} {}}\
+        [list OMFOREIGN {encoding mtmtcl-LaTeX} $L]]
+   ] [
+      list OMFOREIGN {} [list [list #text $NW]]
+   ]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{lincomb_as_LaTeX}
+%   This procedure takes a linear combination of pure networks as 
+%   argument and returns \LaTeX\ code for drawing that linear 
+%   combination (in a math mode context). 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |lincomb_as_LaTeX| \word{linear combination} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   Notable options are:
+%   \begin{ttdescription}
+%     \item[-networks]
+%       If this option is provided, then the keys in the \word{linear 
+%       combination} are not actual networks, but indices into a list 
+%       of networks. That list is the value of this option.
+%     \item[-unit]
+%       Passed on to |network::rich::as_PGF|.
+%     \item[-division]
+%       Passed on to |network::rich::as_PGF|.
+%   \end{ttdescription}
+%   \begin{tcl}
+proc lincomb_as_LaTeX {lincomb args} {
+   variable coefficient
+   set termL {{OMS {cd arith1 name plus} {}}}
+   dict for {mu r} $lincomb {
+      set L {}
+      lappend L {OMS {cd arith1 name times mtmtcl:path .} {}}
+      lappend L [{*}$coefficient export $r {mtmtcl:path scalar}]
+      if {[dict exists $args -networks]} then {
+         set mu [lindex [dict get $args -networks] $mu]
+      }
+      set L2 {}
+      foreach line [split [
+         network_as_LaTeX $mu {*}$args
+      ] \n] {lappend L2 [list #text [string trim $line]]}
+      lappend L [list OMATTR {} [list [
+         list OMATP {} [list\
+           {OMS {cd altenc name LaTeX_encoding} {}}\
+           [list OMFOREIGN {encoding mtmtcl-LaTeX} $L2]]
+      ] [
+         list OMFOREIGN {} [list [list #text $mu]]
+      ]]]
+      lappend termL [list OMA {} $L]
+   }
+   mtmtcl::latex::convertto [list OMA {} $termL]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{database_as_LaTeX}
+%   This procedure dumps the entire database as a \LaTeX\ document. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |database_as_LaTeX| \word{filename} \begin{regblock}[\regstar] 
+%     \word{option} \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   where \word{filename} is the name of the \LaTeX\ file to create. 
+%   Options and values are passed on to |rule_as_LaTeX|.
+%   
+%   \begin{tcl}
+proc database_as_LaTeX {fname args} {
+   set F [open $fname w]
+   puts $F {\documentclass{article}}
+   puts $F {\usepackage{amsmath,sdpgf}}
+   puts $F {\begin{document}}
+   variable DBCMD
+   foreach rule [lsort -integer [
+      concat {*}[thedatabase allrows -as lists {SELECT num6er FROM ru1es}]
+   ]] {
+      puts $F "[rule_as_LaTeX $rule {*}$args]\n"
+   }
+   puts $F {\end{document}}
+   close $F
 }
 %   \end{tcl}
 % \end{proc}
@@ -5885,5 +6225,596 @@ enter_congruence -short "Counit(Im)" {}\
 % \begin{tcl}
 %</Hopf>
 % \end{tcl}
+% 
+% 
+% 
+% \subsection{Hom-associative algebra}
+% 
+% An active research problem.
+% 
+% \begin{tcl}
+%<*HomAss>
+set vertex_appearances {
+   m {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   a {
+      {rectangle {square 8} {}} 
+      {{0 8}}
+      {{0 -8}}
+   }
+   e1 {
+      {rectangle {square 8} {}
+       text {offsets {0 0}} {-font {-size -10} -text e1}} 
+      {{0 8}}
+      {}
+   }
+   e2 {
+      {rectangle {square 8} {}
+       text {offsets {0 0}} {-font {-size -10} -text e2}} 
+      {{0 8}}
+      {}
+   }
+   e3 {
+      {rectangle {square 8} {}
+       text {offsets {0 0}} {-font {-size -10} -text e3}} 
+      {{0 8}}
+      {}
+   }
+}
+sqlite3_init [
+   tk_getSaveFile -initialdir ~/Documents/Artiklar/DL-git/Lund-2009\
+     -initialfile HomAss.db
+] {
+  a {1 1}  m {2 1}  
+%<constants>  e1 {0 1}  e2 {0 1}  e3 {0 1}
+}
+% \end{tcl}
+% 
+% 
+% \subsubsection{Ordering}
+% 
+% For a change, let's try a (height-)lexicographic order.
+% 
+% \begin{proc}{NW_to_Polish}
+%   This procedure takes a pure network, which is expected to be a 
+%   tree, as argument and returns a pair
+%   \begin{displaysyntax}
+%     \word{input heights} \word{Polish list}
+%   \end{displaysyntax}
+%   of lists. The \word{input heights} list is indexed by input index 
+%   and contains the heights of the individual inputs, i.e., the 
+%   number of vertices between the output (root) and this input. The 
+%   \word{Polish list} is the network in Polish notation; each element 
+%   is either a vertex annotation or a natural number (denoting that 
+%   input).
+%   
+%   This procedure tries to do something sensible also for networks 
+%   that are not trees, but the validity of the results is of course 
+%   uncertain in that case. For a forrest, the \word{Polish list} is 
+%   the concatenation of the Polish lists one would get for each 
+%   individual output. If there are cycles, then the network is 
+%   treated as a DAG, and the height reported for an input is the 
+%   height for the rightmost path to that input. Inputs for which no 
+%   oriented path reaches an output will be missing from the 
+%   \word{Polish list} and their entries in the \word{input heights} 
+%   will be arbiitrary (edge labels, thus integers).
+%   \begin{tcl}
+proc NW_to_Polish {NW} {
+   set htL [lindex $NW 0 1 1]
+   set PL {}
+   set stack {}
+   foreach e [lreverse [lindex $NW 0 0 2]] {
+      lappend stack [list $e 0]
+   }
+   while {[llength $stack]} {
+      lassign [lindex $stack end] e h
+      set stack [lreplace $stack [set stack end] end]
+      set v [lindex $NW 1 $e 2]
+      if {$v > 1} then {
+         lappend PL [lindex $NW 0 $v 0]
+         incr h
+         foreach e [lreverse [lindex $NW 0 $v 2]] {
+            lappend stack [list $e $h]
+         }
+      } else {
+         lappend PL [lindex $NW 1 $e 3]
+         lset htL [lindex $PL end] $h
+      }
+   }
+   return [list $htL $PL]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{heightlex_cmpkey}
+%   This procedure computes a height-lexicographic comparison key. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |heightlex_cmpkey| \word{map} \word{input} \word{network}
+%   \end{displaysyntax}
+%   where the \word{map} maps vertex annotations to individual 
+%   characters, for comparison using |string compare|, and 
+%   \word{input} is the character used for inputs.
+%   \begin{tcl}
+proc heightlex_cmpkey {map input NW} {
+   lassign [NW_to_Polish $NW] res PL
+   set str ""
+   foreach item $PL {
+      if {[dict exists $map $item]} then {
+         append str [dict get $map $item]
+      } else {
+         append str $input
+         lappend res $item
+      }
+   }
+   lappend res $str
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{set_cmpcmds}
+%   This procedure sets everything up for a height-lexicographic 
+%   comparison, where input\({}< \mathsf{m} < \mathsf{a}\). The first 
+%   two blocks are needed to make the comparison compatible with 
+%   composition, but neither should ever see any difference for 
+%   congruences derivable from the hom-associativity axiom. The 
+%   second block effectively compares two permutations for equality; 
+%   it can never arrive at |<| or |>|.
+%   \begin{tcl}
+proc set_cmpcmds {} {
+   variable RS
+   set RS(cmpkeycmd) [list [namespace which heightlex_cmpkey] {
+      m M a a
+   } .]
+   set inputs [llength [lindex $RS(si7e) 0 1 1]]
+   set RS(cmpcmds) [lrepeat $inputs [list ::tcl::mathop::-]]
+   set RS(cmpblocks) [lrepeat $inputs 0]
+   if {$inputs} then {lset RS(cmpblocks) end 1}
+   lappend RS(cmpcmds) {*}$RS(cmpcmds) [list ::string compare]
+   lappend RS(cmpblocks) {*}$RS(cmpblocks) 1
+   set RS(cmpclass) [lrepeat [llength $RS(cmpblocks)] _]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \subsubsection{Congruences}
+% 
+% No need to add the basic congruencies again if we're restarting a 
+% completion.
+% \begin{tcl}
+database_counts
+if {$Count(Aa)>0} then {return}
+%<lazy>set am6iguity_top 30
+% \end{tcl}
+% 
+% \begin{tcl}
+enter_congruence -short "Hom-associative" {} 1 {m a \n m} -1 {a m \n m}
+%<aishom>enter_congruence -short "Hom-associative" {} 1 {m \n a} -1 {a a \n m}
+% \end{tcl}
+% 
+% \subsubsection{Tricks with trees}
+% 
+% For sets of tree-like networks, it may be useful to have 
+% descriptions as tree languages of the reducible and irreducible 
+% networks respectively. The following routines make it easy to 
+% compute that.
+% 
+% \begin{proc}{top_down_contains}
+%   This procedure computes a grammar for the language of trees which 
+%   contain at least one subtree occurring in the given list of trees.
+%   
+%   The resulting grammar is a list indexed by state number 
+%   (nonterminal number), whose elements are themselves the possible 
+%   \emph{productions} for this state. A production is a list
+%   \begin{displaysyntax}
+%     \word{annotation} \word{state}\regstar
+%   \end{displaysyntax}
+%   where the \word{annotation} is the annotation from the 
+%   corresponding network vertex, and there are as many \word{state}s 
+%   as that vertex has inputs. The initial state for this language is 
+%   |0|, and the final state is |1|. \textbf{Note} that the language 
+%   of all trees cannot be expressed on that form, so an error is 
+%   thrown if an order $0$ network is given as input. All other tree 
+%   languages are handled correctly.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |top_down_contains| \word{signature} \word{network}\regstar
+%   \end{displaysyntax}
+%   where the \word{signature} is needed to initialise the 
+%   productions for states |0| and |1|. It is often possible to infer 
+%   it from the \word{network}s, but it is cleaner to supply it 
+%   explicitly. 
+%   
+%   Most states only have one production (this is not a minimal 
+%   automaton), but |1| has a separate production for every 
+%   annotation (regardless of annotation, every input gets state |1| 
+%   too), and |0| gains a new production for every \word{network}. 
+%   Therefore the productions for state |0| are collected in the list 
+%   |P0|, and only at the end inserted into the main result.
+%   \begin{tcl}
+proc top_down_contains {signature args} {
+   set P0 {}
+   set P1 {}
+   dict for {symbol type} $signature {
+      set oneprod [linsert [lrepeat [lindex $type 0] 1] 0 $symbol]
+      lappend P1 $oneprod
+      for {set n 1} {$n <= [lindex $type 0]} {incr n} {
+         lappend P0 [lreplace $oneprod $n $n 0]
+      }
+   }
+   set res [list {} $P1]
+   foreach NW $args {
+     if {[llength [lindex $NW 0]] <= 2} then {
+        error "Answer is language of all trees; cannot express that\
+          though"
+     }
+%   \end{tcl}
+%   The idea for converting a network is to first assign a state 
+%   number \texttt{S($e$)} to each edge, and then loop over all edges 
+%   again to construct the productions.
+%   \begin{tcl}
+      array unset S
+      set next [llength $res]
+      set n -1; foreach e [lindex $NW 1] {incr n
+         if {[lindex $e 2] == 1} then {
+            set S($n) 1
+         } elseif {[lindex $e 0] == 0} then {
+            set S($n) 0
+         } else {
+            set S($n) $next
+            incr next
+         }
+      }
+      set n -1; foreach e [lindex $NW 1] {incr n
+         if {$S($n) == 1} then {continue}
+         set v [lindex $NW 0 [lindex $e 2]]
+         set prod [lrange $v 0 0]
+         foreach i [lindex $v 2] {lappend prod $S($i)}
+         if {$S($n) == 0} then {
+            lappend P0 $prod
+         } else {
+            lappend res [list $prod]
+         }
+      }
+   }
+   lset res 0 $P0
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{bottom_up_DFA}
+%   This procedure applies the subset construction (for tree finite 
+%   automata) to convert a top-down nondeterministic automaton to a 
+%   bottom-up deterministic automaton. The call syntax is
+%   \begin{displaysyntax}
+%     |bottom_up_DFA| \word{signature} \word{grammar} 
+%     \word{bottom-list}
+%   \end{displaysyntax}
+%   where the \word{bottom-list} should usually be just |1|; it is 
+%   the list of states allowed at inputs of the corresponding trees. 
+%   
+%   The return value is a pair
+%   \begin{displaysyntax}
+%     \word{states} \word{operations}
+%   \end{displaysyntax}
+%   which together define the automaton (as a 
+%   \word{signature}-algebra): \word{states} is the list of states 
+%   (carrier set of the algebra) and \word{operations} are the tables 
+%   of the operations. The states are going to be ordered (|lsort\
+%   -integer|) lists of states in the input NFA \word{grammar}. The 
+%   \word{operations} is a nested dictionary, where the primary key 
+%   is a symbol name (annotation) and subsequent keys are states; an 
+%   $n$-ary symbol is followed by $n$ levels of state keys! The final 
+%   entries in the \word{operations} nested dictionary are the states 
+%   which this operation assumes for the given arguments.
+%   
+%   \begin{tcl}
+proc bottom_up_DFA {signature grammar bottom} {
+   set bottom [lsort -integer -unique $bottom]
+   set states [list $bottom]
+   set stateTab($bottom) $bottom
+   set operations [dict create]
+   for {set nextstate 0} {$nextstate < [llength $states]}\
+     {incr nextstate} {
+      dict for {symbol type} $signature {
+         Cartesian_foreach_delta stateL\
+           [lreplace $states $nextstate end] [lindex $states $nextstate]\
+           [lindex $type 0] {
+            set L {}
+            set i -1; foreach prodL $grammar {incr i
+               foreach prod $prodL {
+                  if {$symbol eq [lindex $prod 0]} then {
+                     set ok 1
+                     foreach arg [lrange $prod 1 end] state $stateL {
+                        if {$arg ni $state} then {
+                           set ok 0
+                           break
+                        }
+                     }
+                     if {$ok} then {
+                        lappend L $i
+                        break
+                     }
+                  }
+               }
+            }
+%   \end{tcl}
+%   The primary purpose of the following is to take note of new 
+%   states that are created, so that they can be added to the 
+%   |states| list. A secondary purpose is to make sure the same 
+%   Tcl\_Obj is used for all |operations| entries with a particular 
+%   state; this should help to conserve at least some memory 
+%   (although the dictionary keys will use up more memory than the 
+%   keys in this case).
+%   \begin{tcl}
+            if {![info exists stateTab($L)]} then {
+               lappend states $L
+               set stateTab($L) $L
+            }
+            dict set operations $symbol {*}$stateL $stateTab($L)
+         }
+      }
+   }
+   return [list $states $operations]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{Cartesian_foreach_delta}
+%   This is a helper loop command for |bottom_up_DFA|. The idea is 
+%   that the call
+%   \begin{displaysyntax}
+%     |Cartesian_foreach_delta| \word{variable} $X$ $y$ $n$ \word{body}
+%   \end{displaysyntax}
+%   is a loop where the \word{variable} ranges over the set
+%   \[
+%     \bigl( X \cup \{y\} \bigr)^n \setminus X^n \text{.}
+%   \]
+%   In the case that \(n=0\), the above is considered to be empty 
+%   unless \(X = \varnothing\).
+%   
+%   Practically this is done by first constructing that set, and then 
+%   |uplevel|ling a |foreach| over it.
+%   \begin{tcl}
+proc Cartesian_foreach_delta {var X y n body} {
+   if {$n<1} then {
+      if {![llength $X]} then {
+         uplevel 1 [list ::foreach $var [list {}] $body]
+      }
+      return
+   }
+%   \end{tcl}
+%   The main recursion used is\footnote{
+%     If $\times$ is interpreted as doing \texttt{linsert} rather than 
+%     \texttt{concat}.
+%   }
+%   \begin{align*}
+%     X_0 ={}& \bigl\{ () \bigr\} \text{,}&
+%     D_0 ={}& \varnothing\text{,}\\
+%     X_{k+1} ={}& X_k \times X \text{,}&
+%     D_{k+1} ={}& D_k \times \bigl( X \cup \{y\} \bigr) \cup
+%       X_k \times \{y\} \text{.}
+%   \end{align*}
+%   The wanted result is $D_n$, but one should avoid computing $X_n$. 
+%   Therefore the loop is slightly unrolled.
+%   \begin{tcl}
+   set Xk [list {}]
+   set Dk [list]
+   for {set k 1} {$k<$n} {incr k} {
+      set Dk1 {}
+      foreach L $Dk {
+         foreach x $X {
+            lappend Dk1 [linsert $L end $x]
+         }
+         lappend Dk1 [linsert $L end $y]
+      }
+      set Xk1 {}
+      foreach L $Xk {
+         foreach x $X {
+            lappend Xk1 [linsert $L end $x]
+         }
+         lappend Dk1 [linsert $L end $y]
+      }
+      set Dk $Dk1
+      set Xk $Xk1
+   }
+   set Dk1 {}
+   foreach L $Dk {
+      foreach x $X {
+         lappend Dk1 [linsert $L end $x]
+      }
+      lappend Dk1 [linsert $L end $y]
+   }
+   foreach L $Xk {lappend Dk1 [linsert $L end $y]}
+   uplevel 1 [list ::foreach $var $Dk1 $body]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{irreducible_eqsys}
+%   This procedure converts a bottom-up DFA to a list of equations 
+%   defining the OGF of the corresponding irreducible language. The 
+%   call syntax is
+%   \begin{displaysyntax}
+%     |irreducible_eqsys| \word{signature} \word{states} 
+%     \word{operations} \word{initials}\regopt
+%   \end{displaysyntax}
+%   where the last two arguments are as for |bottom_up_DFA|. The 
+%   return value is a list of polynomials in Mathematica-notation, 
+%   where there is one variable for each operation in the 
+%   \word{signature}, one variable named |wanted|, and a bunch of 
+%   variables names |s|\meta{n} for some integer $n$ (which is also 
+%   the corresponding index into the \word{states} list).
+%   
+%   The equations are built up in the |Eq| array, which is indexed by 
+%   left hand side name and whose entries are the lists of terms on 
+%   the right hand side. The terms are in Mathematica format.
+%   \begin{tcl}
+proc irreducible_eqsys {signature states operations {initial 1}\
+  {clean 1}} {
+   set Eq(wanted) -wanted
+   set n -1; foreach state $states {incr n
+      set StateToVar($state) s$n
+      if {0 ni $state} then {lappend Eq(wanted) s$n}
+      lappend Eq(s$n) -s$n
+   }
+   lappend Eq($StateToVar($initial)) 1
+   dict for {op table} $operations {
+      set factors [list $op $table]
+      for {set k 1} {$k<=[lindex [dict get $signature $op] 0]}\
+        {incr k} {
+         set factors2 {}
+         foreach {factor subtable} $factors {
+            dict for {state slice} $subtable {
+               lappend factors2 $factor*$StateToVar($state) $slice
+            }
+         }
+         set factors $factors2
+      }
+      foreach {factor state} $factors {
+         lappend Eq($StateToVar($state)) $factor
+      }
+   }
+   if {$clean} {
+      foreach state $states {
+         if {0 in $state} then {unset Eq($StateToVar($state))}
+      }
+   }
+   set res {}
+   foreach var [lsort -dictionary [array names Eq]] {
+      lappend res [join $Eq($var) " + "]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{irreducible_iterate}
+%   This procedure converts a bottom-up DFA to a \Tcl\ script that 
+%   can be used to compute truncations of the OGF of the corresponding 
+%   irreducible language. The call syntax is
+%   \begin{displaysyntax}
+%     |irreducible_iterate| \word{signature} \word{states} 
+%     \word{operations} \word{poly-ring} \word{prev}
+%     \word{initial}\regopt\ \word{clean?}\regopt
+%   \end{displaysyntax}
+%   where the \word{states} and \word{operations} arguments are as 
+%   returned by |bottom_up_DFA|. The \word{poly-ring} and \word{prev} 
+%   arguments are fragments of \Tcl\ code (that may well employ 
+%   e.g.~variable substitution or expansion) that will be used as 
+%   follows:
+%   \begin{itemize}
+%     \item 
+%       \meta{poly-ring} is a command prefix supporting the 
+%       |ring|~(1.0), |monoid|~(1.0), |additive_group|~(1.1), and 
+%       |named|~(1.0) interfaces; each operation in the 
+%       \word{signature} must also be the name of a ring element.
+%     \item
+%       \meta{prev} is (evaluates to, under substitution) a list of 
+%       elements in the \word{poly-ring}.
+%   \end{itemize}
+%   The result of evaluating the generated script will be a list that 
+%   can be used as a new value of the \meta{prev}. More precisely, 
+%   the return value will be a list
+%   \begin{displaysyntax}
+%     \word{next-script} \word{wanted-script}
+%   \end{displaysyntax}
+%   where the \word{next-script} evaluates to a new 
+%   \word{prev}-vector, and the \word{wanted-script} evaluates to the 
+%   sum of those \word{prev}-elements that do not correspond to 
+%   states containing |0|.
+%   
+%   The \word{initial} is the initial state vector; it defaults to 
+%   |1|. The \word{clean?} is a flag for whether elements 
+%   corresponding to states containing |0| should be left out.
+%   
+%   The |Next| array is used for constructing scripts that compute 
+%   the next value for a state; it is indexed by state name, and the 
+%   script is obtained by |join|ing its elements. The |Get| array is 
+%   also indexed by state and contains code that retrieves the 
+%   \word{prev} value for that state---usually something like 
+%   |[lindex |\meta{prev}| |$n$|]| for some integer $n$.
+%   \begin{tcl}
+proc irreducible_iterate {signature states operations ring prev\
+  {initial 1} {clean 1}} {
+   set wanted [list $ring +]
+   set n 0
+   foreach state $states {
+      set Get($state) "\[lindex $prev $n\]"
+      if {$clean && 0 in $state} then {continue}
+      lappend wanted $Get($state)
+      set Next($state) [list $ring +]
+      incr n
+   }
+   lappend Next($initial) "\[$ring 1\]"
+   dict for {op table} $operations {
+      set factors [list "\[$ring named [list $op]\]" $table]
+      for {set k 1} {$k<=[lindex [dict get $signature $op] 0]}\
+        {incr k} {
+         set factors2 {}
+         foreach {factor subtable} $factors {
+            dict for {state slice} $subtable {
+               lappend factors2 "\[$ring * $factor $Get($state)\]" $slice
+            }
+         }
+         set factors $factors2
+      }
+      foreach {factor state} $factors {
+         lappend Next($state) $factor
+      }
+   }
+   set L {}
+   foreach state $states {
+      if {$clean && 0 in $state} then {continue}
+      lappend L [join $Next($state)]
+   }
+   set next "list \[\n   [join $L "\n\] \[\n  "]\n\]"
+   return [list $next [join $wanted]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tcl}
+interp alias {} Poly_ring {} ::mtmtcl::rings::semigroup_algebra {
+   ::mtmtcl::rings::integer
+} [list ::mtmtcl::groups::power_product_monoid_1.3 [
+   list ::mtmtcl::sets::variable_set {a m} {}
+]]
+proc cull_vector {vector maxdeg} {
+   set res {}
+   foreach sum $vector {
+      set new {}
+      dict for {exps coeff} $sum {
+         set degsum [tcl::mathop::+ {*}$exps]
+         if {$degsum <= $maxdeg} then {
+            lappend new [list $degsum $exps $coeff]
+         }
+      }
+      set D [dict create]
+      foreach term [
+         lsort -index 0 -integer [lsort -index {1 0} -integer $new]
+      ] {dict set D [lindex $term 1] [lindex $term 2]}
+      lappend res $D
+   }
+   return $res
+}
+% \end{tcl}
+% 
+% 
+% \begin{tcl}
+%</HomAss>
+% \end{tcl}
+% 
+% 
+% 
+% 
 % 
 \endinput

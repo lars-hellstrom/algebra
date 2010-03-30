@@ -267,9 +267,63 @@ proc ::mtmtcl::support::sdAPI {interfaces prefix paramcount args} {
 % \end{APIspec}
 % 
 % \begin{tcl}
-namespace eval ::mtmtcl::sets {}
+namespace eval ::mtmtcl::sets {
+   namespace path [list [namespace parent]]
+}
 % \end{tcl}
 % \setnamespace{mtmtcl::set}
+% 
+% \begin{proc}{universe}
+%   The |universe| structure simply has as elements all \Tcl\ 
+%   strings, but no actual operations on them. It is meant as a dummy 
+%   structure to use in cases where a set of values need to be 
+%   presented as residing in a structure, but one doesn't want to 
+%   wrap the true thing up as a structure.
+%   \changes{0.1}{2010/01/28}{Structure added. (LH)}
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     ::mtmtcl::sets::universe \word{subcommand} \word{argument}\regstar
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc ::mtmtcl::sets::universe {subcmd args} {
+   switch -- $subcmd "API" {
+%   \end{tcl}
+%   The set of subcommands and supported interfaces are chosen so that 
+%   it at least becomes possible to form formal linear combinations 
+%   of |universe| elements.
+%   \begin{tcl}
+      ::APIutil::API {
+         equality 1.0
+         canonise 1.1
+         onlycanonical 1.0
+         export 2.0
+         import 1.0
+      } {*}$args
+   } "=" {
+      string equal [lindex $args 0] [lindex $args 1]
+   } "canonise" {
+      lindex $args 0
+   } "export" {
+      list OMFOREIGN [
+         dict replace [lindex $args 1] encoding\
+           application/x-mtmtcl-internal-representation
+      ] [list [list \#text [lindex $args 0]]]
+   } "import" {
+      if {[lindex $args 1 0] eq "OMFOREIGN"} then {
+         openmath::gettext [lindex $args 1] ""
+      } else {
+         return -code error\
+           -errorcode [concat [list API import EDOM] [lrange $args 0 1]]\
+           "Universe elements are expected to be OMFOREIGN"
+      }
+   } default {
+      return -code error "Unknown subcommand \"$subcmd\": must be\
+        API, =, canonise, export, or import"
+   }
+}
+%   \end{tcl}
+% \end{proc}
 % 
 % \begin{APIspec}{finite set}{1.0}
 %   The |finite set| interface v\,1 is for sets like 
@@ -624,8 +678,8 @@ proc ::mtmtcl::sets::variable_set {elements extra method args} {
             set res [list OMATTR $attr [list [
                list OMATP {} [list\
                  {OMS {cd altenc name LaTeX_encoding} {}}\
-                 [list OMSTR {} [dict get $extra LaTeX_encoding $var]]]
-            ] $res]
+                 [openmath::OM STR [dict get $extra LaTeX_encoding $var]]]
+            ] $res]]
          }
          return $res
       }

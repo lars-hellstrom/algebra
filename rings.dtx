@@ -24,7 +24,7 @@ namespace eval mtmtcl::rings {
 % \end{tcl}
 % \setnamespace{mtmtcl::rings}
 % 
-% \begin{APIspec}{ring}{1.0}
+% \begin{APIspec}{ring}{2.0}
 %   A |ring| is neither required to be unital nor associative, but it 
 %   is easy to impose such conditions by claiming support for |monoid| 
 %   and |semigroup| respectively.
@@ -40,11 +40,11 @@ namespace eval mtmtcl::rings {
 %     \end{APImethod}
 %     \begin{APImethod}{0}
 %     \end{APImethod}
-%     \begin{APImethod}{-}
+%     \begin{APImethod}{neg}
 %       \word{element}
 %     \end{APImethod}
-%       The |+|, |0|, and |-| methods are as required by the 
-%       \APIref{additive group}{1.0} interface version 1.0, and in 
+%       The |+|, |0|, and |neg| methods are as required by the 
+%       \APIref{additive group}{2.0} interface version 2.0, and in 
 %       addition the |+| method must be commutative, i.e., for any 
 %       two elements $a$ and $b$ of a \meta{ring} $R$, the two 
 %       expressions
@@ -74,6 +74,12 @@ namespace eval mtmtcl::rings {
 %   All methods are congruent.
 % \end{APIspec}
 % 
+% \begin{APIspec}{ring}{1.0}
+%   Version~1.0 of |ring| was the same as version~2.0, except that it 
+%   built upon \APIref{additive group}{1.0} verion~1.0 rather than 
+%   ditto version~2.0.
+% \end{APIspec}
+% 
 % \begin{tclcommand}{ensemble}{integer}
 %   A structure for integers can be implemented directly as an 
 %   ensemble.
@@ -82,7 +88,7 @@ namespace eval ::tcl::mathop {
    namespace ensemble create -subcommands {
       API 
       = 
-      + - 0 iszero integer.
+      + neg 0 - iszero integer.
       * 
       1 ^ 
       canonise
@@ -93,8 +99,8 @@ namespace eval ::tcl::mathop {
       API {
          ::APIutil::API {
             equality 1.1
-            "additive group" 1.2
-            ring 1.0
+            "additive group" {2.2 1.2}
+            ring {2.0 1.0}
             semigroup 1.2  monoid 1.2
             canonise 1.1
             division 1.0
@@ -103,6 +109,7 @@ namespace eval ::tcl::mathop {
          }
       }
       = ==
+      neg -
       0 {::return -level 0 0}
       iszero {== 0}
       integer. *
@@ -118,7 +125,7 @@ namespace eval ::tcl::mathop {
       div /
       mod %
       export ::mtmtcl::rings::integer_export
-      export ::mtmtcl::rings::integer_import
+      import ::mtmtcl::rings::integer_import
    } -command ::mtmtcl::rings::integer
 }
 %   \end{tcl}
@@ -236,23 +243,22 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
+%   \begin{procmethod}{neg}
+%     The |neg| method is also pretty easy.
+%     \begin{tcl}
+      neg {
+         expr {(-[lindex $args 0]) % $n}
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
 %   \begin{procmethod}{-}
-%     The |-| method has the two forms
-%     \begin{displaysyntax}
-%       ::mtmtcl::rings::integer - \word{term}\par
-%       ::mtmtcl::rings::integer - \word{term} \word{term}
-%     \end{displaysyntax}
-%     where the first is negation and the second is subtraction.
+%     As is the |-| method, since it only has one form.
+%     \changes{0.1}{2010/03/25}{Dropping unary form of \texttt{-}, 
+%        and thus \texttt{ring} 1.0 support. (LH)}
 %     \begin{tcl}
       - {
-         if {[llength $args] == 1} then {
-            expr {(-[lindex $args 0]) % $n}
-         } elseif {[llength $args] == 2} then {
-            expr {([lindex $args 0] - [lindex $args 1]) % $n}
-         } else {
-            return -code error "Wrong # of arguments for -,\
-              must have one or two"
-         }
+         expr {([lindex $args 0] - [lindex $args 1]) % $n}
       }
 %     \end{tcl}
 %   \end{procmethod}
@@ -400,6 +406,28 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
+%   \begin{procmethod}{export}
+%     This method implements the \APIref+{export}{2.0} interface, 
+%     so the call syntax is
+%     \begin{displaysyntax}
+%       \meta{ring} export \word{element} \word{attributes}
+%     \end{displaysyntax}
+%     The export format is as an integer $k$ with \(2\lvert k\rvert 
+%     \leqslant n\), since this is usually more appropriate for 
+%     presentations.
+%     
+%     \changes{0.1}{2009/11/30}{Added \texttt{export} method. (LH)}
+%     \begin{tcl}
+      export {
+        set elem [expr {[lindex $args 0] % $n}]
+        list integer [dict replace [lindex $args 1] value [
+           expr {2*$elem > $n ? $elem-$n : $elem}
+        ]] {}
+        
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
 %   \begin{procmethod}{API}
 %     Finally, there is the |API| method, whose implementation is 
 %     mostly an enumeration of all the supported interfaces.
@@ -411,11 +439,12 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
             autocanonical 1.0
             semigroup 1.1
             monoid 1.1
-            "additive group" 1.2
-            ring 1.0
+            "additive group" 2.2
+            ring 2.0
             division 1.0
-            "generated additive group" 1.0
+            "generated additive group" 2.0
             "named element" 1.0
+            export 2.0
          } {*}$args
       }
 %     \end{tcl}
@@ -424,7 +453,7 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %   \begin{tcl}
       default {
          return -code error "Unknown method \"$method\";\
-           must be =, +, -, *, /, 0, 1, API, integer.,\
+           must be =, +, neg, -, *, /, 0, 1, API, integer.,\
            + decomposition, or named"
       }
    }
@@ -443,7 +472,7 @@ namespace eval ::tcl::mathop {
    namespace ensemble create -subcommands {
       API 
       = 
-      + - 0 iszero integer.
+      + neg - 0 iszero integer.
       * 
       1 ^ 
       canonise
@@ -453,8 +482,8 @@ namespace eval ::tcl::mathop {
       API {
          ::APIutil::API {
             equality 1.1
-            "additive group" 1.2
-            ring 1.0
+            "additive group" {2.2 1.2}
+            ring {2.0 1.0}
             semigroup 1.2  monoid 1.2  group 1.2
 %   \end{tcl}
 %   Unlike the case with |integer|, it is reasonable for |float| to 
@@ -470,6 +499,7 @@ namespace eval ::tcl::mathop {
       }
       =   ==
       0   {::return -level 0 0.0}
+      neg -
       iszero {== 0}
       integer. *
       1   {::return -level 0 1.0}
@@ -582,16 +612,17 @@ proc ::mtmtcl::rings::float_import {path tree} {
 % \end{ensemble}
 % 
 % 
+% 
 % \section{Modules}
 % 
-% \begin{APIspec}{ring-module}{1.1}
+% \begin{APIspec}{ring-module}{2.1}
 %   The |ring-module| interface is for left modules over a ring 
 %   (modules over e.g.~groups are not unheard of).
 %   
 %   \begin{remark}
-%     The reason this interface has version number 1.1 (rather than 
-%     1.0) is that concepts obtained by dropping some of the 
-%     axioms might prove useful on their own.
+%     The reason this interface has version number 2.1 (rather than 
+%     2.0) is an expectation that concepts obtained by dropping some 
+%     of the axioms might prove useful on their own.
 %   \end{remark}
 %   
 %   \begin{APIdescription}{module}
@@ -605,11 +636,11 @@ proc ::mtmtcl::rings::float_import {path tree} {
 %     \end{APImethod}
 %     \begin{APImethod}{0}
 %     \end{APImethod}
-%     \begin{APImethod}{-}
+%     \begin{APImethod}{neg}
 %       \word{element}
 %     \end{APImethod}
-%       The |+|, |0|, and |-| methods are as required by the 
-%       \APIref{additive group}{1.0} interface version 1.0. In 
+%       The |+|, |0|, and |neg| methods are as required by the 
+%       \APIref{additive group}{2.0} interface version 2.0. In 
 %       addition the |+| method must be commutative, i.e., for any 
 %       two elements $a$ and $b$ of a \meta{ring} $R$, the two 
 %       expressions
@@ -623,7 +654,7 @@ proc ::mtmtcl::rings::float_import {path tree} {
 %       \word{submethod} \word{argument}\regstar
 %     \end{APImethod}
 %       The |scalar| method accesses a structure which is both a 
-%       |ring|~v\,1.0 and a |monoid|~v\,1.0.
+%       |ring|~v\,2.0 and a |monoid|~v\,1.0.
 %       
 %     \begin{APImethod}{.}
 %       \word{scalar} \word{element}
@@ -662,9 +693,9 @@ proc ::mtmtcl::rings::float_import {path tree} {
 % \end{APIspec}
 % 
 % 
-% \begin{APIspec}{free ring-module}{1.1}
+% \begin{APIspec}{free ring-module}{2.1}
 %   A free module over a ring is a module which has a basis. 
-%   Version~1.1 of this interface satisfies version~1.1 of the 
+%   Version~2.1 of this interface satisfies version~2.1 of the 
 %   |ring-module| interface.
 %   
 %   \begin{APIdescription}{module}
@@ -675,7 +706,8 @@ proc ::mtmtcl::rings::float_import {path tree} {
 %       constitutes the set of (indices of) basis elements. This 
 %       structure must satisfy v\,1.0 of the |equality| interface. 
 %       \word{index}es below are elements of this structure, and 
-%       need not be equal to their counterparts in the module.
+%       need not be equal to their counterparts in the module (nor 
+%       need they be integers).
 %       
 %     \begin{APImethod}{basiselement}
 %       \word{index}
@@ -824,25 +856,30 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{-}
-%     Subtraction is provided in both unary and binary forms.
+%     Subtraction is straightforward.
 %     \begin{tcl}
       - {
          set res [list]
-         if {[llength $args] == 1} then {
-            foreach t [lindex $args 0] {
-               lappend res [{*}$R - $t]
-            }
-         } elseif {[llength $args] == 2} then {
-            foreach t [lindex $args 0] u [lindex $args 1] {
-               lappend res [{*}$R + $t [{*}$R - $u]]
+         foreach t [lindex $args 0] u [lindex $args 1] {
+            lappend res [{*}$R + $t [{*}$R neg $u]]
+         }
 %     \end{tcl}
 %     It might be faster to use binary subtraction in the ring 
 %     instead, but checking whether that is available isn't free 
 %     either.
 %     \begin{tcl}
-            }
-         } else {
-            return -code error {Wrong # arguments for "-" method}
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{neg}
+%     Negation is even easier.
+%     \begin{tcl}
+      neg {
+         set res [list]
+         foreach t [lindex $args 0] {
+            lappend res [{*}$R neg $t]
          }
          return $res
       }
@@ -858,7 +895,7 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
-%   This completes the support for the |ring-module| v\,1.1 
+%   This completes the support for the |ring-module| v\,2.1 
 %   interface. The next part is to support \tclverb*|free ring-module|.
 %   
 %   \begin{procmethod}{basis}
@@ -917,7 +954,7 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %     \begin{tcl}
       tuple {
          if {[llength $args] != $n} then {
-            return -code error "Wrong \# arguments: must be $n$\
+            return -code error "Wrong \# arguments: must be $n\
               elements in tuple"
          } else {
             return $args
@@ -967,8 +1004,8 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
          if {[{*}$R API ring 1.0] && [{*}$R API monoid 1.0]} then {
             ::APIutil::API {
                equality 1.1
-               ring-module 1.1
-               "additive group" 1.1
+               ring-module 2.1
+               "additive group" 2.1
                "free ring-module" 1.1
                "direct product" 1.0
             } {*}$args
@@ -989,9 +1026,174 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 % \end{proc}
 % 
 % 
+% \begin{APIspec}{ring-module}{1.1}
+%   Version~1.1 of the \APIref{ring-module}{2.1} interface is the 
+%   same as version~2.1, except that it supports version~1.0 of 
+%   \APIref{additive group}{1.0} rather than version~2.0, and 
+%   similarly the |scalar|s support version~1.0 of \APIref{ring}{1.0} 
+%   rather than version~2.0, i.e., the various |neg| methods are 
+%   called |-| instead.
+% \end{APIspec}
+% 
+% \iffalse
+% \begin{APIspec}{ring-module}{1.1}
+%   The |ring-module| interface is for left modules over a ring 
+%   (modules over e.g.~groups are not unheard of).
+%   
+%   \begin{remark}
+%     The reason this interface has version number 1.1 (rather than 
+%     1.0) is that concepts obtained by dropping some of the 
+%     axioms might prove useful on their own.
+%   \end{remark}
+%   
+%   \begin{APIdescription}{module}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies the |equality|~v\,1.0 interface.
+%       
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%     \begin{APImethod}{-}
+%       \word{element}
+%     \end{APImethod}
+%       The |+|, |0|, and |-| methods are as required by the 
+%       \APIref{additive group}{1.0} interface version 1.0. In 
+%       addition the |+| method must be commutative, i.e., for any 
+%       two elements $a$ and $b$ of a \meta{ring} $R$, the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$R$ + $a$ $b$]\par
+%         [$R$ + $b$ $a$]
+%       \end{displaysyntax}
+%       are |=|-equal.
+%     
+%     \begin{APImethod}{scalar}
+%       \word{submethod} \word{argument}\regstar
+%     \end{APImethod}
+%       The |scalar| method accesses a structure which is both a 
+%       |ring|~v\,1.0 and a |monoid|~v\,1.0.
+%       
+%     \begin{APImethod}{.}
+%       \word{scalar} \word{element}
+%     \end{APImethod}
+%       The |.| method is multiplication (on the left) by a scalar, 
+%       i.e.,  the \word{scalar} is an element of the 
+%       \meta{module}| scalar| ring and the \word{element} is an 
+%       element of the \meta{module}, whereas the result is an 
+%       element of the \meta{module}.
+%       
+%       For every element $a$ of a \meta{module} $M$, the expression
+%       \begin{displaysyntax}
+%         [$M$ . [$M$ scalar 1] $a$]
+%       \end{displaysyntax}
+%       is |=|-equal to $a$. Furthermore for all elements $a$ 
+%       and $b$ of $M$ and element $r$ of $M$| scalar|, the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$M$ . $r$ [$M$ + $a$ $b$]]\par
+%         [$M$ + [$M$ . $r$ $a$] [$M$ . $r$ $b$]]
+%       \end{displaysyntax}
+%       are |=|-equal. Finally for every element $a$ of $M$ and 
+%       all elements $r$ and $s$ of $M$| scalar|, the two 
+%       expressions
+%       \begin{displaysyntax}
+%         [$M$ . [$M$ scalar + $r$ $s$] $a$]\par
+%         [$M$ + [$M$ . $r$ $a$] [$M$ . $s$ $a$]]
+%       \end{displaysyntax}
+%       are |=|-equal, as are the two expressions
+%       \begin{displaysyntax}
+%         [$M$ . [$M$ scalar * $r$ $s$] $a$]\par
+%         [$M$ . $r$ [$M$ . $s$ $a$]]
+%       \end{displaysyntax}
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% \fi
+% 
+% \begin{APIspec}{free ring-module}{1.1}
+%   Version~1.1 of \APIref{free ring-module}{2.1} is the same as 
+%   version~2.1 except that it implies version~1.1 of 
+%   \APIref{ring-module}{1.1} rather than version~2.1, i.e., the 
+%   |neg| method is called |-| instead.
+% \end{APIspec}
+% 
+% \iffalse
+% \begin{APIspec}{free ring-module}{1.1}
+%   A free module over a ring is a module which has a basis. 
+%   Version~1.1 of this interface satisfies version~1.1 of the 
+%   |ring-module| interface.
+%   
+%   \begin{APIdescription}{module}
+%     \begin{APImethod}{basis}
+%       \word{submethod} \word{argument}\regstar
+%     \end{APImethod}
+%       The |basis| method accesses a principal structure which 
+%       constitutes the set of (indices of) basis elements. This 
+%       structure must satisfy v\,1.0 of the |equality| interface. 
+%       \word{index}es below are elements of this structure, and 
+%       need not be equal to their counterparts in the module.
+%       
+%     \begin{APImethod}{basiselement}
+%       \word{index}
+%     \end{APImethod}
+%       Returns the \meta{module} basis element whose index is 
+%       \word{index}. Every element of the \meta{module} must be 
+%       possible to express in exactly one way as a linear 
+%       combination of values of this method.
+%       
+%     \begin{APImethod}{coeff}
+%       \word{index} \word{element}
+%     \end{APImethod}
+%       Returns the coefficient (an element of 
+%       \meta{module}| scalar|) of the \word{index}th basis element 
+%       for the \word{element}, i.e., if $M$ is the \meta{module}, then
+%       \begin{displaysyntax}
+%         $a \mapsto {}$[$M$ coeff $i$ $a$]
+%       \end{displaysyntax}
+%       is the $R$-module homomorphism for which
+%       \begin{displaysyntax}
+%         [$M$ coeff $i$ [$M$ basiselement $j$]]
+%       \end{displaysyntax}
+%       is |=|-equal to |[|$M$| scalar 1]| if $i$ is |basis =|-equal 
+%       to $j$, and |=|-equal to |[|$M$| scalar 0]| otherwise.
+%       
+%     \begin{APImethod}{support}
+%       \word{element}
+%     \end{APImethod}
+%       This method returns the \emph{support} of the \word{element}, 
+%       i.e., a list of those basis indices $i$ such that
+%       \begin{displaysyntax}
+%         [$M$ coeff $i$ \word{element}]
+%       \end{displaysyntax}
+%       is nonzero.
+%   \end{APIdescription}
+%   The |basiselement| and |coeff| methods above are congruent.
+%   
+%   An identity linking the methods defined above is that $a$ is 
+%   |=|-equal to 
+%   \begin{displaysyntax}
+%     $\displaystyle\sum_{i \in \text{[$M$ support $a$]}}$
+%     [$M$ . [$M$ coeff $i$ $a$] [$M$ basiselement $i$]]
+%   \end{displaysyntax}
+%   for every element $a$ of the \meta{module}~$M$. 
+%   That there exist methods satisfying this 
+%   identity is not itself a sufficient condition for the 
+%   \meta{module} to be free (it is in fact a necessary and 
+%   sufficient condition for the \meta{module} to be 
+%   \emph{projective}, which is slightly weaker), but combining it  
+%   with the conditions on |coeff| above produces a sufficient 
+%   condition for freeness.
+% \end{APIspec}
+% \fi
+% 
+% 
 % \section{Algebras}
 % 
-% \begin{APIspec}{ring-algebra}{1.0}
+% \begin{APIspec}{ring-algebra}{2.0}
 %   An algebra over a ring is a module with a bilinear multiplication 
 %   operation.
 %   
@@ -1006,7 +1208,7 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %     \end{APImethod}
 %     \begin{APImethod}{0}
 %     \end{APImethod}
-%     \begin{APImethod}{-}
+%     \begin{APImethod}{neg}
 %       \word{element}
 %     \end{APImethod}
 %     \begin{APImethod}{scalar}
@@ -1015,12 +1217,12 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %     \begin{APImethod}{.}
 %       \word{scalar} \word{element}
 %     \end{APImethod}
-%       These methods satisfy the |ring-module| (v\,1.1) interface.
+%       These methods satisfy the \APIref+{ring-module}{2.1} interface.
 %       
 %     \begin{APImethod}{*}
 %       \word{element} \word{element}
 %     \end{APImethod}
-%       The |*| method satisfies the |ring| (v\,1.0) interface. In 
+%       The |*| method satisfies the \APIref+{ring}{2.0} interface. In 
 %       addition, the three expressions
 %       \begin{displaysyntax}
 %         [$R$ * [$R$ scalar . $r$ $a$] $b$]\par
@@ -1042,7 +1244,7 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %   \end{displaysyntax}
 %   whereas the return value depends on the \word{method}. The 
 %   \meta{coefficient ring} must support \APIref+{additive 
-%   group}{1.1}, since distinguishing zero coefficients is a very 
+%   group}{2.1}, since distinguishing zero coefficients is a very 
 %   common operation.
 %   
 %   The representation format is a dictionary where the keys are 
@@ -1080,19 +1282,23 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %   
 %   \begin{procmethod}{+}
 %     Addition is variadic.
+%     \changes{0.1}{2010/03/30}{Remove zero elements at the end, 
+%       rather than checking after each coefficient addition. (LH)}
 %     \begin{tcl}
       + {
          if {![llength $args]} then {return {}}
          foreach term [lassign $args sum] {
             dict for {k v} $term {
                if {[dict exists $sum $k]} then {
-                  dict update sum $k s {
-                     set s [{*}$R + $s $v]
-                     if {[{*}$R iszero $s]} then {unset s}
-                  }
+                  dict set sum $k [{*}$R + [dict get $sum $k] $v]
                } else {
                   dict set sum $k $v
                }
+            }
+         }
+         foreach k [dict keys $sum] {
+            if {[{*}$R iszero [dict get $sum $k]]} then {
+               dict unset sum $k
             }
          }
          return $sum
@@ -1100,26 +1306,35 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
+%   \begin{procmethod}{neg}
+%     Negation is easy, since one only has to switch the sign of 
+%     every coefficient.
+%     \begin{tcl}
+      neg {
+         set res [dict create]
+         dict for {k v} [lindex $args 0] {
+            dict set res $k [{*}$R neg $v]
+         }
+         return $res
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
 %   \begin{procmethod}{-}
-%     Subtraction is available as unary and binary operations.
+%     Subtraction is more like addition, but here it makes sense to 
+%     immediately check coefficients for being zero, since the 
+%     operation is strictly binary.
 %     \begin{tcl}
       - {
-         if {[llength $args] == 1} then {
-            set res [dict create]
-            dict for {k v} [lindex $args 0] {
-               dict set res $k [{*}$R - $v]
-            }
-         } else {
-            lassign $args res term
-            dict for {k v} $term {
-               if {[dict exists $res $k]} then {
-                  dict update res $k s {
-                     set s [{*}$R - $s $v]
-                     if {[{*}$R iszero $s]} then {unset s}
-                  }
-               } else {
-                  dict set res $k [{*}$R - $v]
+         lassign $args res term
+         dict for {k v} $term {
+            if {[dict exists $res $k]} then {
+               dict update res $k s {
+                  set s [{*}$R - $s $v]
+                  if {[{*}$R iszero $s]} then {unset s}
                }
+            } else {
+               dict set res $k [{*}$R neg $v]
             }
          }
          return $res
@@ -1168,14 +1383,16 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
                set lrv [{*}$R * $lv $rv]
                set lrk [{*}$S canonise [{*}$S * $lk $rk]]
                if {[dict exists $res $lrk]} then {
-                  dict update res $lrk s {
-                     set s [{*}$R + $s $lrv]
-                     if {[{*}$R iszero $s]} then {unset s}
-                  }
+                  dict set res $lrk [{*}$R + [dict get $res $lrk] $lrv]
                } elseif {![{*}$R iszero $lrv]} then {
                   dict set res $lrk $lrv
                }
                
+            }
+         }
+         foreach k [dict keys $res] {
+            if {[{*}$R iszero [dict get $res $k]]} then {
+               dict unset res $k
             }
          }
          return $res
@@ -1209,7 +1426,7 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{basis}
-%     On to \APIref{free ring-module}{1.1}, where the |basis| method 
+%     On to \APIref{free ring-module}{2.1}, where the |basis| method 
 %     naturally provides access to the underlying semigroup.
 %     \begin{tcl}
       basis {uplevel 1 $S $args}
@@ -1249,7 +1466,7 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{iszero}
-%     The thing missing to satisfy \APIref+{additive group}{1.1} is 
+%     The thing missing to satisfy \APIref+{additive group}{2.1} is 
 %     the |iszero| method. This is made tolerant for zero 
 %     coefficients.
 %     \begin{tcl}
@@ -1345,23 +1562,28 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{API}
+%     \changes{0.1}{2010/01/28}{Formalised usability as a free 
+%        module even when not over a semigroup. (LH)}
 %     \begin{tcl}
       API {
-         if {![{*}$R API ring 1.0] || ![{*}$R API monoid 1.0] ||\
-           ![{*}$R API "additive group" 1.1] ||\
-           ![{*}$S API semigroup 1.0]} then {
+         if {![{*}$R API ring 2.0] || ![{*}$R API monoid 1.0] ||\
+           ![{*}$R API "additive group" 2.1]} then {
             return [::APIutil::API {} {*}$args]
          }
          set D {
-            ring-algebra 1.0
-            ring 1.0
-            "additive group" 1.1
-            ring-module 1.1
-            semigroup 1.0
-            "free ring-module" 1.1
+            "additive group" 2.1
+            ring-module 2.1
+            "free ring-module" 2.1
             equality 1.0
          }
-         if {[{*}$S API monoid 1.0]} then {dict lappend D monoid 1.0}
+         if {[{*}$S API semigroup 1.0]} then {
+            set D [dict merge $D {
+               ring-algebra 2.0
+               ring 2.0
+               semigroup 1.0
+            }]
+            if {[{*}$S API monoid 1.0]} then {dict lappend D monoid 1.0}
+         }
          if {[{*}$R API export 2.0] && [{*}$S API export 2.0]} then {
             dict lappend D export 2.0
          }
@@ -1384,8 +1606,55 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %   \end{tcl}
 % \end{proc}
 % 
-
-
-
+% \begin{APIspec}{ring-algebra}{1.0}
+%   Version~1.0 of \APIref{ring-algebra}{2.0} is the same as 
+%   version~2.0, except that it supports version~1.1 of 
+%   \APIref{ring-module}{1.1} rather than version~2.1 and version~1.0 
+%   of \APIref{ring}{1.0} rather than version~2.0, i.e., the |neg| 
+%   method is called |-| instead.
+% \end{APIspec}
+% 
+% \iffalse
+% \begin{APIspec}{ring-algebra}{1.0}
+%   An algebra over a ring is a module with a bilinear multiplication 
+%   operation.
+%   
+%   \begin{APIdescription}{algebra}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies the |equality|~v\,1.0 interface.
+%       
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%     \begin{APImethod}{-}
+%       \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{scalar}
+%       \word{submethod} \word{argument}\regstar
+%     \end{APImethod}
+%     \begin{APImethod}{.}
+%       \word{scalar} \word{element}
+%     \end{APImethod}
+%       These methods satisfy the |ring-module| (v\,1.1) interface.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method satisfies the |ring| (v\,1.0) interface. In 
+%       addition, the three expressions
+%       \begin{displaysyntax}
+%         [$R$ * [$R$ scalar . $r$ $a$] $b$]\par
+%         [$R$ * $a$ [$R$ scalar . $r$ $b$]]\par
+%         [$R$ scalar . $r$ [$R$ * $a$ $b$]]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$ and $b$ of the 
+%       \meta{algebra} $R$ and every element $r$ of $R$| scalar|.
+%   \end{APIdescription}
+% \end{APIspec}
+% \fi
 %
 \endinput
