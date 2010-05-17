@@ -196,7 +196,7 @@ relates more to the goal of managing many levels of abstraction,
 since 
 
 
-\begin{policy}
+\begin{policy} \label{Policy:Tcl}
   The main computing environment shall be a \Tcl~(Tool Command 
   Language) interpreter.
 \end{policy}
@@ -206,56 +206,6 @@ independent pieces of code is combined. While this environment has
 many advantages (as described below), it is also perfectly possible 
 to do the bulk of one's work within some other computing 
 environment(s).
-
-
-    
-\begin{itemize}
-    
-  \item
-    
-    
-    
-    
-    ---
-    
-    
-    
-  \item
-    The system should \emph{not} employ a type system to interpret 
-    operations. Instead, it is required that every operation is fully 
-    identified independently of the data it is to operate on.
-    
-    The main use for type systems in computer languages has been to 
-    reserve memory for data storage, but modern high level languages 
-    generally allocate memory dynamically when needed, freeing the 
-    programmer from having to manage allocation explicitly. 
-    A secondary use for a type system that has grown more common in 
-    the last decades is to resolve overloaded (polymorphic) 
-    operations, where the same symbol is used for several operations 
-    and the language environment picks one whose type-labelling 
-    matches that of the operands. It is primarily the latter practice 
-    that this decision rejects.
-    
-    The runtime rationale for this decision is that type-controlled 
-    polymorphism inserts an impractical detour into the very heart of 
-    the computing environment. The programmer implementing an 
-    algorithm always knows \emph{exactly} (up to parameters defining 
-    the context for the computation) which operation is intended at 
-    every point in the program, and this is also what the computer 
-    needs to know to execute the program. 
-    Relying upon type-controlled polymorphism when instructing the 
-    computer will however mean that a lot of this information is 
-    omitted or provided only indirectly, which requires constant 
-    detours into type-matching to resolve the ambiguity created by 
-    the overloading.
-    
-    The coding time rationale is that the system becomes much simpler 
-    if the administrative overhead of assigning formalised types to 
-    everything can be dropped. There is however also a coding time 
-    cost in that polymorphism is often exploited to produce more 
-    compact source code; the explicit identification of operations 
-    must not become tedious.
-\end{itemize}
 
 \Tcl\ is both syntactically and semantically an extremely simple 
 language\Ldash yet expressive and highly flexible\Rdash which makes 
@@ -271,6 +221,97 @@ simplicity, the \Tcl\ syntax also provides an elegant solution to
 the problem of distinguishing between several similarly-named 
 operations that can be a major headache when describing complex 
 algebraic constructions.
+
+
+%     
+% \begin{itemize}
+%     
+%   \item
+%     
+%     
+%     
+%     
+%     ---
+%     
+%     
+%     
+%   \item
+%     The system should \emph{not} employ a type system to interpret 
+%     operations. Instead, it is required that every operation is fully 
+%     identified independently of the data it is to operate on.
+%     
+%     The main use for type systems in computer languages has been to 
+%     reserve memory for data storage, but modern high level languages 
+%     generally allocate memory dynamically when needed, freeing the 
+%     programmer from having to manage allocation explicitly. 
+%     A secondary use for a type system that has grown more common in 
+%     the last decades is to resolve overloaded (polymorphic) 
+%     operations, where the same symbol is used for several operations 
+%     and the language environment picks one whose type-labelling 
+%     matches that of the operands. It is primarily the latter practice 
+%     that this decision rejects.
+%     
+%     The runtime rationale for this decision is that type-controlled 
+%     polymorphism inserts an impractical detour into the very heart of 
+%     the computing environment. The programmer implementing an 
+%     algorithm always knows \emph{exactly} (up to parameters defining 
+%     the context for the computation) which operation is intended at 
+%     every point in the program, and this is also what the computer 
+%     needs to know to execute the program. 
+%     Relying upon type-controlled polymorphism when instructing the 
+%     computer will however mean that a lot of this information is 
+%     omitted or provided only indirectly, which requires constant 
+%     detours into type-matching to resolve the ambiguity created by 
+%     the overloading.
+%     
+%     The coding time rationale is that the system becomes much simpler 
+%     if the administrative overhead of assigning formalised types to 
+%     everything can be dropped. There is however also a coding time 
+%     cost in that polymorphism is often exploited to produce more 
+%     compact source code; the explicit identification of operations 
+%     must not become tedious.
+% \end{itemize}
+
+
+\section{Interpreting interface specifications}
+
+This section explains how to interpret the various specifications of 
+interfaces that make up a significant part of the \mtl\ 
+infrastructure.
+
+
+\subsection{Pseudocode formulae}
+
+For many mathematical structures, it is appropriate for 
+specifications to spell out the axioms that the primitive concepts of 
+such structures must obey. However, since the main computing environment 
+by Policy~\ref{Policy:Tcl} is a \Tcl\ interpreter, it follows that the 
+only syntax for these concepts that is guaranteed to be formally defined 
+is that which is exposed in this environment; more traditional 
+mathematical syntaxes usually exist, but it is hard for a 
+specification to rely on them. 
+Therefore the axioms will generally have to be expressed using 
+\emph{pseudocode formulae}, which mix traditional mathematical 
+notation with some basics of \Tcl\ syntax.
+
+The pseudocode formula syntax is basically given by the following 
+rules:
+\begin{displaysyntax}
+  \(\meta{value} \longrightarrow \meta{mathematical formula} \mid 
+  {}\)[\meta{sentence}]\par
+  \(\meta{sentence} \longrightarrow \meta{word} \mid
+  \meta{sentence}\meta{whitespace}\meta{word}\)\par
+  \(\meta{word} \longrightarrow \meta{literal} \mid \meta{value}\)
+\end{displaysyntax}
+Here, a \meta{sentence} is the syntactical unit corresponding to a 
+\Tcl\ command call, and the brackets signal that we want to make use 
+of the value returned by that call. 
+
+---
+
+Since the main computational environment is a \Tcl\ interpreter, the 
+various interfaces of structures will have to be described in terms 
+of \Tcl\ code---or rather pseudocode 
 
 
 \subsection{A \Tcl\ primer}
