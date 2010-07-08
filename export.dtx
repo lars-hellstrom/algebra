@@ -9,8 +9,7 @@
 % \fi
 % 
 % 
-% 
-% \section{Data export}
+% \part{Conversion of exported data}
 % 
 % 
 % The basic format for exporting structure elements is as a 
@@ -61,116 +60,7 @@
 % \stringtypeheading{attribute}{Data-tree attributes:}
 % 
 % 
-% \subsection{XML generation}
-% 
-% Since the data-tree format was taken over from \textsf{tdom}, the 
-% basic approach would be to use that for generating XML, but there 
-% is also a need for more lightweight generators in cases where 
-% readability is not an issue but employing extensions is.
-% 
-% \begin{tcl}
-%<*xmlgen>
-namespace eval mtmtcl::support {}
-% \end{tcl}
-% \setnamespace{mtmtcl::support}
-% 
-% \begin{proc}{xml_from_tree}
-%   This procedure is the toplevel generator of XML code from a 
-%   data-tree. The call syntax is
-%   \begin{displaysyntax}
-%     |mtmtcl::support::xml_from_tree| \word{tree} 
-%     \begin{regblock}[\regstar] \word{option} \word{value} 
-%     \end{regblock}
-%   \end{displaysyntax}
-%   where \word{tree} of course is the tree to convert and the return 
-%   value is the converted tree as XML code. The supported options 
-%   are:
-%   \begin{ttdescription}
-%     \item[-nodesep]
-%       Basic separator inserted between nodes of the tree; defaults 
-%       to a newline. Setting it to empty reduces the output size, 
-%       but may well have the effect of making the entire result a 
-%       single very long line.
-%     \item[-indentstep]
-%       An indentation step, defaults to being empty. Some repetition 
-%       (corresponding to nesting depth) of this string follows the 
-%       |-nodesep|.
-%     \item[-charmap]
-%       A dictionary of character to entity mappings used with 
-%       |string map| to quote problematic characters in XML character 
-%       data. Defaults to being empty. The five syntax characters 
-%       `|<|', `|>|', `|&|', `|'|', and `|"|' are automatically 
-%       inserted into this dictionary if they are not already there.
-%   \end{ttdescription}
-%   \begin{tcl}
-proc mtmtcl::support::xml_from_tree {tree args} {
-   array set Opt {
-      -nodesep    \n
-      -indentstep ""
-      -charmap    {}
-   }
-   array set Opt $args
-   if {![dict size $Opt(-charmap)]} then {
-      set Opt(-charmap) {< &lt; > &gt; & &amp; ' &apos; \" &quot;}
-   } else {
-      foreach char {< > & ' \"} entity {&lt; &gt; &amp; &apos; &quot;} {
-         if {![dict exists $O(-charmap) $char]} then {
-            dict set $O(-charmap) $char $entity
-         }
-      }
-   }
-   xml_from_treenode $tree $Opt(-nodesep) $Opt(-indentstep)\
-     $Opt(-charmap)
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% \begin{proc}{xml_from_treenode}
-%   This is a more internal procedure that generates the XML fragment 
-%   for a particular branch of the tree. The call syntax is
-%   \begin{displaysyntax}
-%     |xml_from_treenode| \word{branch} \word{node-sep} 
-%     \word{indent-step} \word{char-map}
-%   \end{displaysyntax}
-%   
-%   Not surprisingly, it relies on recursion to convert the tree as a 
-%   whole.
-%   \begin{tcl}
-proc mtmtcl::support::xml_from_treenode {tree sep indent map} {
-   switch -- [lindex $tree 0] "#text" - "#cdata" {
-      return [string map $map [lindex $tree 1]]
-   } "#comment" {
-      return "<!--[lindex $tree 1]-->"
-   } "#pi" {
-      return "<?[lindex $tree 1] [lindex $tree 2]?>"
-   }
-   set res "<[lindex $tree 0]"
-   dict for {key val} [lindex $tree 1] {
-      append res { } $key =\" [string map $map $val] \"
-   }
-   if {[llength [lindex $tree 2]]} then {
-      set subsep $sep$indent
-      append res ">"
-      foreach child [lindex $tree 2] {
-         append res $subsep\
-           [xml_from_treenode $child $subsep $indent $map]
-      }
-      append res $sep "</[lindex $tree 0]>"
-   } else {
-      append res "/>"
-   }
-   return $res
-}
-%   \end{tcl}
-% \end{proc}
-% 
-% 
-% \begin{tcl}
-%</xmlgen>
-% \end{tcl}
-% 
-% 
-% \subsection{Near-OpenMath}
+% \section{Export data details}
 % 
 % The basic format of data-trees encoding \mtl\ structure elements 
 % is mostly OpenMath, i.e., there are node types:
@@ -214,6 +104,214 @@ proc mtmtcl::support::xml_from_treenode {tree sep indent map} {
 % during rendering\Dash use the first child of these nodes as 
 % ``contents'' of the node even though they are conceptually atomic.
 % 
+% What the above describes is thus a sort of ``near-OpenMath''. 
+% Basic operations related to it can be found in the 
+% |mtmtcl::openmath| package and namespace.
+% \begin{tcl}
+%<docstrip.tcl::catalogue>pkgIndex openmath
+%<*openmath>
+package provide mtmtcl::openmath 1.0
+% \end{tcl}
+% 
+% \subsection{Generating (near-)OpenMath}
+% 
+% \setnamespace{mtmtcl::openmath}
+% 
+% \begin{ensemble}{OM}
+%   While it is possible to construct (near-)OpenMath objects using 
+%   nothing but |list|, it is more convenient to have a specialised 
+%   constructor that takes care of the double nesting arising from 
+%   having both the data-is-code list and the list-of-children list; 
+%   forgetting one is a common typo, especially when there is exactly 
+%   one child. The |OM| ensemble has subcommands for constructing the 
+%   basic types of node, with names generally formed by dropping the 
+%   |OM| prefix from the corresponding OpenMath tag. This ensemble is 
+%   exported by the |mtmtcl::openmath| namespace.
+%   \begin{tcl}
+namespace eval mtmtcl::openmath {
+   namespace eval OM {
+      namespace export *
+      namespace ensemble create
+   }
+   namespace export OM
+}
+%   \end{tcl}
+%   
+%   \begin{ensproc}{S}
+%     The |OM S| command is thus for constructing |OMS| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM S \word{cd} \word{name} \begin{regblock}[\regstar] 
+%       \word{attribute} \word{value} \end{regblock}
+%     \end{displaysyntax}
+%     where the content dictionary \word{cd} and symbol name 
+%     \word{name} are mandatory arguments. Additional attributes 
+%     (e.g. |cdbase|) can be specified in additional key--value pairs 
+%     of arguments.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::S {cd name args} {
+   list OMS [dict create cd $cd name $name {*}$args] {}
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{mS}
+%     The |OM mS| command is again for constructing |OMS| nodes, but 
+%     this time to conform to the \APIref+{export}{2.0} interface 
+%     handling of the |mtmtcl:path| attribute. It has the syntax
+%     \begin{displaysyntax}
+%       OM mS \word{cd} \word{name} \word{common attributes} 
+%       \word{suffix} \begin{regblock}[\regstar] 
+%       \word{attribute} \word{value} \end{regblock}
+%     \end{displaysyntax}
+%     where the content dictionary \word{cd} and symbol name 
+%     \word{name} are as for |OM S|. The \word{common attributes} is 
+%     an inherited dictionary of attributes which is getting 
+%     overridden, and the \word{suffix} is a list of elements to 
+%     append to the |mtmtcl:path|. Further attributes (e.g. |cdbase|) 
+%     can be specified in additional key--value pairs of arguments, 
+%     and will override those in the \word{common attributes}.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::mS {cd name attr suffix args} {
+   dict lappend attr mtmtcl:path {*}$suffix
+   list OMS [dict replace $attr cd $cd name $name {*}$args] {}
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{A}
+%     The |OM A| command is for constructing |OMA| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM A \word{child}\regplus
+%     \end{displaysyntax}
+%     where each \word{child} should be a near-OpenMath data-tree, 
+%     the first of which will be the head (``function'') of the 
+%     application.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::A {args} {
+   list OMA {} $args
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{AS}
+%     The |OM AS| command is for constructing |OMA| nodes whose first 
+%     childs are |OMS| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM AS \word{cd} \word{name} \word{child}\regstar
+%     \end{displaysyntax}
+%     where each \word{child} should be a near-OpenMath data-tree to 
+%     be made an argument of the |OMS| node with the specified 
+%     \word{cd} and \word{name}.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::AS {cd name args} {
+   list OMA {} [linsert $args 0 [S $cd $name]]
+}
+%     \end{tcl}
+%     This command does not cover the case where the |OMS| child has 
+%     a |cdbase| attribute, but that could be covered with a separate 
+%     |OM| subcommand.
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{I}
+%     The |OM I| command is for constructing |integer| nodes (rather 
+%     than |OMI| nodes). It has the syntax
+%     \begin{displaysyntax}
+%       OM I \word{value}
+%     \end{displaysyntax}
+%     where the \word{value} is the integer value to encode.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::I {value} {
+   list integer [dict create value $value] {}
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{STR}
+%     The |OM STR| command is for constructing |OMSTR| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM STR \word{value}
+%     \end{displaysyntax}
+%     where the \word{value} is the string to encode.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::STR {value} {
+   list OMSTR {} [list [list \#text $value]]
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{V}
+%     The |OM V| command is for constructing |OMV| nodes. It has 
+%     the syntax
+%     \begin{displaysyntax}
+%       OM V \word{name}
+%     \end{displaysyntax}
+%     where the \word{name} is the name of the OM variable.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::V {name} {
+   list OMV [dict create name $name] {}
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{US}
+%     The |OM US| command constructs an |OMS| element from the 
+%     URI for the symbol. The call syntax is
+%     \begin{displaysyntax}
+%       OM US \word{uri}
+%     \end{displaysyntax}
+%     where the \word{uri} is one of
+%     \begin{displaysyntax}
+%       \meta{cd}\#\meta{name}\par
+%       \meta{cdbase}/\meta{cd}\#\meta{name}
+%     \end{displaysyntax}
+%     depending on whether the |OMS| element should include a 
+%     |cdbase| attribute.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::US {uri} {
+   if {[
+      regexp -- {^(.*)/([^/#]*)#([^/#]*)$} $uri "" base cd name
+   ]} then {
+      list OMS [dict create cdbase $base cd $cd name $name] {}
+   } elseif {[
+      regexp -- {^([^/#]*)#([^/#]*)$} $uri "" cd name
+   ]} then {
+      list OMS [dict create cd $cd name $name] {}
+   } else {
+      error "Bad symbol URI: $uri"
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{UATTR}
+%     The |OM UATTR| command is for attaching attributions to a given 
+%     object, while specifying the attribution symbols through URIs. 
+%     The syntax is
+%     \begin{displaysyntax}
+%       OM UATTR \word{core} \begin{regblock}[\regstar] \word{URI} 
+%       \word{object} \end{regblock}
+%     \end{displaysyntax}
+%     where the \word{core} is the object that will be put in an 
+%     |OMATTR| node. Each \word{object} is the value of an OM 
+%     attribution, and the corresponding \word{URI} is the URI of the 
+%     annotation symbol.
+%     \begin{tcl}
+proc mtmtcl::openmath::OM::UATTR {core args} {
+   set L {}
+   foreach {uri obj} $args {lappend L [US $uri] $obj}
+   list OMATTR {} [list [list OMATP {} $L] $core]
+}
+%     \end{tcl}
+%   \end{ensproc}
+% \end{ensemble}
+% 
+% 
+% \subsection{Cleaning OpenMath}
+% 
 % \setnamespace{mtmtcl::openmath::stricten::helper}
 % \begin{ensemble}{stricten}
 %   \setnamespace{mtmtcl::openmath::stricten}
@@ -247,7 +345,6 @@ proc mtmtcl::support::xml_from_treenode {tree sep indent map} {
 %   \end{itemize}
 %   
 %   \begin{tcl}
-%<*pkg>
 namespace eval mtmtcl::openmath::stricten {
     namespace export *
     namespace eval helper {
@@ -479,393 +576,6 @@ proc mtmtcl::openmath::stricten::OMFOREIGN {attr children clean} {
 %   \end{ensproc}
 % \end{ensemble}
 % 
-% \begin{ensemble}{OM}
-%   While it is possible to construct (near-)OpenMath objects using 
-%   nothing but |list|, it is more convenient to have a specialised 
-%   constructor that takes care of the double nesting arising from 
-%   having both the data-is-code list and the list-of-children list; 
-%   forgetting one is a common typo, especially when there is exactly 
-%   one child. The |OM| ensemble has subcommands for constructing the 
-%   basic types of node, with names generally formed by dropping the 
-%   |OM| prefix from the corresponding OpenMath tag. This ensemble is 
-%   exported by the |mtmtcl::openmath| namespace.
-%   \begin{tcl}
-namespace eval mtmtcl::openmath {
-   namespace eval OM {
-      namespace export *
-      namespace ensemble create
-   }
-   namespace export OM
-}
-%   \end{tcl}
-%   
-%   \begin{ensproc}{S}
-%     The |OM S| command is thus for constructing |OMS| nodes. It has 
-%     the syntax
-%     \begin{displaysyntax}
-%       OM S \word{cd} \word{name} \begin{regblock}[\regstar] 
-%       \word{attribute} \word{value} \end{regblock}
-%     \end{displaysyntax}
-%     where the content dictionary \word{cd} and symbol name 
-%     \word{name} are mandatory arguments. Additional attributes 
-%     (e.g. |cdbase|) can be specified in additional key--value pairs 
-%     of arguments.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::S {cd name args} {
-   list OMS [dict create cd $cd name $name {*}$args] {}
-}
-%     \end{tcl}
-%   \end{ensproc}
-%   
-%   \begin{ensproc}{mS}
-%     The |OM mS| command is again for constructing |OMS| nodes, but 
-%     this time to conform to the \APIref*{export}{2.0} interface 
-%     handling of the |mtmtcl:path| attribute. It has the syntax
-%     \begin{displaysyntax}
-%       OM mS \word{cd} \word{name} \word{common attributes} 
-%       \word{suffix} \begin{regblock}[\regstar] 
-%       \word{attribute} \word{value} \end{regblock}
-%     \end{displaysyntax}
-%     where the content dictionary \word{cd} and symbol name 
-%     \word{name} are as for |OM S|. The \word{common attributes} is 
-%     an inherited dictionary of attributes which is getting 
-%     overridden, and the \word{suffix} is a list of elements to 
-%     append to the |mtmtcl:path|. Further attributes (e.g. |cdbase|) 
-%     can be specified in additional key--value pairs of arguments, 
-%     and will override those in the \word{common attributes}.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::mS {cd name attr suffix args} {
-   dict lappend attr mtmtcl:path {*}$suffix
-   list OMS [dict replace $attr cd $cd name $name {*}$args] {}
-}
-%     \end{tcl}
-%   \end{ensproc}
-%   
-%   \begin{ensproc}{A}
-%     The |OM A| command is for constructing |OMA| nodes. It has 
-%     the syntax
-%     \begin{displaysyntax}
-%       OM A \word{child}\regplus
-%     \end{displaysyntax}
-%     where each \word{child} should be a near-OpenMath data-tree, 
-%     the first of which will be the head (``function'') of the 
-%     application.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::A {args} {
-   list OMA {} $args
-}
-%     \end{tcl}
-%   \end{ensproc}
-%   
-%   \begin{ensproc}{AS}
-%     The |OM AS| command is for constructing |OMA| nodes whose first 
-%     childs are |OMS| nodes. It has 
-%     the syntax
-%     \begin{displaysyntax}
-%       OM AS \word{cd} \word{name} \word{child}\regstar
-%     \end{displaysyntax}
-%     where each \word{child} should be a near-OpenMath data-tree to 
-%     be made an argument of the |OMS| node with the specified 
-%     \word{cd} and \word{name}.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::AS {cd name args} {
-   list OMA {} [linsert $args 0 [S $cd $name]]
-}
-%     \end{tcl}
-%     This command does not cover the case where the |OMS| child has 
-%     a |cdbase| attribute, but that could be covered with a separate 
-%     |OM| subcommand.
-%   \end{ensproc}
-%   
-%   \begin{ensproc}{I}
-%     The |OM I| command is for constructing |integer| nodes (rather 
-%     than |OMI| nodes). It has the syntax
-%     \begin{displaysyntax}
-%       OM I \word{value}
-%     \end{displaysyntax}
-%     where the \word{value} is the integer value to encode.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::I {value} {
-   list integer [dict create value $value] {}
-}
-%     \end{tcl}
-%   \end{ensproc}
-%   
-%   \begin{ensproc}{STR}
-%     The |OM STR| command is for constructing |OMSTR| nodes. It has 
-%     the syntax
-%     \begin{displaysyntax}
-%       OM STR \word{value}
-%     \end{displaysyntax}
-%     where the \word{value} is the string to encode.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::STR {value} {
-   list OMSTR {} [list [list \#text $value]]
-}
-%     \end{tcl}
-%   \end{ensproc}
-%   
-%   \begin{ensproc}{V}
-%     The |OM V| command is for constructing |OMV| nodes. It has 
-%     the syntax
-%     \begin{displaysyntax}
-%       OM STR \word{name}
-%     \end{displaysyntax}
-%     where the \word{name} is the name of the OM variable.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::V {name} {
-   list OMV [dict create name $name] {}
-}
-%     \end{tcl}
-%   \end{ensproc}
-%   
-%   \begin{ensproc}{US}
-%     The |OM US| command constructs an |OMS| element from the 
-%     URI for the symbol. The call syntax is
-%     \begin{displaysyntax}
-%       OM US \word{uri}
-%     \end{displaysyntax}
-%     where the \word{uri} is one of
-%     \begin{displaysyntax}
-%       \meta{cd}\#\meta{name}\par
-%       \meta{cdbase}/\meta{cd}\#\meta{name}
-%     \end{displaysyntax}
-%     depending on whether the |OMS| element should include a 
-%     |cdbase| attribute.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::US {uri} {
-   if {[
-      regexp -- {^(.*)/([^/#]*)#([^/#]*)$} $uri "" base cd name
-   ]} then {
-      list OMS [dict create cdbase $base cd $cd name $name] {}
-   } elseif {[
-      regexp -- {^([^/#]*)#([^/#]*)$} $uri "" cd name
-   ]} then {
-      list OMS [dict create cd $cd name $name] {}
-   } else {
-      error "Bad symbol URI: $uri"
-   }
-}
-%     \end{tcl}
-%   \end{ensproc}
-%   
-%   \begin{ensproc}{UATTR}
-%     The |OM UATTR| command is for attaching attributions to a given 
-%     object, while specifying the attribution symbols through URIs. 
-%     The syntax is
-%     \begin{displaysyntax}
-%       OM UATTR \word{core} \begin{regblock}[\regstar] \word{URI} 
-%       \word{object} \end{regblock}
-%     \end{displaysyntax}
-%     where the \word{core} is the object that will be put in an 
-%     |OMATTR| node. Each \word{object} is the value of an OM 
-%     attribution, and the corresponding \word{URI} is the URI of the 
-%     annotation symbol.
-%     \begin{tcl}
-proc mtmtcl::openmath::OM::UATTR {core args} {
-   set L {}
-   foreach {uri obj} $args {lappend L [US $uri] $obj}
-   list OMATTR {} [list [list OMATP {} $L] $core]
-}
-%     \end{tcl}
-%   \end{ensproc}
-% \end{ensemble}
-% 
-% 
-% \subsection{The \texttt{export} interface}
-% 
-% The key route from \mtl\ to OpenMath is the |export| interface, 
-% which specifies how structure elements are converted to 
-% near-OpenMath data-trees.
-% 
-% \begin{APIspec}{export}{2.0}
-%   This interface is applicable to principal structures. It provides 
-%   a method |export| for converting the internal representation of 
-%   an element to an external format. The syntax for this method is:
-%   \begin{APIdescription}{structure}
-%     \begin{APImethod}{export}
-%       \word{element} \word{common attributes}
-%     \end{APImethod}
-%       where \word{element} is the element to export. The return 
-%       value is a data-tree that encodes the \word{element} as 
-%       near-OpenMath.
-%       
-%       The \word{common attributes} is a dictionary of common 
-%       attributes for nodes in the tree. The |export| method is 
-%       however allowed to override part or all of it, so it is 
-%       prefectly acceptable to ignore the \word{common attributes} 
-%       entirely for some sets of nodes. The typical use is that 
-%       the \word{common attributes} are used for |OMA| nodes and 
-%       get |cd| and |name| entries added in |OMS| nodes.
-%       
-%       For |export| methods that call other |export| methods 
-%       recursively, there is however the condition that they must 
-%       update the \describestring+[attribute]{mtmtcl:path} entry in 
-%       the \word{common attributes} dictionary. The value of this 
-%       attribute is a list of strings, typically a list of method 
-%       names. The purpose of this list is to establish a system for 
-%       addressing subordinate structures by mirroring the command 
-%       prefix that would be used to access its methods. If a 
-%       structure $S_1$ makes use of the |export| method of another 
-%       structure $S_2$ and $S_2$ can be accessed using the $s$ 
-%       method of $S_1$, then the |mtmtcl:path| used for the 
-%       \texttt{[$S_2$ export $\dotsb$]} call should have an $s$ 
-%       append to its value from the \texttt{[$S_1$ export $\dotsb$]} 
-%       call.
-%       
-%       The |mtmtcl:path| may be extended with method names also when 
-%       there is no recursive call to the |export| method. This can 
-%       be done e.g.~to clarify which method corresponds to a 
-%       particular operation symbol.
-%   \end{APIdescription}
-% \end{APIspec}
-% 
-% \textbf{Question:} Would it be appropriate to define a 
-% \emph{content dictionary} for abstract operation symbols? In the 
-% long run probably yes, and this would be an appropriate place to do 
-% so.
-% 
-% \medskip
-% 
-% \begin{APIspec}{import}{1.0}
-%   Where there is export, this is usually also import. 
-%   \begin{APIdescription}{structure}
-%     \begin{APImethod}{import}
-%       \word{path} \word{data-tree} 
-%     \end{APImethod}
-%       returns the element of the \meta{structure} that corresponds 
-%       to the \word{data-tree}, or throws an error if the 
-%       \word{data-tree} couldn't be interpreted as an element of the 
-%       \meta{structure}. The |-errorcode| of such an error should be
-%       \begin{displaysyntax}
-%         API import EDOM \word{who} \word{bad node}
-%       \end{displaysyntax}
-%       where |EDOM| is POSIX for ``domain error'', \word{who} is the 
-%       \word{path} of the party detecting the error, and \word{bad 
-%       node} should be the \word{data-tree} which couldn't be 
-%       interpreted.
-%       
-%       The \word{path} serves two purposes. One is that it may be 
-%       matched against \describestring+[attribute]{mtmtcl:path} 
-%       attributes in the \word{data-tree}, which can aid in 
-%       interpreting abbreviated \word{data-tree}s (for example trees 
-%       where unary addition or multiplication nodes have been 
-%       elided). The other is to identify the substructure that 
-%       has thrown an |EDOM| error. The idea is that it should be 
-%       handled as |mtmtcl:path| by the |export| method, i.e., if the 
-%       |import| method of structure $S_1$ makes use of the |import| 
-%       method of structure $S_2$, and $S_2$ can be accessed using 
-%       the $s$ method of $S_1$, then the \texttt{[$S_2$ import $P_2$ 
-%       $\dotsb$]} call used by the \texttt{[$S_1$ import $P_1$ 
-%       $\dotsb$]} should be such that \(P_2 = P_1 s\) (list append).
-%       
-%       The \word{path} should not be taken into account when 
-%       interpreting a \word{data-tree} without |mtmtcl:path| 
-%       attributes.
-%   \end{APIdescription}
-% \end{APIspec}
-% 
-% \medskip
-% 
-% \noindent Since the above is version~2.0 of |export|, there should 
-% also have been a version~1 that for some reason was abandoned. It 
-% was specified as follows:
-% \begin{quote}
-% \begin{APIspec}{export}{1.0}
-%   This interface is applicable to principal structures. It provides 
-%   a method |export| for converting the internal representation of 
-%   an element to an external format. The syntax for this method is:
-%   \begin{APIdescription}{structure}
-%     \begin{APImethod}{export}
-%       \word{element} \word{path} \word{options-dict}
-%       \begin{regblock}[\regstar] \word{option} \word{value} 
-%       \end{regblock}
-%     \end{APImethod}
-%       where \word{element} is the element to export. The return 
-%       value should have the form of an XML-tree as described above. 
-%       In want of a \mtl-native way of encoding some concept, it is 
-%       recommended that MathML or OpenMath elements are used.
-%       
-%       The \word{path} is a list of strings, typically a list of 
-%       method names. The purpose of this list is to establish a 
-%       system for addressing subordinate structures by mirroring the 
-%       command prefix that would be used to access its methods. If a 
-%       structure $S_1$ makes use of the |export| method of another 
-%       structure $S_2$ and $S_2$ can be accessed using the $s$ 
-%       method of $S_1$, then the \word{path} used for the 
-%       \texttt{[$S_2$ export $\dotsb$]} call should have an $s$ 
-%       append to the \word{path} given in the \texttt{[$S_1$ export 
-%       $\dotsb$]} call.
-%       
-%       The option--value pairs can be used to influence the way in 
-%       which the value gets encoded, as can the \word{options-dict}. 
-%       The keys in this dictionary are \word{path}s, whereas the 
-%       values are option--value dictionaries.
-%   \end{APIdescription}
-%   Note that it is not specified how to merge options specified in 
-%   the \word{option-dict} with options explicit in the call; this 
-%   might well have to vary from case to case. Nor is it specified 
-%   whether the options in the $p$ entry of the \word{options-dict} 
-%   apply only for the structure called with $p$ as \word{path}, or 
-%   e.g.~also for entries whose \word{path} has $p$ as a prefix; 
-%   deciding this requires more experience.
-% \end{APIspec}
-% \end{quote}
-% The main difference between the two are the (rather heavy) 
-% machinery for options in version~1\Dash options of unclear effect 
-% and without known use-cases! It turned out in all cases I've 
-% considered that it is easier to achieve variations by applying a 
-% transformation to the result of |export| than to have it built into 
-% |export|, and moreover the useful variations are hard to predict 
-% when implementing concrete structures while the overhead of 
-% handling options in every |export| method is quite considerable.
-% 
-% Another piece of old machinery which has become deprecated is the 
-% use of \mtl-specific tags for common operations:
-% \begin{quotation}
-%   Much of mathematics is stated in terms of binary operations, 
-%   so it makes sense to have a \describestring+[tag]{binop} tag 
-%   for binary operation nodes. The many binary operations which 
-%   are associative are however better served by an $n$-ary 
-%   operation node \describestring+[tag]{assop}, as that is the 
-%   level at which they will typically be processed. In both cases, 
-%   the children of a node are its operands.
-% 
-%   Three attributes which seem immediately relevant are:
-%   \begin{description}
-%     \renewcommand{\makelabel}[1]{\hspace{\labelsep}\texttt{#1}}
-%     ^^A Was: \describestring*+[attribute]{#1}
-%     \item[symbol]
-%       The symbol used to denote the operation. A suitable 
-%       default could be empty string, to denote invisible 
-%       multiplication\slash juxtaposition.
-%     \item[priority]
-%       The priority (binding strength) associated with the 
-%       symbol. Could default to $3$ for invisible multiplication, 
-%       $1$ for $+$, and $2$ for everything else.
-%     \item[mtmtcl-path]
-%       A list of ``method names'' for accessing the operation 
-%       underlying the node. The intention for this attribute is to 
-%       simplify postprocessing of a raw exported structure, to 
-%       e.g.~change the symbol used for some operation.
-%   \end{description}
-% \end{quotation}
-% This was motivated by a feeling that MathML\slash OpenMath put the 
-% name of an operation too far from the node containing its operands, 
-% but an attribute is not very much better than an attribute of the 
-% first child, and the |symbol| attribute here is \emph{way} too 
-% presentation-oriented (as is the |priority| attribute, which 
-% belongs fairly far on the way towards a rendering).
-% 
-% The |integer| tag which was introduced at the same time did however 
-% prove useful, as did |mtmtcl-path| (which was renamed to sport an 
-% XML namespace separator). That this was changed from a separate 
-% \word{path} argument to an entry in the \word{common attributes} 
-% argument is a convenience optimisation, but one that conveniently 
-% opens up for e.g.~specifying a |cdbase| attribute.
-% 
-% 
-% \StopEventually{}
 % 
 % 
 % \subsection{Generic helpers}
@@ -1298,6 +1008,116 @@ proc mtmtcl::openmath::gettext {tree {how " "}} {
 namespace eval mtmtcl::openmath {
    namespace export *
 }
+%</openmath>
+% \end{tcl}
+% 
+% 
+% \subsection{XML generation}
+% 
+% Since the data-tree format was taken over from \textsf{tdom}, the 
+% basic approach would be to use that for generating XML, but there 
+% is also a need for more lightweight generators in cases where 
+% readability is not an issue but employing extensions is.
+% 
+% \begin{tcl}
+%<*xmlgen>
+namespace eval mtmtcl::support {}
+% \end{tcl}
+% \setnamespace{mtmtcl::support}
+% 
+% \begin{proc}{xml_from_tree}
+%   This procedure is the toplevel generator of XML code from a 
+%   data-tree. The call syntax is
+%   \begin{displaysyntax}
+%     |mtmtcl::support::xml_from_tree| \word{tree} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{tree} of course is the tree to convert and the return 
+%   value is the converted tree as XML code. The supported options 
+%   are:
+%   \begin{ttdescription}
+%     \item[-nodesep]
+%       Basic separator inserted between nodes of the tree; defaults 
+%       to a newline. Setting it to empty reduces the output size, 
+%       but may well have the effect of making the entire result a 
+%       single very long line.
+%     \item[-indentstep]
+%       An indentation step, defaults to being empty. Some repetition 
+%       (corresponding to nesting depth) of this string follows the 
+%       |-nodesep|.
+%     \item[-charmap]
+%       A dictionary of character to entity mappings used with 
+%       |string map| to quote problematic characters in XML character 
+%       data. Defaults to being empty. The five syntax characters 
+%       `|<|', `|>|', `|&|', `|'|', and `|"|' are automatically 
+%       inserted into this dictionary if they are not already there.
+%   \end{ttdescription}
+%   \begin{tcl}
+proc mtmtcl::support::xml_from_tree {tree args} {
+   array set Opt {
+      -nodesep    \n
+      -indentstep ""
+      -charmap    {}
+   }
+   array set Opt $args
+   if {![dict size $Opt(-charmap)]} then {
+      set Opt(-charmap) {< &lt; > &gt; & &amp; ' &apos; \" &quot;}
+   } else {
+      foreach char {< > & ' \"} entity {&lt; &gt; &amp; &apos; &quot;} {
+         if {![dict exists $O(-charmap) $char]} then {
+            dict set $O(-charmap) $char $entity
+         }
+      }
+   }
+   xml_from_treenode $tree $Opt(-nodesep) $Opt(-indentstep)\
+     $Opt(-charmap)
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{xml_from_treenode}
+%   This is a more internal procedure that generates the XML fragment 
+%   for a particular branch of the tree. The call syntax is
+%   \begin{displaysyntax}
+%     |xml_from_treenode| \word{branch} \word{node-sep} 
+%     \word{indent-step} \word{char-map}
+%   \end{displaysyntax}
+%   
+%   Not surprisingly, it relies on recursion to convert the tree as a 
+%   whole.
+%   \begin{tcl}
+proc mtmtcl::support::xml_from_treenode {tree sep indent map} {
+   switch -- [lindex $tree 0] "#text" - "#cdata" {
+      return [string map $map [lindex $tree 1]]
+   } "#comment" {
+      return "<!--[lindex $tree 1]-->"
+   } "#pi" {
+      return "<?[lindex $tree 1] [lindex $tree 2]?>"
+   }
+   set res "<[lindex $tree 0]"
+   dict for {key val} [lindex $tree 1] {
+      append res { } $key =\" [string map $map $val] \"
+   }
+   if {[llength [lindex $tree 2]]} then {
+      set subsep $sep$indent
+      append res ">"
+      foreach child [lindex $tree 2] {
+         append res $subsep\
+           [xml_from_treenode $child $subsep $indent $map]
+      }
+      append res $sep "</[lindex $tree 0]>"
+   } else {
+      append res "/>"
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{tcl}
+%</xmlgen>
 % \end{tcl}
 % 
 % 
@@ -1320,6 +1140,7 @@ namespace eval mtmtcl::openmath {
 % where additional material has been inserted that clarifies how the 
 % expression should be rendered.
 % \begin{tcl}
+%<*pkg>
 namespace eval mtmtcl::present {
    namespace path [list [namespace parent]]
 }
@@ -5139,6 +4960,204 @@ set mtmtcl::latex::phrasebook(linalg2#matrixrow) {
 % \end{arrayvar}
 % 
 % 
+% 
+% 
+% \subsection{\texttt{export} interface arcana}
+% 
+% The key route from \mtl\ to OpenMath is the \APIref{export}{2.0} 
+% interface, which specifies how structure elements are converted to 
+% near-OpenMath data-trees. Version~2.0 of that interface is 
+% specified on page~\pageref{export-2.0}.
+% 
+% \iffalse
+% \begin{APIspec}{export}{2.0}
+%   This interface is applicable to principal structures. It provides 
+%   a method |export| for converting the internal representation of 
+%   an element to an external format. The syntax for this method is:
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{export}
+%       \word{element} \word{common attributes}
+%     \end{APImethod}
+%       where \word{element} is the element to export. The return 
+%       value is a data-tree that encodes the \word{element} as 
+%       near-OpenMath.
+%       
+%       The \word{common attributes} is a dictionary of common 
+%       attributes for nodes in the tree. The |export| method is 
+%       however allowed to override part or all of it, so it is 
+%       prefectly acceptable to ignore the \word{common attributes} 
+%       entirely for some sets of nodes. The typical use is that 
+%       the \word{common attributes} are used for |OMA| nodes and 
+%       get |cd| and |name| entries added in |OMS| nodes.
+%       
+%       For |export| methods that call other |export| methods 
+%       recursively, there is however the condition that they must 
+%       update the \describestring+[attribute]{mtmtcl:path} entry in 
+%       the \word{common attributes} dictionary. The value of this 
+%       attribute is a list of strings, typically a list of method 
+%       names. The purpose of this list is to establish a system for 
+%       addressing subordinate structures by mirroring the command 
+%       prefix that would be used to access its methods. If a 
+%       structure $S_1$ makes use of the |export| method of another 
+%       structure $S_2$ and $S_2$ can be accessed using the $s$ 
+%       method of $S_1$, then the |mtmtcl:path| used for the 
+%       \texttt{[$S_2$ export $\dotsb$]} call should have an $s$ 
+%       append to its value from the \texttt{[$S_1$ export $\dotsb$]} 
+%       call.
+%       
+%       The |mtmtcl:path| may be extended with method names also when 
+%       there is no recursive call to the |export| method. This can 
+%       be done e.g.~to clarify which method corresponds to a 
+%       particular operation symbol.
+%   \end{APIdescription}
+% \end{APIspec}
+% \fi
+% 
+% \textbf{Question:} Would it be appropriate to define a 
+% \emph{content dictionary} for abstract operation symbols? In the 
+% long run probably yes, and this would be an appropriate place to do 
+% so.
+% 
+% \medskip
+% 
+% \iffalse
+% \begin{APIspec}{import}{1.0}
+%   Where there is export, this is usually also import. 
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{import}
+%       \word{path} \word{data-tree} 
+%     \end{APImethod}
+%       returns the element of the \meta{structure} that corresponds 
+%       to the \word{data-tree}, or throws an error if the 
+%       \word{data-tree} couldn't be interpreted as an element of the 
+%       \meta{structure}. The |-errorcode| of such an error should be
+%       \begin{displaysyntax}
+%         API import EDOM \word{who} \word{bad node}
+%       \end{displaysyntax}
+%       where |EDOM| is POSIX for ``domain error'', \word{who} is the 
+%       \word{path} of the party detecting the error, and \word{bad 
+%       node} should be the \word{data-tree} which couldn't be 
+%       interpreted.
+%       
+%       The \word{path} serves two purposes. One is that it may be 
+%       matched against \describestring+[attribute]{mtmtcl:path} 
+%       attributes in the \word{data-tree}, which can aid in 
+%       interpreting abbreviated \word{data-tree}s (for example trees 
+%       where unary addition or multiplication nodes have been 
+%       elided). The other is to identify the substructure that 
+%       has thrown an |EDOM| error. The idea is that it should be 
+%       handled as |mtmtcl:path| by the |export| method, i.e., if the 
+%       |import| method of structure $S_1$ makes use of the |import| 
+%       method of structure $S_2$, and $S_2$ can be accessed using 
+%       the $s$ method of $S_1$, then the \texttt{[$S_2$ import $P_2$ 
+%       $\dotsb$]} call used by the \texttt{[$S_1$ import $P_1$ 
+%       $\dotsb$]} should be such that \(P_2 = P_1 s\) (list append).
+%       
+%       The \word{path} should not be taken into account when 
+%       interpreting a \word{data-tree} without |mtmtcl:path| 
+%       attributes.
+%   \end{APIdescription}
+% \end{APIspec}
+% \fi
+% 
+% \medskip
+% 
+% \noindent Given that the current is version~2.0 of |export|, there 
+% should also have been a version~1 that for some reason was abandoned. 
+% It was specified as follows:
+% \begin{quote}
+% \begin{APIspec}{export}{1.0}
+%   This interface is applicable to principal structures. It provides 
+%   a method |export| for converting the internal representation of 
+%   an element to an external format. The syntax for this method is:
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{export}
+%       \word{element} \word{path} \word{options-dict}
+%       \begin{regblock}[\regstar] \word{option} \word{value} 
+%       \end{regblock}
+%     \end{APImethod}
+%       where \word{element} is the element to export. The return 
+%       value should have the form of an XML-tree as described above. 
+%       In want of a \mtl-native way of encoding some concept, it is 
+%       recommended that MathML or OpenMath elements are used.
+%       
+%       The \word{path} is a list of strings, typically a list of 
+%       method names. The purpose of this list is to establish a 
+%       system for addressing subordinate structures by mirroring the 
+%       command prefix that would be used to access its methods. If a 
+%       structure $S_1$ makes use of the |export| method of another 
+%       structure $S_2$ and $S_2$ can be accessed using the $s$ 
+%       method of $S_1$, then the \word{path} used for the 
+%       \texttt{[$S_2$ export $\dotsb$]} call should have an $s$ 
+%       append to the \word{path} given in the \texttt{[$S_1$ export 
+%       $\dotsb$]} call.
+%       
+%       The option--value pairs can be used to influence the way in 
+%       which the value gets encoded, as can the \word{options-dict}. 
+%       The keys in this dictionary are \word{path}s, whereas the 
+%       values are option--value dictionaries.
+%   \end{APIdescription}
+%   Note that it is not specified how to merge options specified in 
+%   the \word{option-dict} with options explicit in the call; this 
+%   might well have to vary from case to case. Nor is it specified 
+%   whether the options in the $p$ entry of the \word{options-dict} 
+%   apply only for the structure called with $p$ as \word{path}, or 
+%   e.g.~also for entries whose \word{path} has $p$ as a prefix; 
+%   deciding this requires more experience.
+% \end{APIspec}
+% \end{quote}
+% The main difference between the two are the (rather heavy) 
+% machinery for options in version~1\Dash options of unclear effect 
+% and without known use-cases! It turned out in all cases I've 
+% considered that it is easier to achieve variations by applying a 
+% transformation to the result of |export| than to have it built into 
+% |export|, and moreover the useful variations are hard to predict 
+% when implementing concrete structures while the overhead of 
+% handling options in every |export| method is quite considerable.
+% 
+% Another piece of old machinery which has become deprecated is the 
+% use of \mtl-specific tags for common operations:
+% \begin{quotation}
+%   Much of mathematics is stated in terms of binary operations, 
+%   so it makes sense to have a \describestring+[tag]{binop} tag 
+%   for binary operation nodes. The many binary operations which 
+%   are associative are however better served by an $n$-ary 
+%   operation node \describestring+[tag]{assop}, as that is the 
+%   level at which they will typically be processed. In both cases, 
+%   the children of a node are its operands.
+% 
+%   Three attributes which seem immediately relevant are:
+%   \begin{description}
+%     \renewcommand{\makelabel}[1]{\hspace{\labelsep}\texttt{#1}}
+%     ^^A Was: \describestring*+[attribute]{#1}
+%     \item[symbol]
+%       The symbol used to denote the operation. A suitable 
+%       default could be empty string, to denote invisible 
+%       multiplication\slash juxtaposition.
+%     \item[priority]
+%       The priority (binding strength) associated with the 
+%       symbol. Could default to $3$ for invisible multiplication, 
+%       $1$ for $+$, and $2$ for everything else.
+%     \item[mtmtcl-path]
+%       A list of ``method names'' for accessing the operation 
+%       underlying the node. The intention for this attribute is to 
+%       simplify postprocessing of a raw exported structure, to 
+%       e.g.~change the symbol used for some operation.
+%   \end{description}
+% \end{quotation}
+% This was motivated by a feeling that MathML\slash OpenMath put the 
+% name of an operation too far from the node containing its operands, 
+% but an attribute is not very much better than an attribute of the 
+% first child, and the |symbol| attribute here is \emph{way} too 
+% presentation-oriented (as is the |priority| attribute, which 
+% belongs fairly far on the way towards a rendering).
+% 
+% The |integer| tag which was introduced at the same time did however 
+% prove useful, as did |mtmtcl-path| (which was renamed to sport an 
+% XML namespace separator). That this was changed from a separate 
+% \word{path} argument to an entry in the \word{common attributes} 
+% argument is a convenience optimisation, but one that conveniently 
+% opens up for e.g.~specifying a |cdbase| attribute.
 % 
 % \begin{tcl}
 %</pkg>

@@ -13,16 +13,6 @@
 % 
 % \section{Rings}
 % 
-% The basic rings are put in the |mtmtcl::rings| namespace. The main 
-% |mtmtcl| namespace is put in the path of that namespace to 
-% facilitate using features from other parts of the system (at the 
-% time of writing, particularly |mtmtcl::openmath::gettext|).
-% \begin{tcl}
-namespace eval mtmtcl::rings {
-   namespace path [list [namespace parent]]
-}
-% \end{tcl}
-% \setnamespace{mtmtcl::rings}
 % 
 % \begin{APIspec}{ring}{2.0}
 %   A |ring| is neither required to be unital nor associative, but it 
@@ -80,9 +70,32 @@ namespace eval mtmtcl::rings {
 %   ditto version~2.0.
 % \end{APIspec}
 % 
-% \begin{tclcommand}{ensemble}{integer}
+% 
+% \subsection{Integers}
+% 
+% The ring of integers is provided by the |mtmtcl::rings::integers| 
+% package, which has dependencies on the |mtmtcl::rings| and |API| 
+% packages.
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::rings:integers 1.0 integers
+%</docstrip.tcl::catalogue>
+%<*integers>
+package require Tcl 8.5
+package require mtmtcl::openmath
+package require API 1.0
+namespace eval ::mtmtcl::rings::integers {
+   namespace path ::mtmtcl
+}
+% \end{tcl}
+% \setnamespace{mtmtcl::rings::integers}
+% 
+% \begin{tclcommand}{ensemble}{all}
 %   A structure for integers can be implemented directly as an 
-%   ensemble.
+%   ensemble. Since the majority of all subcommands are implemented 
+%   by commands in the |tcl::mathop| namespace however, the namespace 
+%   of this ensemble will be that rather than 
+%   |mtmtcl::rings::integers|.
 %   \begin{tcl}
 namespace eval ::tcl::mathop {
    namespace ensemble create -subcommands {
@@ -97,7 +110,7 @@ namespace eval ::tcl::mathop {
       div mod
    } -map {
       API {
-         ::APIutil::API {
+         ::API::static {
             equality 1.1
             "additive group" {2.2 1.2}
             ring {2.0 1.0}
@@ -121,19 +134,19 @@ namespace eval ::tcl::mathop {
 %   canonising integers, but it turned out that \emph{didn't} 
 %   canonise them, whereas |::tcl::mathop::+| did.
 %   \begin{tcl}
-      / ::mtmtcl::rings::integer_divide
+      / ::mtmtcl::rings::integers::divide
       div /
       mod %
-      export ::mtmtcl::rings::integer_export
-      import ::mtmtcl::rings::integer_import
-   } -command ::mtmtcl::rings::integer
+      export ::mtmtcl::rings::integers::export
+      import ::mtmtcl::rings::integers::import
+   } -command ::mtmtcl::rings::integers::all
 }
 %   \end{tcl}
 %   
-%   \begin{proc}{integer_divide}
+%   \begin{proc}{divide}
 %     This procedure implements strict division for integers.
 %     \begin{tcl}
-proc ::mtmtcl::rings::integer_divide {numer denom} {
+proc ::mtmtcl::rings::integers::divide {numer denom} {
    if {$numer % $denom == 0} then {
       return [expr {$numer / $denom}]
    } else {
@@ -144,26 +157,26 @@ proc ::mtmtcl::rings::integer_divide {numer denom} {
 %     \end{tcl}
 %   \end{proc}
 %   
-%   \begin{proc}{integer_export}
+%   \begin{proc}{export}
 %     This procedure implements the \APIref+{export}{2.0} interface 
 %     for integers. The call syntax is
 %     \begin{displaysyntax}
-%       |::mtmtcl::rings::integer_export| \word{element} 
+%       |::mtmtcl::rings::integers::export| \word{element} 
 %       \word{attributes}
 %     \end{displaysyntax}
 %     
 %     \begin{tcl}
-proc ::mtmtcl::rings::integer_export {elem attr} {
+proc ::mtmtcl::rings::integers::export {elem attr} {
    list integer [dict create value $elem] {}
 }
 %     \end{tcl}
 %   \end{proc}
 %   
-%   \begin{proc}{integer_import}
+%   \begin{proc}{import}
 %     This procedure implements the \APIref+{import}{1.0} interface 
 %     for integers. The call syntax is
 %     \begin{displaysyntax}
-%       |::mtmtcl::rings::integer_import| \word{path} \word{data-tree}
+%       |::mtmtcl::rings::integers::import| \word{path} \word{data-tree}
 %     \end{displaysyntax}
 %     It understands both \describestring*+[node type]{integer} and 
 %     \describestring*+[node type]{OMI} nodes, but the former is 
@@ -171,7 +184,7 @@ proc ::mtmtcl::rings::integer_export {elem attr} {
 %     the element.
 %     
 %     \begin{tcl}
-proc ::mtmtcl::rings::integer_import {path tree} {
+proc ::mtmtcl::rings::integers::import {path tree} {
    while {[lindex $tree 0] eq "OMATTR"} {
       set tree [lindex $tree 2 1]
    }
@@ -193,17 +206,31 @@ proc ::mtmtcl::rings::integer_import {path tree} {
 %   \end{proc}
 % \end{tclcommand}
 % 
-% \begin{proc}{integer_modulo}
+% \begin{proc}{make}
+%   This is a constructor command for the ring of integers structure. 
+%   It takes no arguments and returns a command prefix.
+%   \begin{tcl}
+proc mtmtcl::rings::integers::make {} {
+   list [namespace which all]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{proc}{modulo}
 %   This procedure implements the algebraic structure of `integers 
 %   modulo $n$' (denoted $\mathbb{Z}_n$, $\mathbb{Z}/n$, or 
 %   $\mathbb{Z}/n\mathbb{Z}$) for positive integers $n$. The call 
 %   syntax is
+%   \changes{0.2}{2010/05/23}{Added API parameter/argument. (LH)}
 %   \begin{displaysyntax}
-%     |::mtmtcl::rings::integer_modulo| \word{$n$} \word{method} 
-%     \word{argument}\regstar
+%     |::mtmtcl::rings::integers::modulo| \word{$n$} \word{API} 
+%     \word{method} \word{argument}\regstar
 %   \end{displaysyntax}
-%   so the actual \meta{ring} is the two word prefix 
-%   |::mtmtcl::rings::integer_modulo |\word{$n$}.
+%   so the actual \meta{ring} is the three word prefix 
+%   |::mtmtcl::rings::integers::modulo |\word{$n$} \word{API}. Here, 
+%   \word{API} is the API dictionary.
 %   
 %   The canonical representation is as an integer $k$ satisfying \(0 
 %   \leqslant k < n\), but all integers are valid representations for 
@@ -212,7 +239,7 @@ proc ::mtmtcl::rings::integer_import {path tree} {
 %   \(n \geqslant 2\).
 %   
 %   \begin{tcl}
-proc ::mtmtcl::rings::integer_modulo {n method args} {
+proc ::mtmtcl::rings::integers::modulo {n API method args} {
    switch -- $method {
 %   \end{tcl}
 %   
@@ -280,8 +307,8 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %   \begin{procmethod}{1}
 %     The |1| method has the two forms
 %     \begin{displaysyntax}
-%       ::mtmtcl::rings::integer 1\par
-%       ::mtmtcl::rings::integer 1 \word{integer}
+%       \meta{ring} 1\par
+%       \meta{ring} 1 \word{integer}
 %     \end{displaysyntax}
 %     where the first is the unit constant required for a |monoid|. 
 %     The second form is the canonical homomorphism of 
@@ -349,6 +376,16 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
+%   \begin{procmethod}{inverse}
+%     A \APIref{group}{1.0}-style |inverse| method can be implemented 
+%     as a recursive call to |/|.
+%     \begin{tcl}
+      inverse {
+         modulo $n $API / 1 [lindex $args 0]
+      }
+%     \end{tcl}
+%   \end{procmethod}
+%   
 %   \begin{procmethod}{integer.}
 %     Another way of importing integers is to form integer 
 %     multiples of existing elements.
@@ -360,22 +397,27 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{iszero}
-%     The final method needed for v\,1.2 of \APIref{additive 
-%     group}{1.2} is the unary test for being zero.
+%     The final method needed for v\,2.2 of \APIref{additive 
+%     group}{2.2} is the unary test for being zero.
 %     \begin{tcl}
       iszero { expr {[lindex $args 0] % $n == 0} }
 %     \end{tcl}
 %   \end{procmethod}
 %   
-%   Another useful interface to support is \texttt{generated additive 
-%   group}, since that provides a syntactically pure way of 
-%   extracting the integer representing a group element.
+%   Another useful interface to support would be some sort of 
+%   ``generated additive group'', since that provides a syntactically 
+%   pure way of extracting the integer representing a group element. 
+%   It is however at the moment not quite clear what that interface 
+%   should specify---the main question is whether the generators should 
+%   be |named| or elements of a subordinate structure---so the 
+%   existing code for this is by default not included.
 %   
 %   \begin{procmethod}{+ decomposition}
 %     Since the additive group $\mathbb{Z}_n$ is cyclic, it can 
 %     always be expressed as a multiple of one generator. The easiest 
 %     generator is $1$.
 %     \begin{tcl}
+%<*groupDecomposition>
       "+ decomposition" {
          return [list 1 [expr {[lindex $args 0] % $n}]]
       }
@@ -394,12 +436,17 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
               element name"
          }
       }
+%</groupDecomposition>
 %     \end{tcl}
 %   \end{procmethod}
 %   
+%   An alternative approach, which should definitely be considered, 
+%   is to view $\mathbb{Z}_n$ as a $\mathbb{Z}$-module spanned by 
+%   $\{1\}$.
+%   
 %   \begin{procmethod}{canonise}
 %     The operations always return canonical representations, but 
-%     adaptors sometimes find it useful to have an explicit 
+%     adapters sometimes find it useful to have an explicit 
 %     canonisation method.
 %     \begin{tcl}
       canonise { expr {[lindex $args 0] % $n} }
@@ -428,39 +475,71 @@ proc ::mtmtcl::rings::integer_modulo {n method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
-%   \begin{procmethod}{API}
-%     Finally, there is the |API| method, whose implementation is 
-%     mostly an enumeration of all the supported interfaces.
+%   \begin{procmethod}{import}
+%     The \APIref{import}{1.0} interface can be implemented by 
+%     canonising the result of the general integer importer.
 %     \begin{tcl}
-      API {
-         ::APIutil::API {
-            equality 1.0
-            canonise 1.0
-            autocanonical 1.0
-            semigroup 1.1
-            monoid 1.1
-            "additive group" 2.2
-            ring 2.0
-            division 1.0
-            "generated additive group" 2.0
-            "named element" 1.0
-            export 2.0
-         } {*}$args
+      import {
+         expr { [import {*}$args] % $n }
       }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{API}
+%     Finally, there is the |API| method, which takes all its data 
+%     from the \word{API} parameter.
+%     \begin{tcl}
+      API {::API::static $API {*}$args}
 %     \end{tcl}
 %   \end{procmethod}
 %   
 %   \begin{tcl}
       default {
          return -code error "Unknown method \"$method\";\
-           must be =, +, neg, -, *, /, 0, 1, API, integer.,\
-           + decomposition, or named"
+           must be =, +, neg, -, *, /, 0, 1, API, canonise,\
+           export, import, integer., or inverse"
       }
    }
 }
 %   \end{tcl}
 % \end{proc}
 % 
+% \begin{proc}{make_modulo}
+%   This constructor takes the characteristic $n$ as only argument 
+%   and verifies that it is valid.
+%   \begin{tcl}
+proc mtmtcl::rings::integers::make_modulo {n} {
+   if {$n != round($n) || $n < 2} then {
+      return -code error "The characteristic must be at least 2"
+   }
+   list [namespace which modulo] $n {
+       equality 1.0
+       canonise 1.1
+       autocanonical 1.0
+       semigroup 1.1
+       monoid 1.1
+       "additive group" 2.2
+       ring 2.0
+       division 1.0
+%<*groupDecomposition>
+       "generated additive group" 2.0
+       "named element" 1.0
+%</groupDecomposition>
+       export 2.0
+       import 1.0
+    }
+}
+%</integers>
+%   \end{tcl}
+%   In the long term, it should also check whether $n$ is a prime, 
+%   and if so extend the API with a |field| interface, but this will 
+%   do for the moment.
+% \end{proc}
+% 
+% 
+% \setnamespace{mtmtcl::rings}
+% 
+% \subsection{``Real'' numbers}
 % 
 % \begin{ensemble}{float}
 %   \setnamespace{mtmtcl::rings}
@@ -1566,6 +1645,7 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %        module even when not over a semigroup. (LH)}
 %     \begin{tcl}
       API {
+%<*old>
          if {![{*}$R API ring 2.0] || ![{*}$R API monoid 1.0] ||\
            ![{*}$R API "additive group" 2.1]} then {
             return [::APIutil::API {} {*}$args]
@@ -1591,6 +1671,45 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
             dict lappend D division 1.0
          }
          return [::APIutil::API $D {*}$args]
+%</old>
+%<*!old>
+         ::API::dynamic $args {
+            "additive group" {2.1 {test scalars}}
+            ring-module       {2.1 {test scalars}}
+            "free ring-module" {2.1 {test scalars}}
+            equality          {1.0 {test scalars}}
+            ring-algebra {2.0 {
+               test scalars  test semigroup
+            }}
+            ring {2.0 {
+               test scalars  test semigroup
+            }}
+            semigroup {2.0 {
+               test scalars  test semigroup
+            }}
+            monoid {1.0 {
+               test scalars
+               eval {{*}$S API monoid 1.0}
+            }}
+            export {2.0 {
+               eval {{*}$R API export 2.0}
+               eval {{*}$S API export 2.0}
+            }}
+            division {1.0 {
+               eval {{*}$R API division 1.0}
+               eval {{*}$S API division 1.0}
+            }}
+         } {
+            scalars {
+               eval {{*}$R API ring 2.0}
+               eval {{*}$R API monoid 1.0}
+               eval {{*}$R API "additive group" 2.1}
+            }
+            semigroup {
+               eval {{*}$S API semigroup 1.0}
+            }
+         }
+%</!old>
       }
 %     \end{tcl}
 %   \end{procmethod}

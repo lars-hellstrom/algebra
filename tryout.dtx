@@ -62,7 +62,7 @@ docstrip::sourcefrom [file join $dir rings.dtx] {}
 % \begin{tcl}
 %<*univpoly>
 interp alias {} Zx {} ::mtmtcl::rings::semigroup_algebra {
-   ::mtmtcl::rings::integer
+   ::mtmtcl::rings::integers::all
 } {
    ::mtmtcl::groups::power_product_monoid_1.3 {
       ::mtmtcl::sets::variable_set {x} {}
@@ -203,7 +203,7 @@ docstrip::sourcefrom [file join $dir props.dtx] {pkg}
 % 
 % \begin{tcl}
 interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
-   ::mtmtcl::rings::integer
+   ::mtmtcl::rings::integers::all
 } {
    ::mtmtcl::groups::power_product_monoid_1.3 {
       ::mtmtcl::sets::variable_set {A B C D E F a b c d e f} {}
@@ -396,7 +396,7 @@ set code [mtmtcl::latex::convertto [PROP export $diff {}]]
 % show up next to each other.
 % \begin{tcl}
 interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
-   ::mtmtcl::rings::integer
+   ::mtmtcl::rings::integers::all
 } {
    ::mtmtcl::groups::power_product_monoid_1.3 {
       ::mtmtcl::sets::variable_set {A a B b C c D d E e F f G g} {}
@@ -608,7 +608,8 @@ set code "\\begin{gather}\n  [
 % nullcoary elements.
 % 
 % \begin{tcl}
-interp alias {} PROP {} mtmtcl::matprop::biaffine ::mtmtcl::rings::integer
+interp alias {} PROP {}\
+  mtmtcl::matprop::biaffine ::mtmtcl::rings::integers::all
 if {[catch {
    lrepeat 0 0
 }]} then {
@@ -1123,7 +1124,7 @@ foreach i {0 1 2} {
 % last, which doesn't match the |index| form of an |OMA|.
 % \begin{tcl}
 interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
-   ::mtmtcl::rings::integer
+   ::mtmtcl::rings::integers::all
 } [list ::mtmtcl::groups::power_product_monoid_1.3 [
    list ::mtmtcl::sets::variable_set\
      {a b c d e A B C D E T01 T02 T10 T11 T12 T20 T21 T22} $extraD
@@ -1629,7 +1630,7 @@ interp alias {} inequalities1417 {} latex_inequalities {14 17}
 % position in this calculation, but I fear it won't be enough.
 % \begin{tcl}
 interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
-   ::mtmtcl::rings::integer
+   ::mtmtcl::rings::integers::all
 } [list ::mtmtcl::groups::power_product_monoid_1.3 [
    list ::mtmtcl::sets::variable_set\
      {a b c d e A B C D E T01 T02 T10 T11 T12 T20 T21 T22} $extraD

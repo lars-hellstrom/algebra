@@ -1890,7 +1890,7 @@ proc prepare_ambiguity {amb} {
 %   for coefficients of networks. Definitions are expected to override 
 %   this default definition of $\mathbb{Z}_{32003}$.
 %   \begin{tcl}
-variable coefficient {::mtmtcl::rings::integer_modulo 32003}
+variable coefficient [mtmtcl::rings::integers::make_modulo 32003]
 %   \end{tcl}
 % \end{variable}
 % 
@@ -5458,7 +5458,7 @@ proc standalone_resolution {amb} {
 proc solve_SAR_for {SAR lhs args} {
    variable coefficient
    set M [list ::mtmtcl::rings::semigroup_algebra $coefficient\
-     ::mtmtcl::rings::integer]
+     ::mtmtcl::rings::integers::all]
    set termL {}
    set sum [{*}$M 0]
    foreach partial [lindex $SAR 0] {
@@ -5911,7 +5911,7 @@ proc biaffine_PROP_key {maps NW} {
 %   integers (primarily the natural numbers, to ensure DCC).
 %   \begin{tcl}
 interp alias {} integer_biaffine_PROP {}\
-  mtmtcl::matprop::biaffine ::mtmtcl::rings::integer
+  mtmtcl::matprop::biaffine ::mtmtcl::rings::integers::all
 %   \end{tcl}
 % \end{tclcommand}
 % 
@@ -6784,7 +6784,7 @@ proc irreducible_iterate {signature states operations ring prev\
 % 
 % \begin{tcl}
 interp alias {} Poly_ring {} ::mtmtcl::rings::semigroup_algebra {
-   ::mtmtcl::rings::integer
+   ::mtmtcl::rings::integers::all
 } [list ::mtmtcl::groups::power_product_monoid_1.3 [
    list ::mtmtcl::sets::variable_set {a m} {}
 ]]

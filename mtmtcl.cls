@@ -169,8 +169,11 @@
 \providecommand{\Rdash}{---}
 \providecommand{\Dash}{---}
 
-\newcommand{\splode}{\ensuremath{{\{\mkern-5mu*\mkern-5mu\}}}}
-
+% \newcommand{\splode}{\ensuremath{{\{\mkern-5mu*\mkern-5mu\}}}}
+% \newcommand{\splode}{\texttt{\PrintChar{123}*\PrintChar{125}}}
+\newcommand{\splode}{\texttt{%
+  \PrintChar{123}\kern-0.1em*\kern-0.1em\PrintChar{125}%
+}}
 
 \RequirePackage{amsthm}
 

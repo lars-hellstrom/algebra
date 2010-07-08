@@ -303,6 +303,8 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 % 
 % \section{User-friendly extensions}
 % 
+% \subsection{Variadic operation versions}
+% 
 % While the methods specified by interfaces in the previous section 
 % suffice for any computation with elements in a semigroup, monoid, or 
 % group, it is often possible to provide more optimised implementation 
@@ -386,18 +388,19 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 % \end{APIspec}
 % 
 % 
-% \begin{proc}{list_free_monoid_1.1}
-%   This procedure is an adapter which implements the free 
-%   \texttt{monoid}~(v\,1.1) over a structure with 
-%   \texttt{equality}~(v\,1.0). The overall syntax is
+% \begin{proc}{list_free_monoid_1.1_do}
+%   This procedure implements the free \APIref+{monoid}{1.1} over a 
+%   structure with \APIref{equality}{1.0}. The overall syntax is
 %   \begin{displaysyntax}
-%     |::mtmtcl::groups::list_free_monoid_1.1| \word{base structure} 
-%     \word{subcommand} \word{argument}\regstar
+%     |::mtmtcl::groups::list_free_monoid_1.1_do| \word{base structure} 
+%     \word{API-dict} \word{subcommand} \word{argument}\regstar
 %   \end{displaysyntax}
 %   and the return value depends on the \word{subcommand}.
+%   \changes{0.2}{2010/05/02}{Rewritten as constructor with 
+%     do-procedure. (LH)}
 %   
 %   \begin{tcl}
-proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
+proc ::mtmtcl::groups::list_free_monoid_1.1_do {base API method args} {
    switch -- $method {
 %   \end{tcl}
 %   \begin{procmethod}{=}
@@ -413,17 +416,20 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
          return 1
       }
 %     \end{tcl}
+%     This completes the \APIref+{equality}{1.0} interface. Doing 
+%     version 1.1 would be an unnecessary complication.
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{*}
 %     The product of a collection of lists is their concatenation. 
-%     (That this is so easy to implement is the reason this adapter 
-%     doesn't stop at \texttt{monoid} v\,1.0.)
 %     \begin{tcl}
       * {
          return [concat {*}$args]
       }
 %     \end{tcl}
+%     That this is so easy to implement is the reason why this 
+%     implementation does not stop at \APIref+{monoid}{1.0}, but 
+%     instead goes on to version~1.0.
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{1}
@@ -431,6 +437,7 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
 %     \begin{tcl}
       1 {return [list]}
 %     \end{tcl}
+%     This completes the \APIref+{monoid}{1.1} interface. 
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{canonise}
@@ -445,21 +452,14 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
          return $res
       }
 %     \end{tcl}
+%     This is supported if the base structure supports it.
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{named}
-%     Elements of the base structure are accepted as names for the 
-%     length $1$ list containing that element.
+%     Named elements of the base structure are accepted as names 
+%     for the length $1$ list containing that element.
 %     \begin{tcl}
-      named {return [lrange $args 0 0]}
-%     \end{tcl}
-%   \end{procmethod}
-%   
-%   \begin{procmethod}{namestructure}
-%     The base structure is made available via the |namestructure| 
-%     method.
-%     \begin{tcl}
-      namestructure {uplevel 1 $base $args}
+      named {return [list [{*}$base named [lindex $args 0]]]}
 %     \end{tcl}
 %   \end{procmethod}
 %   
@@ -468,12 +468,56 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
 %     $1$ on everything.
 %     \begin{tcl}
       {* decomposition} {
+%<*trivial>
          set res {}
          foreach item [lindex $args 0] {
             lappend res $item 1
          }
+%</trivial>
+%     \end{tcl}
+%     But it is nicer to recognise sequences of identical elements 
+%     and express those as powers; \APIref{equality}{1.0} in the 
+%     base structure is sufficient for this.
+%     \begin{tcl}
+%<*!trivial>
+         if {[llength [lindex $args 0]] > 1} then {
+            set res [list [lindex $args 0 0]]
+            set count 1
+            foreach item [lrange [lindex $args 0] 1 end] {
+               if {[{*}$base = [lindex $res end] $item]} then {
+                  incr count
+               } else {
+                  lappend res $count $item
+                  set count 1
+               }
+            }
+            lappend res $count
+         } elseif {[llength [lindex $args 0]] == 1} then {
+            set res [list [lindex $args 0 0] 1]
+         } else {
+            set res {}
+         }
+%</!trivial>
          return $res
       }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{generator}
+%     The |generator| method returns a list of length one whose only 
+%     element is the argument.
+%     \begin{tcl}
+      generator {return [lrange $args 0 0]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{generators}
+%     The base structure is made available via the |generators| 
+%     method.
+%     \changes{0.2}{2010/05/02}{Renamed from \texttt{namestructure}. 
+%       (LH)}
+%     \begin{tcl}
+      generators {uplevel 1 $base $args}
 %     \end{tcl}
 %   \end{procmethod}
 %   
@@ -488,7 +532,7 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
          dict lappend sattr mtmtcl:path *
          set childL [list [list OMS $sattr {}]]
          set battr $attr
-         dict lappend battr mtmtcl:path namestructure
+         dict lappend battr mtmtcl:path generators
          foreach factor $L {
             lappend childL [{*}$base export $factor $battr]
          }
@@ -501,27 +545,10 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{API}
-%     The base structure API is only queried when the |API| method is 
-%     called. The adapter denounces support for everything unless the 
-%     base structure at least supports \texttt{equality}.
+%     Since the base structure is cached in a parameter, the 
+%     implementation of this is trivial.
 %     \begin{tcl}
-      API {
-         set D [dict create]
-         if {[{*}$base API equality 1.0]} then {
-            dict lappend D equality 1.0 
-            dict lappend D semigroup 1.1 
-            dict lappend D monoid 1.1
-            dict lappend D "named element" 1.0
-            dict lappend D "* decomposition" 1.0
-         }
-         if {[{*}$base API canonise 1.0]} then {
-            dict set D canonise 1.0 
-         }
-         if {[{*}$base API export 2.0]} then {
-            dict set D export 2.0 
-         }
-         ::APIutil::API $D {*}$args
-      }
+      API {::API::static $API {*}$args}
 %     \end{tcl}
 %   \end{procmethod}
 %   
@@ -535,6 +562,47 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
 %   \end{tcl}
 % \end{proc}
 % 
+% \begin{proc}{list_free_monoid_1.1}
+%   The constructor for the list free monoid has the call syntax
+%   \begin{displaysyntax}
+%     |mtmtcl::groups::list_free_monoid_1.1| \word{base structure}
+%   \end{displaysyntax}
+%   i.e., it takes the underlying base structure as only argument and 
+%   returns the corresponding free monoid.
+%   
+%   \begin{tcl}
+proc mtmtcl::groups::list_free_monoid_1.1 {base} {
+   set D [dict create]
+   if {[{*}$base API equality 1.0]} then {
+      dict lappend D equality 1.0 
+      dict lappend D semigroup 1.1 
+      dict lappend D monoid 1.1
+%   \end{tcl}
+%   The claim to support \APIref{generated semigroup}{1.0} is 
+%   commented out until the actual specification has been done.
+%   \begin{tcl}
+      # dict lappend D "generated semigroup" 1.0
+   }
+   if {[{*}$base API canonise 1.0]} then {
+      if {[{*}$base API canonise 1.1]} then {
+         dict set D canonise 1.1
+      } else {
+         dict set D canonise 1.0 
+      }
+   }
+   if {[{*}$base API "named element" 1.0]} then {
+      dict lappend D "named element" 1.0
+   }
+   if {[{*}$base API export 2.0]} then {
+      dict set D export 2.0 
+   }
+   return [list [namespace which list_free_monoid_1.1_do] $base D]
+}
+%     \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Powers}
 % 
 % Another example is that there might be quicker ways of computing 
 % powers than repeated multiplication\Dash even when that means 
@@ -585,10 +653,10 @@ proc ::mtmtcl::groups::list_free_monoid_1.1 {base method args} {
 %       are |=|-equal for every element $a$ and integer $n$, and on the 
 %       other,
 %       \begin{displaysyntax}
-%         [$G$ |*^| \meta{$L_a$} \meta{$L_b$}]\par
-%         [$G$ * [$G$ |*^| \meta{$L_a$}] [$G$ |*^| \meta{$L_b$}]]
+%         [$G$ |*^| \splode$L_a$ \splode$L_b$]\par
+%         [$G$ * [$G$ |*^| \splode$L_a$] [$G$ |*^| \splode$L_b$]]
 %       \end{displaysyntax}
-%       for all lists $L_a$ and $L_b$ with the structure
+%       are |=|-equal for all lists $L_a$ and $L_b$ with the structure
 %       \begin{quote}
 %         \begin{regblock}[\regstar] \word{element} \word{integer} 
 %         \end{regblock}
@@ -1324,7 +1392,7 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %     \begin{APImethod}{=}
 %       \word{element} \word{element}
 %     \end{APImethod}
-%       The |=| method must satisfy \texttt{equality} v\,1.0.
+%       The |=| method must satisfy \APIref+{equality}{1.0}.
 %     \begin{APImethod}{*}
 %       \word{element} \word{element}
 %     \end{APImethod}
