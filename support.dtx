@@ -13,6 +13,7 @@
 % \section{Auxilliary interfaces}
 % 
 % \subsection{Equality}
+% \label{Ssec:Equality}
 % 
 % A very great number of basic mathematical claims have the form of 
 % an equality, but a prerequisite for speaking about that is that 
@@ -393,6 +394,7 @@ proc mtmtcl::adaptors::equality::to-1.1 {base args} {
 % 
 % 
 % \subsection{More on equality}
+% \label{Ssec:MoreEquality}
 % 
 % \begin{APIspec}{onlycanonical}{1.0}
 %   The |onlycanonical| interface is applicable to arbitrary structure. 
@@ -443,8 +445,18 @@ proc mtmtcl::adaptors::equality::to-1.1 {base args} {
 namespace eval ::mtmtcl::sets {
    namespace path [list [namespace parent]]
 }
+%</pkg>
 % \end{tcl}
-% \setnamespace{mtmtcl::set}
+% \setnamespace{mtmtcl::sets}
+% 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::sets::universe 1.0 universe
+%</docstrip.tcl::catalogue>
+%<*universe,pkg>
+package require mtmtcl::openmath 1.0
+namespace eval ::mtmtcl::sets {}
+% \end{tcl}
 % 
 % \begin{proc}{universe}
 %   The |universe| structure simply has as elements all \Tcl\ 
@@ -466,7 +478,7 @@ proc ::mtmtcl::sets::universe {subcmd args} {
 %   it at least becomes possible to form formal linear combinations 
 %   of |universe| elements.
 %   \begin{tcl}
-      ::APIutil::API {
+      ::API::static {
          equality 1.0
          canonise 1.1
          onlycanonical 1.0
@@ -484,7 +496,7 @@ proc ::mtmtcl::sets::universe {subcmd args} {
       ] [list [list \#text [lindex $args 0]]]
    } "import" {
       if {[lindex $args 1 0] eq "OMFOREIGN"} then {
-         openmath::gettext [lindex $args 1] ""
+         ::mtmtcl::openmath::gettext [lindex $args 1] ""
       } else {
          return -code error\
            -errorcode [concat [list API import EDOM] [lrange $args 0 1]]\
@@ -495,6 +507,7 @@ proc ::mtmtcl::sets::universe {subcmd args} {
         API, =, canonise, export, or import"
    }
 }
+%</universe,pkg>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -528,6 +541,13 @@ proc ::mtmtcl::sets::universe {subcmd args} {
 % \end{APIspec}
 % 
 % 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::sets::finite_ordinal 1.0 ordinal
+%</docstrip.tcl::catalogue>
+% \end{tcl}
+% 
+% 
 % \begin{proc}{finite_ordinal}
 %   In set theory (at least the most common flavours of it), the 
 %   \emph{ordinal numbers} is a number system construction where each 
@@ -553,6 +573,8 @@ proc ::mtmtcl::sets::universe {subcmd args} {
 %   \end{displaysyntax}
 %   whereas the return value depends on the \word{method}.
 %   \begin{tcl}
+%<*ordinal,pkg>
+namespace eval ::mtmtcl::sets {}
 proc ::mtmtcl::sets::finite_ordinal {card method args} {
    switch -- $method {
 %   \end{tcl}
@@ -599,7 +621,7 @@ proc ::mtmtcl::sets::finite_ordinal {card method args} {
 %     Finally, the supported interfaces must be listed.
 %     \begin{tcl}
       API {
-         ::APIutil::API {equality 1.0  "finite set" 1.1 \
+         ::API::static {equality 1.0  "finite set" 1.1 \
             canonise 1.0} {*}$args
       }
 %     \end{tcl}
@@ -608,9 +630,16 @@ proc ::mtmtcl::sets::finite_ordinal {card method args} {
 %   \begin{tcl}
    }
 }
+%</ordinal,pkg>
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::sets::string_set 1.0 stringset
+%</docstrip.tcl::catalogue>
+% \end{tcl}
 % 
 % \begin{proc}{string_set}
 %   This procedure implements a finite set of strings as a structure. 
@@ -621,6 +650,8 @@ proc ::mtmtcl::sets::finite_ordinal {card method args} {
 %   \end{displaysyntax}
 %   whereas the return value depends on the \word{method}.
 %   \begin{tcl}
+%<*stringset,pkg>
+namespace eval ::mtmtcl::sets {}
 proc ::mtmtcl::sets::string_set {elements method args} {
    switch -- $method {
 %   \end{tcl}
@@ -670,7 +701,7 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 %     Finally, the supported interfaces must be listed.
 %     \begin{tcl}
       API {
-         ::APIutil::API {equality 1.0  "finite set" 1.1 \
+         ::API::static {equality 1.0  "finite set" 1.1 \
             canonise 1.0  onlycanonical 1.0  export 2.0} {*}$args
       }
 %     \end{tcl}
@@ -679,6 +710,7 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 %   \begin{tcl}
    }
 }
+%</stringset,pkg>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -733,6 +765,12 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 % particular imply that the list is finite, which is closely related to 
 % the property of being finitely generated.
 % 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::sets::variable_set 1.0 varset
+%</docstrip.tcl::catalogue>
+% \end{tcl}
+% 
 % \begin{proc}{variable_set}
 %   This procedure implements a finite set of variables as a 
 %   structure. It improves upon |string_set| in that it offers 
@@ -776,6 +814,8 @@ proc ::mtmtcl::sets::string_set {elements method args} {
 %   a string, more precisely as a string which is an element of the 
 %   \word{element-list}.
 %   \begin{tcl}
+%<*varset,pkg>
+namespace eval ::mtmtcl::sets {}
 proc ::mtmtcl::sets::variable_set {elements extra method args} {
    switch -- $method {
 %   \end{tcl}
@@ -892,7 +932,7 @@ proc ::mtmtcl::sets::variable_set {elements extra method args} {
 %     Finally, the supported interfaces must be listed.
 %     \begin{tcl}
       API {
-         ::APIutil::API {equality 1.0  "finite set" 1.1 \
+         ::API::static {equality 1.0  "finite set" 1.1 \
             canonise 1.0  onlycanonical 1.0 "named element" 1.0 \
             export 2.0  import 1.0} {*}$args
       }
@@ -907,6 +947,7 @@ proc ::mtmtcl::sets::variable_set {elements extra method args} {
       }
    }
 }
+%</varset,pkg>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -926,13 +967,342 @@ proc ::mtmtcl::sets::variable_set {elements extra method args} {
 %   base& But that's too close to basis and such.\\
 %   understructure& Surprisingly enough, an official English word. 
 %     Feels a bit childish, though (perhaps because it mixes Germanic 
-%     and Latin words).\\
+%     and Latin components).\\
 %   foundation& Certainly posh enough, and seems unclaimed in math.\\
 %   fundament& Ditto.\\
 %   stem& To the point, but could perhaps be useful for other things.
 % \end{longtable}
 % Since it's not to be used in production, |understructure| might 
 % actually be appropriate; otherwise |fundament| seems best.
+% 
+% 
+% \begin{APIspec}{subset}{1.0}
+%   One case of understructure that has applications beyond mere 
+%   debugging is that when one structure is defined as a subset of 
+%   another, e.g.~a matrix group is typically defined as some subset 
+%   of a matrix ring. In this case, every element of the |subset| is 
+%   also an element of the |superset|, but not necessarily vice versa.
+%   
+%   \begin{APIdescription}{subset}
+%     \begin{APImethod}{superset}
+%       \word{method} \word{argument}\regstar
+%     \end{APImethod}
+%       The |superset| method gives access to the structure of which 
+%       the \meta{subset} is a subset. Every element of the 
+%       \meta{subset} is also a valid element of \meta{subset}'s 
+%       \texttt{superset}.
+%   \end{APIdescription}
+%   
+%   This may seem meagre on first sight, but is in practice pretty 
+%   powerful; among those methods of the |superset| that (if at all 
+%   defined) can be applied directly to elements of the \meta{subset} 
+%   are such things as |export|, |import|, methods for constructing 
+%   elements, and methods for taking them apart.
+% \end{APIspec}
+% 
+% \begin{APIspec}{subset}{1.1}
+%   One thing that constructing elements (e.g.~through |import|) in 
+%   the |superset| does not provide is however information about 
+%   whether they in fact belong to the subset in question. This 
+%   suggests adding a membership test method.
+%   
+%   \begin{APIdescription}{subset}
+%     \begin{APImethod}{member}
+%       \word{superset element}
+%     \end{APImethod}
+%       This method takes an element of the |superset| structure as 
+%       argument. It returns boolean true if that argument is also an 
+%       element of the \meta{subset}, and boolean false otherwise.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% Is this what one needs? Well, in some cases yes, but in others no. 
+% The above works well for subsets of sets that can be exactly 
+% represented, but not so well where the representation rather is 
+% approximate. Testing whether some \(\left( \begin{smallmatrix} a & b 
+% \\ c & d \end{smallmatrix} \right) \in \mathbb{Z}^{2 \times 2}\) 
+% belongs to the subset $\mathrm{SL}_2(\mathbb{Z})$ is merely a 
+% matter of checking whether \(ad-bc=1\). Testing whether some $3 
+% \times 3$ matrix of floating-point numbers belongs to 
+% $\mathrm{SO}_3(\mathbb{R})$ is quite another matter, because very 
+% few orthogonal matrices can be exactly represented in 
+% floating-point arithmetic, even though approximate representations 
+% are easy to come by and suffice for most purposes. A 
+% \texttt{member} method with some tolerance would be one way of 
+% approaching this, but a more interesting idea is to make the 
+% possibility of imperfection explicit and provide a tool to 
+% challenge it.
+% 
+% \begin{APIspec}{subset}{2.0}
+%   This is exactly the same as \APIref+{subset}{1.0}, but will be 
+%   developed differently.
+%   \begin{APIdescription}{subset}
+%     \begin{APImethod}{superset}
+%       \word{method} \word{argument}\regstar
+%     \end{APImethod}
+%       The |superset| method gives access to the structure of which 
+%       the \meta{subset} is a subset. Every element of the 
+%       \meta{subset} is also a valid element of \meta{subset}'s 
+%       \texttt{superset}.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% \begin{APIspec}{subset}{2.1}
+%   Version~2.1 is what introduces a tool for approximate 
+%   representation.
+%   \begin{APIdescription}{subset}
+%     \begin{APImethod}{improve}
+%       \word{superset element}
+%     \end{APImethod}
+%       The \word{superset element} is an element of the |superset| 
+%       structure which is approximately an element of the 
+%       \meta{subset}. This method returns an element of the 
+%       |superset| structure which is a better (if possible) 
+%       approximation of the same \meta{subset} element.
+%   \end{APIdescription}
+%   
+%   The idea is that by occasionally applying |improve| to things 
+%   that have been computed and should be elements of the 
+%   \meta{subset}, it is possible to keep one's calculations 
+%   approximately within the \meta{subset}, even if the other 
+%   operations applied would tend to magnify deviations from the 
+%   \meta{subset}.
+% \end{APIspec}
+% 
+% For an example of what \texttt{improve} might do, one can consider 
+% some \(A \in \mathrm{SL}_n(\mathbb{R})\). If \(\det A > 1\) then 
+% taking a power of $A$ will accumulate this deviation and bring the 
+% result further and further away from $\mathrm{SL}_n(\mathbb{R})$. A 
+% suitable \texttt{improve} would then be
+% \begin{equation*}
+%   \texttt{[$\mathrm{SL}_n(\mathbb{R})$ improve $A$]} =
+%   (\det A)^{-1/n} A
+% \end{equation*}
+% since the effect of the right hand side is to rescale $A$ to have 
+% determinant $1$ (up to rounding errors).
+% 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::support::subset 1.0 subset
+%</docstrip.tcl::catalogue>
+% \end{tcl}
+% The |mtmtcl::support::subset| package collects some procedures that 
+% may come in handy when implementing the \texttt{subset} interfaces.
+% 
+% \begin{tcl}
+%<*subset>
+package require Tcl 8.6
+package require mtmtcl::support 1.0
+namespace eval ::mtmtcl::support::subset {
+% \end{tcl}
+% \setnamespace{mtmtcl::support::subset}
+% 
+% \begin{proc}{superexport}
+%   The most common way of exporting an element of a subset would be 
+%   to delegate the operation to the |superset|, but this cannot be 
+%   done by an ensemble mapping alone as there is no way for an 
+%   ensemble-with-parameters to insert the new |export| subcommand in 
+%   the proper position; procedure help with the argument juggling is 
+%   needed. While at that, one should also adjust the |mtmtcl:path| 
+%   attribute of the |export| call, to reflect that any methods that 
+%   the |superset export| might refer to are methods of the |superset| 
+%   rather than the |subset|.
+%   
+%   The most straightforward way of providing that functionality is 
+%   with a procedure that has the call syntax
+%   \begin{displaysyntax}
+%     ::mtmtcl::support::subset::superexport \meta{subset prefix} 
+%     \word{element} \word{common attributes}
+%   \end{displaysyntax}
+%   and performs the call
+%   \begin{displaysyntax}
+%     \meta{subset prefix} superset export \word{element} 
+%     \word{adjusted attributes}
+%   \end{displaysyntax}
+%   Here, the \meta{subset prefix} should be the full command prefix 
+%   of the |subset| structure. If that structure command $c$ is an 
+%   ensemble (possibly with parameters), then what it should map its 
+%   |export| subcommand to is simply
+%   \begin{displaysyntax}
+%     ::mtmtcl::support::subset::superexport $c$
+%   \end{displaysyntax}
+%   since the parameters (if any) are simply copied straight off.
+%   \begin{tcl}
+   proc superexport {args} {
+      set attrD [lindex $args end]
+      dict lappend attrD mtmtcl:path superset
+      {*}[lrange $args 0 end-2] superset export [lindex $args end-1]\
+        $attrD
+   }
+%   \end{tcl}
+%   A slight disadvantage of this command is that it is vulnerable to 
+%   user calling errors: if an |export| call has an argument too much 
+%   or too little, then the method names will be inserted in the 
+%   wrong place. One argument too little will even lead to an 
+%   infinite recursion! (But that should be very noticable, and thus 
+%   caught the first time the calling code is tested.)
+% \end{proc}
+% 
+% \begin{proc}{superexport1p}
+%   A case which turns out to not be entirely uncommon is that the 
+%   parameters of the |superset| are pretty much the same as (or a 
+%   superset of) the parameters of the |subset|; then it can be 
+%   better to call the |superset| command directly. The 
+%   |superexport1p| does the special case that the |superset| command 
+%   takes one parameter, and has the call syntax
+%   \begin{displaysyntax}
+%     ::mtmtcl::support::subset::superexport1p \word{super-command} 
+%     \word{parameter1} \word{element} \word{attributes}
+%   \end{displaysyntax} 
+%   which it translates to
+%   \begin{displaysyntax}
+%     \word{super-command} \word{parameter1} export \word{element} 
+%     \word{attributes$'$}
+%   \end{displaysyntax} 
+%   \begin{tcl}
+   proc superexport1p {command param1 element attrD} {
+      dict lappend attrD mtmtcl:path superset
+      $command $param1 export $element $attrD
+   }
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{byfilter}
+%   This procedure implements a \APIref+{subset}{1.1} by set 
+%   comprehension: the subset of elements which satisfy some 
+%   condition. In functional programming, this is often known as 
+%   filtering; some elements are let through and others are not.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     ::mtmtcl::support::subset::byfilter \word{superset} 
+%     \word{filter} \word{method} \word{arg}\regstar
+%   \end{displaysyntax}
+%   where \word{superset} is the command prefix for the |superset| 
+%   structure and \word{filter} is a command prefix with the syntax
+%   \begin{displaysyntax}
+%     \meta{filter} \word{superset-element}
+%   \end{displaysyntax}
+%   returning boolean true if the \word{superset-element} is in this 
+%   subset and boolean false otherwise.
+%   
+%   \begin{tcl}
+   proc byfilter {superset filter method args} {
+      switch -- $method {
+%   \end{tcl}
+%   The \APIref+{subset}{1.1} methods are pretty obvious.
+%   \begin{tcl}
+         superset {tailcall {*}$superset {*}$args}
+         member {{*}$filter [lindex $args 0]}
+%   \end{tcl}
+%   A couple of other methods can be delegated to the |superset|. (It 
+%   is not checked whether that actually implements them, except when 
+%   quering the API.)
+%   \begin{tcl}
+         = {tailcall {*}$superset = {*}$args}
+         canonise {tailcall {*}$superset canonise [lindex $args 0]}
+         export {
+            set attrD [lindex $args 1]
+            dict lappend attrD mtmtcl:path superset
+            tailcall {*}$superset export [lindex $args 0] $attrD
+         }
+%   \end{tcl}
+%   An interesting case is that of the |elements| method, where this 
+%   procedure does something nontrivial.
+%   \begin{tcl}
+         elements {
+            set res {}
+            foreach x [{*}$superset elements] {
+               if {[{*}$filter $x]} then {lappend res $x}
+            }
+            return $res
+         }
+%   \end{tcl}
+%   But besides this, there really isn't all that much that makes 
+%   sense for a generic |subset| to provide. Parts of \APIref{direct 
+%   product}{1.0} could be implemented, but the |tuple| command 
+%   obviously could not. \APIref{named element}{1.0} could also be 
+%   provided, but would there be any advantage to it over calling 
+%   |superset named| directly? Probably not. \APIref{random 
+%   element}{1.0} could similarly be implemented as picking random 
+%   elements of the |superset| until one is found that is in the 
+%   |subset|, but this could be an extremely inefficient way of 
+%   producing them (if the subset is small), and if it is a 
+%   reasonable method then it may again be better to let the user 
+%   program it explicitly.
+%   
+%   Thus it is instead best to finish off with the |API| subcommand, 
+%   which is delegated to |sdAPI|.
+%   \begin{tcl}
+         API {
+            ::mtmtcl::support::sdAPI {
+               equality canonise export onlycanonical autocanonical 
+               "finite set" subset 
+            } ::mtmtcl::support::subset::byfilter,API \
+              2 $superset $filter {} {*}$args
+         }
+      }
+   }
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{byfilter,API}
+%   The compute-prefix for |byfilter| is again a procedure, which 
+%   thus has the call syntax
+%   \begin{displaysyntax}
+%     |::mtmtcl::support::subset::byfilter,API| \word{interface} 
+%     \word{superset} \word{filter} |{}| \word{interface}\regopt\ 
+%     \word{version}\regopt
+%   \end{displaysyntax}
+%   It is implemented as another big |switch|.
+%   \begin{tcl}
+   proc byfilter,API {interface superset filter args} {
+      switch -- $interface {
+%   \end{tcl}
+%   The only \APIref{equality}{1.1} versions we know about are 1.0 
+%   and 1.1. Ditto for \APIref{canonise}{1.1}.
+%   \begin{tcl}
+         equality - canonise - "finite set" {
+            if {[{*}$superset API $interface 1.0]} then {
+               if {[{*}$superset API $interface 1.1]} then {
+                  return {1.0 1.1}
+               } else {
+                  return {1.0}
+               }
+            }
+         }
+%   \end{tcl}
+%   For \APIref{export}{2.0} it is 2.0.
+%   \begin{tcl}
+         export {
+            if {[{*}$superset API export 2.0]} then {
+               return {2.0}
+            }
+         }
+%   \end{tcl}
+%   For \APIref{onlycanonical}{1.0} and \APIref{autocanonical}{1.0} 
+%   it is 1.0.
+%   \begin{tcl}
+         onlycanonical - autocanonical {
+            if {[{*}$superset API export 1.0]} then {
+               return {1.0}
+            }
+         }
+%   \end{tcl}
+%   \APIref{subset}{1.1} is the only interface which is not 
+%   completely dependent on the \word{superset}.
+%   \begin{tcl}
+         subset {return {1.1 2.0}}
+      }
+   }
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{tcl}
+}
+%</subset>
+% \end{tcl}
 % 
 % 
 % \subsection{Products}
@@ -1014,6 +1384,12 @@ proc ::mtmtcl::sets::variable_set {elements extra method args} {
 %   are |=|-equal.
 % \end{APIspec}
 % 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::sets::cartesian_product 1.1 cartesian
+%</docstrip.tcl::catalogue>
+% \end{tcl}
+% \setnamespace{mtmtcl::sets}
 % 
 % \begin{ensemble}{cartesian_product}
 %   The |cartesian_product| ensemble implements the direct product 
@@ -1027,33 +1403,45 @@ proc ::mtmtcl::sets::variable_set {elements extra method args} {
 %   be empty, in which case API queries are computed at each call, or 
 %   a dictionary.
 %   
+%   Besides \APIref{equality}{1.0} and \APIref{direct product}{1.1}, 
+%   this implementation also tries to satisfy the 
+%   \APIref{canonise}{1.1} and \APIref{finite set}{1.1} interfaces, 
+%   when the component structures so permit. The latter is because, 
+%   from experience, if a set is ``infinite'' then it will typically 
+%   also have some additional structure which one might want a 
+%   cartesian product to preserve, and then one will typically use 
+%   some more specialised cartesian product constructor than this.
+%   
 %   An element of the cartesian structure is a list of elements in 
-%   the substructures; list element $i$ belongs to substructure $i$.
+%   the substructures; list element $i$ belongs to substructure $i$. 
+%   This is part of the documented interface of this package.
 %   
 %   \begin{tcl}
+%<cartesian>package require mtmtcl::support 1.0
+%<*cartesian,pkg>
+package require Tcl 8.6
 namespace eval ::mtmtcl::sets::cartesian_product {
    namespace ensemble create -prefix 0\
-     -subcommands {API = component index tuple canonise}\
+     -subcommands {API = component index tuple canonise elements}\
      -parameters {substructures API-dict}
 %   \end{tcl}
 %   
 %   \begin{ensproc}{API}
 %     The |API| method implementation makes use of a helper ensemble 
 %     also named |API| to compute supported version lists for the 
-%     relevant interfaces (\APIref{direct product}{1.1}, 
-%     \APIref{equality}{1.0}, and \APIref{canonise}{1.0}), but the 
-%     actual |API| method handler is the |::mtmtcl::support::sdAPI| 
-%     command.
+%     relevant interfaces, but the actual |API| method handler is the 
+%     |::mtmtcl::support::sdAPI| command.
 %     \begin{tcl}
    namespace ensemble create -command [namespace current]::API -map {
       equality  API,equality
       canonise  API,canonise
       "direct product" API,direct_product
+      "finite set" API,finite_set
    } -unknown {list apply {args {}}}
    namespace ensemble configure ::mtmtcl::sets::cartesian_product\
      -map [dict create API [
         list ::mtmtcl::support::sdAPI\
-          {"direct product" "equality" "canonise"}\
+          {"direct product" "equality" "canonise" "finite set"}\
           [namespace which API] 1
    ]]
 %     \end{tcl}
@@ -1110,20 +1498,23 @@ namespace eval ::mtmtcl::sets::cartesian_product {
 %     \begin{tcl}
    proc API,equality {substructures args} {
       foreach S $substructures {
-         if {![{*}S API equality 1.0]} then {return ""}
+         if {![{*}$S API equality 1.0]} then {return ""}
       }
       return [list 1.0]
    }
 %     \end{tcl}
+%     Implementing v\,1.1 instead would be possible, but one cannot 
+%     take advantage of the component structures supporting it, so 
+%     there doesn't seem to be much point in doing so.
 %   \end{proc}
 %   
-%   \begin{proc}{API,direct product}
+%   \begin{proc}{API,direct_product}
 %     The \APIref{direct product}{1.1} version is 1.1 if the 
 %     structure has \APIref{equality}{1.0}, and 1.0 otherwise.
 %     \begin{tcl}
-   proc {API,direct product} {substructures args} {
+   proc API,direct_product {substructures args} {
       foreach S $substructures {
-         if {![{*}S API equality 1.0]} then {return [list 1.0]}
+         if {![{*}$S API equality 1.0]} then {return [list 1.0]}
       }
       return [list 1.1]
    }
@@ -1166,11 +1557,139 @@ namespace eval ::mtmtcl::sets::cartesian_product {
       }
       return [list 1.$minor]
    }
-}
 %     \end{tcl}
 %   \end{proc}
 %   
+%   \begin{proc}{elements}
+%     The set of elements is constructed component by component; if 
+%     $E_i$ is the set of elements of the $i$th component and $P_i$ 
+%     is the set of elements in the product of components $\leqslant 
+%     i$ then \(P_i = P_{i-1} \times E_i\). The empty product starts 
+%     out with one element that is the empty list.
+%     \begin{tcl}
+   proc elements {substructures API} {
+      set res {{}}
+      foreach component $substructures {
+         set prod {}
+         foreach item [{*}$component elements] {
+            foreach L $res {
+               lappend L $item
+               lappend prod $L
+            }
+         }
+         set res $prod
+      }
+      return $res
+   }
+%     \end{tcl}
+%     A consequence of the above implementation is that the order of 
+%     elements is such that the first component changes most rapidly 
+%     and the last component changes the slowest. This is probably the 
+%     opposite of what one would expect, and could be changed in the 
+%     future.
+%   \end{proc}
+%   
+%   \begin{proc}{API,finite_set}
+%     In order for the product to satisfy \APIref+{finite set}{1.1}, 
+%     all its components need to do that as well, but if some only 
+%     satisfy \APIref+{finite set}{1.0} then that is what it'll have to 
+%     be.
+%     \begin{tcl}
+   proc API,finite_set {substructures args} {
+      set minor 1
+      foreach S $substructures {
+         if {$minor==1} then {
+            if {![{*}$S API "finite set" 1.1]} then {set minor 0}
+         }
+         if {$minor==0} then {
+            if {![{*}$S API "finite set" 1.0]} then {return ""}
+         }
+      }
+      return [list 1.$minor]
+   }
+}
+%</cartesian,pkg>
+%     \end{tcl}
+%   \end{proc}
 % \end{ensemble}
+% 
+% 
+% \subsection{Metric spaces}
+% 
+% \begin{APIspec}{metric space}{1.0}
+%   A \emph{metric space} is, in general, a set with a real-valued 
+%   distance function that satisfies the triangle inequality.
+%   
+%   \begin{APIdescription}{metric space}
+%     \begin{APImethod}{distance}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method returns the distance between the two 
+%       \word{element}s, in the form of a |double| (most likely an 
+%       IEEE $64$-bit floating point number).
+%       
+%       For any points $x$, $y$, and $z$ in a metric space $M$, 
+%       |distance| must satisfy the conditions
+%       \begin{align*}
+%         \texttt{[$M$ distance $x$ $y$]} ={}&
+%           \texttt{[$M$ distance $y$ $x$]} \text{,}\\
+%         \texttt{[$M$ distance $x$ $y$]} \geqslant{}& 0 \text{,}\\
+%         \texttt{[$M$ distance $x$ $x$]} ={}& 0 \text{,}\\
+%         \texttt{[$M$ distance $x$ $z$]} \leqslant{}&
+%           \texttt{[$M$ distance $x$ $y$]} + 
+%           \texttt{[$M$ distance $y$ $z$]} \text{.}
+%       \end{align*}
+%   \end{APIdescription}
+%   
+%   The reason the method is called |distance| rather than for 
+%   example |metric| the latter is somewhat ambiguous; it can also 
+%   mean an inner product.
+% \end{APIspec}
+% 
+% \begin{APIspec}{metric space}{1.1}
+%   Version~1.1 introduces the correlation between distance and 
+%   equality. Technically, it defines what it means to be a 
+%   \emph{pseudometric space}, since there is no condition that 
+%   elements at $0$ distance are equal.
+%   
+%   \begin{APIdescription}{metric space}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method satisfies the \APIref+{equality}{1.0} interface.
+%     
+%     \begin{APImethod}{distance}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       This method is as specified in the \APIref+{metric 
+%       space}{1.0} interface. In addition, if $x$ and $y$ are 
+%       |=|-equal elements, then the distance between them is $0$.
+%   \end{APIdescription}
+%   
+%   It follows from the above that |distance| is congruent, because 
+%   if $M$ is a metric space where \(x,x',y,y' \in M\) are such that 
+%   $x$ and $x'$ are |=|-equal, and $y$ and $y'$ are |=|-equal, then
+%   \(
+%     \texttt{[$M$ distance $x$ $y$]} \leqslant
+%     \texttt{[$M$ distance $x$ $x'$]} +
+%       \texttt{[$M$ distance $x'$ $y'$]} +
+%       \texttt{[$M$ distance $y'$ $y$]} =
+%     \texttt{[$M$ distance $x'$ $y'$]} \leqslant
+%     \texttt{[$M$ distance $x'$ $x$]} +
+%       \texttt{[$M$ distance $x$ $y$]} +
+%       \texttt{[$M$ distance $y$ $y'$]} =
+%     \texttt{[$M$ distance $x$ $y$]}
+%   \).
+% \end{APIspec}
+% 
+% \begin{APIspec}{metric space}{1.2}
+%   Version~1.2 strengthens the correlation between distance and 
+%   equality to the normal sense of metric space: if $M$ is a 
+%   \APIref+{metric space}{1.2} and \(x,y \in M\) are such that 
+%   \texttt{[$M$ distance $x$ $y$]}\({}=0\), then $x$ and $y$ are 
+%   |=|-equal.
+% \end{APIspec}
+%   
 % 
 % 
 % \subsection{Random structure elements}
@@ -1282,6 +1801,10 @@ namespace eval ::mtmtcl::sets::cartesian_product {
 % \subsection{Helper procedures}
 % 
 % \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::support 1.0 support
+%</docstrip.tcl::catalogue>
+%<*support,pkg>
 namespace eval ::mtmtcl::support {}
 % \end{tcl}
 % \setnamespace{mtmtcl::support}
@@ -1302,7 +1825,7 @@ proc ::mtmtcl::support::constant {arg} {return $arg}
 %     \word{compute-prefix} \word{parameter count} \meta{parameters} 
 %     \word{API-dict} \word{interface}\regopt\ \word{version}\regopt
 %   \end{displaysyntax}
-%   where the last three items are as for the |::APIutil::API| 
+%   where the last three items are as for the |::API::static| 
 %   command. A nonempty \word{API-dict} signals that the API is 
 %   precomputed and need only be parsed, but otherwise it is up to 
 %   this command to supervise the computation of the API.
@@ -1314,8 +1837,11 @@ proc ::mtmtcl::support::constant {arg} {return $arg}
 %     \meta{compute-prefix} \word{interface} \meta{parameters}
 %     \word{API-dict} \word{interface}\regopt\ \word{version}\regopt
 %   \end{displaysyntax}
-%   and they return a list of versions that they support for this 
-%   interface. The list would typically be the list of all versions 
+%   where the two optional arguments are what was in the call to 
+%   |sdAPI|; these are usually not so interesting, but it is easier 
+%   to pass them on than it is to remove them. These calls return a 
+%   list of versions that they support for the first \word{interface}; 
+%   the list would typically be the list of all versions 
 %   supported, but \emph{if} there is an explicit \word{version} and 
 %   it is cheaper to test for only this than to list all supported 
 %   versions, then it is perfectly acceptable to return only this 
@@ -1331,7 +1857,7 @@ proc ::mtmtcl::support::constant {arg} {return $arg}
 proc ::mtmtcl::support::sdAPI {interfaces prefix paramcount args} {
    set tail [lrange $args $paramcount end]
    if {[dict size [lindex $tail 0]]} then {
-      return [::APIutil::API {*}$tail]
+      return [::API::static {*}$tail]
    }
    if {[llength $tail] > 1} then {
       set verL [{*}$prefix [lindex $tail 1] {*}$args]
@@ -1357,7 +1883,7 @@ proc ::mtmtcl::support::sdAPI {interfaces prefix paramcount args} {
 % 
 % 
 % \begin{tcl}
-%</pkg>
+%</support,pkg>
 % \end{tcl}
 % 
 % 

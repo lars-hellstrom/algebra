@@ -1,0 +1,660 @@
+<?xml version="1.0"?>
+<!DOCTYPE html 
+  PUBLIC "-//W3C//DTD XHTML 1.1 plus MathML 2.0 plus SVG 1.1//EN" 
+  "http://www.w3.org/2002/04/xhtml-math-svg/xhtml-math-svg.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xml:lang="en">
+<head>
+
+<title>Rewriting library and completion utility for network algebra</title>
+<meta name="author" content="Lars Hellstr&#246;m"/>
+
+<style type="text/css">
+   svg.network {
+     border-style: dotted;
+     border-width: thin;
+     vertical-align: middle;
+     margin-top: 1pt;
+     margin-bottom: 1pt;
+     fill: none;
+     stroke: currentColor;
+   }
+   table.windowfigure {
+     float: right;
+     background-color: yellow;
+     margin: 6px;
+   }
+   table.windowfigure caption {
+     background-color: inherit;
+     caption-side: bottom;
+   }
+   table.windowfigure img {
+     background-color: inherit;
+     padding: 3px;
+   }
+</style>
+
+</head>
+
+<body>
+
+<h1>Rewriting library and completion utility for network algebra</h1>
+
+
+<svg xmlns="http://www.w3.org/2000/svg" display="none">
+<circle r="8" id="v-m"/>
+<circle r="8" id="v-Delta"/>
+</svg>
+
+<p align="center">
+<span style="font-size: larger;">
+&#x0394;(<i>a</i> &#x22C5;<sub>&#x212C;</sub> <i>b</i>)
+&#x2192;
+&#x0394;(<i>a</i>) &#x22C5;<sub>&#x212C;&#x2297;&#x212C;</sub> 
+&#x0394;(<i>b</i>) ??</span>
+<br/><br/>
+Or
+<svg xmlns="http://www.w3.org/2000/svg" class="network" width="30.0" height="98.0">
+<path d="M 15.0 59.0 Q 15.0 57.0 15.0 49.0 T 15.0 39.0"/>
+<path d="M 9.343 25.343 Q 5.0 21.0 6.25 13.0 T 7.5 0.0"/>
+<path d="M 20.657 25.343 Q 25.0 21.0 23.75 13.0 T 22.5 0.0"/>
+<path d="M 7.5 98.0 Q 7.5 93.0 6.25 85.0 T 9.343 72.657"/>
+<path d="M 22.5 98.0 Q 22.5 93.0 23.75 85.0 T 20.657 72.657"/>
+<use xlink:href="#v-m" transform="translate(15,31)"/>
+<use xlink:href="#v-Delta" transform="translate(15,67)"/>
+</svg>
+&#x2192;
+<svg xmlns="http://www.w3.org/2000/svg" class="network" width="60.0" height="98.0">
+<path d="M 9.343 61.343 Q 5.0 57.0 5.0 49.0 T 9.343 36.657"/>
+<path d="M 39.343 61.343 Q 35.0 57.0 30.0 49.0 T 20.657 36.657"/>
+<path d="M 15.0 23.0 Q 15.0 21.0 18.75 13.0 T 22.5 0.0"/>
+<path d="M 20.657 61.343 Q 25.0 57.0 30.0 49.0 T 39.343 36.657"/>
+<path d="M 50.657 61.343 Q 55.0 57.0 55.0 49.0 T 50.657 36.657"/>
+<path d="M 45.0 23.0 Q 45.0 21.0 41.25 13.0 T 37.5 0.0"/>
+<path d="M 22.5 98.0 Q 22.5 93.0 18.75 85.0 T 15.0 75.0"/>
+<path d="M 37.5 98.0 Q 37.5 93.0 41.25 85.0 T 45.0 75.0"/>
+<use xlink:href="#v-Delta" transform="translate(15,31)"/>
+<use xlink:href="#v-Delta" transform="translate(45,31)"/>
+<use xlink:href="#v-m" transform="translate(15,67)"/>
+<use xlink:href="#v-m" transform="translate(45,67)"/>
+</svg>
+!
+</p>
+
+
+<h2>Summary</h2>
+
+<p>
+This page describes two related pieces of software:
+<ul>
+    <li>
+        <b>network</b> &#8212; a library of operations on networks, 
+        particularly operations related to rewriting, such as finding 
+        instances of one network within another, replacing such instances 
+        by some other network, and listing all critical overlaps of two 
+        networks. Other notable features include generating presentations 
+        of networks, for example as LaTeX code or SVG.
+    </li>
+    <li>
+        <b>cmplutil</b> &#8212; a program which uses said library to 
+        compute the completion of a set of rewrite rules.
+    </li>
+</ul>
+Both are written in <a href="http://www.tcl.tk/">Tcl/Tk</a>, which makes 
+them extremely portable.
+</p>
+
+<h2>Details</h2>
+
+<h3>What is all this about?</h3>
+
+<p>
+<i>Rewriting</i> is the formalisation of an activity that is ubiquous in 
+mathematics: to take an expression, and rewrite it to a form that is 
+better (for whatever purpose on has in mind). Scientifically, rewriting 
+strides the border between mathematics and computer science.
+</p>
+
+<p>
+The central object of study in rewriting is the <i>rewriting system</i>, 
+which is a collection of rewrite <i>rules</i>. A rule has one expression 
+as left hand side, another expression as right hand side, and encodes the 
+idea that "the left hand side expression may be replaced by the right hand 
+side expression, since the two are equivalent" even when occurring as a 
+subexpression within a larger expression. Typical questions asked about 
+rewriting systems are whether they are:
+<dl>
+    <dt>terminating</dt><dd>
+       Will the process of applying rules from this system to an 
+       expression always terminate because an expression is reached where 
+       no rules apply, or can it go on forever?
+    </dd>
+    <dt>confluent</dt><dd>
+       When there is a choice of which rule to apply, does it matter which 
+       rule is chosen, or will the end result always be the same (even 
+       if the number of steps it takes to get there can be very 
+       different)? In a confluent system, the end result is always the 
+       same.
+    </dd>
+</dl>
+Confluent terminating systems can be used to construct effective models of 
+abstract algebraic structures, which is of fundamental importance for 
+computer algebra, but practically also very useful in pure mathematics. 
+This is because two expressions can be tested for equivalence (equality in 
+the modelled algebraic structure) simply by checking whether they both 
+rewrite to the same thing; there is never a need to apply a rule backwards.
+</p>
+
+<p>
+In general, one should not expect the axioms for an algebraic structure to 
+constitute a confluent rewriting system, but this can often be remedied by 
+adding extra rules that encode nontrivial consequences of the given 
+axioms. The process of doing so is called <i>completion</i> (sometimes 
+<i>critical pairs/completion</i> or <i>CPC</i>), and the most renown 
+special case of it is probably the Buchberger algorithm for computing 
+Gr&ouml;bner bases.
+</p>
+
+<p>
+The <b>networks</b> operated on here are generalisations of ordinary 
+mathematical expressions, to better cope with new phenomenons that arise 
+in algebraic structures with co-operations (coproducts, counits, 
+copairings, etc.): the underlying tree structure of ordinary expression is 
+generalised to a Directed Acyclic Graph, to account for the fact that not 
+all operations have coarity 1. Though there are ways of serialising network 
+expressions to fit in a line of text, the most natural way to present them 
+is as small drawings, with a vertex for each operation and edges to show 
+how they fit together in the expression.
+</p>
+
+
+<h3>So what does it do?</h3>
+
+<p>
+The program starts out with a set of "generators" (vertex types) and a set 
+of "congruences" (equations formed from expressions in the generators) 
+that the former are supposed to satisfy. The program turns the congruences 
+into rewrite rules by orienting them, and sets out to verify that the 
+resulting rewrite system is confluent by checking all pairs of rules. 
+Whenever an ambiguity (syzygy, critical pair, &#8230;) is encountered that 
+does not resolve, the corresponding congruence (being nontrivial) is 
+turned into a new rule, giving rise to new pairs, and so on; it's the 
+usual completion procedure. In more detail:
+<ul>
+<li>
+    The expressions considered are formal linear combinations of elements 
+    of the free PROP generated by the given generators. The scalars are by 
+    default from the integers modulo 32003, but that can be changed to any 
+    other field.
+</li>
+<li>
+    When turning a congruence into a rule, the program employs a PROP 
+    partial order (which arguably is as much part of the initial set-up as 
+    the generators and the initial congruences are) to single out a 
+    leading term. Since this may fail, the program actually has two kinds 
+    of rules: proper rules, which could be oriented and are used in 
+    reduction, and "equalities", which could not be oriented and are not 
+    used in reduction. The confluence check / completion considers both 
+    kinds however; the (optimistic) idea is that hopefully some 
+    not-yet-discovered rule will supersede the equality (and maybe the 
+    equality itself is a useful intermediate step towards discovering it).
+</li>
+<li>
+    When adding a new rule, it is checked whether it applies to the left 
+    hand side of any old rule or equality; when it does, that old rule 
+    is deactivated: it is no longer used for reduction, and it no longer 
+    gives rise to ambiguities (except for a final one between the old rule 
+    and the new rule, to make sure no congruence is lost). 
+</li>
+</ul>
+All calculations carried out are recorded in an (SQLite) database, as they 
+may be needed later; for example if one is called upon to present a proof 
+of a rule or that a rewriting system is confluent.
+</p>
+
+<h4>The control panel</h4>
+
+<p>
+<table class="windowfigure">
+   <tr><td><img src="controlpanel.png"/></td></tr>
+   <caption>Control panel window</caption>
+</table>
+Since the completion procedure need not terminate, and even if it does may 
+take a long time to do so, the utility gives the user controls for 
+starting and stopping calculations. These can be found in the Control 
+Panel window. Pressing the Run button starts the completion, whereas 
+pressing Pause or Halt stops it; Pause stops immediately, whereas Halt 
+stops at the next point where the entire state of the completion is stored 
+in the database. In both cases, pressing Run again will resume the 
+calculations. If the calculations are Halted, then no information is 
+lost upon quitting the program.
+</p>
+
+<p>
+All numbers in the control panel window are updated to reflect the 
+current state of the calculations. The first two lines of numbers 
+correspond directly to counts of items in the database. An 
+<i>ambiguity</i> is essentially an expression that should reduce to 0; for 
+inactive ambiguities the reduction has been computed, whereas the active 
+ones still await resolution. A <i>pair</i> is a pair of rules or 
+equalities that needs to be checked for whether they give combine to 
+critical ambiguities; inactive ones have been checked, whereas the active 
+ones still remain. Each pair gives rise to zero or more ambiguities. 
+The third row of numbers in these columns pertain to the strategy for 
+picking the next ambiguity to process: one is chosen which is of minimal 
+size, where the size is heuristically defined as the sum over all terms of 
+the squares of the order the network. In the case shown, 34 = 25 + 9, so 
+one term has order 5 and the other order 3. For pairs, a size estimate is 
+computed based on statistics for the parts, and the program picks either a 
+pair or a rule to process based on which is currently lower.
+</p>
+
+<p>
+When completion is running, a sequence of procedure names may be seen to 
+flash by in the line between the inactive counts and the sizes; these show 
+what the current step in the completion process is.
+<!-- In order to be responsive, the completion process has been unrolled 
+ | into a number of continuations called from the main event loop. -->
+</p>
+
+<h4>The rule browser</h4>
+
+<p>
+<table class="windowfigure">
+   <tr><td><img src="rulebrowser.png"/></td></tr>
+   <caption>Rule browser window</caption>
+</table>
+By default the program also opens another window, the <i>rule browser</i>, 
+which can be used to examine the current database of rules. The top two 
+boxes show the left and right hand sides of a rule, whereas the bottom box 
+shows how it was derived (or its name as an axiom). The numbers in blue 
+there give the number of the rule that was applied at this step, and 
+clicking them tells the browser to jump to the rule in question. Other 
+navigational controls include the Back and Forward buttons (back or 
+forward in browser history), the &#x2212;1 and +1 buttons (one step back 
+or forward in list of rules), and the Go button (jump to rule whose number 
+is in the adjacent entry widget). The window itself, and the individual 
+panes, can be resized. The rule browser may be used regardless of whether 
+the completion process is running or not. When first opened, it may be in 
+a somewhat indeterminate state due to the lack of rules to view; once the 
+completion process has any rules to view, the easiest way out of this 
+state is to type 1 in the number box and press enter (equivalent to 
+clicking Go).
+</p>
+
+<h4>The web interface</h4>
+
+<p>
+Rules may also be browsed using the built-in web server interface. If you 
+point an ordinary web browser (which supports XHTML with inline SVG) to 
+<a href="http://localhost:9090/1.xhtml">localhost port 9090</a>, then you 
+will find web pages with roughly the same contents as the rule browser 
+window. A static collection of such pages can be viewed 
+<a href="Frobenius/10.xhtml">here</a>.
+</p>
+
+<p>
+The built-in web server is <i>very</i> simplistic in that it merely looks 
+at the beginning of the URL path part, and tries to parse one or more 
+digits there as an integer, which is then taken as the number of the rule 
+to serve (in particular, no notice is currently taken of the suffix). 
+Rules are numbered from 1 and up in the order they are created.
+</p>
+
+<h4>Export as LaTeX</h4>
+
+<p>
+Though not offered in any user interface, the utility contains a procedure
+<blockquote>
+  <kbd>database_as_LaTeX <var>filename</var></kbd>
+</blockquote>
+which creates a file named <var>filename</var> containing a LaTeX document 
+with all the rules in the database (and in the case of a derived rule, 
+what is presented is the derivation of that rule).
+</p>
+
+
+<h3>What is the mathematical foundation?</h3>
+
+<p>
+An overview paper is available <a href="overview.pdf">here</a>. Emphasis 
+is on conveying ideas rather formal rigor, so don't expect all details to 
+be spelt out.
+Like rewriting in general, this theory has the advantage of being very 
+intuitive once you grasp the basic idea. However, there is when 
+translating this intuition into a mathematical theory an unfortunate 
+tendency for the details to get rather long and technical, so the complete 
+account of the mathematical foundation is still in the process of being 
+written up. Currently only <a href="foundation.pdf">Sections 2&#8211;6</a> 
+(64 pp.) are ready; these cover networks as a notation for PROP 
+expressions and the construction of PROP orders, but not much about 
+rewriting as such. Fast readers who have finished these and are eager for 
+more should however take a look at 
+<a href="http://arxiv.org/abs/0712.1142"><i>A Generic Framework for 
+Diamond Lemmas</i></a>, as that will be the basis of the rewriting 
+formalism employed.
+</p>
+
+
+<h2>Downloads</h2>
+
+<h3>Quick start</h3>
+
+<p>
+For those eager to try it out for themselves, I have provided two 
+single-file distributions of the completion utility:
+<dl>
+    <dt><a href="Frobenius/cmplfrob.tcl">cmplfrob.tcl</a></dt><dd>
+        Contains the completion utility, as described above, initialised 
+        with an axiom system for Frobenius algebras (system 3 in 
+        <a href="http://arxiv.org/abs/math/0508349v1">[Lauda]</a>).
+    </dd>
+    <dt><a href="Frobenius/cmplfrobnoweb.tcl">cmplfrobnoweb.tcl</a></dt><dd>
+        Is the same, except that it doesn't start the built-in web server.
+    </dd>
+</dl>
+These have one external dependency (besides the Tcl/Tk core) which can be 
+slightly tricky, since it is fairly new: <a 
+href="http://wiki.tcl.tk/TDBC">TDBC</a> (the Tcl DataBase Connectivity 
+layer) and its SQLite backend. Currently (April 2011) the easiest way for 
+you to get hold of these is probably to get the binary 
+<a href="http://www.activestate.com/activetcl/activetcl-8-6">ActiveTcl 8.6</a> 
+distribution 
+<!-- (from <a href="http://www.activestate.com/">ActiveState</a>; -->
+(don't worry that they say it's "beta"; with Tcl, that mostly means it 
+hasn't been fully optimised yet). Hints on instead building Tcl, Tk, and 
+TDBC from sources are given below.
+</p>
+
+<p>
+After installing Tcl etc., all you need to do to start the completion 
+utility is to type
+<blockquote>
+  <kbd>wish8.6 cmplfrob.tcl</kbd>
+</blockquote>
+at a shell prompt, or
+<blockquote>
+  <kbd>wish8.6</kbd><br/>
+  <samp>% </samp><kbd>source cmplfrob.tcl</kbd>
+</blockquote>
+(where the <samp>%</samp> is the wish prompt) if you additionally prefer 
+to have a prompt to type Tcl commands at (such as the 
+<code>database_as_LaTeX</code> shown above).
+</p>
+
+<p>
+When the completion utility starts, it will open a number of windows, one 
+of which is a "Save File" dialog that you will need to complete; the 
+utility asks for the name (and location) of the file in which to keep the 
+calculations database. If you press Cancel, a temporary file is created 
+which is deleted upon exit. If you choose an existing file, then it is 
+assumed you're continuing a previous calculation; the axioms are not 
+reintroduced. To start the completion procedure, you need to press Run.
+</p>
+
+
+<h3>Literate sources</h3>
+
+<p>
+Typeset literate sources for the <a href="network2.pdf">network library</a> 
+and <a href="cmplutil2.pdf">completion utility</a> are available. Items to 
+note are:
+<dl>
+    <dt>network Section 3</dt><dd>
+        describes the format used to enter networks and basic operations 
+        on them.
+    </dd>
+    <dt>network Section 4</dt><dd>
+        is not critical for the understanding of the program, as this is 
+        a collection of heuristics for constructing presentations of 
+        networks.
+    </dd>
+    <dt>network Section 5</dt><dd>
+        contains the implementations of the for rewriting fundamental 
+        operations of finding instances of one network within another and 
+        constructing all overlaps of networks.
+    </dd>
+    <dt>network Section 6</dt><dd>
+        deals with generating graphical renderings of networks, and 
+        describes the "vertex appearances" dictionary which specifies how 
+        vertices are drawn.
+    </dd>
+    <dt>cmplutil Section 1</dt><dd>
+        describes how data is stored in the database, and defines the 
+        operations used when accessing that. (Switching to another TDBC 
+        backend should only require changes here, and those should be 
+        minor; if the SQL dialects are compatible, only the call selecting 
+        the backend needs to be changed.)
+    </dd>
+    <dt>cmplutil Section 2</dt><dd>
+        is the implementation of the completion process.
+    </dd>
+    <dt>cmplutil Section 3</dt><dd>
+        is about viewing the results that the completion has produced.
+    </dd>
+    <dt>cmplutil Section 4</dt><dd>
+        is a collection of problem set-ups for completion.
+    </dd>
+</dl>
+</p>
+
+<p>
+The <b><a href="sources.tar.gz">tarball of sources proper</a></b> contains 
+quite a bit more than that, because the completion utility has a number of 
+external dependencies which have yet to see separate distribution (or even 
+a proper wrap-up as packages). The dominant form for these sources are 
+<code>.dtx</code> files, i.e., LaTeX/docstrip literate sources. If you are 
+unfamiliar with that, then <a 
+href="http://mirrors.ctan.org/macros/latex/contrib/tclldoc/tclldoc.pdf">this 
+document</a> may serve as an introduction.
+</p>
+
+
+<h3>Entering your own problems</h3>
+
+<p>
+Be warned: This is nontrivial, as you'll need to do a bit of programming.
+</p>
+
+<p>
+In order to clarify the task, a "virgin" 
+<a href="cmplutil.tcl">cmplutil.tcl</a> is provided, which contains 
+everything but the actual set-up of a problem. Such a set-up basically 
+consists of three things:
+<ol>
+    <li>
+    <b>Generators.</b>
+    You need to specify the signature of the generators for the free 
+    PROP within which you will be working: this boils down to calling 
+    the <code>sqlite3_init</code> procedure. (The <code>sqlite3</code> 
+    is because this will select the SQLite backend of TDBC for all 
+    database operations; alternatively using some other backend is a 
+    possibility for future development.) If you want to view the results 
+    computed, which is usually the case, you will also need to initialise 
+    the <code>vertex_appearances</code> variable accordingly.
+    </li>
+    <li>
+    <b>Relations.</b>
+    The axioms you require the generators to fulfil are entered, one by 
+    one, using the <code>enter_congruence</code> procedure.
+    </li>
+    <li>
+    <b>Order.</b>
+    You need to provide a <code>set_cmpcmds</code> procedure that defines 
+    a well-founded strict PROP partial order of networks. This is where 
+    outright <i>programming</i> is currently required. 
+    The <code>set_cmpcmds</code> procedure is somewhat indirect in its 
+    operation, in that it is called to initialise various data structures 
+    that (i) tell the completion utility how to compute comparison keys for 
+    networks, and (ii) how to compare such keys. If you should happen to 
+    come up with a procedure that implements the full comparison of two 
+    networks, then it is possible to let the comparison key be a 
+    one-element list containing the whole network and your procedure be 
+    the only one that is used, but it is usually far more practical to do 
+    the comparison in several refinement steps, where each element in the 
+    key contains the information relevant for one basic comparison.
+    </li>
+</ol>
+For details on what all of that means, see the literate sources described 
+above. Note the indices of program symbols at the end.
+</p>
+
+<p>
+There are chances that these tasks (especially the last) may become more 
+user-friendly in the future (as some families of standard orders are 
+emerging), but at the moment it seems more urgent to complete the 
+account of the mathematical foundation for network rewriting.
+</p>
+
+
+<h3>Installing Tcl from sources</h3>
+
+<p>
+Tcl, Tk, and TDBC are all rather easy to install from sources (provided 
+you already have a C compiler with the usual unixy build tools; and if 
+you don't, then you're probably not in the business of installing from 
+sources anyway): it essentially boils down to typing the three commands
+<blockquote>
+  <kbd>./configure</kbd><br/>
+  <kbd>make</kbd><br/>
+  <kbd>make install</kbd>
+</blockquote>
+at the shell prompt. Specifying options for <code>configure</code> is 
+possible (as usual, there are oodles of them), but the defaults are usually 
+good enough.
+</p>
+
+<p>
+Slightly more complicated is the matter of getting all the pieces. The 
+main download site for Tcl and Tk is <a 
+href="http://sourceforge.net/">SourceForge</a>:
+<blockquote>
+   <a href="http://sourceforge.net/projects/tcl/files/Tcl/">http://sourceforge.net/projects/tcl/files/Tcl/</a>
+   (need at least 8.6b1)<br/>
+   Note that there is both <code>tcl-src</code> and <code>tk-src</code> 
+   archives in these directories. For the completion utility, you need 
+   both Tcl and Tk.
+</blockquote>
+<a href="http://tip.tcl.tk/376.html">In the future</a>, 
+TDBC should be included with Tcl (in the tcl/pkg directory 
+of the sources), but until then the canonical place to get it is from the 
+<a href="http://core.tcl.tk/tdbc/index">source repository</a> &#8212; 
+in addition to which you'll need <a 
+href="http://www.sqlite.org/download.html">SQLite</a> with Tcl bindings; 
+currently that download is called 
+<code>sqlite-<b>autoconf</b>-</code><i>version</i><code>.tar.gz</code>.
+</p>
+
+<p>
+Windows users may find the 
+<a href="http://sourceforge.net/projects/tcl/files/TDBC/">TDBC file 
+distribution</a> on SourceForge useful. Although it "only" contains 
+prebuilt binaries, it includes both the TDBC layer and the backend drivers 
+this needs.
+</p>
+
+
+
+<h3>A bonus: Version 1 of the completion utility</h3>
+
+<p>
+<table class="windowfigure">
+   <tr><td><img src="controller1.png"/></td></tr>
+   <caption>Version 1 controller window</caption>
+</table>
+If the above installation procedure seems too much when you just want to 
+take a first look, then you might be interested in instead taking that 
+first look on the <a href="Frobenius/cmplutil1frob.tcl">previous 
+version</a> of the utility. 
+Besides running under Tcl/Tk 8.5 (and 8.4 with the dict package), <b>it 
+shows every step of the calculations as they are being performed</b> 
+because one reason for writing it in the first place was to "exercise" 
+the rewriting library under human supervision (have it do a lot of 
+calculations, while checking that it seemed to get them right). Today, 
+this means watching this program run can help you gain an understanding 
+of what reduction and completion looks like in network rewriting.
+</p>
+
+<p>
+A consequence of this idea of "supervised calculation" is however that 
+the program does a lot in the GUI. For example, whenever it finds 
+something that it will need to resolve, it pops up an "ambiguity window" 
+in which the calculations are carried out at a rate of one step per 
+second. When it is finished, it will let you view the outcome for five 
+seconds, before the window automatically closes. (Various buttons in these 
+windows are remnants of earlier versions still, where the supervising 
+human actually had to press one to tell the program what the outcome was, 
+but now this is all automatic, so just sit back and enjoy the show.)
+</p>
+
+<p>
+The controller window in version 1 is different from the version 2 window 
+described above, and that reflects a difference in the outer loop of the 
+completion. 
+In version 1, critical pairs of rules exist only implicitly. There are two 
+sets of rules &#8212; the "base" and the "queue" &#8212; and one iteration 
+of the outer loop moves one rule from the queue to the base. A loop 
+invariant is that all pairs between rules in the base have been processed, 
+so moving one rule requires processing all pairs it can form with rules in 
+the base. The controller window displays the (left hand sides of the) pair 
+currently being processed; the "right rule" is that being added to the 
+base, and the "left rule" loops over all rules in the base. Pressing the 
+Go button will start this inner loop over possible "left" rules, whereas 
+pressing the Next button will advance the "right" rule one step (and reset 
+the "left" rule to the first in the base). The default is that the user 
+needs to press first "Next" and then "Go" for every iteration of the outer 
+loop, but when the "Auto Next Go" checkbox is checked then the utility will 
+do so itself at the end of the inner loop. Thus, checking this box and 
+pressing Go causes the calculation to run until no more rules remain, or 
+until you uncheck it and the inner loop ends.
+</p>
+
+<p>
+It should be observed that not only are the calculations shown on screen 
+as they happen, the windows in which they are shown are actually used to 
+control the flow of the program: calculations only happen in the window 
+which has focus. This has the effect that switching focus to the rule 
+browser or some other program will pause the completion utility. Closing a 
+window prematurely is possible, but will cause the program to skip some 
+part of the computation.
+</p>
+
+<p>
+Furthermore note that version 1 has a number of shortcomings, compared to 
+the current version 2:
+<ul>
+    <li>
+    It can only work with single network expressions, not linear 
+    combinations of networks. (In Gr&ouml;bner basis terminology, this 
+    means it can only work with binomial identities.)
+    </li>
+    <li>
+    It doesn't have facilities for saving the state of the completion to 
+    disk, nor much in the area of exporting the results, and it only 
+    remembers those calculations that were used to derive new rules.
+    </li>
+    <li>
+    It cannot make productive use of non-orientable derived equalities; 
+    these are merely saved away in a separate list of not-quite-rules, 
+    which have numbers e0, e1, e2, &#8230; in the browser window. (The 
+    expectation was that the user should supply an order that managed 
+    to orient everything which would be derived, and these were remembered 
+    primarily as examples of where the order needed to be improved.)
+    </li>
+</ul>
+The core aspects of network rewriting are however present and fully 
+functional.
+</p>
+
+
+<h2>Contact</h2>
+
+<p>
+The author of all the above is Lars Hellstr&ouml;m. My primary e-mail is 
+lars (dot) hellstrom (at) residenset (dot) net.
+</p>
+
+</body>
+
+</html>

@@ -1,0 +1,487 @@
+%
+% \endinput
+% 
+% This isn't really a literate source file, but simply a normal .tcl 
+% file (for something which was written as a standalone package) with 
+% a bit of wrapper, to make it fit with the "build a huge .tcl with all 
+% the code in it" structure that had to be applied to the rest of 
+% cmplutil2.
+% 
+%<*pkg>
+package require Tcl 8.2
+package provide API 1.0
+
+namespace eval ::API {
+    namespace export static nstatic staticn dynamic ensemble
+}
+
+## 
+ # ::API::static - basic API query handler
+ # 
+ # Synopsis:
+ #   ::API::static $dict ?$interface ?$version??
+ #   
+ #   dict       - Dictionary of supported interfaces and 
+ #                versions.
+ #   interface  - Name of interface to query about.
+ #   version    - Version of interface to check support for.
+ # 
+ # Result:
+ #   Depending on the number of arguments specified, this 
+ #   procedure returns the $dict, a list of versions, or a 
+ #   boolean.
+ #   
+ # Usage:
+ #   To implement an API subcommand, append the arguments of 
+ #   that subcommand to a command prefix
+ #       ::API::static $dict
+ #   where $dict (typically an explicit constant in your code) is 
+ #   the list of interfaces and versions for which you want to 
+ #   claim support.
+ # 
+ ##
+
+proc ::API::static {dict args} {
+    if {[llength $args] == 0} then {
+        return $dict
+    } elseif {[llength $args] > 2} then {
+        return -code error "Too many arguments!"
+    }
+    array set A $dict
+    foreach {i version} $args {break}
+    if {[llength $args] == 1} then {
+        if {[info exists A($i)]} then {
+            return $A($i)
+        } else {
+            return ""
+        }
+    } else {
+        if {![info exists A($i)]} then {return 0}
+        foreach hasver $A($i) {
+            if {[package vsatisfies $hasver $version]} then {return 1}
+        }
+        return 0
+    }
+}
+
+
+## 
+ # ::API::nstatic - basic API query handler in the presence of parameters
+ # 
+ # Synopsis:
+ #   ::API::nstatic $n {*}$ignored $dict ?$interface ?$version??
+ #   
+ #   dict       - Dictionary of supported interfaces and 
+ #                versions.
+ #   interface  - Name of interface to query about.
+ #   version    - Version of interface to check support for.
+ #   ignored    - Ignored arguments.
+ #   n          - Number of arguments to ignore.
+ # 
+ # Result:
+ #   Depending on the number of arguments specified, this 
+ #   procedure returns the $dict, a list of versions, or a 
+ #   boolean.
+ #   
+ # Usage:
+ #   This is a minor variation of the static command, which takes the 
+ #   same arguments as it but only following some fixed number of 
+ #   initial arguments which should be skipped. It might be used to 
+ #   implement an API subcommand for an ensemble with parameters that 
+ #   has the API dictionary are the final parameter. In that case, 
+ #   one would map API to a command prefix
+ #       ::API::nstatic $n
+ #   where $n is one less than the number of ensemble parameters.
+ #   
+ #   The case $n==0 is equivalent to ::API::static.
+ # 
+ ##
+
+proc ::API::nstatic {n args} {
+    set dict [lindex $args $n]
+    set args [lreplace $args 0 $n]
+    if {[llength $args] == 0} then {
+        return $dict
+    } elseif {[llength $args] > 2} then {
+        return -code error "Too many arguments!"
+    }
+    array set A $dict
+    foreach {i version} $args {break}
+    if {[llength $args] == 1} then {
+        if {[info exists A($i)]} then {
+            return $A($i)
+        } else {
+            return ""
+        }
+    } else {
+        if {![info exists A($i)]} then {return 0}
+        foreach hasver $A($i) {
+            if {[package vsatisfies $hasver $version]} then {return 1}
+        }
+        return 0
+    }
+}
+
+
+## 
+ # ::API::staticn - basic API query handler in the presence of parameters
+ # 
+ # Synopsis:
+ #   ::API::staticn $n $dict {*}$ignored ?$interface ?$version??
+ #   
+ #   dict       - Dictionary of supported interfaces and 
+ #                versions.
+ #   interface  - Name of interface to query about.
+ #   version    - Version of interface to check support for.
+ #   ignored    - Ignored arguments.
+ #   n          - Number of arguments to ignore.
+ # 
+ # Result:
+ #   Depending on the number of arguments specified, this 
+ #   procedure returns the $dict, a list of versions, or a 
+ #   boolean.
+ #   
+ # Usage:
+ #   This is another minor variation of the static command, which has 
+ #   the $dict before the ignored arguments rather than (as in the case 
+ #   of nstatic) after them. It might be used to implement an API 
+ #   subcommand for an ensemble with parameters that has the API 
+ #   dictionary as first parameter; in that case, 
+ #   one would map API to a command prefix
+ #       ::API::nstatic $n
+ #   where $n is one less than the number of ensemble parameters. 
+ #   It might also be used to implement an API subcommand for an 
+ #   ensemble with parameters that does not have the API dictionary as 
+ #   a parameter; in that case, one would map API to a command prefix
+ #       ::API::nstatic $n $dict
+ #   where $n is the number of ensemble parameters. 
+ #   
+ #   The case $n==0 is equivalent to ::API::static.
+ # 
+ ##
+
+proc ::API::staticn {n dict args} {
+    set args [lrange $args $n end]
+    if {[llength $args] == 0} then {
+        return $dict
+    } elseif {[llength $args] > 2} then {
+        return -code error "Too many arguments!"
+    }
+    array set A $dict
+    foreach {i version} $args {break}
+    if {[llength $args] == 1} then {
+        if {[info exists A($i)]} then {
+            return $A($i)
+        } else {
+            return ""
+        }
+    } else {
+        if {![info exists A($i)]} then {return 0}
+        foreach hasver $A($i) {
+            if {[package vsatisfies $hasver $version]} then {return 1}
+        }
+        return 0
+    }
+}
+
+
+## 
+ # ::API::dynamic - dynamic API query handler
+ # 
+ # Synopsis:
+ #   ::API::dynamic $APIargs $interfaces $tests
+ #   
+ #   APIargs    - Like $args list of ::API::static.
+ #   interfaces - Interface test dictionary (see below).
+ #   tests      - Named test dictionary (see below)
+ # 
+ # Result:
+ #   Depending on the number of arguments specified, this 
+ #   procedure returns an interface dictionary, a list of versions, 
+ #   or a boolean.
+ #   
+ # Side-effects:
+ #   None.
+ #   
+ # Details:
+ #   The dynamic command is meant to be called from within a procedure 
+ #   body. It is a sort of control structure that aims to arrive at the 
+ #   answer to an API query with as little work as possible, by using 
+ #   demand-driven computation.
+ #   
+ #   The basic concept in understanding its arguments is the idea of 
+ #   a requirements list. This is a list with an even number of elements, 
+ #   where each pair has one of the five forms
+ #     try $script
+ #     eval $script
+ #     expr $expression
+ #     test $name
+ #     not $requirementsList
+ #   Each such item is used to perform some test and will thereby produce 
+ #   a boolean value. The requirements list as a whole is true iff all 
+ #   items in it produces a true value. Evaluation of a requirements list 
+ #   proceeds in short-curcuit manner, and will stop after the first item 
+ #   which produces a false value.
+ #   
+ #   The various items are generally evaluated in the calling context of 
+ #   the dynamic command, which is one reason the latter is typically 
+ #   placed within a procedure body. A try item is considered to be true 
+ #   if the $script returns with a -code of 0 (ok). For an eval item the 
+ #   $script must have a boolean return value, which is taken as the 
+ #   value being produced. For an expr item the same holds for the 
+ #   $expression; expr $expression may be regarded as a shorthand for
+ #   eval [list ::expr $expression]. A test item is true if the test named 
+ #   $name is true. Finally, a not item evaluates the $requirementsList 
+ #   and takes the opposite boolean value.
+ #   
+ #   The $tests dictionary has test names as keys and requirements lists 
+ #   as values; an example might be
+ #     Tk {
+ #        try {package require Tk}
+ #     } colordisplay {
+ #        test Tk
+ #        expr {[winfo screendepth .] > 1}
+ #     }
+ #   $interfaces is a nested dictionary, where the outer key is an interface 
+ #   name and the inner key is a version of that interface. The entries 
+ #   are again requirements lists. An example might be
+ #     foo {1.0 {} 1.3 {test foo}}
+ #     bar {1.0 {test foo expr {$baz>3}}}
+ #   which means:
+ #     foo version 1.0 is always supported, 
+ #     foo version 1.3 is supported if the test named foo succeeds,
+ #     bar version 1.0 is supported if the test named foo succeeds
+ #                        and additionally the $baz variable in the 
+ #                        calling context is greater than 3.
+ #   The point of having named tests is that common conditions can be 
+ #   factored out of individual version tests. In addition, the results 
+ #   of those tests need only be computed once for each ::API::dynamic 
+ #   call, which can make a significant difference for queries that are 
+ #   not restricted to a specific version.
+ #   
+ # Notes:
+ #   The implementation is optimised for cases where individual 
+ #   requirements are expensive to compute.
+ #   
+ ##
+
+proc ::API::dynamic {APIargs interfaces tests} {
+    array set testA $tests
+    array set interfaceA $interfaces
+    # There are two main cases: Test for a specific version, or test 
+    # for all versions.
+    if {[llength $APIargs] > 1} then {
+        if {![info exists interfaceA([lindex $APIargs 0])]} then {return 0}
+        set target [lindex $APIargs 1]
+        foreach {version reqlist} $interfaceA([lindex $APIargs 0]) {
+            if {[package vsatisfies $version $target] && (
+                ![info exists best] || [package vsatisfies $best $version]
+            )} then {
+                set best $version
+                set bestreq $reqlist
+            }
+        }
+        if {[info exists best]} then {
+            return [dynamic,reqs $bestreq]
+        } else {
+            return 0
+        }
+    }
+    # The area where there can be implications is within different versions 
+    # of the same interface, so the code for handling that is common for 
+    # the all interfaces and single interfaces case. To that end, the 
+    # single interface case is handled by removing all other keys  
+    # from the $interfaces dictionary.
+    if {[llength $APIargs]} then {
+        set interface [lindex $APIargs 0]
+        if {![info exists interfaceA($interface)]} then {return ""}
+        set interfaces [list $interface $interfaceA($interface)]
+    } else {
+        set res {}
+    }
+    foreach {interface verlist} $interfaces {
+        # For each specific interface, the versions are tested in 
+        # the order they are listed, and it is remembered which pass 
+        # and which fail. Additional versions are first compared against 
+        # those for which the result is known, to avoid evaulating 
+        # a reqlist for which the result should already be known.
+        set yesL {}
+        set noL {}
+        foreach {version reqlist} $verlist {
+            set known 0
+            foreach ver $yesL {
+                if {[package vsatisfies $ver $version]} then {
+                    set known 1; break
+                }
+            }
+            if {$known} then {continue}
+            foreach ver $noL {
+                if {[package vsatisfies $version $ver]} then {
+                    set known 1; break
+                }
+            }
+            if {$known} then {continue}
+            if {[
+                dynamic,reqs $reqlist
+            ]} then {
+                lappend yesL $version
+            } else {
+                lappend noL $version
+            }
+        }
+        lappend res $interface $yesL
+    }
+    if {[llength $APIargs]} then {
+        return $yesL
+    } else {
+        return $res
+    }
+}
+
+
+## 
+ # ::API::dynamic,reqs - helper for ::API::dynamic
+ # 
+ # This is the command that actually produces the value of a requirements 
+ # list. It expects to be called from within ::API::dynamic, as it will
+ # [uplevel 2] the various $script and $expression elements in the 
+ # requirements list. The call syntax is
+ # 
+ #   ::API::dynamic,reqs $reglist
+ # 
+ # and it returns the value produced for $reqlist. It will also access 
+ # the tests variable and testres array in its calling context, setting 
+ # elements of testres whenever it has determined the value of the 
+ # corresponding test.
+ # 
+ ##
+
+proc ::API::dynamic,reqs {reqlist} {
+    upvar 1 testA testA testres testres
+    foreach {type data} $reqlist {
+        switch -- $type "test" {
+            if {![info exists testres($data)]} then {
+                # One could guard against circular test definitions 
+                # by setting testres($data) to a non-boolean value here,
+                # but the recursionlimit should also catch such errors.
+                set testres($data)\
+                  [uplevel 1 [list dynamic,reqs $testA($data)]]
+            }
+            if {!$testres($data)} then {return 0}
+        } "try" {
+            if {[catch {uplevel 2 $data}]} then {return 0}
+        } "eval" {
+            if {![uplevel 2 $data]} then {return 0}
+        } "expr" {
+            if {![uplevel 2 [list ::expr $data]]} then {return 0}
+        } "not" {
+            if {[uplevel 1 [list dynamic,reqs $data]]} then {return 0}
+        } default {
+            error "Bad requirement type: $type"\
+              "$reqlist\n  being processed by"
+        }
+    }
+    return 1      
+}
+
+
+## 
+ # ::API::ensemble - create ensemble supporting API convention
+ # 
+ # Synopsis:
+ #   ::API::ensemble $name $APIs ?$subcommand $prefix ...?
+ # 
+ # Side-effects:
+ #   A new command $name is created. The first argument of that 
+ #   command is a subcommand name. The available subcommands will 
+ #   be (i) API, behaving as required by the API convention and 
+ #   (ii) those listed as $subcommand's in the call, behaving as 
+ #   aliases to the corresponding $prefix'es. An empty $prefix is 
+ #   equivalent to a $prefix equal to the preceeding $subcommand. 
+ #   The namespace current in the context calling 
+ #   ::API::ensemble will be prepended to each $prefix that is 
+ #   not fully namespace qualified.
+ # 
+ # Result:
+ #   The name of the command created.
+ # 
+ # Note:
+ #   In Tcl 8.5, this command is implemented using
+ #   [namespace ensemble]. Prior to that, the command creates an 
+ #   ordinary procedure.
+ # 
+ ##
+
+if {[package vsatisfies [package provide Tcl] 8.5]} then {
+    proc ::API::ensemble {name APIs args} {
+        if {[llength $args] & 1} then {
+            return -code error {wrong # args: should be\
+              "ensemble name APIs ?subcmd prefix ...?"}
+        }
+        set ns [uplevel 1 {::namespace current}]
+        set map [list API [list ::API::static $APIs]]
+        foreach {subcmd prefix} $args {
+            if {![llength $prefix]} then {
+                 set prefix [list $subcmd]
+            }
+            if {![string match ::* [lindex $prefix 0]]} then {
+                set full "${ns}::[lindex $prefix 0]"
+                lappend map $subcmd [lreplace $prefix 0 0 $full]
+            } else {
+                lappend map $subcmd $prefix
+            }
+        }
+        uplevel 1 [list ::namespace ensemble create\
+          -command $name -map $map -prefixes 0]
+    }
+} else {
+    proc ::API::ensemble {name APIs args} {
+        if {[llength $args] & 1} then {
+            return -code error {wrong # args: should be\
+              "ensemble name APIs ?subcmd1 prefix1 ...?"}
+        }
+        set ns [uplevel 1 {::namespace current}]
+        set map [list API [list ::API::static $APIs]]
+        foreach {subcmd prefix} $args {
+            if {![llength $prefix]} then {
+                 set prefix [list $subcmd]
+            }
+            if {![string match ::* [lindex $prefix 0]]} then {
+                set full "${ns}::[lindex $prefix 0]"
+                lappend map $subcmd [lreplace $prefix 0 0 $full]
+            } else {
+                lappend map $subcmd $prefix
+            }
+        }
+        #
+        # The procedure created will look like
+        #   proc $name {subcmd args} {
+        #      switch -- $subcmd ...
+        #   }
+        # The ... part is constructed in the $switch variable.
+        # 
+        set switch {}
+        set L {}
+        foreach {subcmd prefix} $map {
+            lappend switch $subcmd\
+              "\n  ::uplevel 1 \[::list $prefix\] \$args\n"
+            lappend L $subcmd
+        }
+        set L [lsort -dictionary $L]
+        if {[llength $L]>2} then {
+            set L [lreplace $L end end "or [lindex $L end]"]
+        } elseif {[llength $L]==2} then {
+            set L [list [join $L { or }]]
+        }
+        lappend switch default "\n  ::return -code error\
+          \"unknown subcommand \\\"\$subcmd\\\":\
+          must be \[[list ::join $L {, }]\]\"\n"
+        uplevel 1 [list ::proc $name {subcmd args}\
+          "::switch -- \$subcmd $switch"]
+        uplevel 1 [list ::namespace which -command $name]
+    }
+}
+%</pkg>
+%
+%
+\endinput

@@ -2465,6 +2465,162 @@ proc dump_to_PDF {fname args} {
 % \end{tcl}
 % 
 % 
+% \section{Frobenius algebra}
+% 
+% The following is a demonstration problem, backported from version~2 
+% of the completion utility. It sets up rules for a Frobenius algebra.
+% 
+% \subsection{Generators and rules}
+% 
+% \begin{tcl}
+%<*Frobenius>
+clear_rules
+set vertex_types {
+  Delta {1 2}  epsilon {1 0}  cap {0 2}  m {2 1}  unit {0 1}
+}
+set vertex_appearances {
+   m {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   unit {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {}
+   }
+   Delta {
+      {oval {square 8} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{0 -8}}
+   }
+   epsilon {
+      {oval {square 8} {}}
+      {}
+      {{0 -8}}
+   }
+   cap {
+      {oval {square 8} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {}
+   }
+}
+% \end{tcl}
+% 
+% First, there are the rules for an algebra.
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit . \r m}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {. unit \r m}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {. m \r m}
+] pure [
+   network::pure::construct $vertex_types {m . \r m}
+]
+% \end{tcl}
+% 
+% Then, the rules for bends (zig--zag identities, such as they are).
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {. cap \n m . \n epsilon .}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {cap . \n . m \n . epsilon}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+% \end{tcl}
+% Finally, the rule defining the coproduct.
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {cap . \n . m}
+] pure [
+   network::pure::construct $vertex_types {Delta}
+]
+% \end{tcl}
+% 
+% 
+% \subsection{Order}
+% 
+% \begin{proc}{compare_networks}
+%   In this case, |compare_networks| is really an alias for 
+%   |network::pure::grouplex_compare| with a suitable helper.
+%   \begin{tcl}
+interp alias {} compare_networks {}\
+  network::pure::grouplex_compare Frobenius_cmpkey
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{Frobenius_cmpkey}
+%   This procedure computes comparison keys that should be suitable 
+%   for a Frobenious algebra, so it has the syntax
+%   \begin{displaysyntax}
+%     |Frobenius_cmpkey| \word{network}
+%   \end{displaysyntax}
+%   and returns a list of comparison groups. (The version~2 form of 
+%   this procedure returns the flattening of that list.)
+%   \begin{tcl}
+proc Frobenius_cmpkey {NW} {
+   set groups {}
+%   \end{tcl}
+%   The first group has one item: a basic count of vertices.
+%   \begin{tcl}
+   lappend groups [list [llength [lindex $NW 0]]]
+%   \end{tcl}
+%   The next group consists of path counts, so essentially it is what 
+%   one gets from evaluating the network in the biaffine \PROP. A 
+%   slight twist is however that the signs are reversed, to make the 
+%   symmetric term (with every input connected to every output) in the 
+%   Frobenius identities the smallest of the three.
+%   \begin{tcl}
+   set pathMat [network::pure::list_paths_turning $NW]
+   set group {}
+   foreach row $pathMat {
+      foreach cell $row {
+         lappend group [expr {-[llength $cell]}]
+      }
+   }
+   lappend groups $group
+%   \end{tcl}
+%   The final group consists of weighted path counts, and could 
+%   similarly be obtained by evaluating the network in the biaffine 
+%   \PROP\ (with a slightly different assignment of values to 
+%   vertices). Here, the weight of a path is doubled every time it 
+%   goes through the right branch of a product, coproduct, or cap. 
+%   This has the effect of orienting the associativity and 
+%   coassociativity identities.
+%   \begin{tcl}
+   set group {}
+   foreach row $pathMat {
+      foreach cell $row {
+         set sum 0
+         foreach path $cell {
+            set w 1
+            foreach {tail annot head} $path {
+               if {$head > 0} then {set w [expr {2*$w}]}
+               if {$tail > 0} then {set w [expr {2*$w}]}
+            }
+            set sum [expr {$sum + $w}]
+         }
+         lappend group $sum
+      }
+   }
+   lappend groups $group
+   return $groups
+}
+%</Frobenius>
+%   \end{tcl}
+% \end{proc}
+% 
 % 
 % \section{Hopf algebra}
 % 
@@ -2780,7 +2936,7 @@ add_rule {} pure [
 %   \end{quote}
 %   as this is not immediately visible from the implementation.
 %   \begin{tcl}
-%<*Hopf>
+%<*Hopf&!HopfObsolete>
 proc compare_networks {args} {
    foreach PROP {
       integer_biaffine_PROP 
@@ -3030,7 +3186,7 @@ set Hopf_value_4(twist)\
 % \end{arrayvar}
 % 
 % \begin{tcl}
-%</Hopf>
+%</Hopf&!HopfObsolete>
 % \end{tcl}
 % 
 % \subsection{Obsolete ordering schemes}
@@ -3755,6 +3911,57 @@ proc compare_networks {NW1 NW2} {
 }
 %</GWS>
 % \end{tcl}
+% 
+% 
+% \section{Transposition example}
+% 
+% What happens if one only has a |twist| vertex of arity and coarity 
+% $2$, that is its own inverse and satisfies the Yang--Baxter 
+% equation? 
+% 
+% \begin{tcl}
+%<*Transposition>
+clear_rules
+set vertex_types {
+  twist {2 2}
+}
+% \end{tcl}
+% Twists are circles with a cross.
+% \begin{tcl}
+set vertex_appearances {
+   twist {
+      {oval {square 8} {}  line {square 5.657} {} \
+        line {offsets {5.657 -5.657} {-5.657 5.657}} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+}
+% \end{tcl}
+% 
+% \begin{tcl}
+add_rule {} pure [
+   network::pure::construct $vertex_types {twist \r twist}
+] pure [
+   network::pure::construct $vertex_types {. .}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {twist . \n . twist \n twist .}
+] pure [
+   network::pure::construct $vertex_types {. twist \n twist . \n . twist}
+]
+proc compare_networks {NW1 NW2} {
+   if {[llength [lindex $NW1 0]] > [llength [lindex $NW2 0]]} then {
+      return ">"
+   } elseif {[llength [lindex $NW1 0]] < [llength [lindex $NW2 0]]}\
+   then {
+      return "<"
+   } else {
+      return "="
+   }
+}
+%</Transposition>
+% \end{tcl}
+
 
 
 % \section{Sleep deprivation}

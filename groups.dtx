@@ -21,6 +21,7 @@
 % axioms for a semigroup and monoid, respectively.
 % 
 % \begin{tcl}
+%<*pkg>
 namespace eval ::mtmtcl::groups {}
 % \end{tcl}
 % \setnamespace{mtmtcl::groups}
@@ -125,6 +126,15 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 %     \end{tcl}
 %   \end{procmethod}
 %   
+%   \begin{procmethod}{canonise}
+%     Every string is a value on canonical form, but an explicit 
+%     |canonise| method that just returns the argument is a useful 
+%     piece of glue.
+%     \begin{tcl}
+      canonise {return [lindex $args 0]}
+%     \end{tcl}
+%   \end{procmethod}
+%   
 %   \begin{procmethod}{API}
 %     It just so happens that the definition of |*| above satifies 
 %     not only v\,1.0 but also v\,1.1 of \texttt{semigroup} and 
@@ -134,7 +144,7 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 %     interfaces as well.
 %     \begin{tcl}
       API {
-         ::APIutil::API {equality 1.0  autocanonical 1.0 \
+         ::API::static {equality 1.0  autocanonical 1.0 \
            onlycanonical 1.0  semigroup 1.1  monoid 1.1} {*}$args
       }
 %     \end{tcl}
@@ -144,7 +154,7 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 %   \begin{tcl}
       default {
          return -code error "Unknown method \"$method\": must be\
-           =, *, 1, or API"
+           =, *, 1, canonise, or API"
       }
    }
 }
@@ -888,7 +898,7 @@ proc ::mtmtcl::groups::power_product_monoid_1.3 {base method args} {
          if {[{*}$base API export 2.0]} then {
             dict set D export 2.0 
          }
-         ::APIutil::API $D {*}$args
+         ::API::static $D {*}$args
       }
 %     \end{tcl}
 %   \end{procmethod}
@@ -1175,10 +1185,27 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 % 
 % 
 % 
+% \begin{APIspec}{additive group}{2.0.1}
+%   Version 2.0.1 of \texttt{additive group} introduces |-| for 
+%   subtraction.
+%   \begin{APIdescription}{group}
+%     \begin{APImethod}{-}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The defining property of |-| is that the two expressions
+%       \begin{displaysyntax}
+%         [$G$ - $a$ $b$]\par
+%         [$G$ + $a$ [$G$ neg $b$]]
+%       \end{displaysyntax}
+%       are |=|-equal for all elements $a$ and $b$.
+%   \end{APIdescription}
+%   All methods are congruent. 
+% \end{APIspec}
+% 
 % \begin{APIspec}{additive group}{2.1}
 %   Version 2.1 of \texttt{additive group} extends the syntax of 
-%   addition to be variadic, introduces |-| for subtraction, and 
-%   |iszero| for testing whether something is $0$.
+%   addition to be variadic and introduces |iszero| for testing 
+%   whether something is $0$.
 %   \begin{APIdescription}{group}
 %     \begin{APImethod}{+}
 %       \word{element}\regstar
@@ -1194,16 +1221,6 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %       In particular this implies that \texttt{[$G$ +]} returns 
 %       the identity element and that $a$ is |=|-equal to 
 %       \texttt{[$G$ + $a$]} for every element $a$.
-%       
-%     \begin{APImethod}{-}
-%       \word{element} \word{element}
-%     \end{APImethod}
-%       The defining property of |-| is that the two expressions
-%       \begin{displaysyntax}
-%         [$G$ - $a$ $b$]\par
-%         [$G$ + $a$ [$G$ neg $b$]]
-%       \end{displaysyntax}
-%       are |=|-equal for all elements $a$ and $b$.
 %       
 %     \begin{APImethod}{iszero}
 %       \word{element}
@@ -1227,7 +1244,7 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %     \begin{APImethod}{integer.}
 %       \word{integer} \word{element} 
 %     \end{APImethod}
-%       The value of \texttt{[\meta{group} integer. $n$ $a$]} is 
+%       The value of \texttt{[\meta{group} integer.\@ $n$ $a$]} is 
 %       $\sum_{i=1}^n a$.
 %       
 %       The notation is chosen to on one hand make it easy to turn an 
@@ -1248,12 +1265,12 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %     \end{APImethod}
 %       The value of
 %       \begin{displaysyntax}
-%         [\meta{group} *\^{} $n_1$ $a_1$ $\dots$ $n_k$ $a_k$]
+%         [\meta{group} +integer. $n_1$ $a_1$ $\dots$ $n_k$ $a_k$]
 %       \end{displaysyntax}
 %       is $\sum_{i=1}^k n_1 a_1$, i.e., on one hand
 %       \begin{displaysyntax}
-%         [$G$ +integer. $a$ $n$]\par
-%         [$G$ integer. $a$ $n$]
+%         [$G$ +integer. $n$ $a$]\par
+%         [$G$ integer. $n$ $a$]
 %       \end{displaysyntax}
 %       are |=|-equal for every element $a$ and integer $n$, and on the 
 %       other,
@@ -1509,7 +1526,7 @@ proc mtmtcl::groups::free_abelian_group::= {X sorter {first ""} args} {
 %     |onlycanonical|.
 %     \begin{tcl}
 proc mtmtcl::groups::free_abelian_group::named {X sorter name} {
-   dict create [$X canonise $name] 1
+   dict create [{*}$X canonise $name] 1
 }
 %     \end{tcl}
 %   \end{ensproc}
@@ -1646,7 +1663,7 @@ proc mtmtcl::groups::free_abelian_group::export {X sorter elem attr} {
 %     good enough for now.
 %     \begin{tcl}
 proc mtmtcl::groups::free_abelian_group::API {X sorter args} {
-   ::APIutil::API [lindex {{} {
+   ::API::static [lindex {{} {
       equality 1.1
       onlycanonical 1.0
       canonise 1.1
@@ -1759,6 +1776,9 @@ proc mtmtcl::groups::free_abelian_group::API {X sorter args} {
 %   version 1.0 of \APIref{additive group}{1.0} rather than~2.0.
 % \end{APIspec}
 % 
+% \begin{tcl}
+%</pkg>
+% \end{tcl}
 % 
 % 
 \endinput

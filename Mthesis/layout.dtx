@@ -1,0 +1,4740 @@
+% 
+% \iffalse 
+%<*driver>
+\documentclass{mtmtcl}
+\usepackage{amsmath,amssymb,amsfonts}
+\begin{document}
+\DocInput{layout.dtx}
+\PrintIndex
+\end{document}
+%</driver>
+% \fi
+% 
+% \tableofcontents
+% 
+% 
+% \section{The layout problem}
+% 
+% \begin{tcl}
+%<*pkg>
+package require mtmtcl::rings::complex 1.1
+namespace eval network::ulayout {
+   interp alias {} [namespace current]::complex\
+     {} ::mtmtcl::rings::complex
+}
+package require mtmtcl::Lie::complex_matrix_real_space 1.2
+package require mtmtcl::Lie::unitary1fixed 1.0
+package require mtmtcl::Lie::Rn 1.0
+package require mtmtcl::Lie::product 1.0
+package require mtmtcl::Lie::golden 1.0
+% \end{tcl}
+% \setnamespace{network::ulayout}
+% 
+% 
+% \subsection{Generic formulation}
+% 
+% The generic layout problem solved here can be stated as that of, 
+% given a list of levels of items, finding a permutation of the items 
+% within each level (and horizontal positions for each level as 
+% whole) that minimises the tension of the connectors between these 
+% levels. In its simplest application, each item is either a network 
+% vertex placed in the given level or an edge passing through it, but 
+% one may also consider ``items'' that are rather blocks of more 
+% fundamental items that have been given a fixed relative position.
+% 
+% The input data structure is a list of levels, in order from lowest 
+% to highest. Each level is a list of items, and an item is a list with 
+% the structure
+% \begin{displaysyntax}
+%   \word{width} \word{down-dict} \word{up-dict}
+% \end{displaysyntax}
+% where the \word{width} is a |double|\Ldash the (nominal) width of 
+% this item\Rdash and the two other items are key--value lists with 
+% the structure
+% \begin{displaysyntax}
+%   \begin{regblock}[\regstar] \word{connector} \word{offset} 
+%   \end{regblock}
+% \end{displaysyntax}
+% that specify the connectors between this item and items in neighbouring 
+% levels. The \word{down-dict} is for connectors to the previous level, 
+% and the \word{up-dict} is for connectors to the next level. A 
+% \word{connector} is an arbitrary string, whereas the \word{offset} 
+% is the horizontal offset of the endpoint of that connector from the 
+% reference point (horizontal midpoint) of the item. Two 
+% \word{down-dict}s (and similarly \word{up-dict}s) from the same level 
+% may not have any \word{connector}s in common, and each \word{connector} 
+% found in some \word{down-dict} of a level must also occur in some 
+% \word{up-dict} of the level before (and vice versa). There is however 
+% no restriction on using the same \word{connector} in both a 
+% \word{down-dict} and an \word{up-dict} from the same level; typically 
+% one would use the label of the underlying edge no matter how many 
+% levels that spans.
+% 
+% Solutions to the layout problem typically reference items by their 
+% position in the input data structure, so even though this order on 
+% one hand is arbitrary, it may on the other hand be important.
+% 
+% \bigskip
+% 
+% Internally, a slightly different description is used that separates 
+% connectors from items. In this, a level is represented by a flat list 
+% of \word{width}s (each a |double| as above), whereas the 
+% \word{wiring} between two levels is a list with the structure
+% \begin{displaysyntax}
+%   \begin{regblock}[\regstar] \word{$i$} \word{$j$} \word{delta} 
+%   \end{regblock}
+% \end{displaysyntax}
+% Each such triplet describes one connector, whose lower endpoint is 
+% attached to item $i$ of the level below, whose upper endpoint is 
+% attache to item $j$ of the level above, and for which \word{delta} 
+% is the upper \word{offset} minus the lower \word{offset}. Wirings 
+% and levels are often collected in a list with the structure
+% \begin{displaysyntax}
+%   \begin{regblock}[\regstar] \word{wiring} \word{width-vector} 
+%   \end{regblock}
+% \end{displaysyntax}
+% whereas the very first \word{width-vector} is kept separately.
+% 
+% \begin{proc}{expose_wiring}
+%   To produce this more internal representation, one makes the call
+%   \begin{displaysyntax}
+%     |network::ulayout::expose_wiring| \word{list of levels} 
+%     \word{post-unit}
+%   \end{displaysyntax}
+%   that returns the pair
+%   \begin{displaysyntax}
+%     \word{width-vector 0} \{ \begin{regblock}[\regstar]
+%     \word{wiring} \word{width-vector} \end{regblock} \}
+%   \end{displaysyntax}
+%   At the same time, the lengths in the problem are rescaled so that 
+%   a length of $1$ in the internal representation corresponds to 
+%   \word{post-unit} generic representation units. This is done to 
+%   make the objective function more easily comparable to functions 
+%   defined directly in terms of the domain variables, which is 
+%   something several rounding schemes employ.
+%   
+%   The implementation builds the $k$th \word{wiring} from the entries 
+%   in the array |A|\meta{$k \bmod 2$}, which at the end will be lists 
+%   with the form
+%   \begin{displaysyntax}
+%     \word{down-index} \word{down-offset} \word{up-index} 
+%     \word{up-offset}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc ::network::ulayout::expose_wiring {levelL unit} {
+   set scale [expr {1.0/$unit}]
+   set widths0 {}
+   foreach item [lindex $levelL 0] {
+      foreach {id ofs} [lindex $item 2] {
+         lappend A0($id) [llength $widths0] $ofs
+      }
+      lappend widths0 [expr {$scale*[lindex $item 0]}]
+   }
+   set uparr A1
+   set downarr A0
+   set res {}
+   foreach level [lrange $levelL 1 end] {
+      set widths {}
+      foreach item $level {
+         foreach {id ofs} [lindex $item 1] {
+            lappend ${downarr}($id) [llength $widths] $ofs
+         }
+         foreach {id ofs} [lindex $item 2] {
+            lappend ${uparr}($id) [llength $widths] $ofs
+         }
+         lappend widths [expr {$scale*[lindex $item 0]}]
+      }
+      set wiring {}
+      foreach {id L} [array get $downarr] {
+         if {[llength $L] != 4} then {
+            return -code error "Mismatch for connector: $id"
+         }
+         lappend wiring [lindex $L 0] [lindex $L 2]\
+           [expr {$scale*([lindex $L 3] - [lindex $L 1])}]
+      }
+      lappend res $wiring $widths
+      array unset $downarr
+      foreach {downarr uparr} [list $uparr $downarr] break
+   }
+   return [list $widths0 $res]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{average_width}
+%   A suitable length unit for |expose_wiring| can be the average 
+%   width of an item, which can be computed using the call
+%   \begin{displaysyntax}
+%     |::network::ulayout::average_width| \word{list of levels} 
+%     \word{onlymultiple}
+%   \end{displaysyntax}
+%   The \word{onlymultiple} argument is a boolean. If this is true, 
+%   then items that are alone in their level (typically blocks of 
+%   fixed legs) are not included in the average calculation.
+%   \begin{tcl}
+proc ::network::ulayout::average_width {levelL onlymultiple} {
+   set n 0
+   set sum 0.0
+   foreach level $levelL {
+      if {[llength $level] < 2 && $onlymultiple} then {continue}
+      foreach item $level {
+         incr n
+         set sum [expr {$sum + [lindex $item 0]}]
+      }
+   }
+   if {$n} then {
+      return [expr {$sum / $n}]
+   } else {
+      return 1.0
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% The domain over which a layout is optimised is an 
+% |mtmtcl::Lie::product| of one |mtmtcl::Lie::Rn| and zero or more 
+% |mtmtcl::Lie::unitary1fixed|; points in this domain are thus lists 
+% of component values. Component $0$ is always the $\mathbb{R}^n$ 
+% part, and its components are in turn the \emph{differences} in 
+% reference position between two neighbouring levels. Component $1$ 
+% and up of the great product are elements of some
+% $\mathrm{U}^\mathbf{1}(n)$. One thing to note here is however that 
+% not every level need to have a component; levels with only one item 
+% are skipped since their $\mathrm{U}^\mathbf{1}(n)$ would anyway be 
+% trivial.
+% 
+% \begin{proc}{domain}
+%   For constructing this domain, one uses the call
+%   \begin{displaysyntax}
+%     domain \word{widths 0} \word{wiring--widths}
+%   \end{displaysyntax}
+%   which returns the command prefix implementing the 
+%   optimisation domain (some $\mathbb{R}^n \times \prod_{j=1}^k 
+%   \mathrm{U}^\mathbf{1}(m_j)$).
+%   
+%   \begin{tcl}
+proc ::network::ulayout::domain {widths0 wwL} {
+   set GL [list [::mtmtcl::Lie::Rn::make group [expr {[llength $wwL]/2}]]]
+   foreach {dummy level} [linsert $wwL 0 "" $widths0] {
+      if {[llength $level] > 1} then {
+         lappend GL\
+           [::mtmtcl::Lie::unitary1fixed::make group [llength $level]]
+      }
+   }
+   return [::mtmtcl::Lie::product::make group $GL]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{tangent_angles}
+%   This procedure computes the angles between two tangent vectors, 
+%   separately for each component, and in total. The call syntax is
+%   \begin{displaysyntax}
+%     |tangent_angles| \word{group} \word{vector 1} \word{vector 2}
+%   \end{displaysyntax}
+%   where the \word{group} is a product Lie group as returned by 
+%   |domain|, whereas \word{vector 1} and \word{vector 2} are 
+%   |tangent|s of the \word{group}. The return value is a list
+%   \begin{displaysyntax}
+%     \word{component angle}\regplus\ \word{overall angle}
+%   \end{displaysyntax}
+%   with one \word{component angle} for each component of the 
+%   \word{group}. The angles are expressed in degrees. If the length 
+%   in some component of \word{vector 1} or \word{vector 2} is less 
+%   than $10^{-16}$ then the corresponding \word{component angle} is 
+%   considered to be uncertain and given as |?| rather than a number.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::tangent_angles {G v1 v2} {
+   set res {}
+   set sqr1sum 0.0
+   set sqr2sum 0.0
+   set prodsum 0.0
+   foreach c1 $v1 c2 $v2 {
+      set sqr1\
+        [{*}$G tangent component [llength $res] innerprod $c1 $c1]
+      set sqr2\
+        [{*}$G tangent component [llength $res] innerprod $c2 $c2]
+      set prod\
+        [{*}$G tangent component [llength $res] innerprod $c1 $c2]
+      set sqr1sum [expr {$sqr1sum + $sqr1}]
+      set sqr2sum [expr {$sqr2sum + $sqr2}]
+      set prodsum [expr {$prodsum + $prod}]
+      if {$sqr1 < 1e-32 || $sqr2 < 1e-32} then {
+         lappend res ?
+      } else {
+         set q [expr {$prod / sqrt($sqr1*$sqr2)}]
+         lappend res\
+           [expr {$q>1 ? 0 : $q<-1 ? 180 : acos($q)/acos(-1)*180}]
+      }
+   }
+   set q [expr {$prodsum / sqrt($sqr1sum*$sqr2sum)}]
+   lappend res [expr {$q>1 ? 0 : $q<-1 ? 180 : acos($q)/acos(-1)*180}]
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% In the case \(n=2\), the group $\mathrm{U}^\mathbf{1}(n)$ is a 
+% circle that can be parametrised as
+% \begin{equation}
+%   P(\theta) = \begin{pmatrix}
+%     \frac{1 + e^{i\theta}}{2} & \frac{1 - e^{i\theta}}{2} \\
+%     \frac{1 - e^{i\theta}}{2} & \frac{1 + e^{i\theta}}{2}
+%   \end{pmatrix}
+%   \qquad\text{for \(0 \leqslant \theta < 2\pi\).}
+% \end{equation}
+% One sees from this that \(P(\tfrac{\pi}{2}) = \tfrac{1}{2} 
+% \left( \begin{smallmatrix} 1+i & 1-i \\ 1-i & 1+i \end{smallmatrix} 
+% \right)\) is halfway between the two permutation matrices 
+% $\left( \begin{smallmatrix} 1 & 0 \\ 0 & 1 \end{smallmatrix} 
+% \right)$ and $\left( \begin{smallmatrix} 0 & 1 \\ 1 & 0 
+% \end{smallmatrix} \right)$. Such midpoints are natural candidates 
+% for starting points in that they have no bias for either 
+% permutation, but how might one generalise this to \(n>2\)? There 
+% are at least two possibilities.
+% 
+% \begin{proc}{bigXpoint}
+%   One is to let the matrix components have the form
+%   \[
+%     \begin{pmatrix}
+%       \frac{1+i}{2} & 0 & 0 & \ldots & 0 & 0 & \frac{1-i}{2} \\
+%       0 & \frac{1+i}{2} & 0 & \ldots & 0 & \frac{1-i}{2} & 0 \\
+%       0 & 0 & \frac{1+i}{2} & \ldots & \frac{1-i}{2} & 0 & 0 \\
+%       \vdots & \vdots & \vdots & & \vdots & \vdots & \vdots \\
+%       0 & 0 & \frac{1-i}{2} & \ldots & \frac{1+i}{2} & 0 & 0 \\
+%       0 & \frac{1-i}{2} & 0 & \ldots & 0 & \frac{1+i}{2} & 0 \\
+%       \frac{1-i}{2} & 0 & 0 & \ldots & 0 & 0 & \frac{1+i}{2}
+%     \end{pmatrix}
+%   \]
+%   with a $1$ in the center when the matrix side is odd. 
+%   Conceptually, this is taking the average of the identity 
+%   permutation and the reversal permutation, and it turns out that 
+%   it causes all item positions to have the same real part (halfway 
+%   between $0$ and the combined width), which is about as good as 
+%   one can hope for. (There is a potential problem with the 
+%   separation in the imaginary direction, but more on that in the 
+%   next subsection.)
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     network::ulayout::bigXpoint 
+%     \word{widths 0} \word{wiring--widths} 
+%   \end{displaysyntax}
+%   and the return value is the point in the corresponding |domain| 
+%   which has matrix components of the above type and an 
+%   $\mathbb{R}^n$ component that aligns the level midpoints with 
+%   each other. (This typically agrees with the 
+%   |jumbled_component_layout|, defined in another section.)
+%   
+%   In the following loop, |xL| is the list of \word{point} components 
+%   for the $\mathbb{R}^n$ part of the domain and |ML| is the corresponding 
+%   list of matrix parts of the point.
+%   \begin{tcl}
+proc ::network::ulayout::bigXpoint {widths0 wwL} {
+   set xL {}
+   set ML {}
+   set up [complex cartesian 0.5 0.5]
+   set down [complex cartesian 0.5 -0.5]
+   foreach {dummy level} [linsert $wwL 0 "" $widths0] {
+      set w 0.0
+      foreach item_w $level {set w [expr {$w + $item_w}]}
+      if {[info exists lastwidth]} then {
+         lappend xL [expr {0.5*($lastwidth-$w)}]
+      }
+      set lastwidth $w
+      if {[llength $level] > 1} then {
+         set M [lrepeat [llength $level]\
+           [lrepeat [llength $level] [complex 0]]]
+         for {set j 0} {$j < [llength $level]/2} {incr j} {
+            lset M $j     $j     $up
+            lset M end-$j end-$j $up
+            lset M $j     end-$j $down
+            lset M end-$j $j     $down
+         }
+         if {[llength $level] & 1} then {
+            lset M $j $j [complex 1]
+         }
+         lappend ML $M
+      }
+   }
+   return [linsert $ML 0 $xL]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{smallXespoint}
+%   The other approach is to stack copies of the $2 \times 2$ cross 
+%   beside each other:
+%   \[
+%     \begin{pmatrix}
+%       \frac{1+i}{2} & \frac{1-i}{2} & 0 & 0 & \ldots \\
+%       \frac{1-i}{2} & \frac{1+i}{2} & 0 & 0 & \ldots \\
+%       0 & 0 & \frac{1+i}{2} & \frac{1-i}{2} & \ldots \\
+%       0 & 0 & \frac{1-i}{2} & \frac{1+i}{2} & \ldots \\
+%       \vdots & \vdots & \vdots & \vdots & \ddots 
+%     \end{pmatrix}
+%   \]
+%   with a $1$ in the lower right corner when the matrix side is odd. 
+%   This means the order within a pair of neighbouring items is 
+%   indeterminate, and brings enough complexity into the situation 
+%   that the points can do some moving around, but it has a strong 
+%   bias for something close to the original permutation (where 
+%   closeness should be with respect to a view of permutations as 
+%   functions). This can be a good thing if one has a good guess as 
+%   to what the optimum should be, but will otherwise tend to stand 
+%   out as a very unnatural layout.
+%   
+%   The call syntax is as above
+%   \begin{displaysyntax}
+%     network::ulayout::smallXespoint 
+%     \word{widths 0} \word{wiring--widths} 
+%   \end{displaysyntax}
+%   and the return value is the point in the corresponding |domain| 
+%   which has matrix components of the above type and an 
+%   $\mathbb{R}^n$ component that aligns the level midpoints with 
+%   each other.
+%   
+%   Again, |xL| is the list of \word{point} components for the 
+%   $\mathbb{R}^n$ part of the domain and |ML| is the corresponding 
+%   list of matrix parts of the point.
+%   \begin{tcl}
+proc ::network::ulayout::smallXespoint {widths0 wwL} {
+   set xL {}
+   set ML {}
+   set up [complex cartesian 0.5 0.5]
+   set down [complex cartesian 0.5 -0.5]
+   foreach {dummy level} [linsert $wwL 0 "" $widths0] {
+      set w 0.0
+      foreach item_w $level {set w [expr {$w + $item_w}]}
+      if {[info exists lastwidth]} then {
+         lappend xL [expr {0.5*($lastwidth-$w)}]
+      }
+      set lastwidth $w
+      if {[llength $level] > 1} then {
+         set M [lrepeat [llength $level]\
+           [lrepeat [llength $level] [complex 0]]]
+         for {set j 0} {$j+1 < [llength $level]} {incr j 2} {
+            lset M $j   $j   $up
+            lset M $j+1 $j+1 $up
+            lset M $j   $j+1 $down
+            lset M $j+1 $j   $down
+         }
+         if {[llength $level] & 1} then {
+            lset M end end [complex 1]
+         }
+         lappend ML $M
+      }
+   }
+   return [linsert $ML 0 $xL]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{proc}{permute_point_rows}
+%   This procedure permutes the rows of the matrices in an 
+%   optimisation domain point, which can be useful for constructing 
+%   ``random'' (or at least quite distant from a known one) points in 
+%   the domain. The call syntax is
+%   \begin{displaysyntax}
+%     |permute_point_rows| \word{permutation-list} \word{point}
+%   \end{displaysyntax}
+%   and the return value is the result of letting the permutations in 
+%   the \word{permutation-list} act (from the left) upon the components 
+%   of the \word{point}; the first element of the 
+%   \word{permutation-list} acts upon the first matrix component of 
+%   the \word{point}, the second upon the second, and so on. A 
+%   permutation $\sigma$ of $n$ elements is specified as a list of the 
+%   natural numbers $0$ to $n-1$, inclusive; the value if $\sigma(i)$ 
+%   is \texttt{[lindex $\sigma$ $i$]}. As a special case, the 
+%   identity permutation may also be given as the empty list.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::permute_point_rows {permL point} {
+   set res [lrange $point 0 0]
+   foreach sigma $permL A [lrange $point 1 end] {
+      if {[llength $sigma]} then {
+         set B $A
+         foreach i $sigma row $A {lset B $i $row}
+         lappend res $B
+      } else {
+         lappend res $A
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Optimisation in the domain}
+% 
+% A (local) minimum within the domain is sought using the golden 
+% section line search method, as implemented by the 
+% |mtmtcl::Lie::golden| package, but there are two additional things 
+% that are needed for a working minimisation procedure. One is the 
+% choice of search direction, which is strongly influenced by the 
+% gradient direction (but not directly the raw gradient, for reasons 
+% that will be explained below). The other thing that is needed is 
+% the actual function to minimise, which in practice is going to be a 
+% combination of several ``potentials'' that correspond to different 
+% high-level objectives.
+% 
+% Some of these potentials are defined directly in terms of the 
+% domain point components, but others rather depend on the item 
+% positions that the point determines. Since the calculation of one 
+% from the other is not entirely trivial, it makes sense to do this 
+% calculation only once and supply the same combined account of raw 
+% point and corresponding item positions to each procedure that 
+% computes values for one of the component potentials. The format of 
+% this combined account is a list
+% \begin{displaysyntax}
+%   \word{point} \word{identifier} \word{level-positions} 
+%   \word{extra}\regstar
+% \end{displaysyntax}
+% where the \word{level-positions} is a list (with one element per 
+% level) of complex vectors of the horizontal positions (relative to 
+% the left endpoint of the level) of the items within that level. The 
+% \word{identifier} is a string that identifies the method\slash 
+% formula that was used to compute the \word{level-positions} from 
+% the \word{point} (with the generic problem at hand as given 
+% background). The \word{identifier} also determines which 
+% \word{extra} items (if any) that are present.
+% 
+% The reason for this generality is that the formula for computing 
+% \word{level-positions} from the \word{point} turns out to be less 
+% than obvious. Taking \(\mathbf{z} = (z_1,\dotsc,z_n)\) to be the 
+% position vector and \(\mathbf{w} = (w_1,\dotsc,w_n)\) to be the 
+% vector of item widths, one may first observe that if $1,\dotsc,n$ 
+% is the list of items from left to right, then \(z_k = 
+% \tfrac{1}{2}w_k + \sum_{j=1}^{k-1} w_j\), which can be written in 
+% matrix from as \(\mathbf{z} = M \mathbf{w}\), where $M$ is the 
+% matrix whose entries are $\tfrac{1}{2}$ on the main diagonal, $0$ 
+% above it, and $1$ below it. Next generalising to the case that the 
+% index (in $\mathbf{w}$ and $\mathbf{z}$) of the $k$th item from the 
+% left is $\sigma(k)$, where \(\sigma\colon [n] \longrightarrow [n]\) 
+% is some permutation, the corresponding formula becomes
+% \[
+%   z_{\sigma(k)} = 
+%   \tfrac{1}{2} w_{\sigma(k)} + \sum_{j=1}^{k-1} w_{\sigma(j)}
+%   \text{.}
+% \]
+% Writing $\phi(\sigma)$ for the permutation matrix counterpart of 
+% $\sigma$, the matrix form of this is
+% \begin{equation}
+%   \mathbf{z} = \phi(\sigma) M \phi(\sigma^{-1}) \mathbf{w}
+%   \text{,}
+% \end{equation}
+% suggesting
+% \begin{equation}
+%   \mathbf{z} = P M P^{-1} \mathbf{w}
+% \end{equation}
+% as the corresponding formula when the permutation $\phi(\sigma)$ is 
+% relaxed to a more general matrix \(P \in \mathrm{U}^\mathbf{1}(n)\).
+% 
+% 
+% \begin{proc}{PMP*w}
+%   For unitary matrices, the inverse is more easily computed as the 
+%   Hermitian conjugate, so the above formula boils down to 
+%   \(\mathbf{z} = P M P^* \mathbf{w}\), and that is what this 
+%   procedure primarily computes. It also returns some intermediate 
+%   results as extra data.
+%   
+%   In more detail, this procedure has the call syntax
+%   \begin{displaysyntax}
+%     PMP*w \word{widths0} \word{wiring--widths} \word{point}
+%   \end{displaysyntax}
+%   where \word{widths0} and \word{wiring--widths} make up the 
+%   internal representation for a layout problem (as described above) 
+%   and the \word{point} is an optimisation domain point. It returns 
+%   a combined account with the format
+%   \begin{displaysyntax}
+%     \word{point} PMP*w \word{$PMP^*\mathbf{w}$-list} 
+%     \word{$MP^*\mathbf{w}$-list} \word{$P^*\mathbf{w}$-list}
+%   \end{displaysyntax}
+%   where the last three items are lists of vectors of |complex| 
+%   numbers, and the outer list level is indexed by item level (there 
+%   is also a middle list level indexed by position in vector and an 
+%   inner list level for the |complex| number). 
+%   
+%   In the implementation, $k$ is the index into \word{point} of the 
+%   current matrix component.
+%   \begin{tcl}
+proc ::network::ulayout::PMP*w {widths0 wwL point} {
+   set res {}; set res1 {}; set res2 {}
+   set k 1
+   foreach {wiring widths} [linsert $wwL 0 "" $widths0] {
+%   \end{tcl}
+%   If this is a trivial level (only one item) then the $P$ matrix is 
+%   the identity and the sought $P M P^* \mathbf{w}$ product is 
+%   simply half the only width, recast as a complex number. Deal 
+%   with that case first.
+%   \begin{tcl}
+      if {[llength $widths] < 2} then {
+         lappend res [list [
+            complex cartesian [expr {0.5*[lindex $widths 0]}] 0.0
+         ]]
+         lappend res1 [lindex $res end]
+         lappend res2 [list [
+            complex cartesian [lindex $widths 0] 0.0
+         ]]
+         continue
+      }
+%   \end{tcl}
+%   Otherwise one should begin with the \(P_k^* \mathbf{w} =: 
+%   \mathbf{v}\) product. Since |widths| is a real vector, 
+%   and since the hermitian conjugate $P_k^*$ is still a bit of work 
+%   to compute, this matrix--vector product is unrolled as a couple 
+%   of loops (using an explict |lindex| to effectively put the loop 
+%   over $P_k$ columns as the outer |foreach|).
+%   \begin{tcl}
+      set Pk [lindex $point $k]
+      set v {}
+      foreach column [lindex $Pk 0] {
+         set re 0.0; set im 0.0
+         foreach row $Pk w $widths {
+            set re [expr {$re + [lindex $row [llength $v] 0] * $w}]
+            set im [expr {$im - [lindex $row [llength $v] 1] * $w}]
+         }
+         lappend v [complex cartesian $re $im]
+      }
+      lappend res2 $v
+%   \end{tcl}
+%   The \(\mathbf{u} := M\mathbf{v}\) vector is easy to compute, 
+%   since one merely needs to sum over previous vector elements.
+%   \begin{tcl}
+      set u {}
+      set sum [complex 0]
+      foreach z $v {
+         lappend u [complex + $sum [complex . 0.5 $z]]
+         set sum [complex + $sum $z]
+      }
+      lappend res1 $u
+%   \end{tcl}
+%   Finally, the \(\mathbf{t} := P_k \mathbf{u}\) product is a 
+%   full-blown matrix--vector product (which could have been done as 
+%   a call to |Mvprod| of |mtmtcl::Lie::complex_matrix_real_space|, 
+%   but that felt a bit wrong since I don't have the right |Zero| 
+%   matrix at hand here (even though that particular subcommand 
+%   doesn't use this parameter)).
+%   \begin{tcl}
+      set t {}
+      foreach row $Pk {
+         set sum [complex 0]
+         foreach cell $row z $u {
+            set sum [complex + $sum [complex * $cell $z]]
+         }
+         lappend t $sum
+      }
+      lappend res $t
+      incr k
+   }
+   return [list $point PMP*w $res $res1 $res2]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% To see why the $P^*\mathbf{w}$ and $MP^*\mathbf{w}$ vectors are 
+% useful, one may consider the problem of computing the gradient 
+% of a function on the form \(P \mapsto f\bigl( \operatorname{Re}
+% (\mathbf{c}^* PMP^* \mathbf{w}) \bigr)\), where \(f\colon 
+% \mathbf{R} \longrightarrow \mathbb{R}\) is differentiable and 
+% $\mathbf{c}$ is some constant vector. By the chain rule,
+% \[
+%   \nabla_P f\bigl( 
+%     \operatorname{Re}(\mathbf{c}^* PMP^* \mathbf{w}) 
+%   \bigr) =
+%   f'\bigl( 
+%     \operatorname{Re}(\mathbf{c}^* PMP^* \mathbf{w}) 
+%   \bigr)
+%   \nabla_P \operatorname{Re}(\mathbf{c}^* PMP^* \mathbf{w}) 
+%   \text{.}
+% \]
+% The differential of $\operatorname{Re}(\mathbf{c}^* PMP^* 
+% \mathbf{w})$ is easy to compute in the algebro-symbolic way, by 
+% substituting $P (I +\nobreak \varepsilon A)$ for $P$, where the 
+% formal infinitesimal $\varepsilon$ satisfies \(\varepsilon^2=0\), 
+% and $A$ is a tangent at $I$ of $\mathrm{U}^\mathbf{1}(n)$. This 
+% results in
+% \begin{multline*}
+%   \operatorname{Re}\Bigl(
+%     \mathbf{c}^* P(I + \varepsilon A) M 
+%     \bigl( P(I + \varepsilon A) \bigr)^* \mathbf{w}
+%   \Bigr) =
+%   \operatorname{Re}\bigl(
+%     \mathbf{c}^* P(I + \varepsilon A) M 
+%     (I + \varepsilon A^*) P^* \mathbf{w}
+%   \bigr) =
+%   \operatorname{Re}\bigl(
+%     \mathbf{c}^* P(I + \varepsilon A) M 
+%     (I - \varepsilon A) P^* \mathbf{w}
+%   \bigr) = \\ =
+%   \operatorname{Re}(\mathbf{c}^* PMP^* \mathbf{w}) + 
+%   \varepsilon \operatorname{Re}( 
+%     \mathbf{c}^* P A M P^* \mathbf{w}
+%     - \mathbf{c}^* P M A P^* \mathbf{w}
+%   )
+% \end{multline*}
+% so the differential there is
+% \[
+%   A \mapsto \operatorname{Re}( 
+%     \mathbf{c}^* P A M P^* \mathbf{w}
+%     - \mathbf{c}^* P M A P^* \mathbf{w}
+%   )
+%   \text{.}
+% \]
+% 
+% 
+% 
+% ---
+% 
+% 
+% A problem with the |PMP*w| formula is however what happens when one 
+% tries to apply it to the |bigXpoint| point: item widths are not the 
+% same in the imaginary direction as in the real direction. In fact, 
+% the ``imaginary width'' for item $k$ is exactly $w_{n+1-k}$\Dash 
+% typically the intended width of a completely different item! 
+% 
+% 
+% 
+% \subsection{The objective function}
+% 
+% The vector $\mathbf{x}_k$ of reference positions for items in level 
+% $k$ is given by
+% \begin{equation} \label{Eq:xVektor}
+%   \mathbf{x}_k = x_k \mathbf{1} + P_k M P_k^{-1} \mathbf{w}_k
+% \end{equation}
+% where $x_k$ is the overall displacement for this level, $P_k$ is 
+% the (relaxation of permutation) matrix for this level, 
+% $\mathbf{w}_k$ is the width vector at this level, and $M$ is the 
+% constant matrix which is $\tfrac{1}{2}$ on the main diagonal, $0$ 
+% above it, and $1$ below it.
+% 
+% 
+% \subsubsection{Original interpretation}
+% 
+% \begin{proc}{PMP*w}
+%   Needing the explicit vector of reference positions is however not 
+%   all that common, as there are in many cases natural shortcuts to 
+%   make when setting up the actual calculations. What is very 
+%   commonly needed is on the other hand the products $P_k M P_k^* 
+%   \mathbf{w}_k$, so this procedure computes all of them in one go. 
+%   It has the call syntax
+%   \begin{displaysyntax}
+%     PMP*w \word{widths0} \word{wiring--widths} \word{point}
+%   \end{displaysyntax}
+%   where \word{widths0} and \word{wiring--widths} make up the 
+%   internal representation for a layout problem (as described above) 
+%   and the \word{point} is the optimisation domain point containing 
+%   all the $P_k$ matrices. The return value is a list
+%   \begin{displaysyntax}
+%     \word{$P_k M P_k^* \mathbf{w}_k$}
+%     \word{$M P_k^* \mathbf{w}_k$}
+%     \word{$P_k^* \mathbf{w}_k$}
+%   \end{displaysyntax}
+%   where e.g.~\word{$P_k M P_k^* \mathbf{w}_k$} in turn is the list 
+%   of all $P_k M P_k^* \mathbf{w}_k$ vectors (including those for 
+%   levels of only one item); such a vector is a list of |complex| 
+%   numbers. The \word{$M P_k^* \mathbf{w}_k$} and \word{$P_k^* 
+%   \mathbf{w}_k$} are lists (indexed by $k$) of these intermediate 
+%   products.
+%   
+%   In the implementation, $k$ is the index into \word{point} of the 
+%   current $P_k$ matrix.
+%   \begin{tcl}
+proc ::network::ulayout::PMP*w {widths0 wwL point} {
+   set res {}; set res1 {}; set res2 {}
+   set k 1
+   foreach {wiring widths} [linsert $wwL 0 "" $widths0] {
+%   \end{tcl}
+%   If this is a trivial level (only one item) then the $P$ matrix is 
+%   the identity and the sought $P_k M P_k^* \mathbf{w}_k$ product is 
+%   simply half the only width, recast as a complex number. Deal 
+%   with that case first.
+%   \begin{tcl}
+      if {[llength $widths] < 2} then {
+         lappend res [list [
+            complex cartesian [expr {0.5*[lindex $widths 0]}] 0.0
+         ]]
+         lappend res1 [lindex $res end]
+         lappend res2 [list [
+            complex cartesian [lindex $widths 0] 0.0
+         ]]
+         continue
+      }
+%   \end{tcl}
+%   Otherwise one should begin with the \(P_k^* \mathbf{w}_k =: 
+%   \mathbf{v}\) product. Since $\mathbf{w}_k$ is only a real vector, 
+%   and since the hermitian conjugate $P_k^*$ is still a bit of work 
+%   to compute, this matrix--vector product is unrolled as a couple 
+%   of loops (using an explict |lindex| to effectively put the loop 
+%   over $P_k$ columns as the outer |foreach|).
+%   \begin{tcl}
+      set Pk [lindex $point $k]
+      set v {}
+      foreach column [lindex $Pk 0] {
+         set re 0.0; set im 0.0
+         foreach row $Pk w $widths {
+            set re [expr {$re + [lindex $row [llength $v] 0] * $w}]
+            set im [expr {$im - [lindex $row [llength $v] 1] * $w}]
+         }
+         lappend v [complex cartesian $re $im]
+      }
+      lappend res2 $v
+%   \end{tcl}
+%   The \(\mathbf{u} := M\mathbf{v}\) vector is easy to compute, 
+%   since one merely needs to sum over previous vector elements.
+%   \begin{tcl}
+      set u {}
+      set sum [complex 0]
+      foreach z $v {
+         lappend u [complex + $sum [complex . 0.5 $z]]
+         set sum [complex + $sum $z]
+      }
+      lappend res1 $u
+%   \end{tcl}
+%   Finally, the \(\mathbf{t} := P_k \mathbf{u}\) product is a 
+%   full-blown matrix--vector product (which could have been done as 
+%   a call to |Mvprod| of |mtmtcl::Lie::complex_matrix_real_space|, 
+%   but that felt a bit wrong since I don't have the right |Zero| 
+%   matrix at hand here (even though that particular subcommand 
+%   doesn't use this parameter)).
+%   \begin{tcl}
+      set t {}
+      foreach row $Pk {
+         set sum [complex 0]
+         foreach cell $row z $u {
+            set sum [complex + $sum [complex * $cell $z]]
+         }
+         lappend t $sum
+      }
+      lappend res $t
+      incr k
+   }
+   return [list $res $res1 $res2]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{energy}
+%   Given |PMP*w|, it is now quite easy to compute the base objective 
+%   function. This is called |energy| since it would be the potential 
+%   energy stored in the wiring if these were elastic (and stretched 
+%   from infinitesimal size), and the call syntax is like |PMP*w|
+%   \begin{displaysyntax}
+%     energy \word{widths0} \word{wiring--widths} \word{point}
+%   \end{displaysyntax}
+%   except that this returns a |double|.
+%   
+%   Given that the the \word{wiring} between levels $k-1$ and $k$ is
+%   \begin{displaysyntax}
+%     $i_{k,1}$ $j_{k,1}$ $\delta_{k,1}$ 
+%     $i_{k,2}$ $j_{k,2}$ $\delta_{k,2}$ 
+%     \dots\ 
+%     $i_{k,L_k}$ $j_{k,L_k}$ $\delta_{k,L_k}$ 
+%   \end{displaysyntax}
+%   the part of the |energy| which corresponds to this wiring is
+%   \begin{equation}
+%     \sum_{l=1}^{L_k} \Bigl\vert
+%       x_k + \mathbf{e}_{j_{k,l}}^\mathrm{T} P_k M P_k^* \mathbf{w}_k
+%       - x_{k-1} - \mathbf{e}_{i_{k,l}}^\mathrm{T} 
+%         P_{k-1} M P_{k-1}^* \mathbf{w}_{k-1}
+%       + \delta_{k,l}
+%     \Bigr\vert^2
+%   \end{equation}
+%   where the unit vectors $\mathbf{e}^\mathrm{T}_i$ serve to select 
+%   an element of the $PMP^*\mathbf{w}$ vector, and the absolute 
+%   value is needed because the quantity inside is a complex number. 
+%   Energies for separate wirings are merely added together, so the 
+%   overall structure of this procedure is merely a loop over these. 
+%   Most $P_k M P_k^* \mathbf{w}_k$ vectors are used for two wirings 
+%   however, so it makes sense to compute these in one go first.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::energy {widths0 wwL point} {
+   set posVecL [lindex [PMP*w $widths0 $wwL $point] 0]
+   set res 0.0
+   set below [lindex $posVecL 0]
+   foreach  {wiring dummy} $wwL  above [lrange $posVecL 1 end] \
+     ofs [lindex $point 0] {
+%   \end{tcl}
+%   The |below| variable will be set to the |above| value at the end 
+%   of this loop.
+%   
+%   The next step is also pretty obvious: a loop over the |wiring| 
+%   (summation over $k$ in the formula). Then it's just the formula 
+%   as given. (The |ofs| found in the \word{point} is already the 
+%   difference $x_k - x_{k-1}$.)
+%   \begin{tcl}
+      foreach {i j delta} $wiring {
+         set res [expr {$res
+            + ($ofs + $delta + [lindex $above $j 0]\
+              - [lindex $below $i 0]) ** 2
+            + ([lindex $above $j 1] - [lindex $below $i 1]) ** 2
+         }]
+      }
+      set below $above
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% Much of the point of the whole Lie group machinery is however that 
+% in addition to computing the value of the objective function at a 
+% particular point, one can also find out the direction in which it 
+% decreases fastest and thus do a steepest descent optimisation. What 
+% gives that direction is the \emph{gradient} of the objective 
+% function (or rather the negative of the gradient, since the 
+% gradient is the direction in which the function \emph{increases} the 
+% fastest, but that's a minor detail), so how does one compute the 
+% gradient of the objective function? It might be tempting to try a 
+% component-wise derivative, but the objective function $f$ is 
+% defined on a manifold \(\mathbb{R}^m \times \prod_{k=0}^m 
+% \mathrm{U}^\mathbf{1}(n_k)\), and then the rules are slightly 
+% different.
+% 
+% What is still true for the gradient (as an operation on functions) 
+% is that it is linear, so one may consider it separately for 
+% distinct terms and then add them back up. In particular one may 
+% specialise to the term \(k=l=1\) (fixed values for the indices 
+% mainly so that things become easier to write), i.e.,
+% \begin{multline*}
+%   f_{1,1}(x_1,P_0,P_1) = 
+%   \Bigl\vert
+%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     + \delta
+%   \Bigr\vert^2
+%   = \\ =
+%   \begin{aligned}[t] &
+%   \overline{ (
+%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     + \delta
+%   ) } \times \\ & \qquad\qquad\qquad (
+%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     + \delta
+%   )
+%   = 
+%   \end{aligned} \\ = \begin{aligned}[t] &
+%   (
+%     x_1 + \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%     - \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%     + \delta
+%   ) \times \\ & \qquad\qquad\qquad (
+%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     + \delta
+%   )
+%   =
+%   \end{aligned} \\ = \begin{aligned}[t] &
+%   x_1^2
+%   + x_1 \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   + 2 x_1 \delta 
+%   + x_1 \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j 
+%     + \\ & \qquad{}
+%   + \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%     \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%   - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%     \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     + \\ & \qquad{}
+%   + \delta \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%   - x_1 \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%   - \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i 
+%     \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     + \\ & \qquad{}
+%   + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   - \delta \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%   + \delta \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     + \\ & \qquad{}
+%   - \delta \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   + \delta^2 
+%   \end{aligned}
+% \end{multline*}
+% where \(i = i_{1,1}\), \(j = j_{1,1}\), and \(\delta = 
+% \delta_{1,1}\). 
+% Continuing then with an algebraic geometry style formal 
+% differentiation, where $\varepsilon$ is a formal variable 
+% satisfying \(\varepsilon^2 = 0\), one can expand
+% \begin{multline*}
+%   f_{1,1}\bigl( x_1 + \varepsilon a, P_0(I + \varepsilon A_0), 
+%     P_1(I + \varepsilon A_1) \bigr)
+%   = \\ =
+%   f_{1,1}(x_1,P_0,P_1) + 
+%   \varepsilon \mathrm{d}_x f_{1,1}(x_1,P_0,P_1)(a) + \\ {}+
+%   \varepsilon \mathrm{d}_{P_0} f_{1,1}(x_1,P_0,P_1)(A_0) +
+%   \varepsilon \mathrm{d}_{P_1} f_{1,1}(x_1,P_0,P_1)(A_1)
+% \end{multline*}
+% (any term with two $\varepsilon$ factors vanish) where
+% \begin{align*}
+%   \mathrm{d}_x f_{1,1}(x_1,P_0,P_1)(a) ={}& (
+%     2x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%       + \\ & \qquad {}
+%     + 2\delta
+%     + \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%     - \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%   ) a 
+%   = \\ ={}& 
+%   2\bigl( x_1 + \delta + \operatorname{Re}(
+%      \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%      - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   ) \bigr) a
+%   \text{,}
+% \end{align*}
+% and
+% \begin{multline} \label{Eq:d_{P_0}f_{1,1}}
+%   \mathrm{d}_{P_0} f_{1,1}(x_1,P_0,P_1)(A_0) = \\ =
+%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 A_0 M_0 P_0^* \mathbf{w}_0
+%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 M_0 A_0^* P_0^* \mathbf{w}_0
+%   - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%     \mathbf{e}_i^\mathrm{T} P_0 A_0 M_0 P_0^* \mathbf{w}_0
+%   + \\ 
+%   - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%     \mathbf{e}_i^\mathrm{T} P_0 M_0 A_0^* P_0^* \mathbf{w}_0
+%   - x_1 \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* \mathbf{e}_i
+%   - x_1 \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* \mathbf{e}_i
+%   + \\ 
+%   - \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* \mathbf{e}_i 
+%     \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%   - \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* \mathbf{e}_i 
+%     \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%   + \\ 
+%   + \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   + \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   + \\ 
+%   + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 A_0 M_0 P_0^* \mathbf{w}_0
+%   + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 M_0 A_0^* P_0^* \mathbf{w}_0
+%   + \\ 
+%   - \delta \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* \mathbf{e}_i
+%   - \delta \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* \mathbf{e}_i
+%   - \delta \mathbf{e}_i^\mathrm{T} P_0 A_0 M_0 P_0^* \mathbf{w}_0
+%   - \delta \mathbf{e}_i^\mathrm{T} P_0 M_0 A_0^* P_0^* \mathbf{w}_0
+%   = \\ =
+%   \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* ( 
+%     - x_1 \mathbf{e}_i
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \delta \mathbf{e}_i
+%   ) + \\ {}+
+%   \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* (
+%     - x_1 \mathbf{e}_i
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \delta \mathbf{e}_i
+%   ) + \\ {}+
+%   (
+%     - x_1 \mathbf{e}_i^\mathrm{T}
+%     - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%       \mathbf{e}_i^\mathrm{T}
+%     + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%       \mathbf{e}_i^\mathrm{T}
+%     - \delta \mathbf{e}_i^\mathrm{T}
+%   ) P_0 A_0 M_0 P_0^* \mathbf{w}_0 + \\ {}+
+%   (
+%     - x_1 \mathbf{e}_i^\mathrm{T}
+%     - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%       \mathbf{e}_i^\mathrm{T}
+%     + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%       \mathbf{e}_i^\mathrm{T}
+%     - \delta \mathbf{e}_i^\mathrm{T}
+%   ) P_0 M_0 A_0^* P_0^* \mathbf{w}_0
+% \end{multline}
+% with the $\mathrm{d}_{P_1}$ term being similar; $f_{1,1}$ is 
+% preserved if $P_0$, $M_0$, $\mathbf{w}_0$, and $i$ switch places 
+% with $P_1$, $M_1$, $\mathbf{w}_1$, and $j$ respectively, and $x_1$ 
+% and $\delta$ changes sign, so making these changes in an expression 
+% for $\mathrm{d}_{P_0}f_{1,1}$ will produce an expression for 
+% $\mathrm{d}_{P_1}f_{1,1}$. 
+% 
+% These $\mathrm{d}f_{1,1}$ terms 
+% contain all the information about how $f_{1,1}$ grows in different 
+% directions, but they are not the sought gradients, as they are 
+% differentials.
+% The general relation between a differential $\mathrm{d}f$ and a 
+% gradient $\nabla f$ is that $\mathrm{d}f$ (at each point) is a 
+% linear map from the tangent space to the reals (i.e., a $1$-form), 
+% whereas $\nabla f$ is an element of the tangent space with the 
+% property that \(A \mapsto \langle \nabla f, A\rangle\) is the same 
+% linear map as the differential $\mathrm{d}f$. The gradient $\nabla 
+% f$ thus depends not only on the function $f$ but also on the choice 
+% of inner product, so the differential is more fundamental. What is 
+% sought here is however really the gradient, as we want the actual 
+% direction of steepest descent; it is anyway given that our inner 
+% product of choice is the Frobenius inner product \(\langle A, B\rangle 
+% = \operatorname{Re} \operatorname{tr} (A^* B)\), so lack of 
+% generality is not an issue.
+% 
+% For deriving an expression for the gradient corresponding to the 
+% above $\mathrm{d}_{P_0}f_{1,1}$, it is useful to observe that 
+% $f_{1,1}$ is a real-valed function of $x_1$, $P_0$, and $P_1$, so 
+% the same is true for its differentials. Remembering that \(A_0^* = 
+% -A_0\), on may therefore view \eqref{Eq:d_{P_0}f_{1,1}} as having 
+% the form
+% \begin{equation}
+%   \mathrm{d}_{P_0} f_{1,1}(x_1,P_0,P_1)(A_0) =
+%   \operatorname{Re}\biggl( 
+%     \sum_{r=1}^4 \mathbf{u}_r^* A_0 \mathbf{v}_r
+%   \biggr) =
+%   \sum_{r=1}^4 \operatorname{Re} (\mathbf{u}_r^* A_0 \mathbf{v}_r)
+%   \text{,}
+% \end{equation}
+% and the problem of translating the differential to a gradient has 
+% thus been reduced to that of translating a $1$-form on the form \(A 
+% \mapsto \operatorname{Re} (\mathbf{u}^* A \mathbf{v})\) to a vector 
+% $B$ satisfying \(\langle B, A\rangle = \operatorname{Re} 
+% (\mathbf{u}^* A \mathbf{v})\) for all matrices $A$. As it happens,
+% \[
+%   \operatorname{Re} (\mathbf{u}^* A \mathbf{v}) =
+%   \operatorname{Re} \operatorname{tr} (\mathbf{v} \mathbf{u}^* A) =
+%   \bigl< (\mathbf{v} \mathbf{u}^*)^*, A \bigr> =
+%   \langle \mathbf{u} \mathbf{v}^*, A \rangle
+% \]
+% and hence
+% \begin{equation*}
+%   \nabla_{P_0} f_{1,1}(x_1,P_0,P_1) =
+%   \sum_{r=1}^4 \mathbf{u}_r \mathbf{v}_r^* 
+% \end{equation*}
+% where
+% \begin{align*}
+%   \mathbf{u}_1 ={}&  P_0^* \mathbf{w}_0 \text{,}\\
+%   \mathbf{v}_1 ={}& M_0^* P_0^* ( 
+%     - x_1 \mathbf{e}_i
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \delta \mathbf{e}_i
+%   ) \text{,}\\
+%   \mathbf{u}_2 ={}& -M_0 P_0^* \mathbf{w}_0 \text{,}\\
+%   \mathbf{v}_2 ={}& P_0^* (
+%     - x_1 \mathbf{e}_i
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \delta \mathbf{e}_i
+%   ) \text{,}\\
+%   \mathbf{u}_3 ={}& P_0^* (
+%     - x_1 \mathbf{e}_i
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \delta \mathbf{e}_i
+%   ) \text{,}\\
+%   \textbf{v}_3 ={}& M_0 P_0^* \mathbf{w}_0 \text{,} \\ 
+%   \textbf{u}_4 ={}& M_0^* P_0^* (
+%     - x_1 \mathbf{e}_i
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \delta \mathbf{e}_i
+%   ) \text{,}\\
+%   \textbf{v}_4 ={}& - P_0^* \mathbf{w}_0 \text{.}
+% \end{align*}
+% The point of this presentation (and of not factoring out 
+% $\mathbf{e}_i$ as well) is that it can trivially be extended to the 
+% full \(\nabla_{P_0} f_1 = \sum_{l=1}^{L_1} \nabla_{P_0} f_{1,l}\) by 
+% taking
+% \begin{align*}
+%   \mathbf{u}_3 ={}& P_0^* \sum_{l=1}^{L_1} (
+%     - x_1 \mathbf{e}_{i_{1,l}}
+%     - \mathbf{e}_{i_{1,l}} \mathbf{e}_{j_{1,l}}^\mathrm{T}
+%       P_1 M_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_{i_{1,l}} \mathbf{e}_{i_{1,l}}^\mathrm{T} 
+%       P_0 M_0 P_0^* \mathbf{w}_0
+%     - \delta_{1,l} \mathbf{e}_{i_{1,l}}
+%   )
+%   = \\ ={}& P_0^* \Biggl(
+%     - \sum_{l=1}^{L_1} (x_1 + \delta_{1,l}) \mathbf{e}_{i_{1,l}}
+%     - \biggl(
+%       \sum_{l=1}^{L_1} \mathbf{e}_{i_{1,l}} \mathbf{e}_{j_{1,l}}^\mathrm{T}
+%       \biggr) P_1 M_1 P_1^* \mathbf{w}_1
+%     + \\ & \qquad\qquad\qquad\qquad\qquad\qquad{}
+%     + \biggl(
+%       \sum_{l=1}^{L_1} \mathbf{e}_{i_{1,l}} \mathbf{e}_{i_{1,l}}^\mathrm{T}
+%       \biggr) P_0 M_0 P_0^* \mathbf{w}_0
+%   \Biggr)
+%   \text{,}\\
+%   \mathbf{u}_4 ={}& M_0^* \mathbf{u}_3 
+%   \text{,}\\
+%   \mathbf{v}_2 ={}& \mathbf{u}_3 
+%   \text{,}\\
+%   \mathbf{v}_1 ={}& M_0^* \mathbf{v}_2 = \mathbf{u}_4 \text{.}
+% \end{align*}
+% For a generic $P_k$, one thus wants to compute \(\nabla_{P_k}f = 
+% \sum_{r=1}^4 \mathbf{u}_r(k) \mathbf{v}_r(k)^*\) where
+% \begin{align*}
+%   \mathbf{u}_1(k) ={}& P_k^* \mathbf{w}_k \text{,}\\
+%   \mathbf{u}_2(k) ={}& - M_k P_k^* \mathbf{w}_k \text{,}
+%     \displaybreak[0]\\
+%   \mathbf{u}_3(k) ={}& P_k^* \Biggl(
+%     \sum_{l=1}^{L_k} (x_k + \delta_{k,l}) \mathbf{e}_{j_{k,l}}
+%     - \sum_{l=1}^{L_{k+1}} (x_{k+1} + \delta_{k+1,l}) 
+%       \mathbf{e}_{i_{k+1,l}}
+%     + \\ & \qquad{}
+%     - \biggl(
+%       \sum_{l=1}^{L_k} \mathbf{e}_{j_{k,l}} \mathbf{e}_{i_{k,l}}^\mathrm{T}
+%       \biggr) P_{k-1} M_{k-1} P_{k-1}^* \mathbf{w}_{k-1}
+%     + \\ & \qquad{}
+%     + \biggl(
+%       \sum_{l=1}^{L_k} \mathbf{e}_{j_{k,l}} \mathbf{e}_{j_{k,l}}^\mathrm{T}
+%       + \sum_{l=1}^{L_{k+1}} \mathbf{e}_{i_{k+1,l}} 
+%       \mathbf{e}_{i_{k+1,l}}^\mathrm{T} 
+%       \biggr) P_k M_k P_k^* \mathbf{w}_k
+%     + \\ & \qquad{}
+%     - \biggl( \sum_{l=1}^{L_{k+1}} \mathbf{e}_{i_{k+1,l}} 
+%       \mathbf{e}_{j_{k+1,l}}^\mathrm{T} \biggr) 
+%       P_{k+1} M_{k+1} P_{k+1}^* \mathbf{w}_{k+1}
+%   \Biggr)
+%   \text{,} \displaybreak[0]\\
+%   \mathbf{u}_4(k) ={}& M_k^* \mathbf{u}_3(k)
+%   \text{,}\\
+%   \mathbf{v}_1(k) ={}& \mathbf{u}_4(k) \text{,}\\
+%   \mathbf{v}_2(k) ={}& \mathbf{u}_3(k) \text{,}\\
+%   \mathbf{v}_3(k) ={}& -\mathbf{u}_2(k) \text{,}\\
+%   \mathbf{v}_4(k) ={}& -\mathbf{u}_1(k) \text{.}
+% \end{align*}
+% 
+% One final issue concerning this calculation of a gradient is 
+% however that the sought gradient should live in the tangent space 
+% of the current point on the manifold. What was computed above need 
+% not have this property, but it is still possible to use duality to 
+% define a gradient of $f$ that lies in the tangent space; the trick 
+% is that the dual can be taken to lie in the tangent space if it is 
+% the dual to the restriction of the differential to that same 
+% tangent space. (The only reason we didn't have to worry about the 
+% tangent space sooner is that $f$ can be defined for arbitrary 
+% matrices $P_k$, rather than just the ones in some 
+% $\mathrm{U}^\mathbf{1}(n)$. Making use of \(A_k^* = -A_k\) may 
+% however already have effectively restricted the consideration to 
+% unitary $P_k$.) If $V$ is an inner product space, \(W \subseteq 
+% V\) is a subspace, \(B \in V\) is arbitrary, and \(B' \in W\) is 
+% the orthogonal projection of $B$ into $W$ then clearly \(\langle B, 
+% A\rangle = \langle B', A\rangle\) for all \(A \in W\), so the 
+% gradient dual to the restriction of a $1$-form to the subspace 
+% $W$ should simply be the orthogonal projection $B'$ of $B$ into 
+% $W$. In other words the above formula still applies, but it needs 
+% to be combined with an orthogonal projection at the end. That 
+% orthogonal projection happens to be provided by the 
+% \texttt{[$\mathrm{U}^\mathbf{1}(n)$ tangent improve]} operation.
+% 
+% Notably, the first step of said |improve| operation consists of 
+% taking the |antihermitian_part|. Since by the above
+% \begin{align*}
+%   \nabla_{P_k}f 
+%   ={}& 
+%   \mathbf{u}_1(k) \mathbf{v}_1(k)^* + 
+%   \mathbf{u}_2(k) \mathbf{v}_2(k)^* + 
+%   \mathbf{u}_3(k) \mathbf{v}_3(k)^* + 
+%   \mathbf{u}_4(k) \mathbf{v}_4(k)^* 
+%   = \\ ={}&
+%   \mathbf{u}_1(k) \mathbf{u}_4(k)^* +
+%   \mathbf{u}_2(k) \mathbf{u}_3(k)^*
+%   - \mathbf{u}_3(k) \mathbf{u}_2(k)^*
+%   - \mathbf{u}_4(k) \mathbf{u}_1(k)^*
+%   = \\ ={}&
+%   \mathbf{u}_1(k) \mathbf{u}_4(k)^*
+%   - (\mathbf{u}_1(k) \mathbf{u}_4(k)^*)^* 
+%   + \mathbf{u}_2(k) \mathbf{u}_3(k)^*
+%   - (\mathbf{u}_2(k) \mathbf{u}_3(k)^*)^*
+%   \text{,}
+% \end{align*}
+% it follows that this expression is already antihermitian. Hence it 
+% suffices to compute the first two terms explicitly, double that, 
+% and then rely on the |improve| operation to sort it all out.
+% 
+% \begin{proc}{force}
+%   If the objective function $f$ is |energy|, then it makes sense to 
+%   let the procedure that computes the direction of steepest descent 
+%   $-\nabla f$ be named |force|; this minus sign is even physically 
+%   correct if the |energy| is thought of as potential energy (it is 
+%   the force that would be exerted on the system because of the 
+%   stored energy). The call syntax is
+%   \begin{displaysyntax}
+%     force \word{Lie algebra} \word{widths0} \word{wiring--widths} 
+%     \word{point}
+%   \end{displaysyntax}
+%   where the \word{Lie algebra} is the product of the various 
+%   |tangent| spaces of the factors of the big Lie group in which the 
+%   \word{point} lives. The return value is an element of this 
+%   \word{Lie algebra}.
+%   
+%   The first order of business is to compute all the 
+%   $P_kM_kP_k^*\mathbf{w}_k$ products. For calculating the gradient, 
+%   the partial products are needed as well.
+%   \begin{tcl}
+proc ::network::ulayout::force {TS widths0 wwL point} {
+   set products [PMP*w $widths0 $wwL $point]
+%   \end{tcl}
+%   Then there is a loop, mostly over the wirings, which computes two 
+%   kinds of things: \(\mathbf{N} = -\nabla_x f$ and the vectors 
+%   $\mathbf{y}_k$ such that \(\mathbf{u}_3(k) = P_k^* \mathbf{y}_k\). 
+%   The former is simply the list |N|, which will become one of the 
+%   components of the result. The latter is stored in a list of lists 
+%   |yL|, where the top level index is exactly $k$.
+%   \begin{tcl}
+   set N {}
+   set yL {}
+   set lastprod [lindex $products 0 0]
+   lappend yL [lrepeat [llength $lastprod] [complex 0]]
+   foreach  {wiring widths} $wwL  x [lindex $point 0] \
+     prod [lrange [lindex $products 0] 1 end]  {
+%   \end{tcl}
+%   First complete the calculation of the lower level |yL|; this 
+%   amounts to the $\mathbf{e}_{i_{k+1,l}}$ terms in the expression 
+%   for $\mathbf{u}_3(k)$. Only do something if the lower level is 
+%   nontrivial, however.
+%   \begin{tcl}
+      if {[llength $lastprod] > 1} then {
+         foreach {i j ofs} $wiring {
+            lset yL end $i [complex + [lindex $yL end $i] [
+               complex + [
+                  complex cartesian [expr {-$x-$ofs}] 0.0
+               ] [
+                  complex - [lindex $lastprod $i] [lindex $prod $j]
+               ]
+            ]]
+         }
+      }
+%   \end{tcl}
+%   Then compute the $x$ contribution.
+%   \begin{tcl}
+      set sum 0.0
+      foreach {i j ofs} $wiring {
+         set sum [expr {$sum + $x + $ofs +\
+           [complex Re [lindex $prod $j]] -\
+           [complex Re [lindex $lastprod $i]]}]
+      }
+      lappend N [expr {2*$sum}]
+%   \end{tcl}
+%   And finally begin the new level in |yL| and calculate the 
+%   $\mathbf{e}_{j_{k,l}}$ terms for it. Again, if the level is 
+%   trivial then we don't bother to actually add anything.
+%   \begin{tcl}
+      lappend yL [lrepeat [llength $prod] [complex 0]]
+      if {[llength $prod] > 1} then {
+         foreach {i j ofs} $wiring {
+            lset yL end $j [complex + [lindex $yL end $j] [
+               complex + [
+                  complex cartesian [expr {$x+$ofs}] 0.0
+               ] [
+                  complex - [lindex $prod $j] [lindex $lastprod $i]
+               ]
+            ]]
+         }
+      }
+      set lastprod $prod
+   }
+%   \end{tcl}
+%   The third step is then about constructing the result. This loop 
+%   is over all levels, but it should only make a contribution to the 
+%   result for levels with more than one item. |[llength $res]| can 
+%   be used as index of the current |{*}$TS component| structure.
+%   \begin{tcl}
+   set res [list [{*}$TS component 0 neg $N]]
+   foreach  u1 [lindex $products 2]  v3 [lindex $products 1]  y $yL  {
+      if {[llength $u1] <= 1} then {continue}
+%   \end{tcl}
+%   An example of that can be found in the following calculation of 
+%   the $\mathbf{u}_3$ vector.
+%   \begin{tcl}
+      set u3 [{*}$TS component [llength $res] superset Mcvprod\
+        [lindex $point [llength $res]] $y]
+%   \end{tcl}
+%   This \texttt{Mcvprod} operation requires version~1.1 of the 
+%   |mtmtcl::Lie::complex_matrix_real_space| package, and that this 
+%   structure really is the |superset| here is a not entirely 
+%   trivial dependence of |$TS|.
+%   
+%   For the final step in computing the gradient, one must take into 
+%   account what is immediately available from earlier calculations: 
+%   \(\mathbf{u}_1(k) = P_k^* \mathbf{w}_k\), \(\mathbf{v}_3(k) = 
+%   M_kP_k^*\mathbf{w}_k\), and $\mathbf{u}_3(k)$. What should be 
+%   computed here is
+%   \begin{multline*}
+%     - \nabla_{P_k} f =
+%     - \texttt{[improve }\mathbf{u}_1 \mathbf{v}_1^* + 
+%       \mathbf{u}_2 \mathbf{v}_2^* + \mathbf{u}_3 \mathbf{v}_3^* +
+%       \mathbf{u}_4 \mathbf{v}_4^* \texttt{]}
+%     = \\ =
+%     \texttt{[improve } {-}\mathbf{u}_1 (M^* \mathbf{u}_3)^* 
+%       + \mathbf{v}_3 \mathbf{u}_3^* - \mathbf{u}_3 \mathbf{v}_3^* 
+%       + (M^* \mathbf{u}_3) \mathbf{u}_1^*
+%     \texttt{]}
+%     = \\ =
+%     \texttt{[improve } 2\mathbf{v}_3 \mathbf{u}_3^* 
+%       + 2(M^* \mathbf{u}_3) \mathbf{u}_1^*
+%     \texttt{]}
+%   \end{multline*}
+%   where the last step takes advantage of the antihermitian part 
+%   operation in |improve|.
+%   
+%   One final complication is how to compute \(\mathbf{u}_4 = M^* 
+%   \mathbf{u}_3\) (or rather $2M^*\mathbf{u}_3$, since multiplying 
+%   by $2$ at the vector stage is less work than doing it at the 
+%   matrix stage). $M$ is real so \(M^* = M^\mathrm{T}\), but that 
+%   matrix is not explicitly available for performing a 
+%   matrix--vector multiplication. Instead one may observe that 
+%   $M^*\mathbf{u}_3$ may be computed using the same cumulative sum 
+%   approach as was used for multiplication by $M$ in |PMP*w|, 
+%   provided that one |lreverse|s the vector before and after.
+%   \begin{tcl}
+      set uu4 {}
+      set sum [complex 0]
+      foreach z [lreverse $u3] {
+         lappend uu4 [complex + $z [complex . 2 $sum]]
+         set sum [complex + $sum $z]
+      }
+      lappend res [{*}$TS component [llength $res] improve [
+         {*}$TS component [llength $res] superset +. [
+            {*}$TS component [llength $res] superset vvcprod\
+              [lreverse $uu4] $u1
+         ] 2.0 [
+            {*}$TS component [llength $res] superset vvcprod $v3 $u3
+         ]
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{test_force}
+%   For something as complicated (both mathematically and 
+%   implementation-wise) as |force|, it seems a good idea to test 
+%   whether it produces correct results. Predicting in some other 
+%   way what this procedure should return is however not a likely 
+%   prospect, so one has to check the result some other way. One 
+%   possibility for this is to do numeric directional differentiation 
+%   of |energy| in all basis directions, and compare the results to 
+%   what one gets from an inner product with |force|. Concretely, if 
+%   \texttt{[$E$ $p$]} denotes an application of |energy| to the 
+%   point $p$, \texttt{[$F$ $p$]} denotes the corresponding 
+%   application of |force| to $p$, $G$ is the optimisiation domain 
+%   Lie group, and $A$ is an arbitrary element of 
+%   $G$~\texttt{tangent}, then it should hold that
+%   \begin{multline*}
+%     \frac{ 
+%       \texttt{[$E$ [$G$ * $p$ [$G$ exp $A$]]]} - \texttt{[$E$ $p$]}
+%     }{ h } 
+%     \rightarrow \\ \rightarrow
+%     -\texttt{[$G$ tangent innerprod $A$ [$F$ $p$]]}
+%     \qquad\text{as \(h \rightarrow 0\).}
+%   \end{multline*}
+%   A practical specialisation of this is to take \(\varepsilon = 
+%   \tfrac{1}{2}\) in the definition of limit, and consider a 
+%   direction to be OK if there is an $h$ such that the left hand 
+%   side is within $\pm\tfrac{1}{2}$ of the right hand side.
+%   
+%   To implement this idea, the |test_force| procedure has the call 
+%   syntax
+%   \begin{displaysyntax}
+%     |test_force| \word{group} \word{widths0} \word{wiring--widths} 
+%     \word{point} \word{hlimit}
+%   \end{displaysyntax}
+%   The return value is a list of triplets
+%   \begin{displaysyntax}
+%     \word{component} \word{basis element} \word{error}
+%   \end{displaysyntax}
+%   detailing those directions (component basis elements) which failed 
+%   to exhibit the required limiting behaviour for any \(h 
+%   \geqslant\) the \word{hlimit}. An empty result means everything 
+%   seems fine.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
+   set force [force [list {*}$G tangent] $w0 $wwL $point]
+   set E0 [energy $w0 $wwL $point]
+   set zero [{*}$G tangent 0]
+   set res {}
+   for {set comp 0} {$comp < [{*}$G no.components]} {incr comp} {
+      foreach dir [{*}$G component $comp tangent basis elements] {
+         set A $zero
+         lset A $comp [{*}$G tangent component $comp basiselement $dir]
+         set ip [{*}$G tangent innerprod $A $force]
+         for {set h 1.0} {$h >= $hlimit} {set h [expr {$h*0.5}]} {
+            set E1 [energy $w0 $wwL [
+               {*}$G * $point [{*}$G exp [{*}$G tangent . $h $A]]
+            ]]
+            set err [expr {$ip + ($E1-$E0)/$h}]
+            if {abs($err) < 0.5} then {break}
+         }
+         if {$h < $hlimit} then {
+            lappend res [list $comp $dir $err]
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+%   The result is that everything indeed is correct, but one must go 
+%   down to a \word{hlimit} of $0.00001$ to see this. In other words, 
+%   the nonlinearity seems to be considerable.
+% \end{proc}
+% 
+% 
+% \subsubsection{Transpose interpretation}
+% 
+% The original matrix-formulation of the position vector for a level 
+% given above is $PMP^*\mathbf{w}$, because if $P$ corresponds to the 
+% permutation mapping a horizontal ordinal position to item index, then 
+% it is the inverse permutation that maps an item index to a 
+% horizontal ordinal position, and this is what one needs to turn the 
+% vector $\mathbf{w}$ indexed by item index into the vector 
+% $P^{-1}\mathbf{w}$ indexed by horizontal ordinal position that $M$ 
+% expects to act upon. Since $P$ is unital, \(P^{-1} = P^*\) and we 
+% get a nice polynomial expression for the energy. A problem with 
+% this interpretation can however be that $PMP^{-1}$ is a similarity 
+% tranformation, and $M$ is a rather extreme matrix: its sole 
+% eigenvalue $\tfrac{1}{2}$ has algebraic multiplicity $n$ but its 
+% geometric multiplicity is only $1$ (the eigenspace consists of the 
+% multiples of $\mathbf{e}_1$)! This makes many natural arrangements 
+% of items in the complex plane impossible to achieve (at least 
+% without careful tuning to the width vector), because the matrix 
+% which would realise them is not one which shares this 
+% eigenstructure. Also bad is that many of the arrangements which are 
+% possible have a tendency to place items in overlapping positions, 
+% requiring separate mechanisms to enforce physical realism.
+% 
+% There is however no technical need for the position matrix formula to 
+% be $PMP^{-1}\mathbf{w}$\Dash anything is possible as long as it 
+% coincides with this one for strict permutation matrices! This opens 
+% up rather extensive avenues for generalisations\Ldash one that goes 
+% very far is that \(z^n = z\) for \(z \in \{0,1\}\), and that higher 
+% powers therefore might be introduced fairly arbitrarily in the 
+% formula\Rdash but a more conservative modification is to replace 
+% the Hermitian conjugate $P^*$ by the plain old transpose 
+% $P^\mathrm{T}$ to yield $PMP^\mathrm{T}\mathbf{w}$. There is a 
+% slight justification for using the transpose in the fact that 
+% inverting a permutation corresponds to switching roles for rows and 
+% columns, and if \(P \in \mathrm{U}^\mathbf{1}(n)\) then 
+% \(P^\mathrm{T} \in \mathrm{U}^\mathbf{1}(n)\) as well, but why 
+% should the transpose be \emph{better} than the conjugate? Surely 
+% the operation which respects more of the unitary structure must be 
+% the superior choice!?
+% 
+% Well, in this case the answer seems to be `no'. To see why, 
+% consider the $(n +\nobreak 2) \times (n +\nobreak 2)$ block matrices
+% \begin{equation}
+%   P' = \begin{bmatrix}
+%     \tfrac{1 + e^{i\theta}}{2}& \mathbf{0}^\mathrm{T}& 
+%       \tfrac{1 - e^{i\theta}}{2}\\
+%     \mathbf{0}& P& \mathbf{0}\\
+%     \tfrac{1 - e^{i\theta}}{2}& \mathbf{0}^\mathrm{T}& 
+%       \tfrac{1 + e^{i\theta}}{2}
+%   \end{bmatrix}
+%   \quad\text{and}\quad
+%   M' = \begin{bmatrix}
+%     \tfrac{1}{2} & \mathbf{0}^\mathrm{T}& 0 \\
+%     \mathbf{1}& M & \mathbf{0}\\
+%     1 & \mathbf{1}^\mathrm{T}& \tfrac{1}{2}
+%   \end{bmatrix}
+% \end{equation}
+% where on one hand \(P \in \mathrm{U}^\mathbf{1}(n)\) and \(\theta \in 
+% \mathbb{R}\) are arbitrary, and on the other $M$ is the matrix with 
+% side $n$ that has $\tfrac{1}{2}$ on the diagonal, $1$ below it, and
+% $0$ above it. Calculating the product $P' M' (P')^\mathrm{T}$, 
+% one gets
+% \[
+%   P' M' = \begin{bmatrix}
+%     \tfrac{1}{2} \tfrac{1 + e^{i\theta}}{2} + 
+%       \tfrac{1 - e^{i\theta}}{2} &
+%     \tfrac{1 - e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
+%     \tfrac{1}{2} \tfrac{1 - e^{i\theta}}{2}
+%     \\
+%     P \mathbf{1} & PM & \mathbf{0}
+%     \\
+%     \tfrac{1}{2} \tfrac{1 - e^{i\theta}}{2} + 
+%       \tfrac{1 + e^{i\theta}}{2} &
+%     \tfrac{1 + e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
+%     \tfrac{1}{2} \tfrac{1 + e^{i\theta}}{2}
+%   \end{bmatrix} = \begin{bmatrix}
+%     \tfrac{3}{4} - \tfrac{1}{4} e^{i\theta} &
+%     \tfrac{1 - e^{i\theta}}{2} \mathbf{1}^\mathrm{T}&
+%     \tfrac{1 - e^{i\theta}}{2}
+%     \\
+%     \mathbf{1}& PM& \mathbf{0}
+%     \\
+%     \tfrac{3}{4} + \tfrac{1}{4} e^{i\theta} &
+%     \tfrac{1 + e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
+%     \tfrac{1}{4} + \tfrac{1}{4} e^{i\theta}
+%   \end{bmatrix}
+% \]
+% and
+% \begin{multline*}
+%   P' M' (P')^\mathrm{T} 
+%   = \\ =
+%   \begin{bmatrix}
+%     \frac{3 - e^{i\theta}}{4} \frac{1 + e^{i\theta}}{2} +
+%       \tfrac{1 - e^{i\theta}}{4} \tfrac{1 - e^{i\theta}}{2} &
+%     \tfrac{1 - e^{i\theta}}{2} \mathbf{1}^\mathrm{T} P^\mathrm{T}&
+%     \frac{3 - e^{i\theta}}{4} \frac{1 - e^{i\theta}}{2} +
+%       \tfrac{1 - e^{i\theta}}{4} \tfrac{1 + e^{i\theta}}{2}
+%     \\
+%     \frac{1 + e^{i\theta}}{2} \mathbf{1} &
+%     P M P^\mathrm{T} &
+%     \frac{1 - e^{i\theta}}{2} \mathbf{1}
+%     \\
+%     \frac{3 + e^{i\theta}}{4} \frac{1 + e^{i\theta}}{2} +
+%       \tfrac{1 + e^{i\theta}}{4} \tfrac{1 - e^{i\theta}}{2} &
+%     \tfrac{1 + e^{i\theta}}{2} \mathbf{1}^\mathrm{T} P^\mathrm{T}&
+%     \frac{3 + e^{i\theta}}{4} \frac{1 - e^{i\theta}}{2} +
+%       \tfrac{1 + e^{i\theta}}{4} \tfrac{1 + e^{i\theta}}{2}
+%   \end{bmatrix}
+%   = \\ =
+%   \begin{bmatrix}
+%     \frac{1}{2} &
+%     \tfrac{1 - e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
+%     \tfrac{1 - e^{i\theta}}{2}
+%     \\
+%     \frac{1 + e^{i\theta}}{2} \mathbf{1} &
+%     P M P^\mathrm{T} &
+%     \frac{1 - e^{i\theta}}{2} \mathbf{1}
+%     \\
+%     \frac{1 + e^{i\theta}}{2} &
+%     \tfrac{1 + e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
+%     \tfrac{1}{2}
+%   \end{bmatrix}
+%   =
+%   \tfrac{1}{2}J + \tfrac{1}{2} e^{i\theta} \begin{bmatrix}
+%     0 & -\mathbf{1}^\mathrm{T} & -1 \\
+%     \mathbf{1} & 0 & -\mathbf{1} \\
+%     1 & \mathbf{1}^\mathrm{T} & 0
+%   \end{bmatrix} + \begin{bmatrix}
+%     0 & \mathbf{0}^\mathrm{T} & 0 \\
+%     \mathbf{0} & Q & \mathbf{0}\\
+%     0 & \mathbf{0}^\mathrm{T} & 0
+%   \end{bmatrix}
+% \end{multline*}
+% where \(Q = PMP^\mathrm{T} - \tfrac{1}{2}J\). This means the product 
+% $P' M' (P')^\mathrm{T} \mathbf{w}$ can be described as if it was 
+% determined by a mechanism of two circles and two rods. 
+% The outer circle has diameter $\mathbf{1}^\mathrm{T} \mathbf{w}$ 
+% and has its midpoint fixed at the point $\tfrac{1}{2} 
+% \mathbf{1}^\mathrm{T} \mathbf{w}$ in the complex plane. The two 
+% rods have lengths $\mathbf{e}_1^\mathrm{T} \mathbf{w}$ and 
+% $\mathbf{e}_{n+2}^\mathrm{T} \mathbf{w}$ respectively, and are 
+% mounted along a diametre of the outer circle. Between them is the 
+% inner circle, whose movable centre acts as reference position for 
+% the block of items $2$ through $n+1$, inclusive. As $\theta$ goes 
+% from $0$ to $\pi$, the outer circle is rotated that same angle in 
+% the clockwise direction, and items $1$ and $n+2$ follow the 
+% midpoints of the arcs described by the midpoints of the rods. 
+% Remaining items remain stationary relative to the centre of the 
+% inner circle, but may move slightly in the absolute coordinate 
+% system if the two extremal elements are of unequal size. This is 
+% precisely the kind of rigid body behaviour that one would want the 
+% items to exhibit! (More complicated combinations of movements will 
+% probably allow movements that are less like those of rigid bodies, 
+% but at least this will allow a universal choice of good starting 
+% point: all items given the same real coordinate.)
+% 
+% To see that this is good, one may compare it to what happens when 
+% the conjugate
+% \[
+%   (P')^* = \begin{bmatrix}
+%     \tfrac{1 + e^{-i\theta}}{2}& \mathbf{0}^\mathrm{T}& 
+%       \tfrac{1 - e^{-i\theta}}{2}\\
+%     \mathbf{0}& P^*& \mathbf{0}\\
+%     \tfrac{1 - e^{-i\theta}}{2}& \mathbf{0}^\mathrm{T}& 
+%       \tfrac{1 + e^{-i\theta}}{2}
+%   \end{bmatrix}
+% \]
+% is used instead of the transpose in the product
+% \begin{multline*}
+%   P' M' (P')^* 
+%   = \\ =
+%   \begin{bmatrix}
+%     \frac{3 - e^{i\theta}}{4} \frac{1 + e^{-i\theta}}{2} +
+%       \tfrac{1 - e^{i\theta}}{4} \tfrac{1 - e^{-i\theta}}{2} &
+%     \tfrac{1 - e^{i\theta}}{2} \mathbf{1}^\mathrm{T} P^*&
+%     \frac{3 - e^{i\theta}}{4} \frac{1 - e^{-i\theta}}{2} +
+%       \tfrac{1 - e^{i\theta}}{4} \tfrac{1 + e^{-i\theta}}{2}
+%     \\
+%     \frac{1 + e^{-i\theta}}{2} \mathbf{1} &
+%     P M P^* &
+%     \frac{1 - e^{-i\theta}}{2} \mathbf{1}
+%     \\
+%     \frac{3 + e^{i\theta}}{4} \frac{1 + e^{-i\theta}}{2} +
+%       \tfrac{1 + e^{i\theta}}{4} \tfrac{1 - e^{-i\theta}}{2} &
+%     \tfrac{1 + e^{i\theta}}{2} \mathbf{1}^\mathrm{T} P^*&
+%     \frac{3 + e^{i\theta}}{4} \frac{1 - e^{-i\theta}}{2} +
+%       \tfrac{1 + e^{i\theta}}{4} \tfrac{1 + e^{-i\theta}}{2}
+%   \end{bmatrix}
+%   = \\ =
+%   \begin{bmatrix}
+%     \tfrac{4 + 2e^{-i\theta} - 2e^{i\theta}}{8} &
+%     \tfrac{1 - e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
+%     \tfrac{4 - 2e^{-i\theta} - 2e^{i\theta}}{8}
+%     \\
+%     \frac{1 + e^{-i\theta}}{2} \mathbf{1} &
+%     P M P^* &
+%     \frac{1 - e^{-i\theta}}{2} \mathbf{1}
+%     \\
+%     \frac{4 + 2e^{-i\theta} + 2e^{i\theta}}{8} &
+%     \tfrac{1 + e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
+%     \frac{4 - 2e^{-i\theta} + 2e^{i\theta}}{8}
+%   \end{bmatrix}
+%   = \\ =
+%   \tfrac{1}{2} J +
+%   \tfrac{\cos \theta}{2} \begin{bmatrix}
+%     0 & -\mathbf{1}^\mathrm{T} & -1 \\
+%     \mathbf{1} & 0 & -\mathbf{1} \\
+%     1 & \mathbf{1}^\mathrm{T} & 0
+%   \end{bmatrix} +
+%   \tfrac{i \sin \theta}{2} \begin{bmatrix}
+%     -1 & -\mathbf{1}^\mathrm{T} & 0 \\
+%     -\mathbf{1} & 0 & \mathbf{1} \\
+%     0 & \mathbf{1}^\mathrm{T} & 1
+%   \end{bmatrix} + \begin{bmatrix}
+%     0 & \mathbf{0}^\mathrm{T} & 0 \\
+%     \mathbf{0} & PMP^* - \tfrac{1}{2}J & \mathbf{0}\\
+%     0 & \mathbf{0}^\mathrm{T} & 0
+%   \end{bmatrix}
+%   \text{.}
+% \end{multline*}
+% The real part is the same, but the imaginary part has an 
+% antisymmetry along the transverse diagonal rather than the main 
+% diagonal. This has the effect of reversing the width vector: item 
+% $1$ behaves as if it had the width of item $n+2$ and vice versa! 
+% 
+% 
+% ---
+% 
+% 
+% \begin{proc}{PMPtw}
+%   If the products $P_k M P_k^\mathrm{T} \mathbf{w}_k$ are going to 
+%   be used for item positions, then these ought to be computed using 
+%   a transpose counterpart of |PMP*w|. This has the call syntax
+%   \begin{displaysyntax}
+%     PMPtw \word{widths0} \word{wiring--widths} \word{point}
+%   \end{displaysyntax}
+%   where \word{widths0} and \word{wiring--widths} make up the 
+%   internal representation for a layout problem and the \word{point} 
+%   is the optimisation domain point containing all the $P_k$ matrices. 
+%   The return value is a list
+%   \begin{displaysyntax}
+%     \word{$P_k M P_k^\mathrm{T} \mathbf{w}_k$}
+%     \word{$M P_k^\mathrm{T} \mathbf{w}_k$}
+%     \word{$P_k^\mathrm{T} \mathbf{w}_k$}
+%   \end{displaysyntax}
+%   where e.g.~\word{$P_k M P_k^\mathrm{T} \mathbf{w}_k$} in turn is 
+%   the list of all $P_k M P_k^\mathrm{T} \mathbf{w}_k$ vectors 
+%   (including those for levels of only one item); such a vector is a 
+%   list of |complex| numbers. The \word{$M P_k^\mathrm{T} \mathbf{w}_k$} 
+%   and \word{$P_k^\mathrm{T} \mathbf{w}_k$} are lists (indexed by $k$) 
+%   of these intermediate products.
+%   
+%   In the implementation, $k$ is the index into \word{point} of the 
+%   current $P_k$ matrix.
+%   \begin{tcl}
+proc ::network::ulayout::PMPtw {widths0 wwL point} {
+   set res {}; set res1 {}; set res2 {}
+   set k 1
+   foreach {wiring widths} [linsert $wwL 0 "" $widths0] {
+%   \end{tcl}
+%   If this is a trivial level (only one item) then the $P$ matrix is 
+%   the identity and the sought $P_k M P_k^\mathrm{T} \mathbf{w}_k$ 
+%   product is simply half the only width, recast as a complex number. 
+%   Deal with that case first.
+%   \begin{tcl}
+      if {[llength $widths] < 2} then {
+         lappend res [list [
+            complex cartesian [expr {0.5*[lindex $widths 0]}] 0.0
+         ]]
+         lappend res1 [lindex $res end]
+         lappend res2 [list [
+            complex cartesian [lindex $widths 0] 0.0
+         ]]
+         continue
+      }
+%   \end{tcl}
+%   Otherwise one should begin with the \(P_k^\mathrm{T} \mathbf{w}_k 
+%   =: \mathbf{v}\) product; this is the only step where this 
+%   procedure differs from |PMP*w|. Technically this is a 
+%   straightforward vector--matrix product, but since $\mathbf{w}_k$ 
+%   is a real vector it seems a bit unnecessary to use |vMprod|, so 
+%   the calculation is unrolled as a loop.
+%   \begin{tcl}
+      set Pk [lindex $point $k]
+      set v {}
+      foreach column [lindex $Pk 0] {
+         set re 0.0; set im 0.0
+         foreach row $Pk w $widths {
+            set re [expr {$re + [lindex $row [llength $v] 0] * $w}]
+            set im [expr {$im + [lindex $row [llength $v] 1] * $w}]
+         }
+         lappend v [complex cartesian $re $im]
+      }
+      lappend res2 $v
+%   \end{tcl}
+%   The \(\mathbf{u} := M\mathbf{v}\) vector is easy to compute, 
+%   since one merely needs to sum over previous vector elements.
+%   \begin{tcl}
+      set u {}
+      set sum [complex 0]
+      foreach z $v {
+         lappend u [complex + $sum [complex . 0.5 $z]]
+         set sum [complex + $sum $z]
+      }
+      lappend res1 $u
+%   \end{tcl}
+%   Finally, the \(\mathbf{t} := P_k \mathbf{u}\) product is a 
+%   full-blown matrix--vector product (which could have been done as 
+%   a call to |Mvprod| of |mtmtcl::Lie::complex_matrix_real_space|, 
+%   but that felt a bit wrong since I don't have the right |Zero| 
+%   matrix at hand here (even though that particular subcommand 
+%   doesn't use this parameter)).
+%   \begin{tcl}
+      set t {}
+      foreach row $Pk {
+         set sum [complex 0]
+         foreach cell $row z $u {
+            set sum [complex + $sum [complex * $cell $z]]
+         }
+         lappend t $sum
+      }
+      lappend res $t
+      incr k
+   }
+   return [list $res $res1 $res2]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{energy2}
+%   Given |PMPtw|, it is now quite easy to compute the transpose 
+%   interpretation objective function. This is called |energy2|, and 
+%   is exactly the same as |energy|, except for the fact that it uses 
+%   |PMPtw| rather than |PMP*w|. The call syntax is
+%   \begin{displaysyntax}
+%     energy2 \word{widths0} \word{wiring--widths} \word{point}
+%   \end{displaysyntax}
+%   and the return value is a |double|.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::energy2 {widths0 wwL point} {
+   set posVecL [lindex [PMPtw $widths0 $wwL $point] 0]
+   set res 0.0
+   set below [lindex $posVecL 0]
+   foreach  {wiring dummy} $wwL  above [lrange $posVecL 1 end] \
+     ofs [lindex $point 0] {
+      foreach {i j delta} $wiring {
+         set res [expr {$res
+            + ($ofs + $delta + [lindex $above $j 0]\
+              - [lindex $below $i 0]) ** 2
+            + ([lindex $above $j 1] - [lindex $below $i 1]) ** 2
+         }]
+      }
+      set below $above
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \begin{proc}{force2}
+%   ---
+%   
+%   If the objective function $f$ is |energy|, then it makes sense to 
+%   let the procedure that computes the direction of steepest descent 
+%   $-\nabla f$ be named |force|; this minus sign is even physically 
+%   correct if the |energy| is thought of as potential energy (it is 
+%   the force that would be exerted on the system because of the 
+%   stored energy). The call syntax is
+%   \begin{displaysyntax}
+%     force \word{Lie algebra} \word{widths0} \word{wiring--widths} 
+%     \word{point}
+%   \end{displaysyntax}
+%   where the \word{Lie algebra} is the product of the various 
+%   |tangent| spaces of the factors of the big Lie group in which the 
+%   \word{point} lives. The return value is an element of this 
+%   \word{Lie algebra}.
+%   
+%   The first order of business is to compute all the 
+%   $P_kM_kP_k^*\mathbf{w}_k$ products. For calculating the gradient, 
+%   the partial products are needed as well.
+%   \begin{tcl}
+proc ::network::ulayout::force2 {TS widths0 wwL point} {
+   set products [PMPtw $widths0 $wwL $point]
+%   \end{tcl}
+%   Then there is a loop, mostly over the wirings, which computes two 
+%   kinds of things: \(\mathbf{N} = -\nabla_x f$ and the vectors 
+%   $\mathbf{y}_k$ such that \(\mathbf{u}_3(k) = P_k^* \mathbf{y}_k\). 
+%   The former is simply the list |N|, which will become one of the 
+%   components of the result. The latter is stored in a list of lists 
+%   |yL|, where the top level index is exactly $k$.
+%   \begin{tcl}
+   set N {}
+   set yL {}
+   set lastprod [lindex $products 0 0]
+   lappend yL [lrepeat [llength $lastprod] [complex 0]]
+   foreach  {wiring widths} $wwL  x [lindex $point 0] \
+     prod [lrange [lindex $products 0] 1 end]  {
+%   \end{tcl}
+%   First complete the calculation of the lower level |yL|; this 
+%   amounts to the $\mathbf{e}_{i_{k+1,l}}$ terms in the expression 
+%   for $\mathbf{u}_3(k)$. Only do something if the lower level is 
+%   nontrivial, however.
+%   \begin{tcl}
+      if {[llength $lastprod] > 1} then {
+         foreach {i j ofs} $wiring {
+            lset yL end $i [complex + [lindex $yL end $i] [
+               complex + [
+                  complex cartesian [expr {-$x-$ofs}] 0.0
+               ] [
+                  complex - [lindex $lastprod $i] [lindex $prod $j]
+               ]
+            ]]
+         }
+      }
+%   \end{tcl}
+%   Then compute the $x$ contribution.
+%   \begin{tcl}
+      set sum 0.0
+      foreach {i j ofs} $wiring {
+         set sum [expr {$sum + $x + $ofs +\
+           [complex Re [lindex $prod $j]] -\
+           [complex Re [lindex $lastprod $i]]}]
+      }
+      lappend N [expr {2*$sum}]
+%   \end{tcl}
+%   And finally begin the new level in |yL| and calculate the 
+%   $\mathbf{e}_{j_{k,l}}$ terms for it. Again, if the level is 
+%   trivial then we don't bother to actually add anything.
+%   \begin{tcl}
+      lappend yL [lrepeat [llength $prod] [complex 0]]
+      if {[llength $prod] > 1} then {
+         foreach {i j ofs} $wiring {
+            lset yL end $j [complex + [lindex $yL end $j] [
+               complex + [
+                  complex cartesian [expr {$x+$ofs}] 0.0
+               ] [
+                  complex - [lindex $prod $j] [lindex $lastprod $i]
+               ]
+            ]]
+         }
+      }
+      set lastprod $prod
+   }
+%   \end{tcl}
+%   The third step is then about constructing the result. This loop 
+%   is over all levels, but it should only make a contribution to the 
+%   result for levels with more than one item. |[llength $res]| can 
+%   be used as index of the current |{*}$TS component| structure.
+%   \begin{tcl}
+   set res [list [{*}$TS component 0 neg $N]]
+   foreach  u1 [lindex $products 2]  v3 [lindex $products 1]  y $yL  {
+      if {[llength $u1] <= 1} then {continue}
+%   \end{tcl}
+%   An example of that can be found in the following calculation of 
+%   the $\mathbf{u}_3$ vector.
+%   \begin{tcl}
+      set u3 [{*}$TS component [llength $res] superset Mcvprod\
+        [lindex $point [llength $res]] $y]
+%   \end{tcl}
+%   This \texttt{Mcvprod} operation requires version~1.1 of the 
+%   |mtmtcl::Lie::complex_matrix_real_space| package, and that this 
+%   structure really is the |superset| here is a not entirely 
+%   trivial dependence of |$TS|.
+%   
+%   For the final step in computing the gradient, one must take into 
+%   account what is immediately available from earlier calculations: 
+%   \(\mathbf{u}_1(k) = P_k^* \mathbf{w}_k\), \(\mathbf{v}_3(k) = 
+%   M_kP_k^*\mathbf{w}_k\), and $\mathbf{u}_3(k)$. What should be 
+%   computed here is
+%   \begin{multline*}
+%     - \nabla_{P_k} f =
+%     - \texttt{[improve }\mathbf{u}_1 \mathbf{v}_1^* + 
+%       \mathbf{u}_2 \mathbf{v}_2^* + \mathbf{u}_3 \mathbf{v}_3^* +
+%       \mathbf{u}_4 \mathbf{v}_4^* \texttt{]}
+%     = \\ =
+%     \texttt{[improve } {-}\mathbf{u}_1 (M^* \mathbf{u}_3)^* 
+%       + \mathbf{v}_3 \mathbf{u}_3^* - \mathbf{u}_3 \mathbf{v}_3^* 
+%       + (M^* \mathbf{u}_3) \mathbf{u}_1^*
+%     \texttt{]}
+%     = \\ =
+%     \texttt{[improve } 2\mathbf{v}_3 \mathbf{u}_3^* 
+%       + 2(M^* \mathbf{u}_3) \mathbf{u}_1^*
+%     \texttt{]}
+%   \end{multline*}
+%   where the last step takes advantage of the antihermitian part 
+%   operation in |improve|.
+%   
+%   One final complication is how to compute \(\mathbf{u}_4 = M^* 
+%   \mathbf{u}_3\) (or rather $2M^*\mathbf{u}_3$, since multiplying 
+%   by $2$ at the vector stage is less work than doing it at the 
+%   matrix stage). $M$ is real so \(M^* = M^\mathrm{T}\), but that 
+%   matrix is not explicitly available for performing a 
+%   matrix--vector multiplication. Instead one may observe that 
+%   $M^*\mathbf{u}_3$ may be computed using the same cumulative sum 
+%   approach as was used for multiplication by $M$ in |PMP*w|, 
+%   provided that one |lreverse|s the vector before and after.
+%   \begin{tcl}
+      set uu4 {}
+      set sum [complex 0]
+      foreach z [lreverse $u3] {
+         lappend uu4 [complex + $z [complex . 2.0 $sum]]
+         set sum [complex + $sum $z]
+      }
+      lappend res [{*}$TS component [llength $res] improve [
+         {*}$TS component [llength $res] superset +R2. {1.0 -1.0} [
+            {*}$TS component [llength $res] superset vvcprod\
+              [lreverse $uu4] $u1
+         ] {2.0 2.0} [
+            {*}$TS component [llength $res] superset vvcprod $v3 $u3
+         ]
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \subsection{Maintaining realism}
+% 
+% The idea for the unitary group setting is that it should provide a 
+% rigidity that preserves ``physical realism'' while allowing objects 
+% to continuously switch places. However, it turns out that for \(n 
+% \geqslant 3\) even $\mathrm{U}^\mathbf{1}(n)$ allows some rather 
+% unphysical arrangements where items are placed on top of each other 
+% (\emph{not} separated in the imaginary part either). Moreover, it 
+% largely seems to be the real subgroup that is to blame for this!
+% 
+% 
+% \subsubsection{Barrier against negativity}
+% 
+% One notable feature of unphysical arrangements seems to be that 
+% some matrix elements are negative! This means items widths are 
+% counted backwards, which is probably very wrong, but how can such 
+% things come to be in the first place? 
+% 
+% As the number of elements $n$ in a level increases, the matrix group 
+% $\mathrm{U}^\mathbf{1}(n)$ becomes more flat in about the same rate 
+% $\sqrt{n}$ as distances within the unit hypercube grows. 
+% $\mathrm{U}^\mathbf{1}(n)$ is generally shaped like a circular 
+% cone, so growing flatter while having one end meeting the positive 
+% half of a coordinate axis means that the opposite end will grow 
+% closer to the negative half of that same axis; the effect is that 
+% one may find increasingly negative real parts (minimal value is 
+% $\frac{2}{n} - 1$) in some matrix 
+% elements (even though any row or column as a whole must still sum 
+% to $1$), and such elements are harmful in that they allow items to 
+% be placed in overlapping positions. While it is not possible to 
+% remove them from the domain if it is to remain a Lie group, it is 
+% perfectly possible to introduce a penalty potential that acts 
+% against negative elements.
+% 
+% What the negativity barrier should guard against is negative 
+% \emph{real parts} of matrix elements. The imaginary parts can be 
+% anything, and early experience even suggests that the objective 
+% function itself exerts a force that seeks to reduce these, so it is 
+% fine to forget about the imaginary parts in this discussion; we 
+% seek a function $f$ of a real variable $x$ that penalises \(x<0\). 
+% Since $0$ itself is a perfectly legal (and even most common) matrix 
+% element value, the negativity barrier $f$ should be zero for 
+% nonnegative values. If one still wants it to be smooth (which feels 
+% like a good idea), then it could be taken to be on the form
+% \begin{equation}
+%   f(x) = \begin{cases}
+%     e^{g(x)} \text{ (where \(g(x) \to -\infty\) as \(x \to 0^-\))}&
+%       \text{if \(x < 0\),}\\
+%     0 & \text{if \(x \geqslant 0\).}
+%   \end{cases}
+% \end{equation}
+% An absolute minimum for $x$ here is $-1$, since that is how far 
+% $\mathrm{U}(n)$ goes. Thus it might be an idea to make \(g(x) \to 
+% \infty\) as \(x \to -1^+\); a bit of sign study suggests that the 
+% simplest form of a $g$ that will do this is
+% \[
+%   g(x) = \frac{ cx + 1}{ x(x+1) } 
+%   \qquad\text{for some \(c>1\),}
+% \]
+% so let's try that for \(c=10\).
+% 
+% \begin{proc}{negativity_barrier}
+%   This function computes the sum over all matrix elements of the 
+%   barrier function
+%   \[
+%     f(x) = \begin{cases}
+%       \exp \frac{ 10x+1 }{ x(x+1) }& \text{if \(x<0\),}\\
+%       0 \text{if \(x \geqslant 0\),}
+%     \end{cases}
+%   \]
+%   where $x$ is the real part of the matrix element. The call syntax 
+%   is
+%   \begin{displaysyntax}
+%     |negativity_barrier| \word{point}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc ::network::ulayout::negativity_barrier {point} {
+   set res 0.0
+   foreach A [lrange $point 1 end] {
+      foreach row $A {
+         foreach cell $row {
+            set x [lindex $cell 0]
+            if {$x < 0} then {
+               set res [expr {$res + exp( (10.0*$x+1)/($x*($x+1.0)) ) }]
+            }
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+%   As one goes from \(x=0\) towards \(x = -1\), this function $f$ 
+%   increases smoothly from $0$ to infinity. At \(x = -0.1\) it is 
+%   $1$, at \(x = -0.5\) it is \(e^{16} \approx 8.9 \cdot 10^6\), and 
+%   at \(x = -0.95\) it is \(\approx 5.2 \cdot 10^{77}\). For 
+%   $\mathrm{U}^\mathbf{1}(n)$ to extend that far, one must have \(n 
+%   \geqslant 40\), so it probably won't come to that in practice.
+% \end{proc}
+% 
+% 
+% \begin{proc}{negativity_barrier_force}
+%   The force companion of |negativity_barrier| is 
+%   \begin{displaysyntax}
+%     |negativity_barrier_force| \word{domain} \word{point}
+%   \end{displaysyntax}
+%   which needs to know the underlying Lie group \word{domain} in 
+%   order to project the force correctly onto the tangent space.
+%   
+%   The |component 0| component of this force is always $0$.
+%   \begin{tcl}
+proc ::network::ulayout::negativity_barrier_force {G point} {
+   set res [list [{*}$G tangent component 0 0]]
+   foreach P [lrange $point 1 end] {
+%   \end{tcl}
+%   For subsequent components, the first order of business is to 
+%   construct the negative $B$ of the unrestricted gradient, in a 
+%   calculation that is very element-oriented.
+%   \begin{tcl}
+      set B {}
+      foreach row $P {
+         set brow {}
+         foreach z $row {
+            set x [lindex $z 0]
+%   \end{tcl}
+%   The derivative of $e^{g(x)}$ is $g'(x) e^{g(x)}$, so the chosen 
+%   \(g(x) = (10x +\nobreak 1) \big/ x (x +\nobreak 1)\) has
+%   \begin{multline*}
+%     g'(x) = 
+%     \frac{ 10x(x+1) - (10x+1)(2x+1) }{ x^2 (x+1)^2 } = \\ =
+%     \frac{ 10x^2 + 10x - 20x^2 - 10x - 2x - 1 }{ x^2 (x+1)^2 } =
+%     \frac{ -10x^2 - 2x - 1 }{ x^2 (x+1)^2 }
+%   \end{multline*}
+%   \begin{tcl}
+            if {$x >= 0} then {
+               lappend brow {0.0 0.0}
+            } else {
+               set xxp1 [expr {$x*($x+1)}]
+               lappend brow [list [expr {
+                  ((10*$x+2)*$x+1.0) / ($xxp1*$xxp1) *
+                  exp( (10*$x+1)/$xxp1 )
+               }] 0.0]
+            }
+         }
+         lappend B $brow
+      }
+%   \end{tcl}
+%   Then the corresponding tangent $A$ is found by means of matrix 
+%   operations. Since the tangent space at $P$ is viewed as consisting 
+%   of matrices $PA$ where $A$ is in the tangent space at the identity, 
+%   one must first multiply by \(P^{-1} = P^*\) and second project back 
+%   to the tangent space using the relevant |improve| operation.
+%   \begin{tcl}
+      lappend res [{*}$G tangent component [llength $res] improve [
+         {*}$G component [llength $res] superset * [
+            {*}$G component [llength $res] inverse $P
+         ] $B
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Early impressions is that this definitely has an effect, but that 
+% some matrix elements still creep away towards the negative, roughly 
+% to the $-1/c$ point where $g(x)$ starts to grow. This still seems 
+% to allow placing items in overlapping positions.
+% 
+% 
+% \begin{proc}{test_someforce}
+%   Both mathematically and implementation-wise, 
+%   |negativity_barrier_force| is simpler than |force|, so one might 
+%   think testing it should be unnecessary. The sad truth is however 
+%   that the first implementation of the even simpler 
+%   |penalty01force| had a sign error, so this modification of 
+%   |test_force| was written to verify that energies and forces are 
+%   consistent with each other. 
+%   The |test_someforce| procedure has the call syntax
+%   \begin{displaysyntax}
+%     |test_someforce| \word{domain} \word{force-prefix} 
+%     \word{energy-prefix} \word{point} \word{hlimit}
+%   \end{displaysyntax}
+%   where the \word{energy-prefix} and \word{force-prefix} have the 
+%   call syntaxes
+%   \begin{displaysyntax}
+%     \meta{energy-prefix} \word{point$'$}\par
+%     \meta{force-prefix} \word{point$'$}
+%   \end{displaysyntax}
+%   where the \word{point$'$} is some element of the \word{domain}, 
+%   and return a |double| or an element of `\texttt{\meta{domain} 
+%   tangent}' respectively.
+%   
+%   The return value is a list of triplets
+%   \begin{displaysyntax}
+%     \word{component} \word{basis element} \word{error}
+%   \end{displaysyntax}
+%   detailing those directions (component basis elements) in which, 
+%   for any \(h \geqslant\) the \word{hlimit}, the difference quotient 
+%   of the energy function for a step $h$ times the direction vector 
+%   fails to fall within $0.1$ of what is predicted by the force 
+%   function. An empty result means everything seems fine.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::test_someforce {G forcefun energyfun point hlimit} {
+   set force [{*}$forcefun $point]
+   set E0 [{*}$energyfun $point]
+   set zero [{*}$G tangent 0]
+   set res {}
+   for {set comp 0} {$comp < [{*}$G no.components]} {incr comp} {
+      foreach dir [{*}$G component $comp tangent basis elements] {
+         set A $zero
+         lset A $comp [{*}$G tangent component $comp basiselement $dir]
+         set ip [{*}$G tangent innerprod $A $force]
+         for {set h 1.0} {$h >= $hlimit} {set h [expr {$h*0.5}]} {
+            set E1 [{*}$energyfun [
+               {*}$G * $point [{*}$G exp [{*}$G tangent . $h $A]]
+            ]]
+            set err [expr {$ip + ($E1-$E0)/$h}]
+            if {abs($err) < 0.1} then {break}
+         }
+         if {$h < $hlimit} then {
+            lappend res\
+              [list $comp $dir\
+                [format %.5f $err] [format %.5f $ip]\
+                [format %.5f [expr {($E0-$E1)/(2*$h)}]]]
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{Enforcing non-overlap}
+% 
+% A mathematically less trivial, but perhaps more topical approach, 
+% is to directly penalise items that get too close. Given that $z_1$ 
+% and $z_2$ are coordinates of items, that $R$ is the sum of their 
+% respective radii, and that $\delta$ is a ``compression tolerance'', 
+% one energy function which does this is
+% \begin{equation}
+%   E(z_1,z_2) = \begin{cases}
+%     \frac{ R^2 - (R-\delta)^2 }{ 
+%       \lvert z_1-z_2 \rvert^2 - (R-\delta)^2 
+%     } & \text{if \( \lvert z_1-z_2 \rvert > R - \delta\),}\\
+%     \infty& \text{otherwise,}
+%   \end{cases}
+% \end{equation}
+% since this is between $0$ and $1$ for distances larger than $R$, 
+% between $1$ and $\infty$ for distances between $R$ and $R - 
+% \delta$, and $\infty$ everywhere in the forbidden interval; it is 
+% necessary to define the function there too, since the golden 
+% section search may decide to try such a point even if it will not 
+% stop there.
+% 
+% A natural candidate for the $\delta$ is the |-padx| parameter, 
+% since this is supposed to be padding between the items rather than 
+% part of an item proper.
+% 
+% 
+% \begin{proc}{overlap_energy}
+%   With that in mind, a procedure for computing the overlap energy 
+%   can have the syntax
+%   \begin{displaysyntax}
+%     |overlap_energy| \word{widths0} \word{wiring--widths} 
+%     \word{delta} \word{point}
+%   \end{displaysyntax}
+%   
+%   Much of the actual math is, as ususal, taken care of by |PMP*w|.
+%   \begin{tcl}
+proc ::network::ulayout::overlap_energy {widths0 wwL delta point} {
+   set zVecL [lindex [PMP*w $widths0 $wwL $point] 0]
+%   \end{tcl}
+%   For levels with less than three elements, there is nothing to 
+%   worry about.
+%   \begin{tcl}
+   set res 0.0
+   foreach zVec $zVecL {dummy wVec} [linsert $wwL 0 "" $widths0] {
+      if {[llength $zVec] < 3} then {continue}
+%   \end{tcl}
+%   A slightly tricky issue is how to loop over unordered pairs 
+%   ($2$-subsets) of items. A practical solution to that is to have 
+%   an inner loop over a list over previously seem items, which gets 
+%   extended at the end of each outer loop iteration.
+%   \begin{tcl}
+      set z1w1L {}
+      foreach z2 $zVec w2 $wVec {
+         foreach {z1 w1} $z1w1L {
+            set R [expr {0.5*($w1+$w2)}]
+            set Rd2 [expr {($R-$delta)**2}]
+            set dist [complex distance $z1 $z2]
+            if {$dist <= $R - $delta} then {return Inf}
+            set res [expr {$res + ($R**2 - $Rd2)/($dist**2 - $Rd2)}]
+         }
+         lappend z1w1L $z2 $w2
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Then comes the problem of how to compute the gradient (with respect 
+% to some $P$) of the above $E$. Unlike |energy| it is not 
+% polynomial, so it is not obvious that one can proceed as for 
+% |force|, but one may notice that $E$ is a sum of terms on the form 
+% $f\bigl( \lvert \mathbf{c}^* P M P^* \mathbf{w} \rvert^2 \bigr)$. By 
+% ordinary rules of differentiation it then follows that
+% \begin{multline*}
+%   \nabla_P E =
+%   f'\bigl( \lvert \mathbf{c}^* P M P^* \mathbf{w} \rvert^2 \bigr)
+%   \nabla_P \lvert \mathbf{c}^* P M P^* \mathbf{w} \rvert^2
+%   = \\ =
+%   f'\bigl( \lvert \mathbf{c}^* P M P^* \mathbf{w} \rvert^2 \bigr)
+%   \nabla_P ( \mathbf{w}^\mathrm{T} P M^* P^* \mathbf{c}
+%     \mathbf{c}^* P M P^* \mathbf{w} )
+% \end{multline*}
+% and hence the same basic ideas as for |force| apply also in this 
+% case; pretty much the same pairs vectors will provide the directions, 
+% and the role of $f$ becomes to adjust which magnitudes they are given.
+% 
+% As for |force|, the differential of $\mathbf{w}^\mathrm{T} P 
+% M^* P^* \mathbf{c} \mathbf{c}^* P M P^* \mathbf{w}$ consists of 
+% four terms (one for each $P$) and can be written as \(A \mapsto 
+% \sum_{r=1}^4 \mathbf{u}_r^* A \mathbf{v}_r\) for
+% \begin{align*}
+%   \mathbf{u}_1^* ={}& \mathbf{w}^\mathrm{T} P \text{,}&
+%   \mathbf{v}_1 ={}& M^* P^* \mathbf{c} \mathbf{c}^* P M P^* \mathbf{w}
+%     \text{,}\\
+%   \mathbf{u}_2^* ={}& -\mathbf{w}^\mathrm{T} P M^* \text{,}&
+%   \mathbf{v}_2 ={}& P^* \mathbf{c} \mathbf{c}^* P M P^* \mathbf{w}
+%     \text{,}\displaybreak[0]\\
+%   \mathbf{u}_3^* ={}& \mathbf{w}^\mathrm{T} P M^* P^* \mathbf{c} 
+%     \mathbf{c}^* P \text{,}&
+%   \mathbf{v}_3 ={}& M P^* \mathbf{w}
+%     \text{,}\\
+%   \mathbf{u}_4^* ={}& -\mathbf{w}^\mathrm{T} P M^* P^* \mathbf{c} 
+%     \mathbf{c}^* P M \text{,}&
+%   \mathbf{v}_4 ={}& P^* \mathbf{w}
+%     \text{,}
+% \end{align*}
+% where the minus signs are due to $P$ (and thus $A$) being 
+% conjugate in the basic expression. The corresponding gradient is 
+% $\sum_{r=1}^4 \mathbf{u}_r \mathbf{v}_r^*$, but since the above 
+% expression is antihermitian and will anyway undergo a reduction to 
+% antihermitian form as part of the final projection to the tangent 
+% space of $\mathrm{U}^\mathbf{1}(n)$, it suffices at this point to 
+% compute $2 \mathbf{u}_1 \mathbf{v}_1^* - 2 \mathbf{v}_3
+% \mathbf{v}_2^*$ where
+% \begin{align*}
+%   \mathbf{u}_1 ={}& P^* \mathbf{w} \text{,}\\
+%   \mathbf{v}_2 ={}& P^* \mathbf{c} \mathbf{c}^* P M P^* \mathbf{w}
+%     \text{,}\\
+%   \mathbf{v}_1 ={}& M^* \mathbf{v}_2 \text{,}\\
+%   \mathbf{v}_3 ={}& M P^* \mathbf{w} \text{.}
+% \end{align*}
+% What varies between different pairs of items is merely the 
+% $\mathbf{c}$ vector, so that can be collected into the calculation 
+% of the $\mathbf{v}_2$ vector.
+% 
+% \begin{proc}{overlap_force}
+%   A suitable call syntax for the command to compute the force 
+%   counterpart of |overlap_energy| is then
+%   \begin{displaysyntax}
+%     |overlap_force| \word{tangent space} \word{widths0} 
+%     \word{wiring--widths} \word{toleance} \word{point}
+%   \end{displaysyntax}
+%   and the return value is an element of the Lie algebra for which 
+%   \word{tangent space} is a command prefix.
+%   
+%   Since this is purely a force acting within a level, the main loop 
+%   is over the levels, and only those levels which have $3$ or more 
+%   items go on to having an actual gradient calculation made.
+%   \begin{tcl}
+proc ::network::ulayout::overlap_force {TS widths0 wwL delta point} {
+   set res [list [{*}$TS component 0 0]]
+   lassign [PMP*w $widths0 $wwL $point] PMPwL MPwL PwL
+   foreach {dummy wVec} [linsert $wwL 0 "" $widths0]  u1 $PwL \
+     v3 $MPwL  zVec $PMPwL {
+      if {[llength $wVec] < 2} then {
+         continue
+      } elseif {[llength $wVec] == 2} then {
+         lappend res [{*}$TS component [llength $res] 0]
+         continue
+      }
+%   \end{tcl}
+%   The multiplication of $\sum_k \alpha_k \mathbf{c}_k \mathbf{c}_k^*$ 
+%   by \(\mathbf{z} = PMP^*\mathbf{w}\) is structured as $\sum_k 
+%   (\alpha_k \mathbf{c}_k^* \mathbf{z}) \mathbf{c}_k$ rather than a 
+%   matrix--vector product, since the value of the coefficient 
+%   $\alpha_k$ depends on the product $\mathbf{c}_k^* \mathbf{z}$ and 
+%   each $\mathbf{c}_k$ has exactly two nonzero elements.
+%   For
+%   \[
+%     f(x) = \frac{ R^2 - (R-\delta)^2 }{ x - (R-\delta)^2 }
+%     \qquad\text{one has}\qquad
+%     f'(x) = -\frac{ R^2 - (R-\delta)^2 }{ 
+%       \bigl( x - (R-\delta)^2 \bigr)^2
+%     }
+%   \]
+%   and \(\alpha_k = 2 f'\bigl( \lvert \mathbf{c}_k^* \mathbf{z} 
+%   \rvert^2 \bigr)\), where the $2$ is for that factor in the 
+%   expression $2 \mathbf{u}_1 \mathbf{v}_1^* - 2 \mathbf{v}_3 
+%   \mathbf{v}_2^*$.
+%   \begin{tcl}
+      set ccz [lrepeat [llength $zVec] [complex 0]]
+      for {set j 0} {$j < [llength $zVec]} {incr j} {
+         for {set i 0} {$i < $j} {incr i} {
+            set z [complex - [lindex $zVec $i] [lindex $zVec $j]]
+            set R [expr {0.5*( [lindex $wVec $i] + [lindex $wVec $j] )}]
+            set Rd2 [expr {($R-$delta)**2}]
+            set alpha [expr {-2 * ( $R**2 - $Rd2 ) *\
+              ( [complex abssqr $z] - $Rd2 )**-2}]
+            set az [complex . $alpha $z]
+            lset ccz $i [complex + [lindex $ccz $i] $az]
+            lset ccz $j [complex - [lindex $ccz $j] $az]
+         }
+      }
+%   \end{tcl}
+%   The rest is done more with matrix-level operations, with the 
+%   exception of the $M^* \mathbf{v}_2$ matrix--vector product.
+%   \begin{tcl}
+      set v2 [{*}$TS component [llength $res] superset Mcvprod\
+        [lindex $point [llength $res]] $ccz]
+      set v1rev {}
+      set sum [complex 0]
+      foreach z [lreverse $v2] {
+         lappend v1rev [complex + [complex . 0.5 $z] $sum]
+         set sum [complex + $sum $z]
+      }
+      lappend res [{*}$TS component [llength $res] improve [
+%   \end{tcl}
+%   The following command computes $2 \mathbf{v}_3 \mathbf{v}_2^* - 
+%   2 \mathbf{u}_1 \mathbf{v}_1^*$, which has the sign change that one 
+%   wants for the force (rather than gradient) $-\nabla E$.
+%   \begin{tcl}
+         {*}$TS component [llength $res] superset - [
+            {*}$TS component [llength $res] superset vvcprod $v3 $v2
+         ] [
+            {*}$TS component [llength $res] superset vvcprod\
+              $u1 [lreverse $v1rev]
+         ]
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Regulating the search}
+% 
+% A gradient points in the direction where a function changes the 
+% fastest, but its magnitude need not be related to the distance that 
+% it makes sense to walk in that direction. In particular, the 
+% compact nature of the $\mathrm{U}^\mathbf{1}(n)$ components gives 
+% rise to periodicities, so it probably does not make sense to choose 
+% an initial step longer than (say) half the circumference of any of 
+% the matrix components; longer steps are likely to make it more or 
+% less random on which revolution the golden section search lands, 
+% and that may result in odd choices regarding components other than 
+% the one that is currently dominant. But how can one determine the 
+% circumference of $\mathrm{U}^\mathbf{1}(n)$ in a given direction?
+% 
+% Suppose the direction is given by the antihermitian matrix $A$, and 
+% that $U$ diagonalises $A$, so that \(D := UAU^{-1}\) is diagonal 
+% (every antihermitian matrix can be diagonalised). Then 
+% \[
+%   \exp (tA) = 
+%   \sum_{k=0}^\infty \frac{(tA)^k}{k!} =
+%   \sum_{k=0}^\infty \frac{(tU^{-1}DU)^k}{k!} =
+%   \sum_{k=0}^\infty U^{-1}\frac{(tD)^k}{k!} U =
+%   U^{-1} \exp(tD) U
+% \]
+% and so the periodicities of $\exp(tA)$ are the same as the 
+% periodicities of $\exp(tD)$. This latter matrix exponent is merely 
+% the ordinary exponent applied separately to each diagonal element, 
+% and the diagonal elements of $D$ are precisely the eigenvalues of 
+% $A$. Since these eigenvalues moreover are purely imaginary, it 
+% follows that every periodicity is of the form \(e^{t\lambda} = \cos 
+% (t \operatorname{Im} \lambda) + i \sin (t \operatorname{Im} 
+% \lambda)\); for a step of $tA$ to be at most half a period, one must 
+% have \(\lvert t\lambda \rvert \leqslant \pi\).
+% 
+% Exactly enforcing that bound would require computing the magnitude 
+% of the largest eigenvalue, but an implementation of that is not 
+% currently available. An upper bound on it can however be had from 
+% the Frobenius norm; it can be seen from
+% \[
+%   \sum_{k=1}^n \lvert\lambda_k\rvert^2 =
+%   \sum_{k=1}^n -\lambda_k^2 =
+%   \operatorname{tr}(-D^2) =
+%   \operatorname{tr}(D^*D) =
+%   \langle D, D\rangle =
+%   \langle A, A\rangle
+% \]
+% that this approximation amounts to computing the $\ell^2$-norm of 
+% the vector of eigenvalues rather than the max-norm thereof. This 
+% may yield a higher value than what is actually at hand, but on the 
+% other hand the golden section search is forgiving of being given a 
+% small initial step, and will automatically scale up the search 
+% interval until it contains a minimum.
+% 
+% \begin{proc}{choke}
+%   This procedure limits the length of a tangent vector so that its 
+%   exponent is within half a turn from the identity in every matrix 
+%   component, but preserves the direction. The call syntax is
+%   \begin{displaysyntax}
+%     choke \word{product Lie group} \word{tangent} 
+%     \word{gague}\regopt
+%   \end{displaysyntax}
+%   and the result is the \word{tangent} or a scaled-down version of 
+%   the same. The \word{gague} is an extra scaling factor applied to 
+%   the \word{tangent} independently of the matrix-based limiting; it 
+%   defaults to |1.0|, but smaller values give a smaller result and 
+%   larger values a larger result.
+%   
+%   The first step is to compute the maximum Frobenius norm in any 
+%   component.
+%   \begin{tcl}
+proc ::network::ulayout::choke {G A {gague 1.0}} {
+   set max 0.0
+   for {set k [expr {[{*}$G tangent no.components]-1}]} {$k>=1}\
+     {incr k -1} {
+      set max [::tcl::mathfunc::max $max [
+         {*}$G tangent component $k superset Frobenius_norm\
+           [{*}$G tangent index $k $A]
+      ]]
+   }
+%   \end{tcl}
+%   Then that is compared to the bound, and the tangent is scaled 
+%   down if necessary. The exact bound of $\pi$ has been rounded down 
+%   to $1.0$, because experience has shown that the valley where a 
+%   minimum is sought is typically much smaller than half the 
+%   circumference. In the (apparently not so common) case that the 
+%   function continues to decrease beyond a basic step of unit 
+%   length, the golden section search will anyway notice this 
+%   automatically.
+%   
+%   When a nondefault \word{gague} is applied, that effectively 
+%   replaces the |1.0| bound (which is why it is |choke| that does 
+%   this in the first place).
+%   \begin{tcl}
+   if {$max > $gague} then {
+      return [{*}$G tangent . [expr {$gague/$max}] $A]
+   } elseif {$gague != 1.0} then {
+      return [{*}$G tangent . $gague $A]
+   } else {
+      return $A
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{Locking parts of a permutation}
+% 
+% 
+% Another sense in which one might want to limit the search is that 
+% one might want to lock some matrix elements to being $1$, which 
+% corresponds to prescribing the values of the underlying permutation 
+% in the same number of points. A matrix element is naturally encoded 
+% as a pair $(i,j)$ of row and column, which thus corresponds to the 
+% claim that \(i = \sigma(j)\). For each matrix, it is practical to 
+% keep track of the locks as a list of the locked pairs, and the 
+% total \emph{lock-list} is then the list of per-matrix lock lists, 
+% e.g.
+% \begin{quote}
+%   |{{0 1} {1 0}} {} {} {} {{2 0}}|
+% \end{quote}
+% if the first matrix component has two locked positions, the fifth 
+% matrix component has one locked position, and the second through 
+% fourth have none.
+% 
+% The effect of locking on a group element matrix is straightforward: 
+% the listed elements should be $1$, and the matrix as a whole should 
+% remain an element of $\mathrm{U}^\mathbf{1}(n)$; a direct 
+% consequence of this is that other elements in the same row or 
+% column as one of the listed will be locked to $0$. For the rest of the 
+% matrix elements one could imagine an |improve| should sort things 
+% out, but that can unfortunately lead to a bit of splash in to the 
+% locked matrix elements in the step that seeks to enforce the product 
+% with the $\mathbf{1}$ vector. Hence the best (or at least least 
+% confusing) approach seems to be to extract the submatrix of non-locked 
+% elements, |improve| this separately, and then reinsert the locked 
+% elements afterwards.
+% 
+% 
+% \begin{proc}{lock_point}
+%   This procedure locks some elements of a point. The call syntax is
+%   \begin{displaysyntax}
+%     |lock_point| \word{locklist} \word{point}
+%   \end{displaysyntax}
+%   and it returns the modified \word{point}. The method employed is 
+%   to cutting component matrices down in size, |improve|ing what 
+%   remains, and reinsert the missing rows and columns. Components 
+%   without locks are however left as they were.
+%   
+%   \textbf{Warning:} The \word{point} elements being locked need to 
+%   be \emph{very} close to what they are being locked to 
+%   (even $\frac{1}{10}$ is too far away), because otherwise the 
+%   effects on other elements is quite unpredictable. (In practice, 
+%   this seems to render the whole idea of locking elements less than 
+%   useful.)
+%   
+%   \begin{tcl}
+proc ::network::ulayout::lock_point {locklist point} {
+   set res [lrange $point 0 0]
+   foreach P [lrange $point 1 end] lockL $locklist {
+      if {![llength $lockL]} then {
+         lappend res $P
+         continue
+      } elseif {[llength $lockL] == [llength $P]} then {
+%   \end{tcl}
+%   Components where all rows are locked are also given special 
+%   treatment.
+%   \begin{tcl}
+         set Q [lrepeat [llength $P] [lrepeat [llength $P] {0.0 0.0}]]
+         foreach pair $lockL {
+            lset Q $pair {1.0 0.0}
+         }
+         lappend res $Q
+         continue
+      }
+%   \end{tcl}
+%   The main case is however that only some rows are locked. The 
+%   |rowstat| and |colstat| lists specify the status of a row or column, 
+%   respectively; a |-1| entry means that row or column is unlocked, 
+%   whereas a nonnegative value means it is locked. In the |rowstat|, 
+%   the nonnegative values are the respective column indices of the 
+%   ones in the matrix.
+%   \begin{tcl}
+      set rowstat [lrepeat [llength $P] -1]
+      set colstat $rowstat
+      foreach pair $lockL {
+         lset rowstat [lindex $pair 0] [lindex $pair 1]
+         lset colstat [lindex $pair 1] 0
+      }
+      set Q {}
+      foreach row $P rstat $rowstat {
+         if {$rstat >= 0} then {continue}
+         set qrow {}
+         foreach cell $row cstat $colstat {
+            if {$cstat < 0} then {lappend qrow $cell}
+         }
+         lappend Q $qrow
+      }
+%   \end{tcl}
+%   It is technically possible that the submatrix $Q$ of unlocked rows 
+%   and columns is $1 \times 1$, in which case its only element 
+%   should of course be $1$. This is a highly degenerate case which 
+%   only arises when a locklist specifies $n-1$ items even though 
+%   this determines also the final item, so it arguably should not 
+%   occur in well-written programs, but one might as well check for 
+%   it.
+%   \begin{tcl}
+      if {[llength $Q] == 1} then {
+         lset Q 0 0 {1.0 0.0}
+      } else {
+%   \end{tcl}
+%   What one wants is for the submatrix $Q$ to be an element of 
+%   $\mathrm{U}^\mathbf{1}(n')$, and the |improve| operation of that 
+%   group seems like it should be ideal for this, but there is a 
+%   catch: this |improve| is only an iteration step, not a full 
+%   projection. The result fulfills the row-sum condition, but 
+%   generally not the unitarity condition, so something more is 
+%   needed for the latter. As the \(Q \mathbf{1} = \mathbf{1}\) 
+%   identity is preserved by the |mtmtcl::Lie::unitary| group improve 
+%   iteration \(Q := \tfrac{1}{2}\bigl( Q +\nobreak (Q^*)^{-1} 
+%   \bigr)\), running this a couple of times seems like it should do 
+%   the trick.
+%   
+%   There is a limit of $6$ iterations, but also a limit in terms of 
+%   the Frobenius norm squared of $Q$ getting close enough to $n'$ (i.e., 
+%   the Frobenius norm squared of the identity). `Close enough' is taken 
+%   to mean `a relative error not exceeding $10^{-16}$ per part of matrix 
+%   element'; the $2$ in |2e-16| is because a complex number has two 
+%   parts.
+%   \begin{tcl}
+         set G [::mtmtcl::Lie::unitary1fixed::make group [llength $Q]]
+         set Q [{*}$G improve $Q]
+         set relerr [expr {2e-16*[llength $Q]**2}]
+         for {set i 0} {$i<6 && $relerr <\
+           abs( 1 - [{*}$G superset innerprod $Q $Q]/[llength $Q] )} {incr i} {
+            set Q [{*}$G superset . 0.5 [{*}$G superset + $Q\
+              [{*}$G superset inverse [{*}$G superset conjugate $Q]]]]
+         }
+      }
+%   \end{tcl}
+%   Now all that remains is to reinsert the missing rows and columns, 
+%   thereby producing a new $P$.
+%   \begin{tcl}
+      set zero [lrepeat [llength $colstat] {0.0 0.0}]
+      set P {}
+      set k 0
+      foreach rstat $rowstat {
+         if {$rstat >= 0} then {
+            lappend P $zero
+            lset P end $rstat {1.0 0.0}
+         } else {
+            set row {}
+            set l 0
+            foreach cstat $colstat {
+               if {$cstat < 0} then {
+                  lappend row [lindex $Q $k $l]
+                  incr l
+               } else {
+                  lappend row {0.0 0.0}
+               }
+            }
+            lappend P $row
+            incr k
+         }
+      }
+      lappend res $P
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{lock_tangent}
+%   This procedure is the tangent counterpart of |lock_point|. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     |lock_tangent| \word{locklist} \word{tangent}
+%   \end{displaysyntax}
+%   and it returns the modified \word{tangent}. The method employed is 
+%   to cutting component matrices down in size, |improve|ing what 
+%   remains, and reinsert the missing rows and columns. Components 
+%   without locks are left as they were.
+%   
+%   The main difference to |lock_point| is that this procedure is 
+%   row--column-symmetric, and that it is the column parts of the 
+%   locklist that matter. This is because tangents are viewed as 
+%   appearing on the right side of points.
+%   \begin{tcl}
+proc ::network::ulayout::lock_tangent {locklist tangent} {
+   set res [lrange $tangent 0 0]
+   foreach A [lrange $tangent 1 end] lockL $locklist {
+      if {![llength $lockL]} then {
+         lappend res $A
+         continue
+      } elseif {[llength $lockL] >= [llength $A] - 1} then {
+%   \end{tcl}
+%   Components where all rows are locked are also given special 
+%   treatment.
+%   \begin{tcl}
+         lappend res\
+           [lrepeat [llength $A] [lrepeat [llength $A] {0.0 0.0}]]
+         continue
+      }
+%   \end{tcl}
+%   The main case is however that only some rows are locked. The 
+%   |colstat| list specifies the status of a column (or row); a |-1| 
+%   entry means that row or column is unlocked, whereas a |0| means 
+%   it is locked.
+%   \begin{tcl}
+      set colstat [lrepeat [llength $A] -1]
+      foreach pair $lockL {
+         lset colstat [lindex $pair 1] 0
+      }
+      set Q {}
+      foreach row $A rstat $colstat {
+         if {$rstat >= 0} then {continue}
+         set qrow {}
+         foreach cell $row cstat $colstat {
+            if {$cstat < 0} then {lappend qrow $cell}
+         }
+         lappend Q $qrow
+      }
+%   \end{tcl}
+%   Unlike the case with matrix groups, the |improve| in the 
+%   |unitary1fixed| Lie algebra produces an element of the Lie 
+%   algebra in one step.
+%   \begin{tcl}
+      set Q [{*}[
+         ::mtmtcl::Lie::unitary1fixed::make algebra [llength $Q]
+      ] improve $Q]
+%   \end{tcl}
+%   Now all that remains is to reinsert the missing rows and columns, 
+%   thereby producing a new $A$.
+%   \begin{tcl}
+      set zero [lrepeat [llength $colstat] {0.0 0.0}]
+      set A {}
+      set k 0
+      foreach rstat $colstat {
+         if {$rstat >= 0} then {
+            lappend A $zero
+         } else {
+            set row {}
+            set l 0
+            foreach cstat $colstat {
+               if {$cstat < 0} then {
+                  lappend row [lindex $Q $k $l]
+                  incr l
+               } else {
+                  lappend row {0.0 0.0}
+               }
+            }
+            lappend A $row
+            incr k
+         }
+      }
+      lappend res $A
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{The conjugate gradient method}
+% 
+% A problem with the basic steepest descent method is that it suffers 
+% from the ping-pong phenomenon: in a narrow valley with steep ridges 
+% of the target function, it will tend to zig-zag from side to side 
+% rather than going along the major axis, since the tangents of the 
+% level curves typically are at a rather low angle relative to the 
+% major axis and the the gradients therefore (and complementary) are 
+% not too far from orthogonal to the major axis! One way of dealing 
+% with that is the \emph{conjugate gradient} method, which adjusts 
+% the search directions to be pairwise \emph{conjugate} (orthogonal 
+% with respect to an inner product derived from the matrix of second 
+% derivatives). Remarkably, the only things the method needs to 
+% remember from step to step is the old gradient and search 
+% directions.
+% 
+% \stringtypeheading{CG-entry}{Conjugate gradient array entries:}
+% 
+% It is practical to keep the state of the conjugate gradient search 
+% in an array, which utility procedures access using |upvar|. The 
+% \describestring+[CG-entry]{gss} entry holds the current 
+% |mtmtcl::Lie::golden| state for the search. The 
+% \describestring+[CG-entry]{energy} and 
+% \describestring+[CG-entry]{force} entries are command prefixes of 
+% the forms
+% \begin{displaysyntax}
+%   |{*}|\meta{array}(energy) \word{point}\par
+%   |{*}|\meta{array}(force) \word{point}
+% \end{displaysyntax}
+% which return the value and negative gradient respectively of the 
+% function that is to be minimised. The 
+% \describestring+[CG-entry]{searchdir} entry holds the current 
+% search direction (before |choke|ing), the 
+% \describestring+[CG-entry]{steepest} entry holds the negative of 
+% the raw gradient at the point where that search direction was 
+% chosen, and the \describestring+[CG-entry]{steepest2} entry holds 
+% the inner product of the |steepest| entry with itself. 
+% The \describestring+[CG-entry]{domain} entry is the command prefix of 
+% the group over which some function is being minimised.
+% 
+% The \describestring+[CG-entry]{locklist} entry is the current 
+% locklist.
+% 
+% Another entry is \describestring+[CG-entry]{directions}, which is an 
+% integer that counts the number of times the direction has been 
+% changed; one can generally not expect to find the minimum in fewer 
+% changes of direction than there are dimensions in the space. There 
+% is also an entry \describestring+[CG-entry]{stepgague}, which 
+% serves as gague for the |choke| command; this gague may be adjusted 
+% up or down when a new search direction is chosen.
+% 
+% Finally, there are three entries 
+% \describestring+[CG-entry]{energyL}, 
+% \describestring+[CG-entry]{forceL}, and 
+% \describestring+[CG-entry]{factorL} which are lists of equal 
+% length. The |energyL| and |forceL| elements are syntactically like 
+% the |energy| and |force| entries respectively, whereas the elements 
+% of the |factorL| are real numbers. The effect of having these is 
+% that the combined energy function to minimise is obtained by adding 
+% to the basic |energy| one the linear combination of the |energyL| 
+% ones by the corresponding factors from |factorL|.
+% 
+% \begin{proc}{combined_energy}
+%   As an illustration of this (and helper function), the call
+%   \begin{displaysyntax}
+%     |::network::ulayout::combined_energy| \word{energy} 
+%     \word{energyL} \word{factorL} \word{point}
+%   \end{displaysyntax}
+%   returns this linear combination of values of energy functions at 
+%   the \word{point}. The \word{energyL} and \word{factorL} arguments 
+%   must be lists of equal length, so it is in particular OK to supply 
+%   empty lists for both of them.
+%   
+%   \begin{variable}{energy_components}
+%     Knowing the individual values of the various components of the 
+%     |combined_energy| can be useful, but these are typically 
+%     computed at a time where there is no room for reporting them 
+%     back to the top level. Therefore |combined_energy| dumps the 
+%     components it computes in the |energy_components| variable, as 
+%     individual elements of a list. The list is cleared every time 
+%     |combined_energy| is called (so |combined_energy| is suitable 
+%     for recursive calls).
+%   \end{variable}
+%   \begin{tcl}
+proc ::network::ulayout::combined_energy {E0 EL fL point} {
+   variable energy_components {}
+   set res [{*}$E0 $point]
+   lappend energy_components $res
+   foreach E $EL factor $fL {
+      lappend energy_components [{*}$E $point]
+      set res [expr {$res + $factor*[lindex $energy_components end]}]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{CG-first}
+%   This procedure takes a first optimisation step. Its call syntax is
+%   \begin{displaysyntax}
+%     CG-first \word{CG-array} \word{point}
+%   \end{displaysyntax}
+%   where \word{CG-array} is the name in the calling context of the 
+%   array that contains the CG-entries that the conjugate gradient 
+%   method uses. The |energy|, |energyL|, |force|, |forceL|, 
+%   |factorL|, and |domain| entries must already be filled in, but 
+%   others are initialised according to the \word{point}. The return 
+%   value is the |bestvalue| of the search.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::CG-first {arrname point} {
+   upvar 1 $arrname CG
+   set CG(directions) 0
+   set CG(stepgague) 1.0
+   set CG(locklist) {}
+   set CG(steepest) [{*}$CG(force) $point]
+   foreach F $CG(forceL) factor $CG(factorL) {
+      set CG(steepest) [{*}$CG(domain) tangent + $CG(steepest) [
+         {*}$CG(domain) tangent . $factor [{*}$F $point]
+      ]]
+   }
+   set CG(steepest2)\
+     [{*}$CG(domain) tangent innerprod $CG(steepest) $CG(steepest)]
+   set CG(searchdir) $CG(steepest)
+   set CG(gss) [::mtmtcl::Lie::golden::minimising [
+      list ::network::ulayout::combined_energy $CG(energy)\ 
+        $CG(energyL) $CG(factorL)
+   ] $CG(domain) $point [choke $CG(domain) $CG(searchdir)]]
+   ::mtmtcl::Lie::golden::bestvalue $CG(gss)
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{CG-next}
+%   This procedure takes a subsequent optimisation step. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     CG-next \word{CG-array} \word{tolerance}
+%   \end{displaysyntax}
+%   and similarly to |CG-first| it returns the current |bestvalue| of 
+%   the search, but its main job is to update the array in the 
+%   calling context whose name is \word{CG-array}.
+%   
+%   This procedure always performs a |mtmtcl::Lie::golden::next| 
+%   step. If (that gets |derailed| or) the |stepsize| in that search 
+%   drops below the \word{tolerance} then the procedure also computes 
+%   a new search direction and starts |minimising| in that direction 
+%   before returning.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::CG-next {arrname tolerance} {
+   upvar 1 $arrname CG
+   if {![
+      ::mtmtcl::Lie::golden::next $CG(gss) CG(gss)
+   ] || $tolerance>[::mtmtcl::Lie::golden::stepsize $CG(gss)]} then {
+      set point [::mtmtcl::Lie::golden::bestpoint $CG(gss)]
+      set new [{*}$CG(force) $point]
+      foreach F $CG(forceL) factor $CG(factorL) {
+         set new [{*}$CG(domain) tangent + $new [
+            {*}$CG(domain) tangent . $factor [{*}$F $point]
+         ]]
+      }
+      set new2 [{*}$CG(domain) tangent innerprod $new $new]
+%   \end{tcl}
+%   The following is called the Polak--Ribi\`ere formula:
+%   \begin{tcl}
+      set beta [expr { ( $new2 - [
+        {*}$CG(domain) tangent innerprod $new $CG(steepest) 
+      ] ) / $CG(steepest2) }]
+      set CG(steepest) $new
+      set CG(steepest2) $new2
+      if {$beta > 0} then {
+         set CG(searchdir) [{*}$CG(domain) tangent + $new [
+            {*}$CG(domain) tangent . $beta $CG(searchdir)
+         ]]
+      } else {
+         set CG(searchdir) $new
+      }
+      if {[llength $CG(locklist)]} then {
+         set CG(searchdir) [lock_tangent $CG(locklist) $CG(searchdir)]
+      }
+      set CG(gss) [::mtmtcl::Lie::golden::minimising [
+         list ::network::ulayout::combined_energy $CG(energy)\ 
+           $CG(energyL) $CG(factorL)
+      ] $CG(domain) [::mtmtcl::Lie::golden::bestpoint $CG(gss)]\
+        [choke $CG(domain) $CG(searchdir) $CG(stepgague)]]
+%   \end{tcl}
+%   The gague is adjusted in steps of $1.5$, which is slightly less 
+%   than the golden ratio $\phi$.
+%   \begin{tcl}
+      switch -- [::mtmtcl::Lie::golden::trend $CG(gss)] {
+         1  {set CG(stepgague) [expr {$CG(stepgague)/1.5}]}
+         -1 {set CG(stepgague) [expr {$CG(stepgague)*1.5}]}
+      }
+      incr CG(directions)
+   }
+   ::mtmtcl::Lie::golden::bestvalue $CG(gss)
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{CG-lock}
+%   This procedure adds items to the |locklist| entry in a CG-array, 
+%   updates the current point accordingly, and restarts the search in 
+%   a new direction from the current point. The call syntax is
+%   \begin{displaysyntax}
+%     CG-lock \word{CG-array} \word{script} \begin{regblock}[\regopt]
+%     \word{component} \word{row} \word{column} \end{regblock}
+%   \end{displaysyntax} 
+%   where \word{CG-array} is the name in the calling context of the 
+%   CG-array to update. A \word{component} is the |component| number 
+%   ($1$ or higher) of the matrix to add a lock to, and the following 
+%   \word{row} and \word{column} are the indices ($0$-based) of the 
+%   matrix entry to lock to $1$. The \word{script} is evaluated in 
+%   the calling context after the |locklist| has been updated, but 
+%   before the search is restarted; it can be used to modify the 
+%   objective function accordingly.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::CG-lock {arrname script args} {
+   upvar 1 $arrname CG
+   foreach {comp row col} $args {
+      set P [lindex [::mtmtcl::Lie::golden::bestpoint $CG(gss)] $comp]
+      if {$row < 0 || $row >= [llength $P]} then {
+         return -code error "Row index out of bounds for:\
+           $comp $row $col"
+      }
+      if {$col < 0 || $col >= [llength $P]} then {
+         return -code error "Column index out of bounds for:\
+           $comp $row $col"
+      }
+      incr comp -1
+      while {[llength $CG(locklist)] < $comp} {
+         lappend CG(locklist) {}
+      }
+      set L [lindex $CG(locklist) $comp]
+      if {[lsearch -index 0 -integer $L $row] >= 0} then {
+         incr comp
+         return -code error\
+           "Row $row is already locked in component $comp"
+      }
+      if {[lsearch -index 1 -integer $L $col] >= 0} then {
+         incr comp
+         return -code error\
+           "Column $col is already locked in component $comp"
+      }
+      lappend L [list $row $col]
+      lset CG(locklist) $comp $L
+   }
+   uplevel 1 $script
+   set point [lock_point $CG(locklist)\
+     [::mtmtcl::Lie::golden::bestpoint $CG(gss)]]
+   set CG(directions) 0
+   set CG(stepgague) 1.0
+   set CG(steepest) [{*}$CG(force) $point]
+   foreach F $CG(forceL) factor $CG(factorL) {
+      set CG(steepest) [{*}$CG(domain) tangent + $CG(steepest) [
+         {*}$CG(domain) tangent . $factor [{*}$F $point]
+      ]]
+   }
+   set CG(steepest2)\
+     [{*}$CG(domain) tangent innerprod $CG(steepest) $CG(steepest)]
+   set CG(searchdir) [lock_tangent $CG(locklist) $CG(steepest)]
+   set CG(gss) [::mtmtcl::Lie::golden::minimising [
+      list ::network::ulayout::combined_energy $CG(energy)\ 
+        $CG(energyL) $CG(factorL)
+   ] $CG(domain) $point [choke $CG(domain) $CG(searchdir)]]
+   ::mtmtcl::Lie::golden::bestvalue $CG(gss)
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Rounding schemes}
+% 
+% Finding a minimum is one thing, but the sought solution must be a 
+% permutation in all the matrix group components. How might one find 
+% that?
+% 
+% 
+% \subsubsection{Component-oriented rounding}
+% 
+% \begin{proc}{round_matrix_elements}
+%   One simplistic approach is to round all the matrix elements 
+%   separately to $0$ or $1$, through a call such as
+%   \begin{displaysyntax}
+%     |round_matrix_elements| \word{point}
+%   \end{displaysyntax}
+%   but this has the obvious drawback that it need not produce a 
+%   permutation matrix (or even an invertible matrix). Still, it 
+%   could be useful for displaying results.
+%   \begin{tcl}
+proc ::network::ulayout::round_matrix_elements {point} {
+   set res [lrange $point 0 0]
+   foreach A [lrange $point 1 end] {
+      set B {}
+      foreach row $A {
+         set brow {}
+         foreach cell $row {
+            if {[lindex $cell 0] < 0.5} then {
+               lappend brow {0.0 0.0}
+            } else {
+               lappend brow {1.0 0.0}
+            }
+         }
+         lappend B $brow
+      }
+      lappend res $B
+   }
+   return $res
+}
+%   \end{tcl}
+%   Indeed, this frequently produces matrices with zero rows or rows 
+%   with more than one $1$ in them.
+% \end{proc}
+% 
+% 
+% \begin{proc}{round_by_selecting_ones}
+%   Considering that most matrix elements can be expected to be close 
+%   to $0$, one approach for rounding to a permutation is to select 
+%   which elements are going to be the $1$s. This is implemented by
+%   \begin{displaysyntax}
+%     |round_by_selecting_ones| \word{point}
+%   \end{displaysyntax}
+%   
+%   \begin{tcl}
+proc ::network::ulayout::round_by_selecting_ones {point} {
+   set res [lrange $point 0 0]
+   foreach A [lrange $point 1 end] {
+      set D [dict create]
+      set i -1; foreach row $A {incr i
+         set j -1; foreach cell $row {incr j
+            dict set D [list $i $j]\
+              [expr {hypot(1-[lindex $cell 0], [lindex $cell 1])}]
+         }
+      }
+      set B [lrepeat [llength $A] [lrepeat [llength $A] {0.0 0.0}]]
+      foreach {key value} [lsort -stride 2 -index 1 -real [dict get $D]] {
+         if {![dict exists $D $key]} then {continue}
+         lset B $key {1.0 0.0}
+         foreach key2 [dict keys $D] {
+            if {[lindex $key 0] == [lindex $key2 0] ||
+              [lindex $key 1] == [lindex $key2 1]} then {
+               dict unset D $key2
+            }
+         }
+      }
+      lappend res $B
+   }
+   return $res
+}
+%   \end{tcl}
+%   This may however produce points that are pretty far from what one 
+%   might expect.
+% \end{proc}
+% 
+% 
+% \subsubsection{Projection by real part}
+% 
+% A very simple way of rounding to a permutation is to place the 
+% items in a level in order of their coordinate real parts. For 
+% getting data out of the layout engine, this is something that can 
+% be had directly from |levels_with_xcoord| below.
+% 
+% \begin{proc}{permutations_from_realpart}
+%   For comparison with other ways of rounding, it is however 
+%   practical to produce a result as a point. The call syntax is
+%   \begin{displaysyntax}
+%     |permutations_from_realpart| \word{widths0} 
+%     \word{wiring--widths} \word{point}
+%   \end{displaysyntax}
+%   and the return value is the rounded \word{point}.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::permutations_from_realpart {widths0 wwL point} {
+   set res [lrange $point 0 0]
+   set xVecL [lindex [PMP*w $widths0 $wwL $point] 0]
+   foreach xVec $xVecL {
+      if {[llength $xVec] < 2} then {continue}
+      set L {}
+      foreach z $xVec {
+         lappend L [list [lindex $z 0] [llength $L]]
+      }
+      set P [lrepeat [llength $xVec] [lrepeat [llength $xVec] {0.0 0.0}]]
+      set j -1; foreach pair [lsort -real -index 0 $L] {incr j
+         lset P [lindex $pair 1] $j {1.0 0.0}
+      }
+      lappend res $P
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{Rounding by penalties}
+% 
+% One way of characterising the permutations is as the intersection 
+% of $\mathrm{U}(n)$ with the set of zero/one matrices\Dash the only 
+% way for an element of $\{0,1\}^n$ to have euclidean norm $1$ is 
+% that it contains exactly one element that is $1$. Forcing the 
+% matrix elements of some \(P \in \mathrm{U}^\mathbf{1}(n)\) towards 
+% being $0$ or $1$ can thus have the effect of forcing $P$ towards a 
+% permutation matrix. (The `can' here is warranted, since it is 
+% entirely plausible that non-unitary zero/one matrices may be close 
+% enough to points of $\mathrm{U}^\mathbf{1}(n)$ that they create 
+% local minima for a penalty function that do not correspond to 
+% actual solutions.) The natural way of turning `\(z=0\) or \(z=1\)' 
+% into an algebraic formula is `\(z(1-z) = 0\)', so a straightforward 
+% penalty for forcing one complex number to $0$ or $1$ is 
+% \[
+%   \bigl\vert z(1-z) \bigr\vert^2 =
+%   \lvert z\rvert^2 \lvert 1 - z \rvert^2 =
+%   (a^2 + b^2) \bigl( (1-a)^2 + b^2 \bigr)
+%   \qquad \text{if \(z = a + ib\).}
+% \]
+% 
+% \begin{proc}{penalty01}
+%   This procedure computes the ``penalty energy'' associated with a 
+%   point. The call syntax is
+%   \begin{displaysyntax}
+%     penalty01 \word{pattern} \word{point}
+%   \end{displaysyntax}
+%   where the \word{pattern} can be used to force a component towards 
+%   $0$ or $1$ only. In principle, the \word{pattern} is a list of 
+%   pattern matrices\Dash one for each matrix component of the 
+%   domain, and having the same shape as its point counterpart. The 
+%   elements of the pattern matrices are however not complex numbers, 
+%   but strings. A |0| means this element is only attracted to $0$, a 
+%   |1| means the element is only attracted to $1$, and anything else 
+%   means it is attracted to both as described above. In particular 
+%   the empty string has that interpretation, and since indexing a 
+%   list outside its bounds yields the empty string (also the empty 
+%   list), supplying the empty string as one of the pattern matrices 
+%   is OK and is interpretated as `both' for all elements of that 
+%   matrix. Moreover, one can let the entire \word{pattern} be empty 
+%   and that will be interpreted as `both' for all matrix elements.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::penalty01 {patternL point} {
+   set res 0.0
+   foreach P [lrange $point 1 end] pattern $patternL {
+      foreach row $P patrow $pattern {
+         foreach z $row target $patrow {
+            foreach {a b} $z break
+            set b2 [expr {$b*$b}]
+            set res [expr {$res + (
+               $target eq "0" ?
+                 $a*$a + $b2
+               : $target eq "1" ?
+                 (1-$a)**2 + $b2
+               :
+                 ($a*$a + $b2) * ((1-$a)**2 + $b2)
+            )}]
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% For the corresponding force, one finds that
+% \begin{align*}
+%   \frac{\partial}{\partial a}
+%   (a^2 + b^2) \bigl( (1-a)^2 + b^2 \bigr) ={}&
+%   2a \bigl( (1-a)^2 + b^2 \bigr) - 2(1-a)(a^2 + b^2) = \\ ={}&
+%   2( a - 2a^2 + a^3 + ab^2 - a^2 - b^2 + a^3 + ab^2 ) = \\ ={}&
+%   2a (1 - 2a + 2a^2 + 2b^2) - 2(a^2+b^2)
+%   \text{,}\\
+%   \frac{\partial}{\partial b}
+%   (a^2 + b^2) \bigl( (1-a)^2 + b^2 \bigr) ={}&
+%   2b\bigl( (1-a)^2 + b^2 \bigr) + 2b (a^2+b^2) = \\ ={}&
+%   2b( 1 - 2a + 2a^2 + 2b^2) \text{.}
+% \end{align*}
+% These are however what make up the gradient $B$ in $\mathbb{C}^{n 
+% \times n}$ as a whole. In order to restrict to the tangent space, 
+% one must first multiply by \(P^{-1} = P^*\) since the tangent space 
+% at $P$ is viewed as consisting of matrices $PA$ where $A$ is in the 
+% tangent space at the identity, and second project back to the 
+% tangent space using the relevant |improve| operation.
+% 
+% \begin{proc}{penalty01force}
+%   The force companion of |penalty01| is thus
+%   \begin{displaysyntax}
+%     penalty01force \word{domain} \word{pattern} \word{point}
+%   \end{displaysyntax}
+%   where \word{domain} is the Lie group that the returned force 
+%   should be tangent to, and the other arguments are as for 
+%   |penalty01| (particularly the \word{pattern}).
+%   
+%   The |component 0| component of this force is always $0$.
+%   \begin{tcl}
+proc ::network::ulayout::penalty01force {G patternL point} {
+   set res [list [{*}$G tangent component 0 0]]
+   foreach P [lrange $point 1 end] pattern $patternL {
+%   \end{tcl}
+%   For subsequent components, the first order of business is to 
+%   construct the negative $B$ of the unrestricted gradient, in a 
+%   calculation that is very element-oriented.
+%   \begin{tcl}
+      set B {}
+      foreach row $P patrow $pattern {
+         set brow {}
+         foreach z $row target $patrow {
+            foreach {a b} $z break
+            switch -- $target {
+               0 {
+                  lappend brow [list [expr {-2*$a}] [expr {-2*$b}]]
+               }
+               1 {
+                  lappend brow [list [expr {2*(1-$a)}] [expr {-2*$b}]]
+               }
+               default {
+                  set a2b2 [expr {$a*$a + $b*$b}]
+                  set c [expr {1 + 2*($a2b2-$a)}]
+                  lappend brow [list\
+                    [expr {2*( $a2b2 - $a*$c )}] [expr {-2*$b*$c}]]
+               }
+            }
+         }
+         lappend B $brow
+      }
+%   \end{tcl}
+%   Then the corresponding tangent $A$ is found by means of matrix 
+%   operations.
+%   \begin{tcl}
+      lappend res [{*}$G tangent component [llength $res] improve [
+         {*}$G component [llength $res] superset * [
+            {*}$G component [llength $res] inverse $P
+         ] $B
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \subsubsection{Logarithmic sinkholes}
+% 
+% The logarithmic sinkhole rounding scheme is an alternative to the 
+% |penalty01| scheme. The idea here starts with the observation that 
+% the quadratic behaviour of |penalty01| means there is very little 
+% incentive for a matrix element to become \emph{exactly} $0$ or $1$; 
+% a matrix element of $0.1$ carries a penalty of just $0.0081$.
+% 
+% \begin{proc}{logarithmic1}
+%   This procedure computes a potential which is the sum over all 
+%   matrix elements of the logarithm of the distance to $1$ of that 
+%   element. The call syntax is
+%   \begin{displaysyntax}
+%     |logarithmic1| \word{ignore} \word{point}
+%   \end{displaysyntax}
+%   where the \word{ignore} is a list of boolean matrices of the same 
+%   sizes as the matrix components in the \word{point}. A true entry 
+%   in the \word{ignore} means that matrix element is not to be 
+%   considered.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::logarithmic1 {ignore point} {
+   set res 0.0
+   foreach P [lrange $point 1 end] B $ignore {
+      foreach prow $P brow $B {
+         foreach z $prow ign $brow {
+            if {!$ign} then {
+               set res [expr {$res +\
+                 log(hypot(1-[lindex $z 0],[lindex $z 1]))}]
+            }
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{ignore_from_locklist}
+%   This procedure computes an ignore-list from a locklist. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     |ignore_from_locklist| \word{domain} \word{locklist}
+%   \end{displaysyntax}
+%   where the \word{domain} is the domain Lie group, which is used to 
+%   determine the correct matrix sides.
+%   \begin{tcl}
+proc ::network::ulayout::ignore_from_locklist {G locklist} {
+   set res {}
+   set c 1
+   foreach L $locklist {
+      set n [llength [{*}$G component $c superset 0]]
+      set B [lrepeat $n [lrepeat $n 0]]
+      foreach pair $L {lset B $pair 1}
+      lappend res $B
+      incr c
+   }
+   for {} {$c < [{*}$G no.components]} {incr c} {
+      set n [llength [{*}$G component $c superset 0]]
+      set B [lrepeat $n [lrepeat $n 0]]
+      lappend res $B
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{logarithmic1force}
+%   The gradient of the logarithm $\tfrac{1}{2}\ln(x^2 +\nobreak 
+%   y^2)$ is $\left( \frac{x}{x^2+y^2}, \frac{x}{x^2+y^2} \right)$, 
+%   but in this case one should substitute $1-x$ for $x$. The force 
+%   counterpart of |logarithmic1| therefore has the call syntax
+%   \begin{displaysyntax}
+%     logarithmic1force \word{domain} \word{ignore} \word{point}
+%   \end{displaysyntax}
+%   and returns the negative of the gradient of the corresponding 
+%   |logarithmic1|.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::logarithmic1force {G ignorelist point} {
+   set res [list [{*}$G tangent component 0 0]]
+   foreach P [lrange $point 1 end] Ignore $ignorelist {
+      set B {}
+      foreach prow $P irow $Ignore {
+         set brow {}
+         foreach z $prow i $irow {
+            if {$i} then {
+               lappend brow [complex 0]
+            } else {
+               set square [expr {(1-[lindex $z 0])**2 + [lindex $z 1]**2}]
+               lappend brow [complex cartesian\
+                 [expr { ([lindex $z 0] - 1) / $square }]\
+                 [expr { -[lindex $z 1] / $square }]]
+            }
+         }
+         lappend B $brow
+      }
+      lappend res [{*}$G tangent component [llength $res] improve [
+         {*}$G component [llength $res] superset * [
+            {*}$G component [llength $res] inverse $P
+         ] $B
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{Making item coordinates real}
+% 
+% Simple dimension counting reveals that the item coordinates in 
+% general cannot determine the whole of $P$: in a level of $n$ items, 
+% there are no more than $2n$ real components of the vector of item 
+% positions, but $P$ lives in the $(n -\nobreak 1)^2$-dimensional 
+% manifold $\mathrm{U}^\mathbf{1}(n)$. In the presence of 
+% |overlap_energy|, an approach to rounding could be to force the 
+% item coordinates to being real (or almost real) and then project by 
+% the real part.
+% 
+% \begin{proc}{imaginary_energy}
+%   The easiest way of forcing coordinates to be real is to add a 
+%   potential that is the sum of the squares of the imaginary parts 
+%   of the item coordinates. The natural call syntax for this is
+%   \begin{displaysyntax}
+%     |imaginary_energy| \word{widths0} \word{wiring--widths} 
+%     \word{point}
+%   \end{displaysyntax}
+%   and the implementation is an obvious application of |PMP*w|.
+%   \begin{tcl}
+proc ::network::ulayout::imaginary_energy {w0 wwL point} {
+   set zVecL [lindex [PMP*w $w0 $wwL $point] 0]
+   set res 0.0
+   foreach zVec $zVecL {
+      foreach z $zVec {
+         set res [expr {$res + [complex Im $z]**2}]
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% The force counterpart of this energy function is similar to those 
+% of |energy| and |overlap_energy|, but different in that the real 
+% and imaginary parts of the item coordinates are not treated the 
+% same. This means the core part $\bar{z}z$ in the expression that 
+% was differentiated to find an expression for the sought gradient 
+% will have to be replaced by something else, and consequently the 
+% gradient expression will turn out to be structurally somewhat 
+% different, even though the end result turns out to be quite similar.
+% 
+% The energy associated with the $k$th item in a level can be 
+% expressed as
+% \[
+%   \bigl( \operatorname{Re} ( \mathbf{c}^* P M P^* \mathbf{w}) 
+%   \bigr)^2
+% \]
+% where \(\mathbf{c} = i \mathbf{e}_k\). The inner parenthesis here 
+% has the differential $\mathbf{c}^* P A M P^* \mathbf{w} - 
+% \mathbf{c}^* P M A P^* \mathbf{w}$, so the chain rule says that the 
+% differential of the whole thing is
+% \[
+%   2 \operatorname{Re} ( \mathbf{c}^* P M P^* \mathbf{w}) 
+%   \operatorname{Re} (\mathbf{c}^* P A M P^* \mathbf{w} - 
+%     \mathbf{c}^* P M A P^* \mathbf{w})
+%   \text{.}
+% \]
+% Since this has the form \(\operatorname{Re}(\mathbf{u}_1^* A 
+% \mathbf{v}_1) - \operatorname{Re} (\mathbf{u}_2^* A \mathbf{v}_2)\) 
+% for
+% \begin{align*}
+%   \mathbf{u}_1^* ={}& 
+%     2 \operatorname{Re} ( \mathbf{c}^* P M P^* \mathbf{w})
+%     \mathbf{c}^* P \text{,}\\
+%   \mathbf{v}_1 ={}& M P^* \mathbf{w} \text{,}\\
+%   \mathbf{u}_2^* ={}& \mathbf{u}_1^* M \text{,}\\
+%   \mathbf{v}_2 ={}& P^* \mathbf{w} \text{,}
+% \end{align*}
+% it follows that the corresponding $\mathbf{C}^{n \times n}$ gradient 
+% can be expressed as $\mathbf{u}_1 \mathbf{v}_1^* - 
+% \mathbf{u}_2 \mathbf{v}_2^*$; so far so good. Considering then that
+% \begin{multline*}
+%   \mathbf{u}_1 = 
+%   2 P^* \mathbf{c} 
+%     \operatorname{Re} ( \mathbf{c}^* P M P^* \mathbf{w}) =
+%   2 P^* \mathbf{e}_k i \operatorname{Re} ( -i \mathbf{e}_k^\mathrm{T}
+%     P M P^* \mathbf{w}) = \\ =
+%   2 P^* \mathbf{e}_k i \operatorname{Im} (\mathbf{e}_k^\mathrm{T}
+%     P M P^* \mathbf{w}) \text{,}
+% \end{multline*}
+% one sees that the $\mathbf{u}_1$ terms corresponding to different 
+% items can conveniently be added together. The combined 
+% $\mathbf{u}_1$ can be computed as $2 P^* G P M P^* \mathbf{w}$, 
+% where $G$ is the $\mathbb{R}$-linear operator that replaces the 
+% real parts of all the vector elements by $0$.
+% 
+% 
+% \begin{proc}{imaginary_force}
+%   A suitable call syntax for the command to compute the force 
+%   counterpart of |imaginary_energy| is then
+%   \begin{displaysyntax}
+%     |imaginary_force| \word{tangent space} \word{widths0} 
+%     \word{wiring--widths} \word{point}
+%   \end{displaysyntax}
+%   and the return value is an element of the Lie algebra for which 
+%   \word{tangent space} is a command prefix.
+%   
+%   Since this is purely a force acting within a level, the main loop 
+%   is over the levels, and only those levels which have $2$ or more 
+%   items go on to having an actual gradient calculation made.
+%   \begin{tcl}
+proc ::network::ulayout::imaginary_force {TS widths0 wwL point} {
+   set res [list [{*}$TS component 0 0]]
+   lassign [PMP*w $widths0 $wwL $point] PMPwL MPwL PwL
+   foreach {dummy wVec} [linsert $wwL 0 "" $widths0]  v2 $PwL \
+     v1 $MPwL  zVec $PMPwL {
+      if {[llength $wVec] < 2} then {continue}
+%   \end{tcl}
+%   The following loop computes \(\mathbf{y} = 2QPMP^*\mathbf{w}\). 
+%   \begin{tcl}
+      set yVec {}
+      foreach z $zVec {
+         lappend yVec [complex cartesian 0.0 [expr {2*[complex Im $z]}]]
+      }
+      set u1 [{*}$TS component [llength $res] superset Mcvprod\
+        [lindex $point [llength $res]] $yVec]
+      set u2rev {}
+      set sum [complex 0]
+      foreach z [lreverse $u1] {
+         lappend u2rev [complex + $sum [complex . 0.5 $z]]
+         set sum [complex + $sum $z]
+      }
+      lappend res [{*}$TS component [llength $res] improve [
+%   \end{tcl}
+%   The following command computes $\mathbf{u}_2 \mathbf{v}_2^* - 
+%   \mathbf{u}_1 \mathbf{v}_1^*$; note the sign change to get a force.
+%   \begin{tcl}
+         {*}$TS component [llength $res] superset - [
+            {*}$TS component [llength $res] superset vvcprod\
+              [lreverse $u2rev] $v2
+         ] [
+            {*}$TS component [llength $res] superset vvcprod $u1 $v1
+         ]
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% \section{The network connection}
+% 
+% The reason all of the above exists is to compute layouts for 
+% networks, but there has so far been no communication between the 
+% |network| data structures and the |network::ulayout| ones. It is 
+% time to remedy that.
+% 
+% 
+% \subsection{Interfacing with the traditional layout}
+% 
+% One practical concept to introduce here is that of an \emph{item 
+% key}, which associates parts of a network with those abstract items 
+% that occur in a generic layout problem. Like a generic layout 
+% problem it is a nested list, and the top two levels (levels in 
+% problem, items in level) are the same as in the layout problem; if 
+% \texttt{[lindex \word{layout} $i$ $j$]} picks out an item in the 
+% \word{layout} problem, then \texttt{[lindex \word{item-key} $i$ 
+% $j$]} picks out the corresponding data from the \word{item-key}. 
+% For \word{item}s in an item key, there are three basic forms
+% \begin{displaysyntax}
+%   vertex \word{label}\par
+%   edge \word{label}\par
+%   block \begin{regblock}[\regstar] \word{item} \word{width} 
+%     \end{regblock}
+% \end{displaysyntax}
+% where the |vertex| and |edge| forms are traditional. The |block| 
+% form is used when several items in the network are treated as a 
+% unit in the layout; a \word{width} is then the width of the 
+% \word{item} that preceeds it.
+% 
+% \begin{proc}{levels_with_xcoord}
+%   This procedure computes a list of levels of ``items with 
+%   $x$-coordinate'', i.e., something close to a 
+%   \describestring*+[rich entry]{level-layout-Tk} level. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     |levels_with_xcoord| \word{point} \word{widths0} 
+%     \word{wiring--widths} \word{item-key} \word{unit} 
+%     \word{sorted?} \word{transpose?}
+%     \word{boundary-var}\regopt
+%   \end{displaysyntax}
+%   where \word{widths0} and \word{wiring--widths} make up the internal 
+%   representation for a generic layout problem, \word{point} is a point 
+%   in the optimisation domain for that problem, \word{item-key} is a 
+%   corresponding item key (with widths), \word{unit} is the length 
+%   unit which the internal representation is stated in, and 
+%   \word{sorted?} and \word{transpose?} are booleans. The return value 
+%   is a list of levels (in the same order as the layout problem), 
+%   where each level is a list of items, and an item is on one of the 
+%   forms
+%   \begin{displaysyntax}
+%     vertex \word{label} \word{x-pos}\par
+%     edge \word{label} \word{x-pos}
+%   \end{displaysyntax}
+%   In other words, any |block| item is expanded. 
+%   If a \word{boundary-var} is given (and nonempty), then that is 
+%   taken as the name of a variable in the calling context which gets 
+%   set to the $x$-coordinates of the ``bounding box'' around these 
+%   items; minimum is first, maximum is second, and the box takes the 
+%   item widths into account. If the \word{sorted?} is true then the 
+%   items within each level are sorted by their $x$-coordinates 
+%   (increasing order), otherwise they are returned in the same order 
+%   as they appear in the \word{item-key}. If the \word{transpose?} 
+%   is true then the item coordinates are computed using |PMPtw| 
+%   rather than |PMP*w|.
+%   
+%   The scaling is typically delayed, meaning most $x$-coordinates 
+%   handled below are expressed in the \word{unit}.
+%   \begin{tcl}
+proc ::network::ulayout::levels_with_xcoord\
+  {point widths0 wwL itemKey unit sorted transpose {boundaryVar ""}} {
+   set xVecL [lindex [
+      if {$transpose} then {
+         PMPtw $widths0 $wwL $point
+      } else {
+         PMP*w $widths0 $wwL $point
+      }
+   ] 0]
+   set res {}
+   set xpos 0.0
+   set xmin Inf
+   set xmax -Inf
+   foreach  xVec $xVecL  dx [linsert [lindex $point 0] 0 0.0] \
+     {wiring widthVec} [linsert $wwL 0 {} $widths0]  level $itemKey  {
+      set xpos [expr {$xpos + $dx}]
+      set L {}
+      foreach  item $level  x $xVec  w $widthVec  {
+%   \end{tcl}
+%   At this point, it is important to remember that the |xVec| (the 
+%   second term of $\mathbf{x}_k$ in \eqref{Eq:xVektor}) is a vector 
+%   of \emph{complex} numbers, whereas we here only care about the 
+%   real part.
+%   \begin{tcl}
+         set x [expr {[lindex $x 0] + $xpos}]
+         if {$xmin > $x - 0.5*$w} then {set xmin [expr {$x - 0.5*$w}]}
+         if {$xmax < $x + 0.5*$w} then {set xmax [expr {$x + 0.5*$w}]}
+         switch -- [lindex $item 0] {
+            vertex - edge {
+               lappend L [list [lindex $item 0] [lindex $item 1]\
+                 [expr {$unit*$x}]]
+            }
+            block {
+               lappend L {*}[levels_with_xcoord,expand_block\
+                 [lrange $item 1 end] [expr {$unit*($x - 0.5*$w)}]]
+            }
+            default {
+               error "Unknown item type: [lindex $item 0]"
+            }
+         }
+      }
+      if {$sorted} then {set L [lsort -index 2 -real $L]}
+      lappend res $L
+   }
+   if {$boundaryVar ne ""} then {
+      uplevel 1 [list ::set $boundaryVar\
+        [list [expr {$unit*$xmin}] [expr {$unit*$xmax}]]]
+   }
+   return $res
+}
+%   \end{tcl}
+%   
+%   \begin{proc}{levels_with_xcoord,expand_block}
+%     This is a helper procedure for |levels_with_xcoord| which 
+%     handles the (potentially recursive) problem of expanding a 
+%     |block|. The call syntax is
+%     \begin{displaysyntax}
+%       |levels_with_xcoord,expand_block| \word{item--widths list} 
+%       \word{left}
+%     \end{displaysyntax}
+%     where \word{item--widths list} is a list
+%     \begin{displaysyntax}
+%       \begin{regblock}[\regstar] \word{item} \word{width of item} 
+%       \end{regblock}
+%     \end{displaysyntax}
+%     and \word{left} is the left endpoint (minimal $x$-coordinate) 
+%     of the first \word{item}. This procedure returns a list of 
+%     items on the form
+%     \begin{displaysyntax}
+%       \begin{regblock} vertex \regalt edge \end{regblock}
+%       \word{label} \word{x-coordinate}
+%     \end{displaysyntax}
+%     All $x$-coordinates appearing here are in generic problem 
+%     units, not in internal representation units.
+%     \begin{tcl}
+proc ::network::ulayout::levels_with_xcoord,expand_block {iwL left} {
+   set res {}
+   foreach {item width} $iwL {
+      switch -- [lindex $item 0] {
+         vertex - edge {
+            lappend res [list [lindex $item 0] [lindex $item 1]\
+              [expr {$left + 0.5*$width}]]
+         }
+         block {
+            lappend res {*}[levels_with_xcoord,expand_block\
+              [lrange $item 1 end] $left]
+         }
+         default {
+            error "Unknown item type: [lindex $item 0]"
+         }
+      }
+      set left [expr {$left + $width}]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+% \end{proc}
+% 
+% 
+% \begin{proc}{problem_from_pure}
+%   This procedure constructs a generic layout problem, and a key for 
+%   the same, from a pure network, an appearance-dictionary covering 
+%   that network, and a dictionary associating vertices to levels. 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |network::ulayout::problem_from_pure| \word{pure network} 
+%     \word{level-dict} \word{appearance-dict} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   and the return value is a quadruplet
+%   \begin{displaysyntax}
+%     \word{layout-problem} \word{item-key} \word{start level} 
+%     \word{end level}
+%   \end{displaysyntax}
+%   where the \word{start level} is the nominal number of the first 
+%   level in the \word{layout-probem} and \word{item-key}; the 
+%   alternative to having this would often be to pad the problem with 
+%   a couple of empty levels, which seems less appropriate.
+%   
+%   The \word{level-dict} maps vertex labels to level numbers, and 
+%   serves two purposes. First, it tells which level a vertex belongs 
+%   to (duh!), and secondly it says which vertices should be 
+%   considered in the problem generated. This latter point is what 
+%   one uses to restrict a layout problem to one component of a 
+%   network; it is an error if the |dict keys| of the 
+%   \word{level-dict} is not a union of components of the network. 
+%   The \word{appearance-dict} is a standard vertex-appearance 
+%   dictionary (with vertex annotations as keys).
+%   
+%   The options accept defaults from the 
+%   \describestring+[var.][network::rich]{level-layout-Tk_defaults} 
+%   variable. The options that are interpreted are
+%   \begin{subcmddescription}*{problem_from_pure}{option}
+%     
+%     \begin{subcmditem}{-edgew}
+%       \word{width}
+%     \end{subcmditem}
+%       The width assigned to |edge| items. The classical default is 
+%       $5$.
+%       
+%     \begin{subcmditem}{-vsizes}
+%       \word{pattern--pair list}
+%     \end{subcmditem}
+%     \begin{subcmditem}{-vsizes}
+%       |{| \begin{regblock}[\regstar] \word{pattern} |{| 
+%       \word{width} \word{height} |}| \end{regblock} |}|
+%     \end{subcmditem}
+%       This option is used for assigning widths to vertices; the 
+%       second form shows the intended structure of the 
+%       \word{pattern--pair list} supplied as argument. Each 
+%       \word{pattern} is |string match|ed against the vertex 
+%       annotation in turn, and the width of the vertex is taken from 
+%       the first that matches. The classical default width is $20$ 
+%       for all vertices.
+%       
+%     \begin{subcmditem}{-ofsdirfactor}
+%       \word{factor}
+%     \end{subcmditem}
+%       Since edges often leave vertices at an angle, the visually 
+%       effective length of a connector may be different from the 
+%       distance between the edge endpoints, and in that case it 
+%       makes sense to somewhat adjust the associated offset in the 
+%       generic layout problem. This \word{factor} is passed on to 
+%       |problem_from_pure,dirofs| to configure the magnitude of this 
+%       adjustment. The default is |0.0|, i.e., no adjustment for 
+%       edge direction. Reasonable values are between $0$ and $1$, 
+%       inclusive.
+%       
+%     \begin{subcmditem}{-padx}
+%       \word{amount}
+%     \end{subcmditem}
+%       Informally, this is extra space inserted between items in a 
+%       level, but technically it is rather an amount which is added 
+%       to the widths of all items (the difference being that it 
+%       affects the reported bounds as well). 
+%       The classical default is $10$.
+%       
+%     \begin{subcmditem}{-legsfixed}
+%       \word{boolean}
+%     \end{subcmditem}
+%       This option controls whether the order of the legs should be 
+%       fixed to that of the output and input vertices, or whether 
+%       each leg should be considered a separate item. Defaults to 
+%       true (legs are fixed, i.e., all put in the same |block| 
+%       item). The false setting is useful for grooming ambiguities.
+%       
+%     \begin{subcmditem}{-preblocked}
+%       |{| \begin{regblock}[\regstar] \word{level} \word{item-list} 
+%       \end{regblock} |}|
+%     \end{subcmditem}
+%       Using this option will force some items into a |block| in the 
+%       problem computed; this can be used to make certain 
+%       subnetworks appear in a predetermined way. Each 
+%       \word{item-list} is a list of `\begin{regblock} 
+%       \texttt{vertex}\regalt \texttt{edge} \end{regblock} 
+%       \word{label}' items, and the procedure will at level 
+%       \word{level} form a |block| out of them (in the given order), 
+%       meaning these items will not appear as individual items in 
+%       that level. A specified item that is not found at the given 
+%       level is silently ignored. The default for this option is an 
+%       empty list, i.e., no blocking (other than that of legs, if 
+%       |-legsfixed|) is performed.
+%   \end{subcmddescription}
+%   
+%   The first step is to generate items for vertices. The items are put 
+%   in a nested dictionary |D|, where the outer key is the level, the 
+%   inner key is the item identifier (e.g. `|vertex |$v$'), and the 
+%   value is the list
+%   \begin{displaysyntax}
+%     \word{width} \word{down-dict} \word{up-dict}
+%   \end{displaysyntax}
+%   describing that item as in the generic layout problem that should 
+%   be returned.
+%   \begin{tcl}
+proc ::network::ulayout::problem_from_pure {NW levelD appD args} {
+   array set O {-ofsdirfactor 0.0}
+   array set O ${::network::rich::level-layout-Tk_defaults}
+   array set O {-preblocked {} -legsfixed 1}
+   array set O $args
+   set edgew [expr {double($O(-edgew) + $O(-padx))}]
+   if {[dict exists $levelD 1]} then {
+      set maxlevel [dict get $levelD 1]
+   } else {
+      set maxlevel Inf
+   }
+   set D [dict create]
+   dict for {v level} $levelD {
+      if {$v >= 2} then {
+         incr level 0
+         if {$level <= 0} then {
+            return -code error\
+              "Only the output vertex may be at level 0"
+         } elseif {$level >= $maxlevel} then {
+            return -code error\
+              "The input vertex must be alone in its level"
+         }
+         set annot [lindex $NW 0 $v 0]
+         set w ""
+         foreach {pat size} $O(-vsizes) {
+            if {[string match $pat $annot]} then {
+               set w [lindex $size 0]
+               break
+            }
+         }
+         if {$w eq ""} then {
+            return -code error\
+              "No size known for vertex annotation: $annot"
+         }
+         set downL {}
+         foreach e [lindex $NW 0 $v 1] \
+               ofs [lindex [dict get $appD $annot] 1] {
+            lappend downL $e\
+              [problem_from_pure,dirofs $ofs $size $O(-ofsdirfactor)]
+         }
+         set upL {}
+         foreach e [lindex $NW 0 $v 2] \
+               ofs [lindex [dict get $appD $annot] 2] {
+            lappend upL $e\
+              [problem_from_pure,dirofs $ofs $size $O(-ofsdirfactor)]
+         }
+         dict set D $level [list vertex $v]\
+           [list [expr {double($w + $O(-padx))}] $downL $upL]
+      } elseif {$v == 0} then {
+%   \end{tcl}
+%   The output vertex never gives rise to a |vertex| item, but rather 
+%   to one |block| or to some number of |edge| items. The same is true 
+%   for the input vertex.
+%   \begin{tcl}
+         if {$level != 0} then {
+            return -code error "The output vertex must be at level 0"
+         }
+         if {$O(-legsfixed)} then {
+            set L block
+            set upL {}
+            set ofs [expr {-0.5*([llength [lindex $NW 0 0 2]]-1)*$edgew}]
+            foreach e [lindex $NW 0 0 2] {
+               lappend L [list edge $e] $edgew
+               lappend upL $e $ofs
+               set ofs [expr {$ofs + $edgew}]
+            }
+            dict set D 0 $L\
+              [list [expr {[llength $upL]/2*$edgew}] {} $upL]
+         } else {
+            foreach e [lindex $NW 0 0 2] {
+               dict set D 0 [list edge $e] [list $edgew {} [list $e 0.0]]
+            }
+         }
+      } else {
+%   \end{tcl}
+%   What remains is the case of the input vertex.
+%   \begin{tcl}
+         if {$level <= 0} then {
+            return -code error\
+              "Only the output vertex may be at level 0"
+         }
+         if {$O(-legsfixed)} then {
+            set L block
+            set downL {}
+            set ofs [expr {-0.5*([llength [lindex $NW 0 1 1]]-1)*$edgew}]
+            foreach e [lindex $NW 0 1 1] {
+               lappend L [list edge $e] $edgew
+               lappend downL $e $ofs
+               set ofs [expr {$ofs + $edgew}]
+            }
+            dict set D $maxlevel $L\
+              [list [expr {[llength $downL]/2*$edgew}] $downL {}]
+         } else {
+            foreach e [lindex $NW 0 1 1] {
+               dict set D $maxlevel [list edge $e]\
+                 [list $edgew [list $e 0.0] {}]
+            }
+         }
+      }
+   }
+%   \end{tcl}
+%   That ends the loop over |levelD|, and the first step.
+%   
+%   In the second step, there is a loop over all edges to find those 
+%   that span a level or more, and therefore needs to contribute 
+%   |edge| items to those levels. Unlike the |edge| items that may 
+%   have been generated above, these have connectors at both ends.
+%   \begin{tcl}
+   set e -1; foreach edge [lindex $NW 1] {incr e
+      if {[dict exists $levelD [lindex $edge 0]]} then {
+         set level [dict get $levelD [lindex $edge 0]]
+         set maxlevel [dict get $levelD [lindex $edge 2]]
+         set item [list edge $e]
+         set L [list $edgew [list $e 0.0] [list $e 0.0]]
+         for {incr level} {$level < $maxlevel} {incr level} {
+            dict set D $level $item $L
+         }
+      } elseif {[dict exists $levelD [lindex $edge 2]]} then {
+         return -code error\
+           "Only head of edge $e has been given a level"
+      }
+   }
+%   \end{tcl}
+%   The third step is the handling of |-preblocked| items.
+%   \begin{tcl}
+   foreach {level itemL} $O(-preblocked) {
+      set width 0.0
+      set L {}
+      set upLL {}
+      set downLL {}
+      foreach item $itemL {
+         if {![dict exists $D $level $item]} then {continue}
+         foreach {w downL upL} [dict get $D $level $item] break
+         dict unset D $level $item
+         lappend L $item $w
+         lappend downLL $downL
+         lappend upLL $upL
+         set width [expr {$width + $w}]
+      }
+      set downL {}
+      set upL {}
+      set left [expr {-0.5*$width}]
+      foreach {item w} $L dL $downLL uL $upLL {
+         foreach {e ofs} $dL {
+            lappend downL $e [expr {$left + 0.5*$w + $ofs}]
+         }
+         foreach {e ofs} $uL {
+            lappend upL $e [expr {$left + 0.5*$w + $ofs}]
+         }
+         set left [expr {$left + $w}]
+      }
+      dict set D $level [linsert $L 0 block] [list $width $downL $upL]
+   }
+%   \end{tcl}
+%   And then the fourth step merely has to rearrange the data in the 
+%   expected format.
+%   \begin{tcl}
+   set layoutL {}
+   set keyL {}
+   foreach level [lsort -integer [dict keys $D]] {
+      if {[llength $layoutL]} then {
+         for {incr last} {$last < $level} {incr last} {
+            lappend layoutL {}
+            lappend keyL {}
+         }
+      } else {
+         set start $level
+      }
+      set L {}
+      set itemL {}
+      dict for {item data} [dict get $D $level] {
+         lappend itemL $item
+         lappend L $data
+      }
+      lappend layoutL $L
+      lappend keyL $itemL
+      set last $level
+   }
+   return [list $layoutL $keyL $start $last]
+}
+%   \end{tcl}
+%   
+%   \begin{proc}{problem_from_pure,dirofs}
+%     This procedure has the call syntax
+%     \begin{displaysyntax}
+%       \word{edge-offset} \word{vertex-size} \word{factor}
+%     \end{displaysyntax}
+%     and it returns a horizontal reference position for the edge, 
+%     adjusted to take into account the edge direction near the 
+%     vertex and the nominal \word{vertex-size}. The \word{factor} 
+%     controls the magnitude of this adjustment.
+%     
+%     The idea for this calculation is to shoot a ray from the edge 
+%     endpoint in the initial direction, taking the intersection of 
+%     that ray with the vertex bounding box, and finally multiplying 
+%     the horizontal difference between these two points by the 
+%     \word{factor}.
+%     
+%     \begin{tcl}
+proc ::network::ulayout::problem_from_pure,dirofs {edge vsize factor} {
+   if {[llength $edge] < 4 || [lindex $edge 2] == 0} then {
+      return [lindex $edge 0]
+   }
+%     \end{tcl}
+%     The coordinates are sign-flipped so that the direction is 
+%     positive in both components. A horizontal sign-flip is 
+%     remembered by also flipping the sign of the \word{factor}.
+%     \begin{tcl}
+   if {[lindex $edge 3] < 0} then {
+      set ydir [expr {-[lindex $edge 3]}]
+      set ystart [expr {-[lindex $edge 1]}]
+   } else {
+      set ydir [lindex $edge 3]
+      set ystart [lindex $edge 1]
+   }
+   if {[lindex $edge 2] < 0} then {
+      set xdir [expr {-[lindex $edge 2]}]
+      set xstart [expr {-[lindex $edge 0]}]
+      set factor [expr {-$factor}]
+   } else {
+      set xdir [lindex $edge 2]
+      set xstart [lindex $edge 0]
+   }
+%     \end{tcl}
+%     There are now two cases: the ray intersects the bounding box at 
+%     a horizontal side or at a vertical size. Given that the 
+%     \word{vertex-size} is $(w,h)$, the horizontal distance to the 
+%     vertical side is $w/2 - x_\mathrm{start}$ and the vertical 
+%     distance to the horizontal side is $h/2 - y_\mathrm{start}$. 
+%     The question is thus which of \(t x_\mathrm{dir} \leqslant 
+%     w/2 - x_\mathrm{start}\) and \(t y_\mathrm{dir} \leqslant 
+%     h/2 - y_\mathrm{start}\) is the tighter bound. To that end, one 
+%     wants to solve either inequality for $t$, and it happens to be 
+%     known that $x_\mathrm{dir}$ is nonzero.
+%     \begin{tcl}
+   if {(0.5*[lindex $vsize 0] - $xstart) / $xdir * $ydir <=\
+     0.5*[lindex $vsize 1] - $ystart} then {
+      return [expr {[lindex $edge 0] + $factor *\
+        (0.5*[lindex $vsize 0] - $xstart)}]
+   } else {
+      return [expr {[lindex $edge 0] + $factor * $xdir *\
+        (0.5*[lindex $vsize 1] - $ystart) / $ydir}]
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+% \end{proc}
+% 
+% 
+% \begin{proc}{level_list_to_dict}
+%   This is a minor helper procedure that converts a level 
+%   \emph{list} (as returned by |network::pure::vertex_levels4|) to a 
+%   level \emph{dict} (as expected by the above |problem_from_pure|). 
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |::network::ulayout::level_list_to_dict| \word{level-list} 
+%     \word{vertex-list}\regopt
+%   \end{displaysyntax}
+%   where the \word{vertex-list} (if given) is the list of those 
+%   vertices to include in the return value. If no \word{vertex-list} 
+%   is given, then all vertices are included.
+%   \begin{tcl}
+proc ::network::ulayout::level_list_to_dict {levelL args} {
+   if {[llength $args] > 2} then {
+      return -code error {Wrong # args: should be\
+        "level_list_to_dict levelL ?vertexL?"}
+   } elseif {[llength $args]} then {
+      set res [dict create]
+      foreach v [lindex $args 0] {
+         dict set res $v [lindex $levelL $v]
+      }
+      return $res
+   } else {
+      set res [dict create]
+      foreach l $levelL {dict set res [dict size $res] $l}
+      return $res
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{Tk-layout_component}
+%   This procedure further refines the results from 
+%   |levels_with_xcoord| to include also $y$-coordinate information. 
+%   The return value is a pair
+%   \begin{displaysyntax}
+%     \word{component} \word{bbox}
+%   \end{displaysyntax}
+%   as expected in a |level-layout-Tk| entry. The call syntax is
+%   \begin{displaysyntax}
+%     |Tk_layout-component| \word{levels-with-xcoord} 
+%     \word{hor-bounds} \word{pure network} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{levels-with-xcoord} and the \word{bounds} are data as 
+%   obtained from |levels_with_xcoord|, and \word{pure network} is 
+%   the network they pertain to. The \word{option}s that are 
+%   interpreted are:
+%   \begin{subcmddescription}*{Tk-layout_component}{option}
+%     
+%     \begin{subcmditem}{-edgeh}
+%       \word{height}
+%     \end{subcmditem}
+%       Nominal height of an edge item. Classically this defaults to $10$.
+%     
+%     \begin{subcmditem}{-pady}
+%       \word{separation}
+%     \end{subcmditem}
+%       Vertical separation inserted between levels. Classically this 
+%       defaults to $16$.
+%     
+%     \begin{subcmditem}{-vsizes}
+%       \word{pattern-sizes list}
+%     \end{subcmditem}
+%       Determines size of vertices. Classically this defaults to 
+%       all vertices having a height of $20$.
+%     
+%   \end{subcmddescription}
+%   Defaults for these options are taken from the 
+%   \describestring*+[var.][network::rich]{level-layout-Tk_defaults} 
+%   variable, just as for |problem_from_pure|.
+%   
+%   For simplicity, the lowest level is put at $y$-coordinate $0$ and 
+%   subsequent level are thus at negative $y$-coordinates. This will 
+%   anyway be shifted around when reanchoring the components later.
+%   \begin{tcl}
+proc ::network::ulayout::Tk-layout_component {xlevelL hbounds NW args} {
+   array set O ${::network::rich::level-layout-Tk_defaults}
+   array set O $args
+   set y 0.0
+   set res {}
+   foreach level $xlevelL {
+      set h 0.0
+      foreach item $level {
+         switch -- [lindex $item 0] {
+            edge {
+               if {$h < $O(-edgeh)} then {set h $O(-edgeh)}
+            }
+            vertex {
+               set annot [lindex $NW 0 [lindex $item 1] 0]
+               foreach {pat size} $O(-vsizes) {
+                  if {[string match $pat $annot]} then {
+                     if {$h < [lindex $size 1]} then {
+                        set h [lindex $size 1]
+                     }
+                     break
+                  }
+               }
+            }
+         }
+      }
+      set h [expr {0.5*$h}]
+      if {[info exists lasth]} then {
+         set y [expr {$y - $lasth - $O(-pady) - $h}]
+      } else {
+         set bottom $h
+      }
+      lappend res $level $y $h
+      set lasth $h
+   }
+   return [list $res [list [lindex $hbounds 0] [expr {$y-$h}]\
+     [lindex $hbounds 1] $bottom]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{anchor_Tk-layout}
+%   This procedure shifts the components of a Tk-layout so that they 
+%   are set side to side (even if they start out overlapping or 
+%   whatever) and anchors the whole arrangement according to the 
+%   |-anchor| option. The call syntax is
+%   \begin{displaysyntax}
+%     |anchor_Tk-layout| \word{layout} \begin{regblock}[\regstar] 
+%     \word{option} \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   and the return value is the modified \word{layout}. 
+%   
+%   The \word{option}s that are interpreted are:
+%   \begin{subcmddescription}*{anchor_Tk-layout}{option}
+%     
+%     \begin{subcmditem}{-anchor}
+%       \word{position}
+%     \end{subcmditem}
+%       The final anchoring position for the layout. Classically this 
+%       defaults to |nw| (upper left corner).
+%     
+%     \begin{subcmditem}{-bboxvar}
+%       \word{varname}
+%     \end{subcmditem}
+%       If this option is given, the \word{varname} is taken as 
+%       the name of a variable in the calling context that will be 
+%       set to the bounding box of the returned network. There is no 
+%       default.
+%     
+%   \end{subcmddescription}
+%   Defaults for these options are taken from the 
+%   \describestring*+[var.][network::rich]{level-layout-Tk_defaults} 
+%   variable.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::anchor_Tk-layout {layout args} {
+   array set O ${::network::rich::level-layout-Tk_defaults}
+   array unset O -bboxvar
+   array set O $args
+%   \end{tcl}
+%   The first step computes offsets for the components that will 
+%   anchor them in the |w| position (bounding box left is $0$, 
+%   vertical midpoints are aligned). These are stored in a list
+%   |wOfsL| with the structure
+%   \begin{quote}
+%     \begin{regblock}[\regplus] \word{x-ofs} \word{y-ofs}
+%     \end{regblock}
+%   \end{quote}
+%   This step also computes the overall bounding box |right|, |top|, 
+%   and |bottom| positions for this arrangement, since these are needed 
+%   when computing the anchoring offset.
+%   \begin{tcl}
+   set wOfsL {}
+   set right 0
+   set top 0; set bottom 0;
+   foreach {tcomp bbox} $layout {
+      set dx [expr {$right - [lindex $bbox 0]}]
+      set dy [expr {-0.5*([lindex $bbox 1]+[lindex $bbox 3])}]
+      lappend wOfsL $dx $dy
+      if {$top > [lindex $bbox 1] + $dy} then {
+         set top [expr {[lindex $bbox 1] + $dy}]
+      }
+      if {$bottom < [lindex $bbox 3] + $dy} then {
+         set bottom [expr {[lindex $bbox 3] + $dy}]
+      }
+      set right [expr {$dx + [lindex $bbox 2]}]
+   }
+%   \end{tcl}
+%   Secondary offsets |dx2| and |dy2| are computed to correspond to 
+%   the |-anchor| value.
+%   \begin{tcl}
+   switch -- $O(-anchor) "center" - "e" - "w" {
+      set dy2 0
+   } "n" - "ne" - "nw" {
+      set dy2 [expr {-$top}]
+   } "s" - "sw" - "se" {
+      set dy2 [expr {-$bottom}]
+   } default {
+      error "Bad -anchor value"
+   }
+   switch -- $O(-anchor) "w" - "nw" - "sw" {
+      set dx2 0
+   } "e" - "ne" - "se" {
+      set dx2 [expr {-$right}]
+   } "s" - "n" - "center" {
+      set dx2 [expr {-0.5$right}]
+   } default {
+      error "Bad -anchor value"
+   }
+%   \end{tcl}
+%   Finally the layout is rebuilt.
+%   \begin{tcl}
+   set res {}
+   foreach {tcomp bbox} $layout {dx dy} $wOfsL {
+      set dx [expr {$dx+$dx2}]
+      set dy [expr {$dy+$dy2}]
+      set ncomp {}
+      foreach {tlevel ypos h} $tcomp {
+         set nlevel {}
+         foreach item $tlevel {
+            lset item 2 [expr {$dx + [lindex $item 2]}]
+            lappend nlevel $item
+         }
+         lappend ncomp $nlevel [expr {$ypos + $dy}] $h
+      }
+      set L {}
+      foreach {x y} $bbox {
+         lappend L [expr {$x+$dx}] [expr {$y+$dy}]
+      }
+      lappend res $ncomp $L
+   }
+   if {[info exists O(-bboxvar)]} then {
+      uplevel 1 [list ::set $O(-bboxvar) [
+         list $dx2 [expr {$top+$dy2}] [expr {$right+$dx2}]\
+           [expr {$bottom+$dy2}]
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Incremental presentation updates}
+% 
+% For experimentation, it can be useful to have commands that support 
+% displaying the layout of a network that corresponds to a particular 
+% point in the optimisation domain. The following commands take that 
+% approach.
+% 
+% \begin{proc}{jumbled_component_layout}
+%   This procedure computes an initial ``jumbled'' layout for a 
+%   network, where all items in a component are given the same 
+%   $x$-coordinate. The call syntax is
+%   \begin{displaysyntax}
+%     |jumbled_component_layout| \word{pure network} 
+%     \begin{regblock}[\regstar] \word{option} 
+%     \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   and the return value is a rich network dictionary initialised 
+%   with |pure|, |level-layout-Tk|, |bbox-Tk|, and 
+%   \describestring+*[rich entry]{level-dict-components} entries. 
+%   The last of this is a list (indexed by component index) of the 
+%   level-dict describing that component (i.e., mapping vertex 
+%   labels to level numbers).
+%   
+%   The options accept defaults from the 
+%   \describestring+[var.][network::rich]{level-layout-Tk_defaults} 
+%   variable. The options that are interpreted are
+%   \begin{subcmddescription}*{jumbled_component_layout}{option}
+%     
+%     \begin{subcmditem}{-edgew}
+%       \word{width}
+%     \end{subcmditem}
+%     \begin{subcmditem}{-edgeh}
+%       \word{height}
+%     \end{subcmditem}
+%       The width and height respectively assigned to |edge| items. 
+%       The classical defaults are $5$ and $10$.
+%       
+%     \begin{subcmditem}{-vsizes}
+%       \word{pattern--pair list}
+%     \end{subcmditem}
+%     \begin{subcmditem}{-vsizes}
+%       |{| \begin{regblock}[\regstar] \word{pattern} |{| 
+%       \word{width} \word{height} |}| \end{regblock} |}|
+%     \end{subcmditem}
+%       This option is used for assigning widths to vertices; the 
+%       second form shows the intended structure of the 
+%       \word{pattern--pair list} supplied as argument. Each 
+%       \word{pattern} is |string match|ed against the vertex 
+%       annotation in turn, and the width of the vertex is taken from 
+%       the first that matches. The classical default width is $20$ 
+%       for all vertices.
+%       
+%     \begin{subcmditem}{-padx}
+%       \word{amount}
+%     \end{subcmditem}
+%     \begin{subcmditem}{-pady}
+%       \word{amount}
+%     \end{subcmditem}
+%       Informally, this is extra space inserted between items\Ldash 
+%       within a level for |-padx|, and between levels for 
+%       |-pady|\Rdash but technically the former is rather an amount 
+%       which is added to the widths of all items (the difference being 
+%       that it affects the reported bounds as well). 
+%       The classical defaults are $10$ and $16$, respectively.
+%       
+%     \begin{subcmditem}{-legsfixed}
+%       \word{boolean}
+%     \end{subcmditem}
+%       This option controls whether legs are also all put at the 
+%       same coordinate (false), or put in their normal positions 
+%       (true); it exists for better visual compatibility with 
+%       |problem_from_pure|, and the default is true.
+%       
+%     \begin{subcmditem}{-levellist}
+%       \word{list of integers}
+%     \end{subcmditem}
+%       This option can be used to specify an explicit list of levels 
+%       (list indexed by vertex label, that gives the level of that 
+%       vertex) for vertices. If this is not given, then 
+%       |vertex_levels4| is used to compute one.
+%       
+%   \end{subcmddescription}
+%   There is currently no option for controlling which components are 
+%   formed; that is comparatively easy to modify afterwards (by 
+%   e.g.~merging some |level-dict-components|).
+%   
+%   
+%   \begin{tcl}
+proc ::network::ulayout::jumbled_component_layout {NW args} {
+   array set O ${::network::rich::level-layout-Tk_defaults}
+   array unset O -levellist
+   array set O {-legsfixed 1}
+   array set O $args
+   set res [dict create pure $NW]
+%   \end{tcl}
+%   The first order of business is to call |graded_components|, and 
+%   possibly |vertex_levels4| before that.
+%   \begin{tcl}
+   if {![info exists O(-levellist)]} then {
+      set O(-levellist) [::network::pure::vertex_levels4 $NW]
+   }
+   set grCompL [::network::pure::graded_components $NW $O(-levellist)]
+%   \end{tcl}
+%   This already gets quite close to the wanted |level-layout-Tk|; 
+%   the rest is mostly a loop over this that rebuilds in into the 
+%   wanted format.
+%   \begin{tcl}
+   set layout {}
+   foreach component $grCompL {
+      set levelno [dict exists $res level-dict-components]
+      set y 0
+      set w 0
+      set layoutlevels {}
+      set lD [dict create]
+      foreach level $component {
+         set h 0
+         set itemL {}
+         foreach item $level {
+            if {[lindex $item 0] eq "edge"} then {
+               lappend item 0.0
+               lappend itemL $item
+               set w [::tcl::mathfunc::max $w $O(-edgew)]
+               set h [::tcl::mathfunc::max $h $O(-edgeh)]
+            } elseif {[lindex $item 1] >= 2} then {
+               dict set lD [lindex $item 1] $levelno
+               lappend item 0.0
+               lappend itemL $item
+               set annot [lindex $NW 0 [lindex $item 1] 0]
+               foreach {pat size} $O(-vsizes) {
+                  if {[string match $pat $annot]} then {
+                     set w [::tcl::mathfunc::max $w [lindex $size 0]]
+                     set h [::tcl::mathfunc::max $h [lindex $size 1]]
+                     break
+                  }
+               }
+            } else {
+%   \end{tcl}
+%   The output from |graded_components| have explicit |vertex 0| and 
+%   |vertex 1| items, which for the layout must be replaced by lists 
+%   of edges. The effect of |-legsfixed| can be nicely reduced to the 
+%   setting of |dx| (separation between two legs).
+%   \begin{tcl}
+               set dx [expr {$O(-legsfixed) ? $O(-edgew)+$O(-padx) : 0.0}]
+               if {[lindex $item 1] == 1} then {
+                  set L [lindex $NW 0 1 1]
+               } else {
+                  set L [lindex $NW 0 0 2]
+               }
+               set x [expr {-0.5 * $dx * ([llength $L] - 1)}]
+               foreach e $L {
+                  lappend itemL [list edge $e $x]
+                  set x [expr {$x + $dx}]
+               }
+               set w [expr {max($w, $O(-edgew) + $dx*([llength $L]-1))}]
+               set h [::tcl::mathfunc::max $h $O(-edgeh)]
+               dict set lD [lindex $item 1] $levelno
+            }
+         }
+         set h [expr {0.5*$h}]
+         if {[llength $layoutlevels]} then {
+            set y [expr {$y - $lasth - $O(-pady) - $h}]
+         } else {
+            set bottom $h
+         }
+         lappend layoutlevels $itemL $y $h
+         set lasth $h
+         incr levelno
+      }
+      set w [expr {0.5*($w + $O(-padx))}]
+      lappend layout $layoutlevels [
+         list [expr {-$w}] [expr {$y-$h}] $w $bottom
+      ]
+      dict lappend res level-dict-components $lD 
+   }
+%   \end{tcl}
+%   Finally, the components are separated visually by reanchoring the 
+%   layout.
+%   \begin{tcl}
+   dict set res level-layout-Tk [
+      anchor_Tk-layout $layout {*}$args -bboxvar bbox
+   ]
+   dict set res bbox-Tk $bbox
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{update_rich_from_xlevels}
+%   This procedure updates the |level-layout-Tk|, |bbox-Tk|, 
+%   |vpos-Tk|, and |ecurve-Tk-tt| entries of a rich network (that 
+%   already has a |level-layout-Tk| entry) with positions from a list 
+%   of ``levels with $x$-coordinates''. The call syntax is
+%   \begin{displaysyntax}
+%     |update_rich_from_xlevels| \word{network-array} \word{component} 
+%     \word{xlevels} \word{hbounds} \word{appearance} 
+%     \begin{regblock}[\regstar] \word{option} 
+%     \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   where \word{network-array} is the name in the calling context of 
+%   an array containing the rich network to update, \word{component} 
+%   is the index of the component to update, \word{xlevels} is the 
+%   list of levels with $x$-coordinates that should replace those in 
+%   the existing |level-layout-Tk|, \word{hbounds} is the horizontal 
+%   bounds for the \word{xlevels} items, and \word{appearance} is the 
+%   appearance-dictionary to use. The various options are passed on 
+%   to all subordinate procedures that take them.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::update_rich_from_xlevels\
+  {NWvar k xlevels hbounds appearance args} {
+   upvar 1 $NWvar NWR
+   set NWR(level-layout-Tk) [
+      anchor_Tk-layout [lreplace $NWR(level-layout-Tk)\
+        [expr {2*$k}] [expr {2*$k+1}] {*}[
+         Tk-layout_component $xlevels $hbounds $NWR(pure) {*}$args
+      ]] {*}$args -bboxbar NWR(bbox-Tk)
+   ]
+   ::network::rich::vpos-Tk_by_level -var NWR
+   ::network::rich::ecurve-Tk-tt_by_level $appearance -var NWR
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{tangent_trends}
+%   This procedure seeks to decode what ``trends'', in terms of 
+%   permutations of items, the dominant components of a particular 
+%   tangent direction corresponds to. The call syntax is
+%   \begin{displaysyntax}
+%     |tangent_trends| \word{nlimit} 
+%     \word{item-key} \word{group} \word{point} \word{tangent} 
+%   \end{displaysyntax}
+%   where \word{nlimit} is a limit on how many trends to report per 
+%   component, \word{item-key} gives names for the problem items, 
+%   \word{group} is the domain of the problem, \word{point} 
+%   is a point in the \word{group}, and \word{tangent} is a |tangent| 
+%   relevant at the \word{point}.
+%   
+%   The return value is a list with one element per component of the 
+%   \word{group}. These elements are key--value lists that encodes 
+%   trends (effectively components of the \word{tangent}) in order of 
+%   descending magnitude; the key is a seminatural language 
+%   representation of a transposition or length $3$ cycle, and the 
+%   value is the real coefficient of same. The seminatural 
+%   representation of the transposition of edges $1$ and $2$ would be
+%   \begin{displaysyntax}
+%     edge 1 edge 2
+%   \end{displaysyntax}
+%   and the seminatural representation of shifting levels $k-1$ and 
+%   $k$ relative to each other is |x|$k$.
+%   
+%   The easiest way of ordering items with those of largest magnitude 
+%   first is keep track of both the coefficient with sign and without 
+%   sign, do an |lsort -index| on the without sign type, and then 
+%   throw it away.
+%   \begin{tcl}
+proc ::network::ulayout::tangent_trends {nlimit itemkey G P A} {
+   set L {}
+   set xs [{*}$G tangent index 0 $A]
+   foreach j [{*}$G tangent component 0 support $xs] {
+      set c [{*}$G tangent component 0 coeff $j $xs]
+      lappend L [list "x[expr {$j+1}]" $c [expr {abs($c)}]]
+   }
+   set trendL {}
+   foreach item [lsort -index 2 -real -decreasing $L] {
+      lappend trendL [lindex $item 0] [lindex $item 1]
+      if {[llength $trendL]/2 >= $nlimit} then {break}
+   }
+   set res [list $trendL]
+   set k 1
+   foreach level $itemkey {
+      if {[llength $level] < 2} then {lappend res {}; continue}
+      set Pk [{*}$G index $k $P]
+      set Ak [{*}$G tangent index $k $A]
+%   \end{tcl}
+%   A complication is that since the representation $A$ of a tangent at 
+%   a point $P$ is taken from the expression $P (I +\nobreak 
+%   \varepsilon A)$, since the Lie algebra is taken to be the Lie 
+%   algebra of left-invariant vector fields, the elements of $A$ as 
+%   such correspond more to positions in the diagram than to actual 
+%   items. This can be remedied by switching to the right-invariant 
+%   counterpart \(B := PAP^*\), since \( P (I +\nobreak \varepsilon A) = 
+%   ( I +\nobreak \varepsilon PAP^*) P\), and an extra factor on the 
+%   left of $P$ translates to an extra operation that is done after 
+%   whatever operation that lead to the current point $P$.
+%   \begin{tcl}
+      set B [{*}$G component $k superset * $Pk $Ak\
+        [{*}$G component $k inverse $Pk]]
+      set L {}
+      foreach j [{*}$G tangent component $k support $B] {
+         set c [{*}$G tangent component $k coeff $j $B]
+         lappend L [list $j $c [expr {abs($c)}]]
+      }
+      set trendL {}
+      foreach item [lsort -index 2 -real -decreasing $L] {
+%   \end{tcl}
+%   At this point, one must recall how the index set for the tangent 
+%   space of $\mathrm{U}^\mathbf{1}(n)$ was chosen: the elements are 
+%   pairs of natural numbers, correspond to an imaginary basis vector 
+%   if the first component is smaller, and to a real basis vector if 
+%   the first component is greater. The imaginary basis vectors 
+%   correspond to straight transpositions, but the real ones 
+%   correspond to length $3$ cycles involving the two list elements 
+%   and the last element; one can work out that if \(0 \leqslant r < 
+%   s < n-1\) then
+%   \begin{displaysyntax}
+%     [\meta{Lie algebra} basiselement |{|$s$ $r$|}|]\par
+%     [\meta{Lie algebra} * 
+%     [\meta{Lie algebra} basiselement |{|$r$ $n-1$|}|]
+%     [\meta{Lie algebra} basiselement |{|$s$ $n-1$|}|]]
+%   \end{displaysyntax}
+%   are |=|-equal. By the Campbell--Hausdorff formula \(e^X e^Y = 
+%   \exp \bigl( X +\nobreak Y +\nobreak \tfrac{1}{2} [X,Y] +\nobreak 
+%   \dotsb \bigr)\), the $(s,r)$ pair thus has a touch of transposing 
+%   $(s, n -\nobreak 1)$ first and $(r, n -\nobreak 1)$ second, which 
+%   amounts to the cycle $(s\;r\;n{-}1)$.
+%   \begin{tcl}
+         if {[lindex $item 0 0] < [lindex $item 0 1]} then {
+            lappend trendL [concat [lindex $level [lindex $item 0 0]]\
+              [lindex $level [lindex $item 0 1]]]
+         } else {
+            lappend trendL [concat [lindex $level [lindex $item 0 1]]\
+              [lindex $level [lindex $item 0 0]] [lindex $level end]]
+         }
+         lappend trendL [lindex $item 1]
+         if {[llength $trendL]/2 >= $nlimit} then {break}
+      }
+      lappend res $trendL
+      incr k
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+\endinput

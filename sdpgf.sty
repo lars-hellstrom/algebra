@@ -1,0 +1,124 @@
+%%
+%% This is file `sdpgf.sty',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% network2.dtx  (with options: `sdpgf')
+%% 
+%% IMPORTANT NOTICE:
+%% 
+%% For the copyright see the source file.
+%% 
+%% Any modified versions of this file must be renamed
+%% with new filenames distinct from sdpgf.sty.
+%% 
+%% For distribution of the original source see the terms
+%% for copying and modification in the file network2.dtx.
+%% 
+%% This generated file may be distributed as long as the
+%% original source files, as listed above, are part of the
+%% same distribution. (The sources need not necessarily be
+%% in the same archive or directory.)
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{sdpgf}[2011/01/24 Space-delimited PGF pictures]
+\ProcessOptions
+\RequirePackage{pgfcore}
+\usepgfmodule{shapes}
+\newdimen\sdpgfunit
+\newdimen\SDPGF@x
+\newdimen\SDPGF@y
+\def\SDPGF@@L #1 #2 {%
+   \advance \SDPGF@x #1\sdpgfunit
+   \advance \SDPGF@y #2\sdpgfunit
+   \pgfpathqlineto{\the\SDPGF@x}{\the\SDPGF@y}%
+}
+\def\SDPGF@@m #1 #2 {%
+   \SDPGF@x=#1\sdpgfunit
+   \SDPGF@y=#2\sdpgfunit
+   \pgfpathqmoveto{\the\SDPGF@x}{\the\SDPGF@y}%
+}
+\def\SDPGF@@M #1 #2 {%
+   \advance \SDPGF@x #1\sdpgfunit
+   \advance \SDPGF@y #2\sdpgfunit
+   \pgfpathqmoveto{\the\SDPGF@x}{\the\SDPGF@y}%
+}
+\def\SDPGF@@C #1 #2 #3 #4 #5 #6 {%
+   \advance \SDPGF@x #1\sdpgfunit
+   \advance \SDPGF@y #2\sdpgfunit
+   \edef\@tempa{{\the\SDPGF@x}{\the\SDPGF@y}}%
+   \advance \SDPGF@x #3\sdpgfunit
+   \advance \SDPGF@y #4\sdpgfunit
+   \edef\@tempa{%
+     \noexpand\pgfpathqcurveto\@tempa{\the\SDPGF@x}{\the\SDPGF@y}%
+   }%
+   \advance \SDPGF@x #5\sdpgfunit
+   \advance \SDPGF@y #6\sdpgfunit
+   \@tempa{\the\SDPGF@x}{\the\SDPGF@y}%
+}
+\def\SDPGF@@h{\pgfsyssoftpath@closepath}
+\def\SDPGF@@S{\pgfusepathqstroke}
+\def\SDPGF@@re #1 #2 #3 #4 {%
+   \pgfsyssoftpath@rect{#1\sdpgfunit}{#2\sdpgfunit}%
+     {#3\sdpgfunit}{#4\sdpgfunit}%
+}
+\def\SDPGF@@ov #1 #2 #3 #4 {%
+   \SDPGF@x=#1\sdpgfunit    \SDPGF@y=#2\sdpgfunit
+   \pgf@x=#3\sdpgfunit      \pgf@y=#4\sdpgfunit
+   \pgf@xa=0.224\pgf@x      \pgf@ya=0.224\pgf@y
+   \pgf@xb=0.5\pgf@x        \pgf@yb=0.5\pgf@y
+   \pgf@xc=0.776\pgf@x      \pgf@yc=0.776\pgf@y
+   \advance\pgf@x\SDPGF@x   \advance\pgf@y\SDPGF@y
+   \advance\pgf@xa\SDPGF@x  \advance\pgf@ya\SDPGF@y
+   \advance\pgf@xb\SDPGF@x  \advance\pgf@yb\SDPGF@y
+   \advance\pgf@xc\SDPGF@x  \advance\pgf@yc\SDPGF@y
+   \edef\@tempa{%
+      \noexpand\pgfpathqmoveto{\the\pgf@x}{\the\pgf@yb}%
+      \noexpand\pgfpathqcurveto{\the\pgf@x}{\the\pgf@yc}%
+        {\the\pgf@xc}{\the\pgf@y}{\the\pgf@xb}{\the\pgf@y}%
+      \noexpand\pgfpathqcurveto{\the\pgf@xa}{\the\pgf@y}%
+        {\the\SDPGF@x}{\the\pgf@yc}{\the\SDPGF@x}{\the\pgf@yb}%
+      \noexpand\pgfpathqcurveto{\the\SDPGF@x}{\the\pgf@ya}%
+        {\the\pgf@xa}{\the\SDPGF@y}{\the\pgf@xb}{\the\SDPGF@y}%
+      \noexpand\pgfpathqcurveto{\the\pgf@xc}{\the\SDPGF@y}%
+        {\the\pgf@x}{\the\pgf@ya}{\the\pgf@x}{\the\pgf@yb}%
+   }%
+   \@tempa
+   \h %\pgfsyssoftpath@closepath
+}
+\def\SDPGF@@TR #1 #2 #3 #4 #5 {{%
+   \pgftransformxshift{#1\sdpgfunit}%
+   \pgftransformyshift{#2\sdpgfunit}%
+   \pgftransformrotate{#3}%
+   \pgfnode{rectangle}{#4}{#5}{}{\pgfusepath{discard}}%
+}}
+\def\SDPGF@@Fs#1{\fontsize{#1\sdpgfunit}\z@}
+\def\SDPGF@@FS#1{\SDPGF@@Fs{#1}\selectfont}
+\newenvironment{sdpgf}[5]{%
+   \SDPGF@y=-1ex%
+   \setlength\sdpgfunit{#5}%
+   \pgfpicture
+   \global\pgf@picminx=#1\sdpgfunit
+   \global\pgf@picminy=#4\sdpgfunit
+   \global\pgf@picmaxx=#3\sdpgfunit
+   \global\pgf@picmaxy=#2\sdpgfunit
+   \advance \SDPGF@y #2\sdpgfunit
+   \advance \SDPGF@y #4\sdpgfunit
+   \advance \SDPGF@y -1ex
+   \divide \SDPGF@y \tw@
+   \expandafter\pgfsetbaseline\expandafter{\the\SDPGF@y}%
+   \let\m\SDPGF@@m
+   \let\M\SDPGF@@M
+   \let\L\SDPGF@@L
+   \let\C\SDPGF@@C
+   \let\h\SDPGF@@h
+   \let\S\SDPGF@@S
+   \let\re\SDPGF@@re
+   \let\ov\SDPGF@@ov
+   \let\TR\SDPGF@@TR
+   \let\Fs\SDPGF@@Fs
+   \let\FS\SDPGF@@FS
+}{\endpgfpicture}
+\endinput
+%%
+%% End of file `sdpgf.sty'.

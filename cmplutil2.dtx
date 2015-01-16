@@ -238,30 +238,60 @@
 % 
 % \subsubsection*{Problem initialisation modules}
 % 
+% The \Module{Frobenius} module contains all code initialising the 
+% utility with (one axiom system of) a Frobenius algebra. The 
+% submodule \Module{coproduct} guards a congruence defining the 
+% coproduct.
+% 
 % The \Module{Hopf} module contains all code initialising the utility 
-% with the axioms of a Hopf algebra or variation thereof.
+% with the axioms of a Hopf algebra or variation thereof. It has 
+% several submodules:
+% \begin{itemize}
+%   \item
+%     The \Module{twist} module modifies the definitions to be for 
+%     ``Hopf algebra with abstract twist'', i.e., the distributive 
+%     law employs an abstract twist vertex rather than an explicit 
+%     permutation. In particular this extends the partial order 
+%     with $4$ extra blocks. \Module{untwist} is a submodule of 
+%     \Module{twist} that adds an extra vertex whose only given 
+%     property is that it is the inverse of the twist vertex.
+%   \item
+%     The \Module{cocomplex} module adds two constant vertices |Re| 
+%     and |Im|, and axioms for their interaction with |Delta| and 
+%     |epsilon| that give them the behaviour of the real-part and 
+%     imaginary-part maps in the coalgebra dual to the complex 
+%     numbers as a real algebra.
+%   \item
+%     The \Module{testequalities} module adds some congruences that 
+%     can be derived anyway, but only after several hundred steps. 
+%     As the name hints, they were intended for testing the handling 
+%     of equalities, but subsequent refinements of the ordering have 
+%     actually made them orientable.
+%   \item
+%     The \Module{moretwist} module adds axioms about the |twist|. 
+%     It is hoped that these will actually turn out to be implied by 
+%     the basic set of axioms, but if that is true then the proof 
+%     would have to be rather large.
+% \end{itemize}
 % 
-% The \Module{twist} module modifies the definitions to be for 
-% ``Hopf algebra with abstract twist'', i.e., the distributive law 
-% employs an abstract twist vertex rather than an explicit 
-% permutation. In particular this extends the partial order with $4$ 
-% extra blocks.
+% The \Module{HomAss} module initialising the utility with the axioms 
+% of a hom-associative algebra or variation thereof. The 
+% \Module{aishom} submodule adds the congruence stating that the 
+% unary operation is a homomorphism of the algebra.
 % 
-% The \Module{cocomplex} module adds two constant vertices |Re| and 
-% |Im|, and axioms for their interaction with |Delta| and |epsilon| 
-% that give them the behaviour of the real-part and imaginary-part 
-% maps in the coalgebra dual to the complex numbers as a real algebra.
+% The \Module{WeakAss} module initialising the utility with a ``weak 
+% associative'' axiom.
 % 
-% The \Module{testequalities} module adds some congruences that can 
-% be derived anyway, but only after several hundred steps. As the 
-% name hints, they were intended for testing the handling of 
-% equalities, but subsequent refinements of the ordering have 
-% actually made them orientable.
+% Common to the \Module{HomAss} and \Module{WeakAss} modules is a 
+% (fairly large) block of code which, in coarity~$1$ settings only, 
+% can produce estimates of the growth of the operad by computing a 
+% finite tree automaton for the language of irreducible networks.
 % 
-% The \Module{moretwist} module adds axioms about the |twist|. It is 
-% hoped that these will actually turn out to be implied by the basic 
-% set of axioms, but if that is true then the proof would have to be 
-% rather large.
+% The \Module{Transposition} module sets up an axiom system for a 
+% vertex to be an abstract transposition: it is its own inverse and 
+% satisfies the Yang--Baxter equation. The main challenge here is to 
+% come up with an ordering that actually manages to orient some 
+% derived equalities.
 % 
 % 
 % \subsubsection*{Other}
@@ -271,6 +301,13 @@
 % accumulated runtime (in microseconds).
 % 
 % The \Module{Tk} module contains code that gives the utility a GUI. 
+% \textbf{Note} that many example modules contain a call to 
+% |tk_getSaveFile|, which means they too have a Tk dependency.
+% 
+% The \Module{testserver} module contains code that starts a HTTP 
+% miniserver at port 9090. When that server is asked to GET a path 
+% that begins with what looks like a rule number, then it delivers an 
+% XHTML+SVG rendering of that rule (with proof).
 % 
 % The \Module{trans} module bracket some code that makes each 
 % creation of a new rule a separate transaction. The primary reason 
@@ -328,8 +365,9 @@ lappend DB_column(am6iguities) num6er {INTEGER PRIMARY KEY AUTOINCREMENT}
 %   are never removed from these tables, but I don't think it hurts 
 %   either.
 %   
-%   Note: Need a mechanism for adjusting column types to underlying 
-%   database.
+%   Note: A mechanism for adjusting column types to the underlying 
+%   database would be good. The |column_defs| proc has the beginnings 
+%   of such a mechanism.
 % \end{arrayvar}
 % 
 % \describecolumn[ru1es]{lhs}
@@ -1150,6 +1188,20 @@ proc prepare_statements {db} {
         [join [lsearch -all -inline $pcols v*] +] AS lhsOrder
       FROM ru1es ORDER BY num6er
    "]
+%     \end{tcl}
+%     This is used when estimating pairs in \Tcl.
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{GetSomeOverl4ps}
+%     The |GetSomeOverl4ps| statement is like |GetOverl4ps|, but 
+%     retrieves only a range of rows. There are two parameters: the 
+%     result set size limit |limit|, and the ditto offset |ofs|.
+%     \begin{tcl}
+   set DBCMD(GetSomeOverl4ps) [$db prepare "
+      SELECT num6er,st4te,overl4pSum,overl4pTimes,vSum,v2Sum,
+        [join [lsearch -all -inline $pcols v*] +] AS lhsOrder
+      FROM ru1es ORDER BY num6er LIMIT :limit OFFSET :ofs
+   "]
 %</lazier>
 %     \end{tcl}
 %     This is used when estimating pairs in \Tcl.
@@ -1473,7 +1525,8 @@ proc completion_main_loop {} {
 %</stats>
    if {[catch {lindex $main_loop_stack end 0} cmd]} then {set cmd ""}
    variable next_task_type $cmd
-   after 0 [list after idle completion_main_loop]
+%<!eventbug>   after 0 [list after idle completion_main_loop]
+%<eventbug>   after 1 [list after idle completion_main_loop]
 }
 %   \end{tcl}
 % \end{proc}
@@ -1504,6 +1557,23 @@ proc halt_main_loop {} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% \begin{proc}{exit_main_loop}
+%   This procedure is similar to |halt_main_loop| in that it causes 
+%   something to happen when the stack would otherwise be empty, but 
+%   instead of |return|ing from |completion_main_loop|, it |exit|s 
+%   the entire process.
+%   \begin{tcl}
+proc exit_main_loop {} {
+   variable main_loop_stack
+   set main_loop_stack [linsert $main_loop_stack 0 {uplevel #0 {
+      $DBCMD(database) close
+      exit
+   }}]
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % 
 % \begin{arrayvar}{Stats}[n,\meta{command}]
 % \begin{arrayvar}{Stats}[t,\meta{command}]
@@ -1573,11 +1643,11 @@ proc database_counts {} {
       ] 0 0]
    }
    set Count(Aa) [lindex [$DBCMD(database) allrows -as lists {
-      SELECT count(num6er) FROM am6iguities
+      SELECT count(*) FROM am6iguities
    }] 0 0]
    set Count(a) [lindex [$DBCMD(database) allrows -as lists {
-      SELECT count(num6er) FROM am6iguities 
-      WHERE st4te!='A' AND st4te!='S'
+      SELECT count(*) FROM am6iguities 
+      WHERE NOT (st4te IN ('A','S'))
    }] 0 0]
    set Count(P) [lindex [$DBCMD(database) allrows -as lists {
       SELECT count(*) FROM pa1rs
@@ -1592,6 +1662,15 @@ proc database_counts {} {
       ] 0 0]
    }
 %</lazy>
+%<*pairmap>
+   if {$Count(P)} then {
+      variable pairs_top [tcl::mathfunc::round [lindex [
+         $DBCMD(database) allrows -as lists {
+            SELECT max(pick8y) FROM pa1rs
+         }
+      ] 0 0]]
+   }
+%</pairmap>
 }
 %   \end{tcl}
 % \end{proc}
@@ -1656,6 +1735,7 @@ eval {
       button .control.run -text "Run" -command completion_main_loop
    ]
    wm title .control "Control panel"
+   lower .
 }
 %</Tk>
 % \end{tcl}
@@ -1670,6 +1750,20 @@ variable pair_level "" ambiguity_level ""
 %   \end{tcl}
 % \end{variable}\end{variable}
 % 
+% The following is a minimal alternative control mechanism: Create a 
+% child that sits waiting forever, which when killed will initiate a 
+% controlled shutdown of the present process.
+% \begin{tcl}
+%<*noTk>
+set kill_to_exit_child [open "|[info nameofexecutable]" r+]
+fconfigure $kill_to_exit_child -buffering none -blocking no
+puts $kill_to_exit_child "vwait forever\n"
+fileevent $kill_to_exit_child readable "
+   catch {[list ::close $kill_to_exit_child]}
+   exit_main_loop
+"
+%</noTk>
+% \end{tcl}
 % 
 % 
 % \subsection{Reducing ambiguities}
@@ -3298,6 +3392,14 @@ proc overlaps_between {plus minus} {
            [dict create num6er $plus sum $overlap_sum times $times]
          $DBCMD(UpdateOverl4p) allrows\
            [dict create num6er $minus sum $overlap_sum times $times]
+         variable overlaps_uncached
+         incr overlaps_uncached
+         variable overlaps_cached
+         if {200*$overlaps_uncached*$overlaps_uncached >\
+           $overlaps_cached} then {
+            variable overlap_cache {}
+            set overlaps_uncached 0
+         }
       }
       set obj [$DBCMD(DropPair) execute\
         [dict create p1us $plus m1nus $minus]]
@@ -3536,6 +3638,45 @@ proc raise_ambiguity_top_A {obj newtop oldtop} {
 %   delivers this.
 % \end{variable}
 % 
+% \begin{variable}{overlap_cache}
+%   It turns out that merely performing a |GetOverl4ps| can be a 
+%   bottleneck when the |ru1es| table grows large enough. 
+%   Furthermore it turns out that when one needs this data, it 
+%   tends not to change very often, whereas in periods where it 
+%   changes frequently it tends not to be used. Hence it makes 
+%   sense to cache the list, and clear this cache when a certain 
+%   number of new overlaps have been successfully computated. The 
+%   cache is empty when it is an empty list. When the cache is 
+%   nonempty, it should hold the result one would get from 
+%   |$DBCMD(GetOverl4ps) allrows|.
+%   \begin{tcl}
+variable overlap_cache {}
+%   \end{tcl}
+% \end{variable}
+% 
+% \begin{variable}{overlaps_cached}
+% \begin{variable}{overlaps_uncached}
+%   In practice, many new rules give rise to a few pairs with 
+%   estimated size less than the current ambiguity level---maybe only 
+%   by a fraction, but still less---and in that case the cache is of 
+%   limited utility. A more pragmatic approach is to allow some 
+%   fraction of uncached overlaps before invalidating the cache. The 
+%   |overlaps_cached| variable is updated when |overlap_cache| is 
+%   filled in, and at the same time |overlaps_uncached| is zeroed. 
+%   When $100$ times the number of uncached overlaps exceed the 
+%   number of cached overlaps, then the cache is cleared.
+%   \begin{tcl}
+variable overlaps_cached 0
+variable overlaps_uncached 0
+%   \end{tcl}
+%   Technically, the |overlaps_cached| value is rather twice the number 
+%   of overlaps, since it is the sum of all |overl4pTimes| value, and 
+%   each computed overlap is contributed twice (once for each rule 
+%   involved). Therefore the factor $100$ rather appears as $200$ in 
+%   the code.
+% \end{variable}\end{variable}
+% 
+% 
 % \begin{proc}{estimate_pairs}
 %   This procedure creates the pairs that can be formed from a new 
 %   rule, estimating their |pick8y| value and placing them into the 
@@ -3551,27 +3692,45 @@ proc raise_ambiguity_top_A {obj newtop oldtop} {
 %   There is no particular return value, and the procedure pushes tasks 
 %   on the main loop stack.
 %   
-%   In fact, all the procedure does is to start a transaction and 
-%   fetch the |overl4p| data; all the pair generation is handled by 
-%   the iterate procedure |estimate_pairs_A|.
+%   In fact, almost the only thing this procedure does is to start a 
+%   transaction; all the pair generation is handled by the iterate 
+%   procedure |estimate_pairs_A|. There is however one thing that 
+%   needs to be done: a new row for the present rule must be added to 
+%   the |overlap_cache|. All the necessary data except the |st4te| is 
+%   immediately available, so the latter is faked as `|ER|', which 
+%   |estimate_pairs_A| understands.
 %   \begin{tcl}
 proc estimate_pairs {minus lhs_order vsum v2sum} {
    variable DBCMD
    $DBCMD(database) begintransaction
-   push_main_task estimate_pairs_A [$DBCMD(GetOverl4ps) allrows] ""\
-     $minus $lhs_order $vsum $v2sum
+   variable overlap_cache
+   if {[llength $overlap_cache]} then {
+      lappend overlap_cache [dict create  num6er $minus  st4te ER \
+        overl4pSum 0.0  overl4pTimes 0  vSum $vsum  v2Sum $v2sum \
+        lhsOrder $lhs_order]
+      push_main_task estimate_pairs_A 1 0 "" $minus $lhs_order\
+        $vsum $v2sum
+   } else {
+      push_main_task estimate_pairs_A 0 0 "" $minus $lhs_order\
+        $vsum $v2sum
+      variable overlaps_cached 0
+      variable overlaps_uncached 0
+   }
 }
 %   \end{tcl}
 %   
 %   \begin{proc}{estimate_pairs_A}
 %     The call syntax of |estimate_pairs_A| is
 %     \begin{displaysyntax}
-%       |estimate_pairs_A| \word{overlap-data} \word{pair-map} 
-%       \word{minus-number} \word{lhs-order} \word{v-sum} 
-%       \word{$v^2$-sum}
+%       |estimate_pairs_A| \word{use cache} \word{overlap-offset} 
+%       \word{pair-map} \word{minus-number} \word{lhs-order} 
+%       \word{v-sum} \word{$v^2$-sum}
 %     \end{displaysyntax}
-%     where \word{overlap-data} is (a tail of) the list returned by 
-%     the |GetOverl4ps| statement, \word{pair-map} is the part of the 
+%     where \word{use cache} is |1| if overlap data are to be taken 
+%     from |overlap_cache| and |0| if it is to be fetched from the 
+%     database. \word{overlap-offset} is the offset (starting at $0$) 
+%     to the chunk of overlap data to process on this round.
+%     \word{pair-map} is the part of the 
 %     |plu5es| that has been computed so far, and remaining arguments 
 %     are as for |estimate_pairs|. This procedure either processes the 
 %     \word{overlap-data} to end, sets the row in |pa1rMap|, and 
@@ -3581,13 +3740,27 @@ proc estimate_pairs {minus lhs_order vsum v2sum} {
 %     |pa1rs| table.
 %     
 %     \begin{tcl}
-proc estimate_pairs_A {overlapL plu5es minus lhs_order vsum v2sum} {
+proc estimate_pairs_A {use_cache offset plu5es minus lhs_order vsum v2sum} {
    variable DBCMD
    variable pairs_top
    variable Count
+   variable overlap_cache
+   variable overlaps_cached
+   
    set bits ""
+   if {$use_cache} then {
+      set overlapL [lrange $overlap_cache $offset $offset+511]
+   } else {
+      set overlapL [$DBCMD(GetSomeOverl4ps) allrows [
+         dict create ofs $offset limit 512
+      ]]
+      lappend overlap_cache {*}$overlapL
+      foreach row $overlapL {
+         incr overlaps_cached [dict get $row overl4pTimes]
+      }
+   }
    foreach row $overlapL {
-      if {[dict get $row st4te] in {R E}} then {
+      if {[dict get $row st4te] in {R E ER}} then {
          set overlap [expr {[dict get $row overl4pTimes]>0 ? 
             double([dict get $row overl4pSum]) / 
               [dict get $row overl4pTimes] 
@@ -3612,19 +3785,18 @@ proc estimate_pairs_A {overlapL plu5es minus lhs_order vsum v2sum} {
       } else {
          append bits 0
       }
-      if {[string length $bits] == 512} then {break}
    }
    append plu5es [binary format B* $bits]
-   set tail [lrange $overlapL [string length $bits] end]
-   if {[llength $tail]} then {
-      push_main_task estimate_pairs_A $tail $plu5es $minus\
-        $lhs_order $vsum $v2sum
-   } else {
+   if {[llength $overlapL] < 512} then {
       if {![regexp -- {^\0*$} $plu5es]} then {
          $DBCMD(SetPairmap) allrows\
            [dict create  m1nus $minus  plu5es $plu5es]
       }
       $DBCMD(database) commit
+   } else {
+      incr offset [llength $overlapL]
+      push_main_task estimate_pairs_A $use_cache $offset $plu5es $minus\
+        $lhs_order $vsum $v2sum
    }
 }
 %     \end{tcl}
@@ -3648,6 +3820,12 @@ proc resieve_pairs {} {
    set Count(PP) 0
    variable DBCMD
    set overlapL [$DBCMD(GetOverl4ps) allrows]
+   variable overlap_cache $overlapL
+   variable overlaps_cached 0
+   foreach row $overlapL {
+      incr overlaps_cached [dict get $row overl4pTimes]
+   }
+   variable overlaps_uncached 0
    set minusL [concat {*}[$DBCMD(ListPairmaps) allrows -as lists]]
    if {[llength $minusL]} then {
       push_main_task resieve_pairs_A $overlapL $minusL
@@ -3721,7 +3899,7 @@ proc resieve_pairs_B {overlapL plu5es_old plu5es_new mrow} {
    set bits_new ""
    foreach bit [split $bits_old ""] prow $overlapL {
       if {$bit eq ""} then {break}
-      if {[dict get $prow st4te] in {R E}} then {
+      if {$bit && [dict get $prow st4te] in {R E}} then {
          set overlapTimes [expr {[dict get $prow overl4pTimes] +\
            [dict get $mrow overl4pTimes]}]
          if {$overlapTimes>0} then {
@@ -4592,6 +4770,7 @@ proc rule_browser_fbar {t} {
 % corresponding window.
 % \begin{tcl}
 rule_browser_layout
+lower .rulebrowser .control
 %</Tk>
 % \end{tcl}
 % 
@@ -4617,6 +4796,10 @@ rule_browser_layout
 %       The value is the dictionary of data-trees to use for the 
 %       vertices. If this option is not given, then the 
 %       |SVG_appearances| procedure is called to compute these.
+%     \item[-feedbacks]
+%       The value is a boolean and defaults to true. If true, the 
+%       reurn value includes a note with the transferrence matrix 
+%       the rule was derived under.
 %   \end{ttdescription}
 %   
 %   \begin{tcl}
@@ -4652,12 +4835,45 @@ proc rule_as_XHTML {row args} {
          ]
       ]
    }
-   if {[llength $children] == 1} then {
-      lappend children [list #text " \u2261 0"]
-   } elseif {[lindex $children 1] eq {#text { + }}} then {
-      lset children 1 [list #text " \u2261 "]
+   if {[dict get $row st4te] in {R r}} then {
+      set to \u2192
    } else {
-      lset children 1 1 " \u2261[lindex $children 1 1]"
+      set to \u2261
+   }
+   if {[llength $children] == 1} then {
+      lappend children [list #text " $to 0"]
+   } elseif {[lindex $children 1] eq {#text { + }}} then {
+      lset children 1 [list #text " $to "]
+   } else {
+      lset children 1 1 " $to[lindex $children 1 1]"
+   }
+% \smallskip
+   if {![dict exists $args -feedbacks] || [dict get $args -feedbacks]}\
+   then {
+      lappend children [list #text " derived under transferrence "]
+      set L {}
+      foreach e [lindex [dict get $row lhs] 0 1 1] {lappend L 1}
+      set M {}
+      foreach e [lindex [dict get $row lhs] 0 0 2] {lappend M $L}
+      if {![llength $M] || ![llength $L]} then {
+         lappend children [list #text "None."]
+      } elseif {![llength [dict get $row feed6acks]]} then {
+         lappend children [list #text "All."]
+      } else {
+         foreach fb [dict get $row feed6acks] {
+            lset M {*}$fb 0
+         }
+         set L {}
+         foreach matrow $M {
+            set M {}
+            foreach cell $matrow {
+               lappend M [list td {} [list [list \#text $cell]]]
+            }
+            lappend L [list tr {} $M]
+         }
+         lappend children [list table {class transferrence} $L]\
+           [list #text "."]
+      }
    }
    return [list p {} $children]
 }
@@ -4975,6 +5191,18 @@ proc XHTML_prologue {F title} {
          stroke: currentColor;
        }
 %   \end{tcl}
+%   The following is for encoding feedbacks (a boolean matrix).
+%   \begin{tcl}
+       table.transferrence {
+         display: inline-table;
+         border-collapse: collapse;
+         vertical-align: middle;
+       }
+       table.transferrence td {
+         border-style: dotted;
+         border-width: thin;
+       }
+%   \end{tcl}
 %   The following are used to make an XHTML equivalent of |\stackrel|.
 %   \begin{tcl}
        span.stackrel {
@@ -4989,6 +5217,12 @@ proc XHTML_prologue {F title} {
        span.stackedrel {
          display: block;
          text-align: center;
+       }
+%   \end{tcl}
+%   The following is for the status page.
+%   \begin{tcl}
+       table.siffertabell td {
+         text-align: ".";
        }
     </style>
   }
@@ -5211,6 +5445,11 @@ proc XHTML_rule_document {F ruleno args} {
            {*}$args -vertexobjs $refD
       ]]
    } else {
+%   \end{tcl}
+%   The following is actually too simple; it doesn't account for the 
+%   case that an axiom undergoes reduction before it is turned into a 
+%   rule, so those reductions are not shown. [FixMe]
+%   \begin{tcl}
       puts $F [mtmtcl::support::xml_from_tree [
          list p {} [list [
             list #text [dict get $arow p1us2eg]
@@ -5256,17 +5495,22 @@ proc HTTP_accept {incoming sock ip port} {
          regexp -- {^([A-Za-z]+) ([^\r\n]+) ([^\r\n ]+)\r\n} $incoming\
            "" method url version
       ]} then {
-         scan [lindex [split $url /] end] %d ruleno
          fconfigure $sock -translation crlf
          puts $sock "HTTP/1.0 200 OK"
          puts $sock "Content-Type: application/xhtml+xml; charset=UTF-8"
          puts $sock "Connection: close\n"
          fconfigure $sock -encoding utf-8
-         XHTML_rule_document $sock $ruleno -head [
-            format {<p><a href="%d.xhtml">Prev</a>\
-              <a href="%d.xhtml">Next</a></p>}\
-              [expr {$ruleno-1}] [expr {$ruleno+1}]
-         ] -rulelink {::format %d.xhtml}
+         if {[
+            scan [lindex [split $url /] end] %d ruleno
+         ]>0} then {
+            XHTML_rule_document $sock $ruleno -head [
+               format {<p><a href="%d.xhtml">Prev</a>\
+                 <a href="%d.xhtml">Next</a></p>}\
+                 [expr {$ruleno-1}] [expr {$ruleno+1}]
+            ] -rulelink {::format %d.xhtml}
+         } else {
+            XHTML_status_document $sock
+         }
          close $sock
       } elseif {[string length $incoming]<5000} {
          fileevent $sock readable [list\
@@ -5280,6 +5524,103 @@ proc HTTP_accept {incoming sock ip port} {
       Log "Error: $msg"
       catch {close $sock}
    }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{XHTML_status_document}
+%   This procedure produces an XHTML rendering of the data (but not 
+%   the controls) of the control window. Its call syntax is
+%   \begin{displaysyntax}
+%     |XHTML_status_document| \word{socket}
+%   \end{displaysyntax}
+%   where \word{socket} is the channel to which the document should 
+%   be written.
+%   
+%   \begin{tcl}
+proc XHTML_status_document {F} {
+   variable Count
+   variable pair_level
+   variable ambiguity_level
+   variable main_loop_stack
+   variable DBCMD
+   XHTML_prologue $F "<title>Completion utility status</title>"
+   set rows {}
+   set cells {}
+   lappend cells {td {} {}}
+   lappend cells [list th {scope col} [list [list #text Rules]]]
+   lappend cells [list th {scope col} [list [list #text Equalities]]]
+   lappend cells [list th {scope col} [list [list #text Pairs]]]
+   lappend cells [list th {scope col} [list [list #text Ambiguities]]]
+   lappend rows [list tr {} $cells]
+   set cells {} 
+   lappend cells [list th {scope row} [list [list #text Active]]]
+   lappend cells [list td {} [list [list #text $Count(R)]]]
+   lappend cells [list td {} [list [list #text $Count(E)]]]
+   lappend cells [list td {} [list [list #text $Count(P)]]]
+   lappend cells [list td {} [list [list #text $Count(A)]]]
+   lappend rows [list tr {} $cells]
+   set cells {} 
+   lappend cells [list th {scope row} [list [list #text Inactive]]]
+   lappend cells [list td {} [list [list #text $Count(r)]]]
+   lappend cells [list td {} [list [list #text $Count(e)]]]
+   lappend cells [list td {} [list [list #text $Count(p)]]]
+   lappend cells [list td {} [list [list #text $Count(a)]]]
+   lappend rows [list tr {} $cells]
+   set cells {} 
+   lappend cells [list td {} {}]
+   lappend cells [list td {} {}]
+   lappend cells [list th {scope row} [list [list #text Level]]]
+   lappend cells [list td {} [list [list #text $pair_level]]]
+   lappend cells [list td {} [list [list #text $ambiguity_level]]]
+   lappend rows [list tr {} $cells]
+   puts $F [mtmtcl::support::xml_from_tree [
+      list table {class siffertabell} $rows
+   ] -nodesep ""]
+   if {$Count(R)>0} then {
+      set L [$DBCMD(database) allrows -as lists {
+         SELECT min(num6er),max(num6er) FROM ru1es WHERE st4te='R'
+      }]
+      puts $F [mtmtcl::support::xml_from_tree [
+         list p {} [list [
+            list a [dict create href [lindex $L 0 0].xhtml] [list [
+               list #text "First rule"
+            ]]
+         ] {#text " / "} [
+            list a [dict create href [lindex $L 0 1].xhtml] [list [
+               list #text "Last rule"
+            ]]
+         ]]
+      ]]
+   }
+   if {$Count(E)>0} then {
+      set L [$DBCMD(database) allrows -as lists {
+         SELECT min(num6er),max(num6er) FROM ru1es WHERE st4te='E'
+      }]
+      puts $F [mtmtcl::support::xml_from_tree [
+         list p {} [list [
+            list a [dict create href [lindex $L 0 0].xhtml] [list [
+               list #text "First equality"
+            ]]
+         ] {#text " / "} [
+            list a [dict create href [lindex $L 0 1].xhtml] [list [
+               list #text "Last equality"
+            ]]
+         ]]
+      ]]
+   }
+   puts $F {<h3>Main loop stack</h3>}
+   foreach cmd [lreverse $main_loop_stack] {
+      puts $F [mtmtcl::support::xml_from_tree [
+         list p {} [list [
+            list kbd {} [list [
+               list #text $cmd
+            ]]
+         ]]
+      ] -nodesep "" -charmap {\0 &#x2400; \33 &#x241B; \17 &#x241F;}]
+   }
+   puts $F "</body></html>"
 }
 %   \end{tcl}
 % \end{proc}
@@ -5526,15 +5867,36 @@ proc solve_SAR_for {SAR lhs args} {
 %     |rule_as_LaTeX| \word{ruleno} \begin{regblock}[\regstar] 
 %     \word{option} \word{value} \end{regblock}
 %   \end{displaysyntax}
-%   where the supported options are
+%   where the directly supported options are
 %   \begin{ttdescription}
+%     \item[-style]
+%       The basic kind of \LaTeX\ code unit generated for each rule; 
+%       supported values are |equation| (default) and |theorem|. In 
+%       the |equation| style, the material generated for a rule is 
+%       its derivation formula. In the |theorem| style, the material 
+%       generated is a pair of theorem-like environment stating the 
+%       rule as such, and a |proof| environment giving the derivation.
 %     \item[-labelprefix]
 %       A string which is used as prefix for |\label|s of rule 
-%       equations.
+%       equations. If this is not specified, then no referencing is 
+%       made.
+%     \item[-environment]
+%       The name of the main \LaTeX\ environment for the rule. 
+%       Defaults to |equation| in |equation| style, but to |lemma| in 
+%       |theorem| style.
 %   \end{ttdescription}
+%   Other options are passed on to lower level commands, particularly 
+%   |network::rich::as_PGF|.
 %   
 %   \begin{tcl}
 proc rule_as_LaTeX {ruleno args} {
+   array set O {-style equation}
+   array set O $args
+   if {$O(-style) eq "theorem"} then {
+      set O(-environment) lemma
+   } else {
+      set O(-environment) equation
+   }
 %   \end{tcl}
 %   \begin{tcl}
    variable DBCMD
@@ -5543,21 +5905,40 @@ proc rule_as_LaTeX {ruleno args} {
       error "No rule $ruleno found in database"
    }
    set rrow [lindex $rows 0]
-   set res {\begin{equation}}
+   set res "\\begin{$O(-environment)}"
    if {[dict exists $args -labelprefix]} then {
       append res " \\label{[dict get $args -labelprefix]$ruleno}"
    }
-   append res "\n  " [string map {\n "\n  "} [
+   set nl "\n  "
+   if {$O(-style) eq "theorem"} then {
+      append res "\n  \\begin{displaymath}"
+      append nl "  "
+   }
+   append res $nl [string map [list \n $nl] [
      network_as_LaTeX [dict get $rrow lhs] {*}$args
-   ]] \n
+   ]]
    set arow [lindex [$DBCMD(GetAmbiguity) allrows\
      [dict create num6er [dict get $rrow pr00f]]] 0]
-   if {![dict exists $arow p1us]} then {
-      append res {  \equiv} \n
-      append res {  } [
+   if {$O(-style) eq "theorem" || ![dict exists $arow p1us]} then {
+      if {[dict get $rrow st4te] in {R r}} then {
+         append res $nl {\rightarrow}
+      } else {
+         append res $nl {\equiv}
+      }
+      append res $nl [
         lincomb_as_LaTeX [dict get $rrow rhs] {*}$args
-      ] \n
-   } else {
+      ]
+   }
+   if {$O(-style) eq "theorem"} then {
+      append res \n {  \end{displaymath}} \n "\\end{$O(-environment)}"
+   }
+   if {[dict exists $arow p1us]} then {
+      if {$O(-style) eq "theorem"} then {
+         append res \n {\begin{proof}} \n {  \begin{math}}
+         append res $nl [string map [list \n $nl] [
+           network_as_LaTeX [dict get $rrow lhs] {*}$args
+         ]]
+      }
 %<*zlib>
       dict set arow m0n0mials [encoding convertfrom utf-8\
         [zlib inflate [dict get $arow deflated_m0n0mials]]]
@@ -5569,19 +5950,25 @@ proc rule_as_LaTeX {ruleno args} {
       set SAR [solve_SAR_for $SAR0 $mu0]
       foreach lincomb [lindex $SAR 0] rule [lindex $SAR 1] {
          if {[dict exists $args -labelprefix]} then {
-            append res "  \\stackrel{\\eqref{[
+            append res $nl "\\stackrel{\\eqref{[
                dict get $args -labelprefix
-            ]$rule}}{\\equiv}\n"
+            ]$rule}}{\\equiv}"
          } else {
-            append res {  \equiv} \n
+            append res $nl {\equiv}
          }
-         append res {  } [
+         append res $nl [
            lincomb_as_LaTeX $lincomb -networks [lindex $SAR 5]\
              {*}$args
-         ] \n
+         ]
+      }
+      if {$O(-style) eq "theorem"} then {
+         append res \n {  \end{math}} \n {\end{proof}}
       }
    }
-   append res {\end{equation}}
+   if {$O(-style) ne "theorem"} then {
+      append res "\n\\end{$O(-environment)}"
+   }
+   return $res
 }
 %   \end{tcl}
 % \end{proc}
@@ -5635,7 +6022,7 @@ proc network_as_LaTeX {NW args} {
 %   
 %   Currently, the OM object returned is just an |OMFOREIGN| 
 %   (containing the \word{network} verbatim, without even specifying 
-%   an |encoding|) equipped with an \OMSref{altenc}{LaTeX_encoding} 
+%   an |encoding|) equipped with an |altenc/LaTeX_encoding| 
 %   attribution. 
 %   
 %   \begin{tcl}
@@ -5752,6 +6139,167 @@ proc database_as_LaTeX {fname args} {
 % 
 % \section{Examples}
 % 
+% These examples call |tk_getSaveFile| to get the name of the 
+% database file to operate on. This is impractical in the 
+% \Module{noTk} setting, where a suitable substitute instead is to 
+% use the last command-line argument.
+% \begin{tcl}
+%<noTk>proc tk_getSaveFile {args} {lindex $::argv end}
+% \end{tcl}
+% 
+% 
+% \subsection{Frobenius algebra}
+% 
+% Given the axiom system that we have an algebra with a 
+% non-degenerate form~\cite[p.~10]{Lauda}, what will be derived?
+% 
+% \begin{tcl}
+%<*Frobenius>
+set vertex_appearances {
+   m {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   unit {
+      {oval {square 8} {}} 
+      {{0 8}}
+      {}
+   }
+   Delta {
+      {oval {square 8} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{0 -8}}
+   }
+   epsilon {
+      {oval {square 8} {}}
+      {}
+      {{0 -8}}
+   }
+   cap {
+      {oval {square 8} {}}
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {}
+   }
+}
+sqlite3_init [tk_getSaveFile -initialdir ~/tmp -initialfile Frobenius] {
+  Delta {1 2}  epsilon {1 0}  cap {0 2}  m {2 1}  unit {0 1}
+}
+% \end{tcl}
+% 
+% 
+% \subsubsection{Ordering}
+% 
+% \begin{proc}{Frobenius_cmpkey}
+%   This procedure computes comparison keys that should be suitable 
+%   for a Frobenious algebra, so it has the syntax
+%   \begin{displaysyntax}
+%     |Frobenius_cmpkey| \word{network}
+%   \end{displaysyntax}
+%   and returns the comparison key.
+%   \begin{tcl}
+proc Frobenius_cmpkey {NW} {
+%   \end{tcl}
+%   The first blocks is a basic count of vertices.
+%   \begin{tcl}
+   set res [list [llength [lindex $NW 0]]]
+%   \end{tcl}
+%   The next block consists of path counts, so essentially it is what 
+%   one gets from evaluating the network in the biaffine \PROP. A 
+%   slight twist is however that the signs are reversed, to make the 
+%   symmetric term (with every input connected to every output) in the 
+%   Frobenius identities the smallest of the three.
+%   \begin{tcl}
+   set pathMat [network::pure::list_paths_turning $NW]
+   foreach row $pathMat {
+      foreach cell $row {
+         lappend res [expr {-[llength $cell]}]
+      }
+   }
+%   \end{tcl}
+%   The final block consists of weighted path counts, and could 
+%   similarly be obtained by evaluating the network in the biaffine 
+%   \PROP\ (with a slightly different assignment of values to 
+%   vertices). Here, the weight of a path is doubled every time it 
+%   goes through the right branch of a product, coproduct, or cap. 
+%   This has the effect of orienting the associativity and 
+%   coassociativity identities.
+%   \begin{tcl}
+   foreach row $pathMat {
+      foreach cell $row {
+         set sum 0
+         foreach path $cell {
+            set w 1
+            foreach {tail annot head} $path {
+               if {$head > 0} then {set w [expr {2*$w}]}
+               if {$tail > 0} then {set w [expr {2*$w}]}
+            }
+            set sum [expr {$sum + $w}]
+         }
+         lappend res $sum
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{set_cmpcmds}
+%   The comparison key command is |Frobenius_cmpkey| straight off.
+%   \begin{tcl}
+proc set_cmpcmds {} {
+   variable RS
+   set RS(cmpkeycmd) [list [namespace which Frobenius_cmpkey]]
+%   \end{tcl}
+%   The blocks list begins with two single-element blocks, but the 
+%   lengths of the two final blocks depend on the network arity and 
+%   coarity. An auxiliary lists of zeroes is constructed to simplify 
+%   this.
+%   \begin{tcl}
+   set L {}
+   foreach e [lindex $RS(si7e) 0 1 1] {lappend L 0}
+   set RS(cmpblocks) {1}
+   foreach e [lindex $RS(si7e) 0 0 2] {
+      lappend RS(cmpblocks) {*}$L 0
+   }
+   lappend RS(cmpblocks) {*}$L 1
+   lappend RS(cmpblocks) {*}[lrange $RS(cmpblocks) 1 end]
+%   \end{tcl}
+%   Finally, the comparison command is always |::tcl::mathop::-|, so 
+%   |cmpcmds| is a list where all elements are this command.
+%   \begin{tcl}
+   set RS(cmpcmds) [lrepeat [llength $RS(cmpblocks)]\
+     [list ::tcl::mathop::-]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \subsubsection{Congruences}
+% 
+% No need to add the basic congruencies again if we're restarting a 
+% completion.
+% \begin{tcl}
+database_counts
+if {$Count(Aa)>0} then {return}
+%<lazy>set am6iguity_top 30
+% \end{tcl}
+% 
+% \begin{tcl}
+enter_congruence -short "Left unit" {} 1 {unit . \n m} -1 {.}
+enter_congruence -short "Right unit" {} 1 {. unit \n m} -1 {.}
+enter_congruence -short "Associative" {} 1 {m . \n m} -1 {. m \n m}
+enter_congruence -short "Left bend" {} 1 {. cap \n m . \n epsilon .} -1 {.}
+enter_congruence -short "Right bend" {} 1 {cap . \n . m \n . epsilon} -1 {.}
+%<*coproduct>
+enter_congruence -short "Coproduct" {} 1 {Delta} -1 {cap . \n . m}
+%</coproduct>
+%</Frobenius>
+% \end{tcl}
+% 
+% 
+% 
+% 
+% 
 % \subsection{Hopf algebra}
 % 
 % As ever, the motivating example.
@@ -5790,6 +6338,12 @@ set vertex_appearances {
       {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
       {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
    }
+   untwist {
+      {oval {square 8} {}  line {offsets {0 -8} {0 8}} {} \
+        line {offsets {-8 0} {8 0}} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
    Re {
       {rectangle {square 8} {}
        text {offsets {0 0}} {-font {-size -10} -text R}} 
@@ -5802,10 +6356,28 @@ set vertex_appearances {
       {{0 8}}
       {}
    }
+%<*odd>
+   odd {
+      {polygon {offsets {0 8} {-9.238 -8} {9.238 -8}} {}} 
+      {{0 8}}
+      {{0 -8}}
+   }
+%</odd>
+   cup {
+      {oval {square 8} {}}
+      {}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   cap {
+      {oval {square 8} {}}
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {}
+   }
 }
 sqlite3_init [tk_getSaveFile -initialdir ~/tmp -initialfile Hopfrules] {
   Delta {1 2}  epsilon {1 0}  S {1 1}  m {2 1}  unit {0 1}
 %<twist>  twist {2 2}
+%<twist&untwist>  untwist {2 2}
 %<cocomplex>  Re {0 1}  Im {0 1}
 }
 % \end{tcl}
@@ -5832,6 +6404,8 @@ sqlite3_init [tk_getSaveFile -initialdir ~/tmp -initialfile Hopfrules] {
 %   that \PROP. The return value is the flat list of components in 
 %   that element.
 %   \begin{tcl}
+%</Hopf>
+%<*Hopf,Transposition>
 proc flatten_biaffine {prefix element} {
    set res [list [{*}$prefix part closed $element]]
    lappend res {*}[{*}$prefix part end $element]
@@ -5961,6 +6535,8 @@ proc list_select_flatten {indexL prefix arg} {
    }
    return $res
 }
+%</Hopf,Transposition>
+%<*Hopf>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -5994,6 +6570,8 @@ proc set_cmpcmds {} {
    dict set seed1 S\
      [integer_biaffine_PROP fromparts 0 0 0 2]
    dict set seed1 twist\
+     [integer_biaffine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
+   dict set seed1 untwist\
      [integer_biaffine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
    dict set seed1 Re [dict get $seed1 unit]
    dict set seed1 Im [dict get $seed1 unit]
@@ -6037,6 +6615,8 @@ proc set_cmpcmds {} {
 %   than one crossing on the other side of it.
 %   
 %   ---
+%   
+%   |untwist|s are treated just like |twist|s.
 %   \begin{tcl}
    set rPROPprefix [list realmatrix_biaffine_PROP]
    lappend map $rPROPprefix
@@ -6060,6 +6640,7 @@ proc set_cmpcmds {} {
    dict set seed3 twist [realmatrix_biaffine_PROP fromparts\
      $zero [list $zero $zero] [list $zero $zero]\
      [list [list $E $one] [list $one $zero]]]
+   dict set seed3 untwist [dict get $seed3 twist]
    lappend map $seed3 [list list_select_flatten {{0 0} {1 1} {0 1}}\
      [list flatten_biaffine $rPROPprefix]]
    incr blocks 3
@@ -6067,6 +6648,7 @@ proc set_cmpcmds {} {
    dict set seed3 twist [realmatrix_biaffine_PROP fromparts\
      $zero [list $zero $zero] [list $zero $zero]\
      [list [list $zero $one] [list $one $E]]]
+   dict set seed3 untwist [dict get $seed3 twist]
    lappend map $seed3 [list list_select_flatten {{0 1}}\
      [list flatten_biaffine $rPROPprefix]]
    incr blocks
@@ -6090,6 +6672,7 @@ proc set_cmpcmds {} {
      [integer_biaffine_PROP fromparts 0 0 0 1]
    dict set seed4 twist\
      [integer_biaffine_PROP fromparts 0 {0 0} {1 0} {{0 2} {1 0}}]
+   dict set seed4 untwist [dict get $seed4 twist]
    lappend map $iPROPprefix $seed4 [list flatten_biaffine $iPROPprefix]
    incr blocks
 %</twist>
@@ -6147,7 +6730,7 @@ proc set_cmpcmds {} {
 % completion.
 % \begin{tcl}
 database_counts
-if {$Count(Aa)>0} then {return}
+if {$Count(Aa)<=0} then {
 %<lazy>set am6iguity_top 30
 % \end{tcl}
 % 
@@ -6176,6 +6759,17 @@ enter_congruence -short "Left formal inverse" {}\
   1 {Delta \n S . \n m} -1 {epsilon \n unit}
 enter_congruence -short "Right formal inverse" {}\
   1 {Delta \n . S \n m} -1 {epsilon \n unit}
+% \end{tcl}
+% 
+% The only identity given for the |untwist| is that it undoes 
+% whatever |twist| does, on both sides.
+% \begin{tcl}
+%<*twist&untwist>
+enter_congruence -short "Untwist below" {}\
+  1 {twist \n untwist} -1 {. .}
+enter_congruence -short "Untwist above" {}\
+  1 {untwist \n twist} -1 {. .}
+%</twist&untwist>
 % \end{tcl}
 % 
 % The following are consequences of the above axioms, but adding them 
@@ -6221,8 +6815,10 @@ enter_congruence -short "Counit(Im)" {}\
 % \end{tcl}
 % 
 % 
-% 
+% This is the end of the |if| preventing reading the initial 
+% congruences.
 % \begin{tcl}
+}
 %</Hopf>
 % \end{tcl}
 % 
@@ -6233,7 +6829,7 @@ enter_congruence -short "Counit(Im)" {}\
 % An active research problem.
 % 
 % \begin{tcl}
-%<*HomAss>
+%<*HomAss,WeakAss,HomLeib>
 set vertex_appearances {
    m {
       {oval {square 8} {}} 
@@ -6264,6 +6860,15 @@ set vertex_appearances {
       {}
    }
 }
+%</HomAss,WeakAss,HomLeib>
+%<*WeakAss>
+sqlite3_init [
+   tk_getSaveFile -initialdir ~/tmp -initialfile WeakAss.db
+] {
+  m {2 1}  
+}
+%</WeakAss>
+%<*HomAss,HomLeib>
 sqlite3_init [
    tk_getSaveFile -initialdir ~/Documents/Artiklar/DL-git/Lund-2009\
      -initialfile HomAss.db
@@ -6338,6 +6943,17 @@ proc NW_to_Polish {NW} {
 %   where the \word{map} maps vertex annotations to individual 
 %   characters, for comparison using |string compare|, and 
 %   \word{input} is the character used for inputs.
+%   
+%   The key computed has the structure
+%   \begin{quote}
+%     \meta{heights} \meta{inputs} \word{Polish}
+%   \end{quote}
+%   where the \meta{heights} is one element for each input and gives 
+%   the height of that input, \word{Polish} is the left-Polish 
+%   encoding as directed by the \word{map} and \word{input} of the 
+%   \word{network}, and the \meta{inputs} the actual input numbers, 
+%   in the order that they ``should'' appear in the \word{Polish}.
+%   each input 
 %   \begin{tcl}
 proc heightlex_cmpkey {map input NW} {
    lassign [NW_to_Polish $NW] res PL
@@ -6380,6 +6996,114 @@ proc set_cmpcmds {} {
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% Since a major limitation of the above is that there can be 
+% absolutely no permutation of inputs, an alternative approach that 
+% at least sometimes allows permutations would be useful. The idea 
+% for the following is to do a breadth first scan of the network, 
+% starting from the output side (i.e.~root, in the case of a tree), 
+% and comparing the resulting sequences of annotations 
+% lexicographically. Inputs also appear as items in these sequences, 
+% but an input must be considered as uncomparable to everything but 
+% itself, since anything can be substituted for an input; this is 
+% sufficient for making the order a \PROP\ partial order.
+% 
+% The tricky things for these orders is how one implements the 
+% comparison. Since the number of items in the sequences is 
+% \emph{not} known from the network arity (and coarity), one cannot 
+% make each item a separate element of the comparison key\Dash 
+% instead one must have key items which are lists compared 
+% lexicographically.
+% 
+% \begin{proc}{lexcompare_lists}
+%   The |lexcompare_lists| procedure takes two lists (which may be of 
+%   unequal length) and compares them lexicographically, returning 
+%   one of |-1|, |0|, and |1|. The call syntax is
+%   \begin{displaysyntax}
+%     |lexcompare_lists| \word{left} \word{right}
+%   \end{displaysyntax}
+%   List items are compared using |expr|'s |!=| and |<|.
+%   \begin{tcl}
+proc lexcompare_lists {left right} {
+   foreach l $left r $right {
+      if {$l != $r} then {
+         return [expr {$l < $r ? -1 : 1}]
+      }
+   }
+   return 0
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Doing the comparison that way introduces another complication, 
+% however: an elementary comparison must be total, whereas the target 
+% \PROP\ order must be partial! The way out of this is to make a 
+% comparison group of two key items, and make sure that incomparable 
+% sequence items have opposite key orders.
+% 
+% \begin{proc}{BFS_scan_keypair}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |BFS_scan_keypair| \word{mapdict} \word{network}
+%   \end{displaysyntax}
+%   and returns a pair that is meant to be contributed to a 
+%   comparison key (as two key items). The elements of this pair are 
+%   lists themselves, which are constructed by scanning the 
+%   \word{network} in breadth first order. Inputs of the network are 
+%   represented by their index in the first pair element and by the 
+%   negative of their index in the second pair element. What a vertex 
+%   is represented by is determined by the \word{mapdict}, which maps 
+%   vertex annotations to pairs where the first element is used in 
+%   the left result component and the second element is used in the 
+%   right result element; normally, the first should be a negative 
+%   number and the second a positive number.
+%   
+%   \begin{tcl}
+proc BFS_scan_keypair {mapD NW} {
+   set scan0 {}
+   set scan1 {}
+   set queue [lindex $NW 0 0 2]
+   for {set qp 0} {$qp < [llength $queue]} {incr qp} {
+      set edge [lindex $NW 1 [lindex $queue $qp]]
+      set v [lindex $edge 2]
+      if {$v < 2} then {
+         lappend scan0 [lindex $edge 3]
+         lappend scan1 [expr {-[lindex $edge 3]}]
+      } else {
+         foreach var {scan0 scan1} \
+                 val [dict get $mapD [lindex $NW 0 $v 0]] {
+            lappend $var $val
+         }
+         lappend queue {*}[lindex $NW 0 $v 2]
+      }
+   }
+   return [list $scan0 $scan1]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{set_cmpcmds}
+%   This procedure sets everything up for a BFS-lexicographic 
+%   comparison, where \(\mathsf{m} < \mathsf{a}\). Note that it is 
+%   fixed.
+%   \begin{tcl}
+%<*HomLeib>
+proc set_cmpcmds {} {
+   variable RS
+   set RS(cmpkeycmd) [list [namespace which BFS_scan_keypair] {
+      m {-2 1}  a {-1 2}
+   }]
+   set RS(cmpcmds) [lrepeat 2 [namespace which lexcompare_lists]]
+   set RS(cmpblocks) {0 1}
+   set RS(cmpclass) {+ -}
+}
+%</HomLeib>
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
 % \subsubsection{Congruences}
 % 
 % No need to add the basic congruencies again if we're restarting a 
@@ -6391,8 +7115,15 @@ if {$Count(Aa)>0} then {return}
 % \end{tcl}
 % 
 % \begin{tcl}
+%<*HomAss>
 enter_congruence -short "Hom-associative" {} 1 {m a \n m} -1 {a m \n m}
+%</HomAss>
+%<*HomLeib>
+enter_congruence -short "Hom-Leibniz" {}\
+  1 {a m \n m} -1 {m a \n m} 1 {. X \n m a \n m}
+%</HomLeib>
 %<aishom>enter_congruence -short "Hom-associative" {} 1 {m \n a} -1 {a a \n m}
+%</HomAss,HomLeib>
 % \end{tcl}
 % 
 % \subsubsection{Tricks with trees}
@@ -6436,6 +7167,7 @@ enter_congruence -short "Hom-associative" {} 1 {m a \n m} -1 {a m \n m}
 %   Therefore the productions for state |0| are collected in the list 
 %   |P0|, and only at the end inserted into the main result.
 %   \begin{tcl}
+%<*HomAss,WeakAss>
 proc top_down_contains {signature args} {
    set P0 {}
    set P1 {}
@@ -6806,15 +7538,327 @@ proc cull_vector {vector maxdeg} {
    }
    return $res
 }
+%</HomAss,WeakAss>
 % \end{tcl}
+% 
+% 
+% \subsubsection{Weak associative algebras}
+% 
+% On 2011-04-12, Pallo Jean asked a question on the rewriting mailing 
+% list about the weak associative law. This is quite similar to the 
+% above, so one might go ahead in the same way.
+% 
+% \begin{proc}{Leftass_cmpkey}
+%   This procedure is a cut-down |Frobenius_cmpkey|, with only the 
+%   final block left. It has the syntax
+%   \begin{displaysyntax}
+%     |Leftass_cmpkey| \word{network}
+%   \end{displaysyntax}
+%   and returns the comparison key.
+%   \begin{tcl}
+%<*WeakAss>
+proc Leftass_cmpkey {NW} {
+   set res {}
+   set pathMat [network::pure::list_paths_turning $NW]
+   foreach row $pathMat {
+      foreach cell $row {
+         set sum 0
+         foreach path $cell {
+            set w 1
+            foreach {tail annot head} $path {
+               if {$head > 0} then {set w [expr {2*$w}]}
+               if {$tail > 0} then {set w [expr {2*$w}]}
+            }
+            set sum [expr {$sum + $w}]
+         }
+         lappend res $sum
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{set_cmpcmds}
+%   The comparison key command is |Leftass_cmpkey| straight off.
+%   \begin{tcl}
+proc set_cmpcmds {} {
+   variable RS
+   set RS(cmpkeycmd) [list [namespace which Leftass_cmpkey]]
+   set L {}
+   foreach e [lindex $RS(si7e) 0 1 1] {lappend L 0}
+   set RS(cmpblocks) {}
+   foreach e [lindex $RS(si7e) 0 0 2] {
+      lappend RS(cmpblocks) {*}$L 0
+   }
+   lappend RS(cmpblocks) {*}$L 1
+   set RS(cmpcmds) [lrepeat [llength $RS(cmpblocks)]\
+     [list ::tcl::mathop::-]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% No need to add the basic congruencies again if we're restarting a 
+% completion.
+% \begin{tcl}
+database_counts
+if {$Count(Aa)>0} then {return}
+%<lazy>set am6iguity_top 30
+% \end{tcl}
+% 
+% \begin{tcl}
+enter_congruence -short "Weak associative" {}\
+  1 {. m . \n . m \n m} -1 {m . . \n m . \n m}
+%</WeakAss>
+% \end{tcl}
+% 
+% 
+% 
+% 
+% \subsection{Transposition}
+% 
+% An example considered by Samuel Mimram, Yves Lafont, and others.
+% 
+% \begin{tcl}
+%<*Transposition>
+set vertex_appearances {
+   twist {
+      {oval {square 8} {}  line {square 5.657} {} \
+        line {offsets {5.657 -5.657} {-5.657 5.657}} {}} 
+      {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
+      {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+}
+sqlite3_init [
+   tk_getSaveFile -initialdir ~/tmp\
+     -initialfile transposition.db
+] {twist {2 2}}
+% \end{tcl}
+% 
+% \subsubsection{Ordering}
+% 
+% The ordering is basically the same as developed for Hopf algebra 
+% with twist, but with the unnecessary parts removed.
+% 
+% \begin{proc}{set_cmpcmds}
+%   The comparison keys command set up by this procedure consists of 
+%   |biaffine_PROP_key| with a hardwired \word{maps} argument. By far 
+%   the largest part of the following is spent constructing this 
+%   \word{maps} argument (but it could in principle be cached since 
+%   that does not depend on the arity or coarity of the network).
+%   
+%   \begin{tcl}
+proc set_cmpcmds {} {
+   variable RS
+   set map {}
+%   \end{tcl}
+%   The first comparison level simply counts the total number of 
+%   |twist|s, otherwise treating them as a permutation.
+%   \begin{tcl}
+   set iPROPprefix [list integer_biaffine_PROP]
+   dict set seed1 twist\
+     [integer_biaffine_PROP fromparts 1 {0 0} {0 0} {{0 1} {1 0}}]
+   lappend map $iPROPprefix $seed1 [list flatten_biaffine $iPROPprefix]
+   set blocks 1
+%   \end{tcl}
+%   The second comparison level was the fourth comparison level is 
+%   about ordering the sides of the braiding equation\slash``Yang--Baxter 
+%   equation'': |. twist \n twist . \n . twist| is less than 
+%   |twist . \n . twist \n twist .|. The difference comes out for the 
+%   middle strand in this braid, as it goes first right and then left 
+%   in the former case, but first left and then right in the latter.
+%   \begin{tcl}
+   dict set seed4 twist\
+     [integer_biaffine_PROP fromparts 0 {0 0} {1 0} {{0 2} {1 0}}]
+   lappend map $iPROPprefix $seed4 [list flatten_biaffine $iPROPprefix]
+   incr blocks
+   set RS(cmpkeycmd) [list [namespace which biaffine_PROP_key] $map]
+   set inputs [llength [lindex $RS(si7e) 0 1 1]]
+   set outputs [llength [lindex $RS(si7e) 0 0 2]]
+   set size [expr { (1+$outputs) * (1+$inputs) }]
+   set L [list d]
+   lappend L {*}[lrepeat $inputs c] {*}[lrepeat $outputs b]
+   lappend L {*}[lrepeat [expr {$inputs*$outputs}] A]
+   set RS(cmpclass) [lrepeat $blocks {*}$L]
+   set RS(cmpcmds)\
+     [lrepeat [expr {$blocks*$size}] [list ::tcl::mathop::-]]
+   set RS(cmpblocks)\
+     [lrepeat $blocks {*}[lrepeat [expr {$size-1}] 0] 1]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{Congruences}
+% 
+% No need to add the basic congruencies again if we're restarting a 
+% completion.
+% \begin{tcl}
+database_counts
+if {$Count(Aa)>0} then {return}
+%<lazy>set am6iguity_top 30
+% \end{tcl}
+% 
+% \begin{tcl}
+enter_congruence -short "Own inverse" {} 1 {twist \n twist} -1 {. .}
+enter_congruence -short "Yang--Baxter" {}\
+  1 {. twist \n twist . \n . twist} -1 {twist . \n . twist \n twist .}
+% \end{tcl}
+% 
 % 
 % 
 % \begin{tcl}
-%</HomAss>
+%</Transposition>
 % \end{tcl}
 % 
 % 
+% \subsection{A braid representation}
 % 
+% The following (ab)uses the network completion machinery to make a 
+% mere associative word completion. However, the problem originated 
+% with one of ordering the above \Module{Transposition} relations, as 
+% explained in more detail below.
+% 
+% 
+% \subsubsection{Generators and order}
+% 
+% There are four generators $A$, $B$, $C$, and $D$, which correspond 
+% to the four quadrants of the block matrix $\left[ 
+% \begin{smallmatrix} A&B \\ C&D \end{smallmatrix} \right]$.
+% 
+% \begin{tcl}
+%<*BraidMatrix>
+set vertex_appearances {}
+set signature {}
+foreach x {A B C D} {
+   dict set vertex_appearances $x [list [
+      list rectangle {square 8} {} \
+        text {offsets {0 0}} [dict create -font {-size -10} -text $x]
+   ] {{0 8}} {{0 -8}}]
+   dict set signature $x {1 1}
+}
+sqlite3_init [
+   tk_getSaveFile -initialdir ~/tmp -initialfile braidmatrix.db
+] $signature
+% \end{tcl}
+% 
+% 
+% \begin{proc}{set_cmpcmds}
+%   The order will be a basic length-lexicographic order. 
+%   \begin{tcl}
+proc cmpkeycmd {NW} {
+   lrange [
+      network::pure::compkey_paths-wdeg-lex deglex {A A B B C C D D}\
+        $NW
+   ] 1 end
+}
+proc set_cmpcmds {} {
+   variable RS
+   if {[llength [lindex $RS(si7e) 0 1 1]] != 1 ||
+       [llength [lindex $RS(si7e) 0 0 2]] != 1} then {
+      error "Networks must (and should) be of type (1,1) in this setup"
+   }
+   set RS(cmpkeycmd) [namespace which cmpkeycmd]
+   set RS(cmpblocks) {1 1}
+   set RS(cmpcmds) [list ::tcl::mathop::- {string compare}] 
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tcl}
+database_counts
+if {$Count(Aa)>0} then {return}
+%<lazy>set am6iguity_top 30
+% \end{tcl}
+% 
+% 
+% \subsubsection{Congruences}
+% 
+% The congruences can be entered as a set of explicit equations, but 
+% it is nicer to actually compute those equations from the components 
+% of the Yang--Baxter equation when substituting the above block 
+% matrix for the crossing. This requires constructing a free 
+% associative algebra to use for the elements of such matrices.
+% 
+% \begin{tcl}
+interp alias {} Z<A,B,C,D> {} \
+  ::mtmtcl::rings::semigroup_algebra ::mtmtcl::rings::integers::all\
+    ::mtmtcl::groups::string_free_monoid
+interp alias {} matrix_PROP {} \
+  ::mtmtcl::matprop::trivial dummy ::Z<A,B,C,D>
+% \end{tcl}
+% 
+% Then |twist| will be the \PROP\ element $\left[ 
+% \begin{smallmatrix} A&B \\ C&D \end{smallmatrix} \right]$. 
+% |matrix_PROP| documents its value format rather than providing 
+% generic value constructors. Similarly the |string_free_monoid| has 
+% a documented value format.
+% \begin{tcl}
+set twist [list [
+  list [Z<A,B,C,D> basiselement A] [Z<A,B,C,D> basiselement B]
+] [
+  list [Z<A,B,C,D> basiselement C] [Z<A,B,C,D> basiselement D]
+]]
+% \end{tcl}
+% 
+% The |lhs| and |rhs| are the two sides of the Yang--Baxter equation.
+% \begin{tcl}
+set nwse [matrix_PROP * [
+   matrix_PROP tensor $twist [matrix_PROP permutation 0]
+] [
+   matrix_PROP tensor [matrix_PROP permutation 0] $twist
+]]
+set lhs [matrix_PROP * $nwse [
+   matrix_PROP tensor $twist [matrix_PROP permutation 0]
+]]
+set rhs [matrix_PROP * [
+   matrix_PROP tensor [matrix_PROP permutation 0] $twist
+] $nwse]
+set diff [matrix_PROP - $lhs $rhs]
+% \end{tcl}
+% 
+% Now each element of the matrix |diff| gives rise to a congruence.
+% \begin{tcl}
+set i 0; foreach row $diff {incr i
+   set j 0; foreach cell $row {incr j
+      set call [list enter_congruence -short "Yang--Baxter ($i,$j)" {}]
+      foreach mu [Z<A,B,C,D> support $cell] {
+         lappend call [{*}$coefficient 1 [Z<A,B,C,D> coeff $mu $cell]]\
+           [join [lreverse [split $mu ""]] { \n }]
+      }
+      eval $call
+   }
+}
+% \end{tcl}
+% And that's it!
+% 
+% \begin{tcl}
+%</BraidMatrix>
+% \end{tcl}
+% 
+% 
+% \section*{Closing}
+% 
+% Wish starts an event loop and waits for the user to run the 
+% completion main loop, but this is not an option in the 
+% \Module{noTk} setting.
+% \begin{tcl}
+%<*noTk>
+after 0 completion_main_loop
+vwait forever
+%</noTk>
+% \end{tcl}
+% 
+% \begin{thebibliography}{9}
+% 
+% \bibitem{Lauda}
+%   Aaron D. Lauda:
+%   \textit{Frobenius algebras and planar open string topological 
+%   field theories}, 2005.
+%   arXiv:\texttt{math.QA/0508349v1}
+% 
+% \end{thebibliography}
 % 
 % 
 \endinput

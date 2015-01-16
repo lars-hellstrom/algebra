@@ -94,7 +94,7 @@ following goals:
     \fi
   \item
     It should be open to new concepts and new implementations\Dash 
-    built-in operations should not recieve preferential treatment or 
+    built-in operations should not receive preferential treatment or 
     display behaviour that is otherwise unattainable.
   \item
     It should be able to manage the many levels of abstraction that 
@@ -134,12 +134,12 @@ interface; the ways in which one can reinterpret the basic
 mathematical structures are surprisingly many.
 
 What this means in practice is that in order to multiply two 
-elements $a$ and $b$ of some algebra $\mathcal{A}$ one does not 
-write `$a$ times $b$', but rather `$\mathcal{A}$-multiply $a$ and 
-$b$'; cf.~the notation \(a \cdot_{\mathcal{A}} b\) that is 
+elements $a$ and $b$ of some algebra $\mathcal{C}$ one does not 
+write `$a$ times $b$', but rather `$\mathcal{C}$-multiply $a$ and 
+$b$'; cf.~the notation \(a \cdot_{\mathcal{C}} b\) that is 
 sometimes used when one needs to clarify that this is the 
-multiplication operation of~$\mathcal{A}$. Provided that (references 
-to) structures such as this `$\mathcal{A}$' can be passed around as 
+multiplication operation of~$\mathcal{C}$. Provided that (references 
+to) structures such as this `$\mathcal{C}$' can be passed around as 
 easily as elements of structures\Ldash which is essentially the 
 `provided as parameters' in the policy statment, and explained in 
 more detail below\Rdash this is a cheap and effective way of 
@@ -216,9 +216,9 @@ actual computing needs quite well.
 
 \Tcl\ is both syntactically and semantically an extremely simple 
 language\Ldash yet expressive and highly flexible\Rdash which makes 
-it easy to learn. Unlike the majority of contemporary programming 
-languages, the syntax of \Tcl\ is not descendant from that of 
-traditional mathematical formulae (hence it will probably seem 
+it easy to use in this context. Unlike the majority of contemporary 
+programming languages, the syntax of \Tcl\ is not descendant from that 
+of traditional mathematical formulae (hence it will probably seem 
 unfamiliar the first time it is encountered), but when it comes to 
 programming this is mostly an improvement; the syntax of mathematical 
 formulae is actually very complicated and it is often a matter of 
@@ -280,357 +280,234 @@ algebraic constructions.
 % \end{itemize}
 
 
-\section{Interpreting interface specifications}
+\section{Remarks on the computational environment}
 
-This section explains how to interpret the various specifications of 
-interfaces that make up a significant part of the \mtl\ 
-infrastructure.
-Here is an example of an interface specification (recall that a 
-\emph{magma} is an algebraic structure with a binary multiplication 
-operation, which is not required to be associative or anything like 
-that):
-\begin{quote}
-  \small\leavevmode
-  \begin{APIspec}{division}{1.0}
-    The |division| interface specifies the existence of a binary 
-    division operation |/| that is an inverse of |*|. The quotient 
-    need not be defined for all pairs of elements. It probably makes 
-    more sense if |*| is at least associative, but is perfectly 
-    possible to define even in other situations.
-    \begin{APIdescription}{magma}
-      \begin{APImethod}{=}
-        \word{element} \word{element}
-      \end{APImethod}
-        The |=| method must satisfy \APIref+{equality}{1.0}.
-      \begin{APImethod}{*}
-        \word{element} \word{element}
-      \end{APImethod}
-        The |*| method returns an element.
-      \begin{APImethod}{/}
-        \word{element} \word{element}
-      \end{APImethod}
-        This method may throw an error, but if
-        \begin{displaysyntax}
-          [$M$ / $a$ $b$]
-        \end{displaysyntax}
-        for elements $a$ and $b$ of a \meta{magma} $M$ returns $x$ 
-        then that $x$ must be an element such that the two expressions
-        \begin{displaysyntax}
-          [$M$ * $b$ $x$]\par
-          $a$
-        \end{displaysyntax}
-        are |=|-equal.
-        
-        \begin{remark}
-          In terms of a multiplicative inverse, this defines $a/b$ 
-          to be $b^{-1}a$, i.e., it is a \emph{left} division. This 
-          may seem unintuitive, but it makes it possible to have 
-          \(a/(bc) = (a/b)/c\). Right division would have \(a/(bc) = 
-          (a/c)/b\).
-        \end{remark}
-        
-        If this method throws an error, then it should set the 
-        |-errorcode| to one of the following lists:
-        \begin{displaysyntax}
-          API division nosolution\par
-          API division unimplemented
-        \end{displaysyntax}
-        Use of the |nosolution| form signals that there really isn't 
-        any solution $x$ to \(bx=a\). Use of the |unimplemented| form 
-        merely means that division has not been implemented for these 
-        arguments (e.g.~a ring of polynomials might have division 
-        implemented only for monomial denominators), in which case 
-        the error does not imply nonexistence of a solution.
-    \end{APIdescription}
+This section collects some introductory notes on \mtl\ from a 
+programming perspective. Readers who (for the moment) are more 
+interested in the mathematical perspective may prefer to skip ahead. 
+Readers who are interested in the philosophical considerations 
+underlying \mtl\ should however pay attention.
+
+
+\subsection{A \Tcl\ primer}
+
+At its conceptual core, a \Tcl\ interpreter is a dispatch engine: it 
+processes a sequence of calls, each of which has the form of a list of 
+values, by interpreting the first value of each call as the name of a 
+command and then handing the call over to (the function implementing) 
+that command, getting back a result that may become one of the values 
+in a later call. Commands may be implemented natively in \Tcl\ 
+(procedures, ensembles, aliases, etc.), in C (as is the case with many 
+core commands, for speed or because they need to interface more 
+closely with the OS), or in a variety of other languages such as C++ 
+and Fortran (if you can link it with a reasonably modern C, then you can 
+use it with Tcl). A classical development paradigm is that one 
+tries to implement commands in \Tcl\ first (which typically allows for 
+rapid prototyping, particularly of interfaces) and maybe later 
+reimplements critical parts in a lower level language if the \Tcl\ 
+implementation turned out to not be performant enough. (Another 
+time-tested approach, which is appropriate when the wanted operations 
+are already available in some code library, it to provide a thin 
+wrapper for that library which makes its functionality available as 
+\Tcl\ commands.)
+
+The \Tcl\ \emph{language} syntax describes how a \Tcl\ program piece 
+(or \emph{script}) is translated to a sequence of calls. Technically, a 
+script consists of a sequence of \emph{sentences}, which are 
+separated by newlines (or semicolons), and each sentence consists of 
+a sequence of \emph{words}, which are separated by ordinary 
+whitespace. The basic idea is that each sentence codes one command 
+call, and each word of that sentence contributes one element to the 
+list of values making up that call, but there is (as explained below) 
+some room for bending that rule.
+
+Words in \Tcl\ programs tend to fall in five functional categories:
+\begin{description}
+  \item[Variable references]
+    A word like `|$foo|', where the first character a dollar sign 
+    `\texttt{\$}' and the rest is the name of a variable, is a 
+    reference to that variable. Its contribution to the command call 
+    is the current value of that variable.
     
-    Note that |/| is not required to be congruent. This is 
-    because the \texttt{division} interface does not require the 
-    equation \(bx=a\) to have a unique solution, and 
-    ensuring that the choice of solution is independent of 
-    argument representation could well be unreasonably expensive. 
-  \end{APIspec}
-\end{quote}
-The name and version number in the left margin marks where the formal 
-specification begins. The triangle marks where it ends (compare 
-\qedsymbol\ in proofs).
+  \item[Barewords]
+    A word simply denotes itself if it does not contain any of the 
+    characters `|{|' (left brace), `|}|' (right brace), `|[|' (left 
+    bracket), `|]|' (right bracket), `|$|' (dollar), `|\|' 
+    (backslash), `|"|' (quotation mark), `|#|' (hash sign), 
+    `|;|'~(semicolon), or whitespace; such words typically serve as 
+    identifiers\slash symbols or explicit constants. Note that the 
+    characters allowed in such barewords thus include `|+|', `|-|', 
+    `|*|', `|/|', `|=|', `|<|', `|>|', `|!|', and many more, in 
+    particular all the non-ASCII characters in Unicode! This often 
+    makes it possible to use the ``proper'' mathematical symbol when 
+    denoting something, whereas in more traditional languages the 
+    wanted character would be unsupported or appropriated for 
+    some built-in functionality of the language.
+    
+  \item[Recursive calls]
+    A word like `|[bar baz $foo]|'\Ldash where the first character is a 
+    left bracket `\texttt{[}', the last character is the matching 
+    right bracket `\texttt{]}', and what is between them is a 
+    complete sentence of its own\Rdash is a recursive command call. 
+    This first causes the call coded by the inner sentence to be 
+    performed, and then the value it returns will be used as the 
+    contribution from this word to the call of the outer sentence.
+    
+    Hence, whereas a function call in traditional mathematical 
+    formulae looks like `$f(x,y,z)$'\Ldash the main pattern being 
+    function--left parenthesis--arguments--right parenthesis\Rdash 
+    in \Tcl\ it rather becomes `\texttt{[$f$ $x$ $y$ $z$]}', i.e., 
+    left bracket--function--arguments--right bracket.
+    
+  \item[Strings]
+    A word like `|"My hovercraft is full of eels."|'\Ldash where the 
+    first and last characters are (straight ASCII) quotation marks\Rdash 
+    typically denotes a string; the effect of the initial quote is that 
+    the word does not end until another quote is encountered, so 
+    e.g.~spaces and semicolons temporarily lose their roles as 
+    separators. `|$|', `|[|', and `|\|' are still special however, 
+    triggering variable, command, and backslash substitution 
+    respectively, in which the substitution character sequence is 
+    replaced by some other piece of text in the string being 
+    constructed. The first two behave as explained above (variable 
+    references and recursive calls) whereas backslash substitution is 
+    like character escapes in strings in~C: literal quotes, left 
+    brackets, etc.~in the string can be written as `|\"|', `|\[|', 
+    `|\$|', and `|\\|'.
+    
+  \item[Inlined verbatim material]
+    A word that begins with a left brace `|{|' and ends with the 
+    matching right brace `|}|' can be used to inline material that is 
+    passed on verbatim in the call; the value for this word is the 
+    exact string of characters between (but not including) the 
+    delimiting braces. The target command is then free to apply any 
+    interpretation it sees fit to the word in question. This 
+    mechanism can be used to embed code following syntactic 
+    principles other than those of \Tcl\Ldash such as ordinary infix 
+    form mathematical expressions, regular expressions, or SQL 
+    statements\Rdash into \Tcl\ scripts. It is part of the \Tcl\ 
+    philosophy that one should not force everything into one 
+    syntactic mold, but instead let each thing be expressed in the 
+    manner which suits it best.
+    
+    Brace-delimited words are also used to embed \Tcl\ scripts into 
+    \Tcl\ scripts; most \Tcl\ commands implementing basic control 
+    structures, such as |if|, |for|, |while|, and |proc|, expect one or 
+    several arguments to be \Tcl\ scripts that they recursively call 
+    the \Tcl\ interpreter to have evaluated when the functionality 
+    they implement requires this! That way, the overall language 
+    syntax need not have special cases for control structures built 
+    in, and it is possible for user-defined commands to implement 
+    custom control structures. Visually, the effect can often be that 
+    braces in \Tcl\ appear to be block statement constructors, 
+    similarly to braces in C and \textbf{begin}--\textbf{end} in 
+    Pascal. In
+    \begin{quote}
+      |set sum 0.0|\\
+      |foreach row $matrix {|\\
+      |   foreach cell $row {|\\
+      |      set sum [expr {$sum + $cell}]|\\
+      |   }|\\
+      |}|
+    \end{quote}
+    the two outer levels of braces delimit inner scripts (bodies for 
+    |foreach| loops), whereas the innermost brace level delimits an 
+    artihmetic expression in infix form, this latter interpretation 
+    being imposed by the |expr| command that receives the expression 
+    as argument.
+\end{description}
+(Technically, the parsing of words is a bit more unified than the 
+above may have suggested, but for the exact story we refer to the 
+Tcl.n manpage.)
 
+The slight bending of the rule that one sentence corresponds to one 
+call is that brackets may embed recursive calls, as explained above. 
+The slight bending of the rule that one word contributes one element 
+to the call is due to a mechanism known as \emph{expansion}. If a 
+word begins with the three-character sequence `|{*}|' (brace, 
+asterisk, brace), then the rest of that word first gives rise to a 
+value as explained above, but then that value is interpreted as a 
+list and each element of that list is contributed as a separate 
+element to the call being constructed. A word such as `|{*}$list|' or 
+`|{*}[foo $bar]|' thus contributes zero or more values to call 
+constructed from the surrounding sentence. This has several 
+applications in common \mtl\ idioms.
 
-\subsection{Pseudocode formulae}
+In order to parse a \Tcl\ program, one must in addition to the 
+overall language syntax also be aware of the syntaxes of the 
+particular commands used in the program, which by convention are 
+documented in separate manpages (section \texttt{n} in the Unix man 
+system). Some important commands, and some commands whose existence 
+may be hard to guess, are:
+\begin{longtable}{l p{0.7\linewidth}}
+  \texttt{set}& Assign new value to a variable.\\
+  \texttt{proc}& Define a procedure\Dash a command that is a 
+    subroutine whose body is a \Tcl\ script.\\
+  \texttt{if}& Conditional controlled by boolean expression.\\
+  \texttt{switch}& Multiway-choice conditional.\\
+  \texttt{foreach}& Loop over the elements of a list, 
+    or synchronously over several lists.\\
+  \texttt{expr}& Expressions in C-like infix notation.\\
+  \texttt{incr}& Increment (or decrement) integer variable.\\
+  \texttt{info}& Introspection into the \Tcl\ interpreter.
+\end{longtable}
+Some notable functional areas and commands related to these are:
+\begin{longtable}{l p{0.7\linewidth}}
+  Flow control&
+    \texttt{break}, \texttt{catch}, \texttt{continue}, 
+    \texttt{error}, \texttt{eval}, \texttt{for}, \texttt{foreach}, 
+    \texttt{if}, \texttt{return}, \texttt{switch}, \texttt{tailcall}, 
+    \texttt{throw}, \texttt{try}, \texttt{uplevel}, \texttt{while}
+    \\
+  Variable scoping&
+    \texttt{global}, \texttt{upvar}, \texttt{variable}\\
+  Files and I/O&
+    \texttt{chan}, \texttt{close}, \texttt{eof}, \texttt{exec}, 
+    \texttt{fblocked}, \texttt{fconfigure}, \texttt{fcopy}, 
+    \texttt{file}, \texttt{fileevent}, \texttt{flush}, \texttt{gets}, 
+    \texttt{glob}, \texttt{open}, \texttt{pid}, \texttt{puts}, 
+    \texttt{read}, \texttt{seek}, \texttt{socket}, \texttt{tell}
+    \\
+  Lists&
+    \texttt{concat}, \texttt{join}, \texttt{lappend}, 
+    \texttt{lassign}, \texttt{lindex}, \texttt{list}, 
+    \texttt{llength}, \texttt{lrange}, \texttt{lrepeat}, 
+    \texttt{lreplace}, \texttt{lreverse}, \texttt{lsearch}, 
+    \texttt{lset}, \texttt{lsort}, \texttt{split}
+    \\
+  Dictionaries&
+    \texttt{dict}, \texttt{array}
+    \\
+  Strings&
+    \texttt{append}, \texttt{format}, \texttt{join}, \texttt{regexp}, 
+    \texttt{regsub}, \texttt{scan}, \texttt{split}, \texttt{string}, 
+    \texttt{subst}
+    \\
+  Binary data&
+    \texttt{binary}, \texttt{encoding}, \texttt{string}, 
+    \texttt{zlib}
+\end{longtable}
 
-For many mathematical structures, it is appropriate for 
-specifications to spell out the axioms that the primitive concepts of 
-such structures must obey. However, since the main computing environment 
-by Policy~\ref{Policy:Tcl} is a \Tcl\ interpreter, it follows that the 
-only syntax for these concepts that is guaranteed to be formally defined 
-is that which is exposed in this environment; more traditional 
-mathematical syntaxes usually exist, but it is hard for a 
-specification to rely on them. 
-Therefore the axioms will generally have to be expressed using 
-\emph{pseudocode formulae}, which mix traditional mathematical 
-notation with some basics of \Tcl\ syntax.
+Finally, it should be observed that \Tcl\ has a concept of 
+\emph{namespaces} which affect resolution of command (and nonlocal 
+variable) names. The namespaces form a hierarchic structure similar 
+to a file system, but with the two-character sequence `|::|' as 
+separator rather than forward or backward slash. The position 
+of a command or variable in the namespace hierarchy generally 
+reflects to what package (or subpackage) it belongs. The global (i.e., 
+root) namespace is |::|. Command or variable names that begin with 
+|::| are interpreted relative to the global namespace, names that do 
+not are interpreted relative to the current namespace. All the core 
+commands listed above reside in the global namespace, but by 
+tradition their names are usually written without the leading |::| in 
+scripts since \Tcl\ will try to resolve a name relative to the global 
+namespace if no definition of it could be found relative to the 
+current namespace. Control of and introspection into namespaces is 
+provided by the |namespace| command.
 
-The pseudocode formula syntax is essentially given by the following 
-rules:
-\begin{displaysyntax}
-  \(\meta{formula} \longrightarrow \meta{mathematical formula} \mid 
-  {}\)[\meta{sentence}]\par
-  \(\meta{sentence} \longrightarrow \meta{word} \mid
-  \meta{sentence}\meta{whitespace}\meta{word}\)\par
-  \(\meta{word} \longrightarrow \meta{literal} \mid \meta{formula}\)
-\end{displaysyntax}
-Here, a \meta{sentence} is the syntactical unit corresponding to a 
-\Tcl\ command call, and the brackets signal that we want to make use 
-of the value returned by that call. A typical example of how such a 
-\meta{formula} might look is
-\begin{displaysyntax}
-  [$G$ * [$G$ * $a$ $b$] $c$]
-\end{displaysyntax}
-where `$G$', `$a$', `$b$', and `$c$' are \meta{mathematical formula}s 
-while `\texttt{*}' is a \meta{literal}; literals will be written in 
-\texttt{typewriter} font.
+% The namespaces form a tree-like hierarchy, where 
+% The  is call
 
-A `\texttt{[}\meta{sentence}\texttt{]}' formula is evaluated as 
-follows. First the individual \meta{word}s are evaluated, and a list 
-of their values is constructed. Second, the value of the first word 
-is interpreted as a \emph{command name}, and the corresponding 
-command implementation is looked up. Third, the list of values is 
-passed on to that command, to be interpreted in whatever way it sees 
-fit, and the return value of that call is taken as the value of the 
-formula as a whole. In other words, sentence formulae will formally 
-be in \emph{prefix notation}; the value of a formula `\texttt{[f $x$ 
-[g $y$] $z$]}' is $f(x,g(y),z)$ if $f$ and $g$ are the implementations 
-of the commands named `\texttt{f}' and `\texttt{g}' respectively. 
-The very simple syntax does however leave plenty of room in practice 
-for deviations from this prefix notation, where the programmer deems 
-that they are appropriate.
-
-The trick is that every command is free to interpret its arguments in 
-whatever way it wants; in particular it may expect one or several 
-arguments to be \meta{literal}s that control what will be done to 
-remaining arguments. The most important use of this 
-possibility is the \emph{object command pattern},\footnote{
-  So called because it is in \Tcl\ the traditional form of method 
-  calls in object-oriented (OO) programming systems: each object is 
-  a separate command that has the methods as subcommands. Different 
-  methods of a single object may have wildly different syntaxes, but 
-  methods of the same name for different objects of the same class 
-  will normally have exactly the same syntax.
-} where the actual 
-command name is not explicit in the code (it is rather kept in a 
-variable or function parameter) but the \emph{second} word is a 
-literal name of a \emph{subcommand}; it is known that the primary 
-command will perform a new round of dispatch based on its subcommand 
-argument. Thus, in the example above, `$G$' is to be thought of as 
-such an ``object command'' for a mathematical structure, while 
-`\texttt{*}' is a subcommand name. Indeed, if $G$ is a group and 
-\texttt{*} the group operation then the example above is the left 
-hand side of the associativity axiom \((ab)c = a(bc)\), or \((a 
-*_G\nobreak b) *_G c = a *_G (b *_G\nobreak c)\) if the operation 
-symbol and dependence on the structure cannot be elided. In 
-comparison to the latter, the pseudocode formula counterpart
-\begin{displaysyntax}
-  [$G$ * [$G$ * $a$ $b$] $c$] ${}={}$ [$G$ * $a$ [$G$ * $b$ $c$]]
-\end{displaysyntax}
-isn't too onerous---especially for formulae involving things that are 
-not merely the associate binary operations for which traditional 
-mathematical notation has been optimised.
-
-One reservation one can have regarding the formula above is however 
-that the equality relation `$=$' itself is one of the things that 
-depend on the structure\Ldash indeed, a perfectly sensible 
-implementation of many quotient structures is to have everything the 
-same as in the numerator structure, except that the equality relation 
-considers more things to be equal\Rdash and therefore the claim 
-should rather be that
-\begin{displaysyntax}
-  [$G$ = [$G$ * [$G$ * $a$ $b$] $c$] [$G$ * $a$ [$G$ * $b$ $c$]]]
-\end{displaysyntax}
-has the value true for all $G$-elements $a$, $b$, and $c$. This is 
-also what needs to be done when specifying more unusual structures, 
-but for ordinary structures with equality the following intermediate 
-formulation (of \(aa^{-1} = a^{-1}a = 1\)) is convenient:
-\begin{quote}
-  For all \(a \in G\), the three expressions
-  \begin{displaysyntax}
-    [$G$ * $a$ [$G$ inv $a$]]\par
-    [$G$ * [$G$ inv $a$] $a$]\par
-    [$G$ 1]
-  \end{displaysyntax}
-  are |=|-equal.
-\end{quote}
-The formal interpretation of this would be: \texttt{[$G$ = $x$ $y$]} 
-must return true when given as $x$ and $y$ any two of those three 
-expressions.
-
-
-\subsection{Command syntax specifications}
-
-Besides the axioms characterising a mathematical structure, it is 
-also necessary for an interface specification to detail the syntax 
-of each subcommand. In principle this can of course be done using BNF 
-rules for \meta{syntax elements} as above, but two extensions of this 
-formalism turn out to be very useful, to the point that almost all 
-syntaxes one needs to specify can be handled without any 
-$\longrightarrow$ rules at all.
-
-The first extension stems from the fact that all a \Tcl\ command gets 
-to see is a list of words (or rather the values these words evaluate 
-to)\Dash hence it is preferable to point out when an element makes up 
-exactly one word. This is done by changing the angle brackets around 
-an \meta{element} to braces, like so: \word{element}. This makes it 
-totally clear that the |foo| command with syntax
-\begin{displaysyntax}
-  foo \word{bar} \word{baz}
-\end{displaysyntax}
-has exactly two arguments.
-Because of this, the basic \meta{foo} kind of syntax element is most 
-commonly used when the element is a list of items that are going to 
-be inserted into the sentence as one word per item. It is however 
-also used for used for syntax elements that may only constitute part 
-of a word, such as the \meta{unsigned integer}s of 
-Subsection~\ref{Ssec:InterfaceVersion} below.
-
-The second extension is that made in EBNF~\cite{EBNF-RFC}, namely 
-that one may use the repetition and grouping constructions of 
-regular expressions within a syntax description. Hence
-\begin{longtable}{l@{ means }p{0.6\linewidth}}
-  \word{term}\regstar& zero or more \word{term}s,\\
-  \word{term}\regplus& one or more \word{term}s,\\
-  \word{term}\regopt& zero or one \word{term},\\
-  \word{foo} \begin{regblock} \word{bar}\regalt \word{baz} 
-    \end{regblock}& 
-    a \word{foo} followed by a \word{bar} or a \word{baz},\\
-  \begin{regblock}[\regstar] \word{key} \word{value} \end{regblock}&
-    an even number (which may be zero) of elements, which 
-    alternatingly are \word{key}s and \word{value}s, beginning with a 
-    \word{key},
-\end{longtable}\noindent
-and so on. The \regstar, \regplus, and \regopt\ in particular often 
-come in handy to clarify whether an operation is binary, unary, or 
-variadic.
-
-
-\subsection{Lists in pseudocode formulae}
-
-The 
-
-
-% $^{\splode} L + {}^{\splode}\!L + {\splode} + \hbox{|{*}|} L$
-% 
-% $^{\circledast} L + {}^{\circledast}\!L + 
-% {}^{\circledast}\!\!L + {\circledast} L$
-
-% \begin{displaysyntax}
-%   [$M$ + [$M$ + \splode$L_1$] [$M$ + \splode$L_2$]]\par
-%   [$M$ + \splode$L_1$ \splode$L_2$]
-% \end{displaysyntax}
-% \begin{displaysyntax}
-%   [$M$ + [$M$ + \tsplode$L_1$] [$M$ + \tsplode$L_2$]]\par
-%   [$M$ + \tsplode$L_1$ \tsplode$L_2$]
-% \end{displaysyntax}
-
----
-
-
-\subsection{Interface names and versions}
-\label{Ssec:InterfaceVersion}
-
-An important aspect of the \mtl\ system is that the information of 
-which interfaces are supported by a structure should be available at 
-runtime, for other structures to query and act upon. This is done 
-using the \emph{API convention}, according to which every structure 
-should have a method |API| with the following three forms:
-\begin{displaysyntax}
-  \meta{structure} API \word{interface} \word{version}\par
-  \meta{structure} API \word{interface}\par
-  \meta{structure} API
-\end{displaysyntax}
-In these calls, the \word{interface} is the name of the interface and 
-the \word{version} is a version number such as \texttt{1.0} or 
-\texttt{2.3.1}. Formally, the \word{interface} can be an arbitrary 
-string and the \word{version} is defined by the rules
-\begin{displaysyntax}
-  \meta{version} $\longrightarrow$ \meta{unsigned integer}\relax
-    \begin{regblock}[\regstar] .\meta{unsigned integer} \end{regblock}
-    \par
-  \meta{unsigned integer} $\longrightarrow$ 0 $\bigm\vert$ 
-    \meta{digit 1--9}\meta{digit}\regstar\par
-  \meta{digit} $\longrightarrow$ 0 $\vert$ 1 $\vert$ 2 $\vert$ 3 
-    $\vert$ 4 $\vert$ 5 $\vert$ 6 $\vert$ 7 $\vert$ 8 $\vert$ 9\par
-  \meta{digit 1--9} $\longrightarrow$ 1 $\vert$ 2 $\vert$ 3 
-    $\vert$ 4 $\vert$ 5 $\vert$ 6 $\vert$ 7 $\vert$ 8 $\vert$ 9
-\end{displaysyntax}
-The most important form of the |API| method is the first, since it 
-constitutes the query ``does \meta{structure} support version 
-\meta{version} of \word{interface}''; the return value is a boolean. 
-When the result is true, the user knows that this structure lives up 
-to what is specified in that version of the interface.
-
-The idea of the version numbers is that interface specifications, like 
-standards in general, may evolve over time and that later versions 
-are better (for example from a usability perspective) than earlier 
-versions; hence it is desirable to support as high a version number 
-as possible. On the other hand, it is usually easier to implement 
-lower versions of an interface since these make fewer claims that the 
-implementation needs to satisfy. That \mtl\ interfaces are more or less 
-\emph{theories} in the sense of mathematical logic implies that they 
-evolve in a slightly different manner than for example software 
-packages do.
-
-The first \meta{unsigned integer} of a \word{version} is called the 
-\emph{major version number}, whereas the remaining are collectively 
-known as \emph{minor version numbers}. Within a series of versions 
-with the same major version number, later versions are 
-specialisations of earlier versions, meaning any axiom claimed by the 
-earlier version must hold also in the later version. Versions with 
-different major numbers are however formally as independent as 
-interfaces with different names; a jump to a new major number signals 
-a fresh start, sometimes because of taking a completely different 
-view of the subject (e.g.~starting from a different set of primitive 
-concepts), but other times because the previous specification turned 
-out to have botched some technical detail and thereby became less 
-useful than what was intended.
-
-Taking the above specification of \texttt{division} as an example, 
-one could (especially in view of the \emph{remark}) imagine that there 
-had been some version~0.0 of this interface according to which |/| 
-would instead do right division, but that this got deprecated because 
-in a \texttt{group} $G$ it would unintuitively imply that 
-\texttt{[$G$ / $a$ [$G$ * $b$ $c$]]} is equal to 
-\texttt{[$G$ / [$G$ / $a$ $c$] $b$]}. (There wasn't such a version, 
-but there could have been.) Bumping the major version number up to~1 
-would then be the way to start anew. Structures where |*| is 
-commutative could actually claim to support both versions, but 
-noncommutative ones would have to choose on or the other.
-
-For minor version numbers, one could imagine a \texttt{division}~1.1 
-where the syntax of |/| was generalised to
-\begin{displaysyntax}
-  \meta{magma} / \word{numerator} \word{denominator}\regplus
-\end{displaysyntax}
-This should then be combined with an axiom that serves as a 
-definition of this extended division operation. One possibility is to 
-say that
-\begin{displaysyntax}
-  [$M$ / $a$ $b$ \splode$C$]\par
-  [$M$ / [$M$ / $a$ $b$] \splode$C$]
-\end{displaysyntax}
-are |=|-equal for all \(a,b \in M\) and nonempty lists $C$ of 
-elements of $M$, but this has the disadvantage to enforcing an 
-algorithm for computing the multiple-argument form of |/|. A 
-different approach is to say that if \(x \in M\) is the value of
-\begin{displaysyntax}
-  [$M$ / $a$ $b_1$ \dots $b_n$]
-\end{displaysyntax}
-then
-\begin{displaysyntax}
-  [$M$ * $b_1$ [$\dots$ [$M$ * $b_n$ $x$]$\dots$]]
-\end{displaysyntax}
-is |=|-equal to $a$.
-
-
-% \subsection{A \Tcl\ primer}
-% 
 % Informally, a \Tcl\ program (or \emph{script}) is a sequence of 
 % \emph{command sentences}\Ldash typically one per line, although there 
 % is variance in both directions\Dash and a sentence consists of 
@@ -811,11 +688,284 @@ is |=|-equal to $a$.
 % 
 % ---
 
+\subsection{The issue of a type system}
 
-\section{Basic notions}
+One thing that readers with computer science training tend to be 
+curious about is what type system \mtl\ employs. Mathematicians, on 
+the other hand, are not so inclined to worry on this and should 
+therefore feel free to skip this subsection on a first reading. 
+The simple truth is that \mtl\ doesn't have a type system. It doesn't 
+need one anyhow, and there is evidence to suggest that adding a type 
+system would mostly be harmful! Since these are claims that tend to be 
+shocking for the average computer scientist, they need some 
+elaboration.
 
-A structure is supposed to be more or less the kind of things that 
-universal algebra are about, although the need to make it work in 
+To begin with, it should be observed that the standard foundation of 
+mathematics\Ldash Zermelo--Fraenkel set theory and its variants\Rdash 
+is untyped. The closest to a ``type'' in the programming language sense 
+that you get in it is that one can recognise certain sets as being 
+the domains of various functions (meaning it is okay to apply said 
+function to an element of that set), but there is none of that business of 
+values being associated to one specific type that is frequently presumed 
+in computer science. Hence mathematics as such is untyped, or if you 
+will one-typed: everything is a set, period. For a system for mathematics 
+to be otherwise would therefore be a deviation from the true thing.
+
+The historically versed reader may here object that it has not always been 
+the case that the standard foundation was untyped. The 
+set theory in the Russell--Whitehead \emph{Principia Mathematica} was 
+certainly typed (it is even known as ``the type theory of sets''). 
+In Greek antiquity (or at least that period during it which became 
+authorative for subsequent ages), a quantity had to be specified as 
+either length, area, volume, or whatever; there was no canonical way in 
+which e.g. the an area and a length could have comparable ``numerical 
+values'', so they were of different types.
+% is indeed true. 
+Type distinctions of this kind have however a strong tendency to dissolve 
+over time, as the cost of maintaining them (which can be found in the 
+form of frequent extra manoeuvres in arguments to work around the 
+type boundaries) is rarely accompanied by any advantages whatsoever. 
+In particular the type theory of sets has, to the 21th century observer, 
+the distinct smell of a failed high-profile standard that collapses under 
+its own weight: too impractical and complicated to see much in the area 
+of actual implementations, but nonetheless taken seriously and being 
+pursued because of its association with big names and high-profile 
+projects. There is no need for us to repeat that mistake today.
+
+% Historically, that is 
+% however an oversimplification: there was actually a short period when 
+% the standard foundational set theory was one with types (more precisely 
+% the type theory of sets in the Russell--Whitehead \emph{Principia 
+% Mathematica}), but this never really caught on. For the 21th century 
+% observer, this set theory with types has the distinct smell of a failed 
+% high-profile standard that collapses under its own weight: too impractical 
+% and complicated to see much in the area of actual implementations, but 
+% nonetheless taken seriously and being pursued because of its association 
+% with big names and high-profile projects. Mandatory typing was 
+% abandoned when more lightweight alternatives emerged as equally 
+% consistent.
+
+% One important problem with doing serious 
+% mathematics on top of the Russellian set theory is that one 
+% frequently encounters situations where everything works out except 
+% that the types of two things don't match, and considerable effort has 
+% to be spent on adjusting the types, whereas in an untyped setting one 
+% would be done already.
+
+Another problem with types is that many programming languages use 
+them as a work-around for having limited vocabularies: rather than 
+having separate names for what is technically distinct (even if 
+analogous) operations, multiple operations are bundled together under 
+the same name in the source, and there is a presumption that the 
+programmer's exact intentions can be recovered later by analysing the 
+operand types. There is no doubt that this to a great extent is 
+inspired by generally accepted practices for writing mathematical 
+formulae\Ldash in which addition or substraction always denotes the 
+operation suitable for the given operands (be they numbers, vectors, 
+matrices, functions, or whatever) and multiplication can (depending 
+on context) denote almost every operation imaginable\Rdash but that 
+fails to take into account the formality gap between the two 
+situations. A computer program is always fully formal (even if some 
+languages may allow a relaxed-looking syntax) because they are meant 
+to be parsed by a dumb mechanism. Mathematical formulae, on the other 
+hand, are primarily meant to be read by humans and may therefore skip 
+plenty of fine details as long as the intelligent reader will be able 
+to fill them in. It is true that there is a substantial body of 
+mathematical notation that pretty much all agree upon (and 
+which thus could be formalised to everyone's content), but this unity 
+quickly evaporates once one starts to venture into notational regions 
+that are traversed chiefly by specific subdomains of mathematics; as 
+a particular example, one may note that computer science and 
+differential geometry have very different ideas about such basic 
+concepts as function and argument! The matter is further complicated 
+by the fact that many mathematical formulae admit multiple 
+fundamentally distinct interpretations, often coming from quite 
+different theories each offering its own understanding of the topic, 
+and the equal validity of different interpretations can be deep 
+theorems (nonstandard analysis, anyone?). In formal mathematical 
+logic, where mathematical formulae \emph{are} required to be fully 
+formal, symbols are as a rule specified using exact and complete names 
+throughout.
+
+This does not mean types are useless as theoretical devices. Much of 
+type theory as a field of computer science is really about proving 
+simple statements that can be phrased on the form `$x$ is-a $T$', 
+where the ``type'' $T$ is some collection of claims that may or 
+may not hold true for the ``value'' $x$. The interface specifications 
+introduced in the next subsection can be read as providing a great deal 
+of information that can be phrased in this form. That \mtl\ still 
+does not have a type system in this epistemic sense is primarily 
+because all ``type'' information contained in the interface 
+specifications is \emph{informal}; there is no formal language using 
+which one has to encode all typing relations. Maybe at some point in 
+the future will there emerge some language using which one can 
+conveniently encode all the type information a computing system 
+could reasonably want to know, and which a compiler would then use to 
+produce heavily optimised code or a static analyser could use to 
+verify program correctness, but that remains to be seen; in 
+particular correctness will, in the problem domain for which \mtl\ is 
+designed, frequently depend on quite nontrivial mathematical theorems 
+and thus for practical purposes be beyond what can be automated anyway. 
+For the moment, it would be extremely premature to try to design a 
+formal specification language for \mtl, as the main result of 
+deploying any given language would probably only be that users' 
+imaginations are constrained by having to fit their designs to 
+what the specification language supports.
+
+One final aspect of type is the \emph{encoding} aspect, in which a 
+type is taken as a specification of how some set of values are 
+encoded in terms of some lower-level data model (such as the bits of 
+computer memory, characters in a text file, or bytes in a binary file). 
+This is an aspect which \mtl\ cannot avoid, but decisions in this area 
+tend to be quite local; each package decides for itself how it prefers 
+to encode the values it operates on, and other packages generally treat 
+these values as opaque units. Since many encoding problems are very 
+far from being original however, it is useful to collect a body of 
+example solutions to the most common problems (see 
+Subsection~\ref{Ssec:TclValues}), and one could argue that this 
+consistutes a sort of type system, even if it is of course 
+not mandatory. In addition, a package may choose to publicly specify 
+the encoding of some data, and it is for that too useful to have a 
+common body of data encoding principles and techniques for package 
+authors to employ. Some suggestions along these lines for improving 
+interoperability between packages can be found in 
+Subsection~\ref{Ssec:StandardDataEncodings}.
+
+
+% Another, more conceptual application of types in many modern 
+% programming languages is for selecting definition of a polymorphic 
+% operation; practically the same token is used as name of several 
+% different operations, and the types (which in some cases are 
+% compile-time properties of variables and in other runtime properties 
+% of values) of the operation arguments are used to select an exact 
+% definition. This idea was probably taken from ordinary mathematical 
+% notation, where it is common that the intended interpretation of an 
+% operation symbol (or lack thereof, as in $xy$) depends on what the 
+% operands happen to denote; $G-u$ means one thing if $G$ and $u$ are 
+% numbers, another thing if they are vectors, and something very 
+% different if $G$ is a graph and $u$ is a vertex in $G$. While this 
+% is absolutely standard, one should nonetheless observe that it really 
+% is a shorthand notation; the standard formalisation of mathematics in 
+% mathematical logic requires that operation with different definitions 
+% are given distinct names. In particular the distinction between 
+% `element' and `set' used to justify shorthands such as $f(S)$ for 
+% $\left\{ f(x) \bigm\vert x \in S\right\}$ when $S$ is a set break 
+% down when it is taken into account that mathematics is constructed on 
+% top of set theory, since \emph{everything} is a set\footnote{
+%   Or in some axiomatisations: a class; the same argument applies 
+%   for all kinds of collections.
+% } in standard set theory; if one were to actually take that shorthand 
+% seriously as a rule of definition, one would find that every function 
+% was defined for every mathematical object, and usually not in 
+% any way that makes practical sense!
+
+
+% ---
+% 
+% 
+% For applications where types are convenient, it is perfectly 
+% straightforward to emulate typing within a subsystem of mathematics 
+% by simply implementing the type system of one's choice, but it is 
+% frequently less straightforward to rid oneself of an awkward type 
+% system that has been allowed to permeate the foundations. 
+% 
+% 
+% ---
+
+
+
+
+
+
+
+\subsection{The \Tcl\ value model}
+\label{Ssec:TclValues}
+
+Several references have been made above to `values', without actually 
+defining what these can be or how they behave. Sadly, it is quite 
+common for language manuals to dodge this question, since the true 
+story tends to be both complicated and not all that flattering for 
+the language designers; the model is frequently ``whatever happened 
+to get implemented'' rather than something thought out in advance. 
+\emph{\Tcl\ is different,} in that it has a clearly defined model 
+whose simplicity, flexibility, and expressive power are befitting of 
+mathematics. It should however be observed that this model has two 
+rather different faces: on one hand, there is the formal model 
+against which program correctness should be judged, and on the other 
+hand there is the underlying technology, which determines the 
+complexity of algorithm implementations. (There have unfortunately 
+been some widely disseminated, although by now rather old, analyses 
+of \Tcl\ whose incorrect conclusions about complexity are based on 
+the formal model alone.)
+
+The formal model is simply this: \emph{everything} (i.e., every 
+value) \emph{is a string!} Every value has a unique decomposition 
+into a finite sequence (of length zero or more) of characters, and 
+two values are equal if and only if the decompose to the same 
+sequence of characters. Commands are allowed to treat unequal 
+strings as denoting equivalent values\Ldash for example 
+`\texttt{0xFF}' and `\texttt{255}' are equivalent to commands 
+expecting an integer\Rdash but they may not distinguish between equal 
+values constructed in different ways. This is useful for testing and 
+debugging, since it has the corollary that ``what you see is what it 
+got'' with respect to calling of commands; providing an input value 
+as a literal string is the same as had it been constructed by some 
+complicated subroutine. It also means that the value model maps 
+straightforwardly into several fundamental models of computations, 
+particularly those of more mathematical flavour such as 
+recursive functions (on natural numbers) and Turing machines.
+
+The underlying technology instead supports two separate views of 
+values: the \emph{string representation} of the formal model, and an 
+\emph{internal representation} adapted to the hardware at hand. The 
+canonical string representation of a number is for example in 
+decimal, but the internal representation (which the arithmetic 
+operations make use of) is in binary. Conversions between the two are 
+lazy, meaning a particular representation is only generated if 
+somethings asks for it. Hence most numbers in a well-written \Tcl\ 
+program are born, live, and eventually die possessing only their 
+binary internal representations; it is sufficient for `everything is 
+a string' (EIAS) that the string representations could have been 
+generated.
+
+The set of internal representations is furthermore not closed, but 
+something that can be extended: many dynamically loadable \Tcl\ 
+extensions define their own internal representation for some kind of 
+data they provide operations on. The only requirement is really that 
+they set up two C-level functions: one for deallocating the internal 
+representation for a value (called when the last reference to that 
+value goes away), and one function for generating a string 
+representation for a value given its internal representation, to meet 
+the requirement that every value potentially can be viewed as a string. 
+The string representation can be something as raw as a hexdump of the 
+internal representation, but it can equally well be something more 
+enduring and readable, such as an OpenMath-XML encoding of the value 
+in question. 
+
+That the internal representation still has to live up to the promises 
+set by the formal model also has the implication that all values are 
+immutable: there's no way to change a value.
+
+
+% ; the closest equivalent of `type' that one finds is 
+% `set of values (strings) which are valid in a particular circumstance 
+% (for example, constitute valid input to a particular command)', and 
+% as it happens that is very much the case also in mathematics.
+
+% Ultimately, what one deals with is always \emph{encodings} in computer 
+% memory of mathematical elements rather than the elements 
+% themselves. 
+
+
+
+\section{Interpreting interface specifications}
+
+This section explains how to interpret the various specifications of 
+interfaces that make up a significant part of the \mtl\ 
+infrastructure.
+
+A structure is supposed to be more or less the kind of thing that 
+universal algebra is about, although the need to make it work in 
 practice rather than just in theory means some classical tricks to 
 simplify the theoretical framework cannot be used. As a particular 
 example, modules are in universal algebra often regarded as an 
@@ -823,71 +973,8 @@ algebra with one unary operation for every element of the thing
 acting on the module, which leads to huge (often infinite) axiom 
 systems but makes it possible to keep the theory single-sorted. A 
 more pragmatic approach will have to face up with the fact that many 
-algebraic structures have several sorts of elements.\footnote{\relax
-  Even though it is sometimes possible to ``hide'' all but the main 
-  set of elements in ``helper'' structures.
-} Another example is that in theoretical constructions it is often 
-sufficient to know equality (or congruence, depending on how one 
-looks at it) as an implicit relation (give me two elements and I can 
-tell you whether they are equal), but in practice it may be much 
-more useful to provide a function that computes a canonical form 
-for every element is given.
-
-
-\subsection{Types and encodings}
-
-\Tcl\ has the basic principle that any value is 
-\emph{formally} a string of (Unicode) characters\Ldash which from a 
-foundational mathematical point of view is very sound, as it admits 
-direct translation to several fundamental models for computation\Dash 
-although internally the usual assortment of implementation tricks 
-(such as machine-native number representations where possible) are 
-employed to speed up processing (and in some cases reduce memory use). 
-A consequence of this principle is that \Tcl\ is mostly a typeless 
-language (or if you prefer, language with exactly one type). This may 
-seem strange if one is used to classical programming languages, but 
-one should keep in mind that the main reason variables are typed in 
-languages such as Fortran, Pascal, and C is that different types of 
-data require different amounts of memory. More modern, higher level 
-programming languages such as Tcl manage memory allocation implicitly 
-and dynamically, so there is no need for the programmer to bother 
-with the minutae of this.
-
-Another, more conceptual application of types in many modern 
-programming languages is for selecting definition of a polymorphic 
-operation; practically the same token is used as name of several 
-different operations, and the types (which in some cases are 
-compile-time properties of variables and in other runtime properties 
-of values) of the operation arguments are used to select an exact 
-definition. This idea was probably taken from ordinary mathematical 
-notation, where it is common that the intended interpretation of an 
-operation symbol (or lack thereof, as in $xy$) depends on what the 
-operands happen to denote; $G-u$ means one thing if $G$ and $u$ are 
-numbers, another thing if they are vectors, and something very 
-different if $G$ is a graph and $u$ is a vertex in $G$. While this 
-is absolutely standard, one should nonetheless observe that it really 
-is a shorthand notation; the standard formalisation of mathematics in 
-mathematical logic requires that operation with different definitions 
-are given distinct names. In particular the distinction between 
-`element' and `set' used to justify shorthands such as $f(S)$ for 
-$\left\{ f(x) \bigm\vert x \in S\right\}$ when $S$ is a set break 
-down when it is taken into account that mathematics is constructed on 
-top of set theory, since \emph{everything} is a set\footnote{Or in 
-some axiomatisations: a class; the same argument applies for all 
-kinds of collections.} in standard set theory. 
-
----
-
-
-; the closest equivalent of `type' that one finds is 
-`set of values (strings) which are valid in a particular circumstance 
-(for example, constitute valid input to a particular command)', and 
-as it happens that is very much the case also in mathematics.
-
-Ultimately, what one deals with is always \emph{encodings} in computer 
-memory of mathematical elements rather than the elements 
-themselves. 
-
+algebraic structures have several sorts of elements. To that end, the 
+following definition is useful.
 
 \begin{definition}
   A structure is said to be \defining{single-sorted} if it has one sort 
@@ -898,6 +985,452 @@ themselves.
   sort). The \defining{principal set of elements} of a structure is 
   the set of elements of the principal sort.
 \end{definition}
+
+Fairly often, it is possible to ``hide'' the nonprincipal sorts of 
+elements by making them the principal sets of elements of various 
+``helper'' structures, but it is not always useful to do so. 
+Therefore the concept is needed.
+
+Another example of how theory might not match practice is that in 
+theoretical constructions it is often sufficient to know equality (or 
+congruence, depending on how one looks at it) as an \emph{implicit} 
+relation (give me two elements and I can tell you whether they are 
+equal), but in practice it may be much more useful to provide a 
+function that computes a canonical form for every element is given. 
+This matter is addressed more in Subsection~\ref{Ssec:Equality}.
+
+
+Here is an example of an interface specification (recall that a 
+\emph{magma} is an algebraic structure with a binary multiplication 
+operation, which is not required to be associative or anything like 
+that):
+\begin{quote}
+  \small\leavevmode
+  \begin{APIspec}{division}{1.0}
+    The |division| interface specifies the existence of a binary 
+    division operation |/| that is an inverse of |*|. The quotient 
+    need not be defined for all pairs of elements. It probably makes 
+    more sense if |*| is at least associative, but is perfectly 
+    possible to define even in other situations.
+    \begin{APIdescription}{magma}
+      \begin{APImethod}{=}
+        \word{element} \word{element}
+      \end{APImethod}
+        The |=| method must satisfy \APIref+{equality}{1.0}.
+      \begin{APImethod}{*}
+        \word{element} \word{element}
+      \end{APImethod}
+        The |*| method returns an element.
+      \begin{APImethod}{/}
+        \word{element} \word{element}
+      \end{APImethod}
+        This method may throw an error, but if
+        \begin{displaysyntax}
+          [$M$ / $a$ $b$]
+        \end{displaysyntax}
+        for elements $a$ and $b$ of a \meta{magma} $M$ returns $x$ 
+        then that $x$ must be an element such that the two expressions
+        \begin{displaysyntax}
+          [$M$ * $b$ $x$]\par
+          $a$
+        \end{displaysyntax}
+        are |=|-equal.
+        
+        \begin{remark}
+          In terms of a multiplicative inverse, this defines $a/b$ 
+          to be $b^{-1}a$, i.e., it is a \emph{left} division. This 
+          may seem unintuitive, but it makes it possible to have 
+          \(a/(bc) = (a/b)/c\). Right division would have \(a/(bc) = 
+          (a/c)/b\).
+        \end{remark}
+        
+        If this method throws an error, then it should set the 
+        |-errorcode| to one of the following lists:
+        \begin{displaysyntax}
+          API division nosolution\par
+          API division unimplemented
+        \end{displaysyntax}
+        Use of the |nosolution| form signals that there really isn't 
+        any solution $x$ to \(bx=a\). Use of the |unimplemented| form 
+        merely means that division has not been implemented for these 
+        arguments (e.g.~a ring of polynomials might have division 
+        implemented only for monomial denominators), in which case 
+        the error does not imply nonexistence of a solution.
+    \end{APIdescription}
+    
+    Note that |/| is not required to be congruent. This is 
+    because the \texttt{division} interface does not require the 
+    equation \(bx=a\) to have a unique solution, and 
+    ensuring that the choice of solution is independent of 
+    argument representation could well be unreasonably expensive. 
+  \end{APIspec}
+\end{quote}
+The name and version number in the left margin marks where the formal 
+specification begins. The triangle marks where it ends (compare 
+\qedsymbol\ in proofs).
+
+
+\subsection{Pseudocode formulae}
+\label{Ssec:Pseudokodsformler}
+
+For many mathematical structures, it is appropriate for 
+specifications to spell out the axioms that the primitive concepts of 
+such structures must obey. However, since the main computing environment 
+by Policy~\ref{Policy:Tcl} is a \Tcl\ interpreter, it follows that the 
+only syntax for these concepts that is guaranteed to be formally defined 
+is that which is exposed in this environment; more traditional 
+mathematical syntaxes usually exist, but it is hard for a 
+specification to rely on them. 
+Therefore the axioms will generally have to be expressed using 
+\emph{pseudocode formulae}, which mix traditional mathematical 
+notation with some basics of \Tcl\ syntax.
+
+The pseudocode formula syntax is essentially given by the following 
+rules:
+\begin{displaysyntax}
+  \(\meta{formula} \longrightarrow \meta{mathematical formula} \mid 
+  {}\)[\meta{sentence}]\par
+  \(\meta{sentence} \longrightarrow \meta{word} \mid
+  \meta{sentence}\meta{whitespace}\meta{word}\)\par
+  \(\meta{word} \longrightarrow \meta{literal} \mid \meta{formula}\)
+\end{displaysyntax}
+Here, a \meta{sentence} is the syntactical unit corresponding to a 
+\Tcl\ command call, and the brackets signal that we want to make use 
+of the value returned by that call. A typical example of how such a 
+\meta{formula} might look is
+\begin{displaysyntax}
+  [$G$ * [$G$ * $a$ $b$] $c$]
+\end{displaysyntax}
+where `$G$', `$a$', `$b$', and `$c$' are \meta{mathematical formula}s 
+while `\texttt{*}' is a \meta{literal}; literals will be written in 
+\texttt{typewriter} font.
+
+A `\texttt{[}\meta{sentence}\texttt{]}' formula is evaluated as 
+follows. First the individual \meta{word}s are evaluated, and a list 
+of their values is constructed. Second, the value of the first word 
+is interpreted as a \emph{command name}, and the corresponding 
+command implementation is looked up. Third, the list of values is 
+passed on to that command, to be interpreted in whatever way it sees 
+fit, and the return value of that call is taken as the value of the 
+formula as a whole. In other words, sentence formulae will formally 
+be in \emph{prefix notation}; the value of a formula `\texttt{[f $x$ 
+[g $y$] $z$]}' is $f(x,g(y),z)$ if $f$ and $g$ are the implementations 
+of the commands named `\texttt{f}' and `\texttt{g}' respectively. 
+The very simple syntax does however leave plenty of room in practice 
+for deviations from this prefix notation, where the programmer deems 
+that they are appropriate.
+
+The trick is that every command is free to interpret its arguments in 
+whatever way it wants; in particular it may expect one or several 
+arguments to be \meta{literal}s that control what will be done to 
+remaining arguments. The most important use of this 
+possibility is the \emph{object command pattern},\footnote{
+  So called because it is in \Tcl\ the traditional form of method 
+  calls in object-oriented (OO) programming systems: each object is 
+  a separate command that has the methods as subcommands. Different 
+  methods of a single object may have wildly different syntaxes, but 
+  methods of the same name for different objects of the same class 
+  will normally have exactly the same syntax.
+} where the actual 
+command name is not explicit in the code (it is rather kept in a 
+variable or function parameter) but the \emph{second} word is a 
+literal name of a \emph{subcommand}; it is known that the primary 
+command will perform a new round of dispatch based on its subcommand 
+argument. Thus, in the example above, `$G$' is to be thought of as 
+such an ``object command'' for a mathematical structure, while 
+`\texttt{*}' is a subcommand name. Indeed, if $G$ is a group and 
+\texttt{*} the group operation then the example above is the left 
+hand side of the associativity axiom \((ab)c = a(bc)\), or \((a 
+*_G\nobreak b) *_G c = a *_G (b *_G\nobreak c)\) if the operation 
+symbol and dependence on the structure cannot be elided. In 
+comparison to the latter, the pseudocode formula counterpart
+\begin{displaysyntax}
+  [$G$ * [$G$ * $a$ $b$] $c$] ${}={}$ [$G$ * $a$ [$G$ * $b$ $c$]]
+\end{displaysyntax}
+isn't too onerous---especially for formulae involving things that are 
+not merely the associate binary operations for which traditional 
+mathematical notation has been optimised.
+
+One reservation one can have regarding the formula above is however 
+that the equality relation `$=$' itself is one of the things that 
+depend on the structure\Ldash indeed, a perfectly sensible 
+implementation of many quotient structures is to have everything the 
+same as in the numerator structure, except that the equality relation 
+considers more things to be equal\Rdash and therefore the claim 
+should rather be that
+\begin{displaysyntax}
+  [$G$ = [$G$ * [$G$ * $a$ $b$] $c$] [$G$ * $a$ [$G$ * $b$ $c$]]]
+\end{displaysyntax}
+has the value true for all $G$-elements $a$, $b$, and $c$. This is 
+also what needs to be done when specifying more unusual structures, 
+but for ordinary structures with equality the following intermediate 
+formulation (of \(aa^{-1} = a^{-1}a = 1\)) is convenient:
+\begin{quote}
+  For all \(a \in G\), the three expressions
+  \begin{displaysyntax}
+    [$G$ * $a$ [$G$ inverse $a$]]\par
+    [$G$ * [$G$ inverse $a$] $a$]\par
+    [$G$ 1]
+  \end{displaysyntax}
+  are |=|-equal.
+\end{quote}
+The formal interpretation of this would be: \texttt{[$G$ = $x$ $y$]} 
+must return true when given as $x$ and $y$ any two of those three 
+expressions.
+
+
+\subsection{Command syntax specifications}
+
+Besides the axioms characterising a mathematical structure, it is 
+also necessary for an interface specification to detail the syntax 
+of each subcommand. In principle this can of course be done using BNF 
+rules for \meta{syntax elements} as above, but two extensions of this 
+formalism turn out to be very useful, to the point that almost all 
+syntaxes one needs to specify can be handled without any 
+$\longrightarrow$ rules at all.
+
+The first extension stems from the fact that all a \Tcl\ command gets 
+to see is a list of words (or rather the values these words evaluate 
+to)\Dash hence it is preferable to point out when an element makes up 
+exactly one word. This is done by changing the angle brackets around 
+an \meta{element} to braces, like so: \word{element}. This makes it 
+totally clear that the |foo| command with syntax
+\begin{displaysyntax}
+  foo \word{bar} \word{baz}
+\end{displaysyntax}
+has exactly two arguments.
+Because of this, the basic \meta{foo} kind of syntax element is most 
+commonly used when the element is a list of items that are going to 
+be inserted into the sentence as one word per item. It is however 
+also used for used for syntax elements that may only constitute part 
+of a word, such as the \meta{unsigned integer}s of 
+Subsection~\ref{Ssec:InterfaceVersion} below.
+
+The second extension is that made in EBNF~\cite[Sec.~6]{XML-spec}, 
+namely that one may use the repetition and grouping constructions of 
+regular expressions within a syntax description. Hence
+\begin{longtable}{l@{ means }p{0.6\linewidth}}
+  \word{term}\regstar& zero or more \word{term}s,\\
+  \word{term}\regplus& one or more \word{term}s,\\
+  \word{term}\regopt& zero or one \word{term},\\
+  \word{foo} \begin{regblock} \word{bar}\regalt \word{baz} 
+    \end{regblock}& 
+    a \word{foo} followed by a \word{bar} or a \word{baz},\\
+  \begin{regblock}[\regstar] \word{key} \word{value} \end{regblock}&
+    an even number (which may be zero) of elements, which 
+    alternatingly are \word{key}s and \word{value}s, beginning with a 
+    \word{key},
+\end{longtable}\noindent
+and so on. The \regstar, \regplus, and \regopt\ in particular often 
+come in handy to clarify whether an operation is binary, unary, or 
+variadic.
+
+
+\subsection{Lists in pseudocode formulae}
+
+When writing pseudocode formulae, it is sometimes necessary to 
+deal with sequences whose lengths are not fixed, precisely as in 
+regular mathematical formulae. Several styles of such expressions 
+exist, and the choice between them is mainly a stylistic one.
+
+The first style is the traditional mathematical ellipsis (\dots) 
+notation. One might for example say that
+\begin{quote}
+  For any \(a_1,\dotsc,a_m,b_1,\dotsc,b_n \in G\), the two expressions
+  \begin{displaysyntax}
+    [$G$ * $a_1$ $\dots$ $a_m$ $b_1$ $\dots$ $b_n$]\par
+    [$G$ * [$G$ * $a_1$ $\dots$ $a_m$] [$G$ * $b_1$ $\dots$ $b_n$]]
+  \end{displaysyntax}
+  are |=|-equal.
+\end{quote}
+Here it is understood that each `$a_1$ $\dots$ $a_m$' represents a 
+stretch of zero or more words, the exact number being denoted by $m$. 
+If one wishes to express a stretch of one or more words, then one can 
+do so as `$a_1$ $a_2$ $\dots$ $a_m$'.
+
+The second style derives from syntax specifications as described 
+above, and consists essentially in the observation that a 
+\meta{quantity} within angle brackets may represent any amount of 
+material, thus also a sequence of zero or more words. Expressing the 
+above in this style would instead look like
+\begin{quote}
+  For any sequences \meta{A} and \meta{B} of elements of $G$, the 
+  two expressions
+  \begin{displaysyntax}
+    [$G$ * \meta{A} \meta{B}]\par
+    [$G$ * [$G$ * \meta{A}] [$G$ * \meta{B}]]
+  \end{displaysyntax}
+  are |=|-equal.
+\end{quote}
+This style my be more appropriate in cases where the \meta{quantity} is 
+effectively opaque (i.e., one is not in the current discussion 
+supposed to take it apart), such as the \meta{prefix} that implements 
+a particular structure.
+
+The third style derives from the syntax of \Tcl\ itself, and could 
+arguably be considered an extension of the pseudocode formula syntax 
+given in Subsection~\ref{Ssec:Pseudokodsformler}. It applies when 
+some quantity is \emph{the list of} those values that one would like 
+to give as separate words, and takes the form of the expand-prefix 
+`\splode' followed by (the psuedocode formula for) the list in 
+question. In this notation, the previous example looks like
+\begin{quote}
+  For any lists $A$ and $B$ of elements of $G$, the two expressions
+  \begin{displaysyntax}
+    [$G$ * \splode$A$ \splode$B$]\par
+    [$G$ * [$G$ * \splode$A$] [$G$ * \splode$B$]]
+  \end{displaysyntax}
+  are |=|-equal.
+\end{quote}
+This is most useful when the list of these values is an 
+abstraction which occurs naturally in the argument, rather than 
+as something which is introduced ad hoc to build a collection.
+
+There can conversely also be a need to have a notation for forming a 
+list from separate words, if some operation requires such a list as an 
+argument. One basic may of doing this is to use \Tcl's list 
+construction command |list|, since
+\begin{displaysyntax}
+  [list $a_1$ \dots\ $a_n$]
+\end{displaysyntax}
+evaluates to the length $n$ list whose elements are $a_1$, \dots, 
+$a_n$. There is however also a tradition of simply enumerating the 
+list elements between braces, like so:\footnote{
+  This example is straight from the \texttt{switch.n} manpage.
+}
+\begin{displaysyntax}
+  switch \meta{options}\regopt\ \word{string}
+  |{|\begin{regblock}[\regplus] \word{pattern} \word{body} 
+  \end{regblock}|}|
+\end{displaysyntax}
+
+
+---
+
+% The 
+
+
+% $^{\splode} L + {}^{\splode}\!L + {\splode} + \hbox{|{*}|} L$
+% 
+% $^{\circledast} L + {}^{\circledast}\!L + 
+% {}^{\circledast}\!\!L + {\circledast} L$
+
+% \begin{displaysyntax}
+%   [$M$ + [$M$ + \splode$L_1$] [$M$ + \splode$L_2$]]\par
+%   [$M$ + \splode$L_1$ \splode$L_2$]
+% \end{displaysyntax}
+% \begin{displaysyntax}
+%   [$M$ + [$M$ + \tsplode$L_1$] [$M$ + \tsplode$L_2$]]\par
+%   [$M$ + \tsplode$L_1$ \tsplode$L_2$]
+% \end{displaysyntax}
+
+---
+
+
+\subsection{Interface names and versions}
+\label{Ssec:InterfaceVersion}
+
+An important aspect of the \mtl\ system is that the information of 
+which interfaces are supported by a structure should be available at 
+runtime, for other structures to query and act upon. This is done 
+using the \emph{API convention}, according to which every structure 
+should have a method |API| with the following three forms:
+\begin{displaysyntax}
+  \meta{structure} API \word{interface} \word{version}\par
+  \meta{structure} API \word{interface}\par
+  \meta{structure} API
+\end{displaysyntax}
+In these calls, the \word{interface} is the name of the interface and 
+the \word{version} is a version number such as \texttt{1.0} or 
+\texttt{2.3.1}. Formally, the \word{interface} can be an arbitrary 
+string and the \word{version} is defined by the rules
+\begin{displaysyntax}
+  \meta{version} $\longrightarrow$ \meta{unsigned integer}\relax
+    \begin{regblock}[\regstar] .\meta{unsigned integer} \end{regblock}
+    \par
+  \meta{unsigned integer} $\longrightarrow$ 0 $\bigm\vert$ 
+    \meta{digit 1--9}\meta{digit}\regstar\par
+  \meta{digit} $\longrightarrow$ 0 $\vert$ 1 $\vert$ 2 $\vert$ 3 
+    $\vert$ 4 $\vert$ 5 $\vert$ 6 $\vert$ 7 $\vert$ 8 $\vert$ 9\par
+  \meta{digit 1--9} $\longrightarrow$ 1 $\vert$ 2 $\vert$ 3 
+    $\vert$ 4 $\vert$ 5 $\vert$ 6 $\vert$ 7 $\vert$ 8 $\vert$ 9
+\end{displaysyntax}
+The most important form of the |API| method is the first, since it 
+constitutes the query ``does \meta{structure} support version 
+\meta{version} of \word{interface}''; the return value is a boolean. 
+When the result is true, the user knows that this structure lives up 
+to what is specified in that version of the interface.
+
+The idea of the version numbers is that interface specifications, like 
+standards in general, may evolve over time and that later versions 
+are better (for example from a usability perspective) than earlier 
+versions; hence it is desirable to support as high a version number 
+as possible. On the other hand, it is usually easier to implement 
+lower versions of an interface since these make fewer claims that the 
+implementation needs to satisfy. That \mtl\ interfaces are more or less 
+\emph{theories} in the sense of mathematical logic implies that they 
+evolve in a slightly different manner than for example software 
+packages do.
+
+The first \meta{unsigned integer} of a \word{version} is called the 
+\emph{major version number}, whereas the remaining are collectively 
+known as \emph{minor version numbers}. Within a series of versions 
+with the same major version number, later versions are 
+specialisations of earlier versions, meaning any axiom claimed by the 
+earlier version must hold also in the later version. Versions with 
+different major numbers are however formally as independent as 
+interfaces with different names; a jump to a new major number signals 
+a fresh start, sometimes because of taking a completely different 
+view of the subject (e.g.~starting from a different set of primitive 
+concepts), but other times because the previous specification turned 
+out to have botched some technical detail and thereby became less 
+useful than what was intended.
+
+Taking the above specification of \texttt{division} as an example, 
+one could (especially in view of the \emph{remark}) imagine that there 
+had been some version~0.0 of this interface according to which |/| 
+would instead do right division, but that this got deprecated because 
+in a \texttt{group} $G$ it would unintuitively imply that 
+\texttt{[$G$ / $a$ [$G$ * $b$ $c$]]} is equal to 
+\texttt{[$G$ / [$G$ / $a$ $c$] $b$]}. (There wasn't such a version, 
+but there could have been.) Bumping the major version number up to~1 
+would then be the way to start anew. Structures where |*| is 
+commutative could actually claim to support both versions, but 
+noncommutative ones would have to choose on or the other.
+
+For minor version numbers, one could imagine a \texttt{division}~1.1 
+where the syntax of |/| was generalised to
+\begin{displaysyntax}
+  \meta{magma} / \word{numerator} \word{denominator}\regplus
+\end{displaysyntax}
+This should then be combined with an axiom that serves as a 
+definition of this extended division operation. One possibility is to 
+say that
+\begin{displaysyntax}
+  [$M$ / $a$ $b$ \splode$C$]\par
+  [$M$ / [$M$ / $a$ $b$] \splode$C$]
+\end{displaysyntax}
+are |=|-equal for all \(a,b \in M\) and nonempty lists $C$ of 
+elements of $M$, but this has the disadvantage to enforcing an 
+algorithm for computing the multiple-argument form of |/|. A 
+different approach is to say that if \(x \in M\) is the value of
+\begin{displaysyntax}
+  [$M$ / $a$ $b_1$ \dots $b_n$]
+\end{displaysyntax}
+then
+\begin{displaysyntax}
+  [$M$ * $b_1$ [$\dots$ [$M$ * $b_n$ $x$]$\dots$]]
+\end{displaysyntax}
+is |=|-equal to $a$.
+
+
+
+\section{Basic notions}
+
+This section covers some basics of the \mtl\ programming environment.
+
+
+
 
 
 \subsection{Implementations and constructors}
@@ -985,6 +1518,7 @@ first two.
 
 
 \subsection{Concrete and abstract data}
+\label{Ssec:StandardDataEncodings}
 
 The interfaces mostly deal with \emph{abstract} data, i.e., it does 
 not specify how the data is to be encoded. This is generally because 
@@ -1049,7 +1583,20 @@ data-is-code technique}.
 \DocInclude{support}
 \DocInclude{groups}
 \DocInclude{rings}
-\DocInclude{export}
+% \DocInclude{export}
+
+
+\begin{thebibliography}{99}
+
+\bibitem{XML-spec}
+  \textit{Extensible Markup Language (XML) 1.0} (Fifth Edition).
+  C. M. Sperberg-McQueen, F. Yergeau, E. Maler, T. Bray, J. Paoli, 
+  Editors.
+  W3C Recommendation, 26 November 2008, 
+  http://www.w3.org/TR/2008/REC-xml-20081126/ 
+  % Latest version available at http://www.w3.org/TR/xml .
+
+\end{thebibliography}
 
 \PrintIndex
 

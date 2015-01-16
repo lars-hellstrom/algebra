@@ -42,10 +42,10 @@ if {[catch {
    source [file join [file dirname $dir] API apiutil.tcl]
 }
 package require docstrip
-docstrip::sourcefrom [file join $dir export.dtx] {pkg}
+docstrip::sourcefrom [file join $dir export.dtx] {openmath pkg}
 docstrip::sourcefrom [file join $dir support.dtx] {pkg}
-docstrip::sourcefrom [file join $dir groups.dtx] {}
-docstrip::sourcefrom [file join $dir rings.dtx] {}
+docstrip::sourcefrom [file join $dir groups.dtx] {pkg}
+docstrip::sourcefrom [file join $dir rings.dtx] {integers SemigroupAlgebra}
 %</loadbase>
 % \end{tcl}
 % 
@@ -1624,6 +1624,12 @@ interp alias {} inequalities1417 {} latex_inequalities {14 17}
 % twist, which would violate DCC! Hence it might be time for another 
 % round of indeterminate calculations.
 % 
+% \begin{tcl}
+%<*loadbase>
+docstrip::sourcefrom [file join $dir network2.dtx] {pkg Hopf}
+%</loadbase>
+% \end{tcl}
+% 
 % \subsubsection{Biaffine calculations}
 % 
 % The |biaffine| PROP has been good so far, so it should be given pole 
@@ -1641,6 +1647,13 @@ interp alias {} PROP {} mtmtcl::matprop::biaffine Coeff_ring
 % |latex_inequalities|, which means the sides to compare will have to 
 % be expressed as a rule. 
 % \begin{tcl}
+if {![info exists vertex_types]} then {
+   set vertex_types {
+      Delta {1 2}
+      m {2 1}
+      twist {2 2}
+   }
+}
 set othersL {}
 add_rule {} pure [
    network::pure::construct $vertex_types {twist \r . Delta}
@@ -1754,6 +1767,543 @@ set code [
 %     the DCC.
 % \end{itemize}
 % 
+% 
+% \subsection{The twist by itself}
+% 
+% In Edinburgh (FLoC, July 2010) I tried a system consisting of only 
+% the Yang--Baxter (braiding) identity, since Samuel Mimram had 
+% mentioned that in his RTA talk. Somewhat to my surprise, it turned 
+% out that the ordering I was using for Hopf-with-twist very quickly 
+% got stuck in a quagmire of rules with incomparable left and right 
+% hand sides. Since the things it got stuck with furthermore had 
+% occurencies of a twist--twist combination that is very common in 
+% rules derived under the full Hopf-with-twist, it would seem that 
+% the Yang--Baxter system is a good example to consider when seeking 
+% a better way of ordering twists.
+% 
+% \begin{tcl}
+set extraD {}
+foreach i {0 1 2} {
+   foreach j {0 1 2} {
+      dict set extraD pseudoexpression T$i$j [
+         list OMA {form index} [list\
+           [list OMS {cd linalg1b name matrix_selector} {}]\
+           [list OMV {name T} {}]\
+           [list integer [dict create value $i] {}]\
+           [list integer [dict create value $j] {}]]
+      ]
+   }
+}
+interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
+   ::mtmtcl::rings::integers::all
+} [list ::mtmtcl::groups::power_product_monoid_1.3 [
+   list ::mtmtcl::sets::variable_set\
+     {a T01 T02 T10 T11 T12 T20 T21 T22} $extraD
+]]
+interp alias {} PROP {} mtmtcl::matprop::biaffine Coeff_ring
+% \end{tcl}
+% 
+% \begin{tcl}
+set rulesL {}
+lappend rulesL [list [list [
+   network::pure::construct $vertex_types {
+     twist . \n . twist \n twist .
+   }
+]] {} [list [
+   network::pure::construct $vertex_types {
+     . twist \n twist . \n . twist
+   }
+]]]
+lappend rulesL [list [list [
+   network::pure::construct $vertex_types {
+     twist . . \n . twist . \n . . 1X1 \n  . twist . \n twist . . \n
+     . twist .
+   }
+]] {} [list [
+   network::pure::construct $vertex_types {
+     . twist . \n twist . . \n . twist . \n . . 1X1 \n 
+     . twist . \n twist . .
+   }
+]]]
+set PROPgen(twist) [
+   PROP fromparts [Coeff_ring 0] [
+      list [Coeff_ring named T10] [Coeff_ring named T20]
+   ] [
+      list [Coeff_ring named T01] [Coeff_ring named T02]
+   ] [
+      list [list [Coeff_ring named T11] [Coeff_ring named T12]]\
+        [list [Coeff_ring named T21] [Coeff_ring named T22]]
+   ]
+]
+% \end{tcl}
+% 
+% \clearpage
+% 
+% \begin{tcl}
+set code [latex_inequalities {0 1} twist $PROPgen(twist)]
+% \end{tcl}
+% 
+% \begin{enumerate}
+% \item[0:1]
+%   \(T_{0,1} T_{1,0} + T_{0,2} T_{1,1} T_{2,0} - T_{0,1} T_{1,0} T_{2,2} - 
+%     T_{0,2} T_{2,0}  \geqslant 0\).
+% \item[2]
+%   \(T_{1,1} ( T_{1,0} + T_{1,2} T_{2,0} )  \geqslant 0\).
+% \item[3]
+%   \(T_{2,0} + T_{1,0} T_{2,1} + T_{1,0} T_{2,2} + T_{1,1} T_{2,0} T_{2,2} 
+%     - T_{1,0} - T_{1,1} T_{2,0} - T_{1,0} T_{1,1} T_{2,2} - 
+%     T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[4]
+%   \(T_{2,2} ( - T_{1,0} T_{2,1} - T_{2,0} )  \geqslant 0\).
+% \item[5]
+%   \(T_{1,1} ( T_{0,1} + T_{0,2} T_{2,1} )  \geqslant 0\).
+% \item[6]
+%   \(T_{0,2} + T_{0,1} T_{2,2} + T_{0,1} T_{1,2} + T_{0,2} T_{1,1} T_{2,2} 
+%     - T_{0,1} - T_{0,2} T_{1,1} - T_{0,1} T_{1,1} T_{2,2} - 
+%     T_{0,2} T_{2,1}  \geqslant 0\).
+% \item[7]
+%   \(T_{2,2} ( - T_{0,1} T_{1,2} - T_{0,2} )  \geqslant 0\).
+% \item[8]
+%   \(T_{1,1} ( T_{1,1} + T_{1,2} T_{2,1} - 1 )  \geqslant 0\).
+% \item[9]
+%   \(T_{1,1} T_{1,2} T_{2,2}  \geqslant 0\).
+% \item[11]
+%   \(T_{1,1} T_{2,1} T_{2,2}  \geqslant 0\).
+% \item[12]
+%   \(T_{1,1} T_{2,2} ( T_{2,2} - T_{1,1} )  \geqslant 0\).
+% \item[13]
+%   \(- T_{1,1} T_{1,2} T_{2,2}  \geqslant 0\).
+% \item[15]
+%   \(- T_{1,1} T_{2,1} T_{2,2}  \geqslant 0\).
+% \item[16]
+%   \(T_{2,2} ( 1 - T_{1,2} T_{2,1} - T_{2,2} )  \geqslant 0\).
+% \item[1:17]
+%   \(T_{0,1} T_{2,0} - T_{0,2} T_{1,0} + T_{0,1} T_{1,0} T_{2,1} + 
+%     T_{0,1} T_{1,1} ^ 2 T_{2,0} T_{2,2} + T_{0,2} T_{1,0} T_{2,1} + 
+%     T_{0,2} T_{1,1} T_{2,0} T_{2,1} - T_{0,1} T_{1,2} T_{2,0} - 
+%     T_{0,1} T_{1,0} T_{1,2} - T_{0,2} T_{1,0} T_{1,1} ^ 2 T_{2,2} - 
+%     T_{0,2} T_{1,1} T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[18]
+%   \(T_{1,1} T_{1,2} 
+%     ( - T_{1,0} - T_{1,0} T_{1,1} T_{2,2} - T_{1,2} T_{2,0} )  \geqslant 0\).
+% \item[19]
+%   \(T_{1,0} + T_{1,1} T_{2,0} + T_{1,0} T_{1,1} T_{2,1} + 
+%     T_{1,0} T_{1,1} ^ 2 T_{2,2} + T_{1,1} ^ 3 T_{2,0} T_{2,2} + 
+%     T_{1,2} T_{2,0} + T_{1,1} T_{1,2} T_{2,0} T_{2,1} - T_{2,0} - 
+%     T_{1,0} T_{2,1} - T_{1,0} T_{2,2} - T_{1,1} ^ 2 T_{2,0} T_{2,2} - 
+%     T_{1,0} T_{1,1} ^ 2 T_{2,2} ^ 2 - T_{1,1} T_{1,2} T_{2,0} T_{2,2}  \geqslant 0\).
+% \item[20]
+%   \(T_{2,0} T_{2,1} + T_{1,0} T_{2,1} ^ 2 + 2 T_{1,0} T_{2,1} T_{2,2} + 
+%     T_{1,1} ^ 2 T_{2,0} T_{2,1} T_{2,2} + T_{2,0} T_{2,2} + 
+%     T_{1,1} T_{2,0} T_{2,1} T_{2,2} - T_{1,0} T_{2,1} - 
+%     T_{1,1} T_{2,0} T_{2,1} - T_{1,2} T_{2,0} T_{2,1}  \geqslant 0\).
+% \item[21]
+%   \(T_{2,2} ( - T_{1,0} T_{2,1} - T_{2,0} )  \geqslant 0\).
+% \item[22]
+%   \(T_{1,1} T_{2,1} 
+%     ( T_{0,1} + T_{0,1} T_{1,1} T_{2,2} + T_{0,2} T_{2,1} )  \geqslant 0\).
+% \item[23]
+%   \(T_{0,2} + T_{0,1} T_{2,2} + T_{0,1} T_{1,2} + 
+%     T_{0,2} T_{1,1} ^ 2 T_{2,2} + T_{0,1} T_{1,1} ^ 2 T_{2,2} ^ 2 + 
+%     T_{0,2} T_{1,1} T_{2,1} T_{2,2} - T_{0,1} - T_{0,2} T_{1,1} - 
+%     T_{0,2} T_{2,1} - T_{0,1} T_{1,1} ^ 2 T_{2,2} - 
+%     T_{0,1} T_{1,1} T_{1,2} - T_{0,2} T_{1,1} ^ 3 T_{2,2} - 
+%     T_{0,2} T_{1,1} T_{1,2} T_{2,1}  \geqslant 0\).
+% \item[24]
+%   \(T_{0,1} T_{1,2} + T_{0,2} T_{1,1} T_{1,2} + T_{0,2} T_{1,2} T_{2,1} - 
+%     T_{0,2} T_{1,2} - 2 T_{0,1} T_{1,2} T_{2,2} - T_{0,2} T_{2,2} - 
+%     T_{0,1} T_{1,2} ^ 2 - T_{0,2} T_{1,1} ^ 2 T_{1,2} T_{2,2} - 
+%     T_{0,2} T_{1,1} T_{1,2} T_{2,2}  \geqslant 0\).
+% \item[25]
+%   \(T_{2,2} ( T_{0,1} T_{1,2} + T_{0,2} )  \geqslant 0\).
+% \item[27]
+%   \(T_{1,1} T_{1,2} ( 1 + T_{1,1} T_{2,2} - T_{1,1} - T_{1,1}^2 T_{2,2} - 
+%       T_{1,2} T_{2,1} )  \geqslant 0\).
+% \item[28]
+%   \(T_{1,1} T_{1,2} ^ 2 T_{2,2} ( - T_{1,1} - 1 )  \geqslant 0\).
+% \item[30]
+%   \(T_{1,1} T_{2,1} ( T_{1,1} + T_{1,1}^2 T_{2,2} + T_{1,2} T_{2,1} - 1 - 
+%       T_{1,1} T_{2,2} )  \geqslant 0\).
+% \item[32]
+%   \(T_{1,1} T_{1,2} T_{2,2} ( T_{1,1} - T_{1,1} T_{2,2} - T_{2,2} )  \geqslant 0\).
+% \item[33]
+%   \(T_{1,1} T_{1,2} T_{2,2}  \geqslant 0\).
+% \item[34]
+%   \(T_{1,1} T_{2,1} ^ 2 T_{2,2} ( T_{1,1} + 1 )  \geqslant 0\).
+% \item[35]
+%   \(T_{1,1} T_{2,1} T_{2,2} ( T_{1,1} T_{2,2} + T_{2,2} - T_{1,1} )  \geqslant 0\).
+% \item[37]
+%   \(T_{2,2} ( T_{1,2} T_{2,1} + T_{2,2} - 1 )  \geqslant 0\).
+% \item[39]
+%   \(- T_{1,1} T_{2,1} T_{2,2}  \geqslant 0\).
+% \item[40]
+%   \(T_{2,2} ( 1 - T_{1,2} T_{2,1} - T_{2,2} )  \geqslant 0\).
+% \end{enumerate}
+% 
+% \clearpage
+% 
+% \begin{tcl}
+set PROPgen(twist2) [
+   PROP fromparts [Coeff_ring 0] [
+      list [Coeff_ring named T10] [Coeff_ring named T20]
+   ] [
+      list [Coeff_ring named T01] [Coeff_ring named T02]
+   ] [
+      list [list [Coeff_ring named T11] [Coeff_ring named T12]]\
+        [list [Coeff_ring named T21] [Coeff_ring 0]]
+   ]
+]
+set code [latex_inequalities {0 1} twist $PROPgen(twist2)]
+% \end{tcl}
+% 
+% \begin{enumerate}
+% \item[0:1]
+%   \(T_{0,1} T_{1,0} + T_{0,2} T_{1,1} T_{2,0} - T_{0,2} T_{2,0}  \geqslant 0\).
+% \item[2]
+%   \(T_{1,1} ( T_{1,0} + T_{1,2} T_{2,0} )  \geqslant 0\).
+% \item[3]
+%   \(T_{2,0} + T_{1,0} T_{2,1} - T_{1,0} - T_{1,1} T_{2,0} - 
+%     T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[5]
+%   \(T_{1,1} ( T_{0,1} + T_{0,2} T_{2,1} )  \geqslant 0\).
+% \item[6]
+%   \(T_{0,2} + T_{0,1} T_{1,2} - T_{0,1} - T_{0,2} T_{1,1} - 
+%     T_{0,2} T_{2,1}  \geqslant 0\).
+% \item[8]
+%   \(T_{1,1} ( T_{1,1} + T_{1,2} T_{2,1} - 1 )  \geqslant 0\).
+% \item[1:17]
+%   \(T_{0,1} T_{2,0} - T_{0,2} T_{1,0} + T_{0,1} T_{1,0} T_{2,1} + 
+%     T_{0,2} T_{1,0} T_{2,1} + T_{0,2} T_{1,1} T_{2,0} T_{2,1} - 
+%     T_{0,1} T_{1,2} T_{2,0} - T_{0,1} T_{1,0} T_{1,2} - 
+%     T_{0,2} T_{1,1} T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[18]
+%   \(T_{1,1} T_{1,2} ( - T_{1,0} - T_{1,2} T_{2,0} )  \geqslant 0\).
+% \item[19]
+%   \(T_{1,0} + T_{1,1} T_{2,0} + T_{1,0} T_{1,1} T_{2,1} + T_{1,2} T_{2,0} 
+%     + T_{1,1} T_{1,2} T_{2,0} T_{2,1} - T_{2,0} - T_{1,0} T_{2,1}  \geqslant 0\).
+% \item[20]
+%   \(T_{2,1} ( T_{2,0} + T_{1,0} T_{2,1} - T_{1,0} - T_{1,1} T_{2,0} - 
+%       T_{1,2} T_{2,0} )  \geqslant 0\).
+% \item[22]
+%   \(T_{1,1} T_{2,1} ( T_{0,1} + T_{0,2} T_{2,1} )  \geqslant 0\).
+% \item[23]
+%   \(T_{0,2} + T_{0,1} T_{1,2} - T_{0,1} - T_{0,2} T_{1,1} - 
+%     T_{0,2} T_{2,1} - T_{0,1} T_{1,1} T_{1,2} - 
+%     T_{0,2} T_{1,1} T_{1,2} T_{2,1}  \geqslant 0\).
+% \item[24]
+%   \(T_{1,2} ( T_{0,1} + T_{0,2} T_{1,1} + T_{0,2} T_{2,1} - T_{0,2} - 
+%       T_{0,1} T_{1,2} )  \geqslant 0\).
+% \item[27]
+%   \(T_{1,1} T_{1,2} ( 1 - T_{1,1} - T_{1,2} T_{2,1} )  \geqslant 0\).
+% \item[30]
+%   \(T_{1,1} T_{2,1} ( T_{1,1} + T_{1,2} T_{2,1} - 1 )  \geqslant 0\).
+% \end{enumerate}
+% 
+% \clearpage
+% 
+% The following is a minor experiment: how much is the system 
+% simplified by setting \(T_{1,2} = T_{2,1} = 1\) and \(T_{1,1} = 
+% T_{2,2} = 0\)? This is certainly a very mainstream case.
+% \begin{tcl}
+set PROPgen(twist3) [
+   PROP fromparts [Coeff_ring 0] [
+      list [Coeff_ring named T10] [Coeff_ring named T20]
+   ] [
+      list [Coeff_ring named T01] [Coeff_ring named T02]
+   ] [
+      list [list [Coeff_ring 0] [Coeff_ring 1]]\
+        [list [Coeff_ring 1] [Coeff_ring 0]]
+   ]
+]
+set code [latex_inequalities {0 1} twist $PROPgen(twist3)]
+% \end{tcl}
+% And it certainly comes out easily solvable:
+% \begin{enumerate}
+% \item[0:1]
+%   \(T_{0,1} T_{1,0} - T_{0,2} T_{2,0}  \geqslant 0\).
+% \end{enumerate}
+% Unfortunately this is a bit too simple: the sides of rule 1 are not 
+% distinguishable under these identifications, so none of these 
+% solutions accomplish what they were supposed to.
+% 
+% Backing out, one can consider the case \(T_{1,2} = T_{2,1}\) and 
+% \(T_{1,1} = T_{2,2} = 0\) without making any claim about the 
+% numerical value of $T_{1,2}$. Does this make any difference?
+% \begin{tcl}
+set PROPgen(twist4) [
+   PROP fromparts [Coeff_ring 0] [
+      list [Coeff_ring named T10] [Coeff_ring named T20]
+   ] [
+      list [Coeff_ring named T01] [Coeff_ring named T02]
+   ] [
+      list [list [Coeff_ring 0] [Coeff_ring named T12]]\
+        [list [Coeff_ring named T12] [Coeff_ring 0]]
+   ]
+]
+set code [latex_inequalities {0 1} twist $PROPgen(twist4)]
+% \end{tcl}
+% On the surface, it does:
+% \begin{enumerate}
+% \item[0:1]
+%   \(T_{0,1} T_{1,0} - T_{0,2} T_{2,0}  \geqslant 0\).
+% \item[3]
+%   \(T_{2,0} + T_{1,0} T_{1,2} - T_{1,0} - T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[6]
+%   \(T_{0,2} + T_{0,1} T_{1,2} - T_{0,1} - T_{0,2} T_{1,2}  \geqslant 0\).
+% \item[1:17]
+%   \(T_{0,1} T_{2,0} - T_{0,2} T_{1,0} + T_{0,2} T_{1,0} T_{1,2} - 
+%     T_{0,1} T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[19]
+%   \(T_{1,0} + T_{1,2} T_{2,0} - T_{2,0} - T_{1,0} T_{1,2}  \geqslant 0\).
+% \item[20]
+%   \(T_{1,2} ( T_{2,0} + T_{1,0} T_{1,2} - T_{1,0} - T_{1,2} T_{2,0} )  \geqslant 0\).
+% \item[23]
+%   \(T_{0,2} + T_{0,1} T_{1,2} - T_{0,1} - T_{0,2} T_{1,2}  \geqslant 0\).
+% \item[24]
+%   \(T_{1,2} ( T_{0,1} + T_{0,2} T_{1,2} - T_{0,2} - T_{0,1} T_{1,2} )  \geqslant 0\).
+% \end{enumerate}
+% Unfortunately, inequalities 3 and 19 combine to \((T_{2,0} 
+% -\nobreak T_{1,0}) (1 -\nobreak T_{1,2}) = 0\) and likewise 
+% inequalities 6 and 24 combine to \((T_{0,2} -\nobreak T_{0,1}) 
+% (1 -\nobreak T_{1,2}) T_{1,2} = 0\). For any \(T_{1,2} \notin \{0,1\}\) 
+% this kills off the left--right asymmetry, making the sides of rule 0 
+% indistinguishable. The degenerate case \(T_{1,2}=0\) is not so 
+% interesting either, but it deserves to be spelt out in full:
+% \begin{tcl}
+set code [latex_inequalities {0 1} twist [
+   PROP fromparts [Coeff_ring 0] [
+      list [Coeff_ring named T10] [Coeff_ring named T20]
+   ] [
+      list [Coeff_ring named T01] [Coeff_ring named T02]
+   ] [
+      list [list [Coeff_ring 0] [Coeff_ring 0]]\
+        [list [Coeff_ring 0] [Coeff_ring 0]]
+   ]
+]]
+% \end{tcl}
+% \begin{enumerate}
+% \item[0:1]
+%   \(T_{0,1} T_{1,0} - T_{0,2} T_{2,0}  \geqslant 0\).
+% \item[3]
+%   \(T_{2,0} - T_{1,0}  \geqslant 0\).
+% \item[6]
+%   \(T_{0,2} - T_{0,1}  \geqslant 0\).
+% \item[1:17]
+%   \(T_{0,1} T_{2,0} - T_{0,2} T_{1,0}  \geqslant 0\).
+% \item[19]
+%   \(T_{1,0} - T_{2,0}  \geqslant 0\).
+% \item[23]
+%   \(T_{0,2} - T_{0,1}  \geqslant 0\).
+% \end{enumerate}
+% Since inequalities 3 and 19 combine to make \(T_{2,0} = T_{1,0}\), 
+% another round of simplification gives
+% \begin{tcl}
+set code [latex_inequalities {0 1} twist [
+   PROP fromparts [Coeff_ring 0] [
+      list [Coeff_ring named T10] [Coeff_ring named T10]
+   ] [
+      list [Coeff_ring named T01] [Coeff_ring named T02]
+   ] [
+      list [list [Coeff_ring 0] [Coeff_ring 0]]\
+        [list [Coeff_ring 0] [Coeff_ring 0]]
+   ]
+]]
+% \end{tcl}
+% \begin{enumerate}
+% \item[0:1]
+%   \(T_{1,0} ( T_{0,1} - T_{0,2} )  \geqslant 0\).
+% \item[6]
+%   \(T_{0,2} - T_{0,1}  \geqslant 0\).
+% \item[1:17]
+%   \(T_{1,0} ( T_{0,1} - T_{0,2} )  \geqslant 0\).
+% \item[23]
+%   \(T_{0,2} - T_{0,1}  \geqslant 0\).
+% \end{enumerate}
+% Taking \(T_{1,0}=0\) would mean strict inequalities are not 
+% conserved under composition, so we're forced to make \(T_{1,0}>0\) 
+% and thus see all left--right asymmetry disappear. Again.
+% 
+% \clearpage
+% 
+% Backing out another step, one might try \(T_{1,2} \neq T_{2,1}\), 
+% or (to pick one orientation of it) \(T_{2,1} = T_{1,2} + a\) where 
+% \(a>0\). This amounts to
+% \begin{tcl}
+set PROPgen(twist5) [
+   PROP fromparts [Coeff_ring 0] [
+      list [Coeff_ring named T10] [Coeff_ring named T20]
+   ] [
+      list [Coeff_ring named T01] [Coeff_ring named T02]
+   ] [
+      list [list [Coeff_ring 0] [Coeff_ring named T12]]\
+        [list [
+           Coeff_ring + [Coeff_ring named T12] [Coeff_ring named a]\
+        ] [Coeff_ring 0]]
+   ]
+]
+set code [latex_inequalities {0 1} twist $PROPgen(twist5)]
+% \end{tcl}
+% \begin{enumerate}
+% \item[0:1]
+%   \(T_{0,1} T_{1,0} - T_{0,2} T_{2,0}  \geqslant 0\).
+% \item[3]
+%   \(T_{2,0} + T_{1,0} T_{1,2} + a T_{1,0} - T_{1,0} - T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[6]
+%   \(T_{0,2} + T_{0,1} T_{1,2} - T_{0,1} - T_{0,2} T_{1,2} - a T_{0,2}  \geqslant 0\).
+% \item[1:17]
+%   \(T_{0,1} T_{2,0} - T_{0,2} T_{1,0} + a T_{0,1} T_{1,0} + 
+%     T_{0,2} T_{1,0} T_{1,2} + a T_{0,2} T_{1,0} - 
+%     T_{0,1} T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[19]
+%   \(T_{1,0} + T_{1,2} T_{2,0} - T_{2,0} - T_{1,0} T_{1,2} - a T_{1,0}  \geqslant 0\).
+% \item[20]
+%   \(T_{1,2} T_{2,0} + T_{1,0} T_{1,2}^2 + 2 a T_{1,0} T_{1,2} + a T_{2,0} 
+%     + a^2 T_{1,0} - T_{1,0} T_{1,2} - T_{1,2}^2 T_{2,0} - a T_{1,0} - 
+%     a T_{1,2} T_{2,0}  \geqslant 0\).
+% \item[23]
+%   \(T_{0,2} + T_{0,1} T_{1,2} - T_{0,1} - T_{0,2} T_{1,2} - a T_{0,2}  \geqslant 0\).
+% \item[24]
+%   \(T_{1,2} ( T_{0,1} + T_{0,2} T_{1,2} + a T_{0,2} - T_{0,2} - 
+%       T_{0,1} T_{1,2} )  \geqslant 0\).
+% \end{enumerate}
+% Unfortunately, this too comes out as a system where equality holds 
+% in all inequalities. The argument comes out as follows:
+% \begin{enumerate}
+%   \item
+%     In view of inequality 1, one would hope for \(T_{1,0} > T_{2,0}\) 
+%     or \(T_{0,1} > T_{0,1}\).
+%   \item
+%     Inequalities 3 and 19 combine to make \(a T_{1,0} = (T_{1,0} 
+%     -\nobreak T_{2,0}) (1 -\nobreak T_{1,2})\). Combining this with 
+%     inequality 6 yields
+%     \begin{equation} \label{Eq1:T21=T12+a}
+%       T_{1,0} (T_{0,2} - T_{0,1}) (1 - T_{1,2}) \geqslant
+%       (T_{1,0} - T_{2,0}) (1 - T_{1,2}) T_{0,2} \text{.}
+%     \end{equation}
+%     Depending on the sign of $1 - T_{1,2}$, this provides three 
+%     possibilities.
+%   \item
+%     If \(T_{1,2} = 1\) then \(a = 0\) and we're back to a case 
+%     previously considered.
+%   \item
+%     If \(T_{1,2} < 1\) then \eqref{Eq1:T21=T12+a} can be divided by 
+%     $1 - T_{1,2}$ and simplifies to \(-T_{1,0}T_{0,1} \geqslant 
+%     -T_{0,2}T_{2,0}\). Since this is the opposite of inequality 1, 
+%     it follows that equality holds both in it and in inequality 6. 
+%     Hence the sides of rule 0 are indistinguishable.
+%   \item
+%     If \(T_{1,2} > 1\) then in particular \(T_{1,2}>0\) and it 
+%     follows from combining inequalities 6 and 24 that \(aT_{0,2} = 
+%     (T_{0,1} -\nobreak T_{0,2}) (T_{1,2} -\nobreak 1)\). Hence
+%     \begin{equation*}
+%       (T_{1,0} - T_{2,0}) (1 - T_{1,2}) T_{0,2} =
+%       a T_{1,0} T_{0,2} = 
+%       T_{1,0} (T_{0,1} - T_{0,2}) (T_{1,2} - 1) \text{,}
+%     \end{equation*}
+%     which first simplifies to \((T_{2,0} -\nobreak T_{1,0}) T_{0,2} 
+%     = T_{1,0} (T_{0,1} -\nobreak T_{0,2})\) and then to 
+%     \(T_{2,0} T_{0,2} = T_{1,0} T_{0,1}\). Again there equality 
+%     hold in inequality 1, and the sides of rule 0 are 
+%     indistinguishable.
+% \end{enumerate}
+% 
+% 
+% \subsubsection{A method of matrices}
+% 
+% So, when neither \(T_{1,2} > 1\), \(T_{1,2} < 1\), or \(T_{1,2} = 
+% 1\) works, then make $T_{1,2}$ incomparable with $1$! Concretely, 
+% one can take
+% \begin{equation}
+%   T_{1,2} = T_{2,1} = 
+%   \begin{pmatrix} 0 & 1 \\ 1 & 0 \end{pmatrix} =
+%   \phi({}^1 \mathsf{X}^1)
+% \end{equation}
+% since this makes \(T_{1,2}^2 = 1\) and thus renders inequality 20 
+% equivalent to inequality 19 and inequality 24 equivalent to 
+% inequality 23, instead of having them oppositely directed as would 
+% have been the case for positive real $T_{1,2}$. It does not avoid 
+% the fact that inequalities 3 and 19 are each other's opposites, so 
+% one has to accept equality here, meaning \((T_{2,0} -\nobreak 
+% T_{1,0}) (1 -\nobreak T_{1,2}) = 0\) and hence \(T_{2,0} = 
+% T_{1,0}\) since $1 - T_{1,2}$ is invertible in 
+% $\mathbb{R}^{2 \times 2}$. This brings us to
+% \begin{tcl}
+set code [latex_inequalities {0 1} twist [
+   PROP fromparts [Coeff_ring 0] [
+      list [Coeff_ring named T10] [Coeff_ring named T10]
+   ] [
+      list [Coeff_ring named T01] [Coeff_ring named T02]
+   ] [
+      list [list [Coeff_ring 0] [Coeff_ring named T12]]\
+        [list [Coeff_ring named T12] [Coeff_ring 0]]
+   ]
+]]
+% \end{tcl}
+% producing
+% \begin{enumerate}
+% \item[0:1]
+%   \(T_{1,0} ( T_{0,1} - T_{0,2} )  \geqslant 0\).
+% \item[6]
+%   \(T_{0,2} + T_{0,1} T_{1,2} - T_{0,1} - T_{0,2} T_{1,2}  \geqslant 0\).
+% \item[1:17]
+%   \(T_{1,0} ( T_{0,1} - T_{0,2} - T_{0,1} T_{1,2} + T_{0,2} T_{1,2} )  \geqslant 0\).
+% \item[23]
+%   \(T_{0,2} + T_{0,1} T_{1,2} - T_{0,1} - T_{0,2} T_{1,2}  \geqslant 0\).
+% \item[24]
+%   \(T_{1,2} ( T_{0,1} + T_{0,2} T_{1,2} - T_{0,2} - T_{0,1} T_{1,2} )  \geqslant 0\).
+% \end{enumerate}
+% where, as stated, inequalities 6, 23, and 24 are really equivalent 
+% (and many products appear in the wrong order; it should be 
+% $T_{0,\bullet}$ leftmost, $T_{1,2}$ in the middle, and 
+% $T_{\bullet,0}$ rightmost).
+% 
+% 
+% \subsection{Tensor attempt for project course}
+% 
+% In the Autumn of 2013, I suggested the problem of finding solutions 
+% to these kind of ordering problems using genetic algorithms as 
+% problem for a student project course. Nice utilisation of available 
+% workforce resources, but first I must of course construct the 
+% system of inequalities that the students need to solve.
+% 
+% More concretely, the problem is to order expressions with abstract 
+% twist $T$. For production comparisons, the PROP would be 
+% $\mathrm{Hom}_\mathbb{R}\bigl( (\mathbb{R}^2)^{\otimes\bullet}, 
+% (\mathbb{R}^2)^{\otimes\bullet} \bigr)$, where the underlying 
+% vector space is $2$-dimensional simply because it is the first 
+% nontrivial example. For constructing the inequalities, the PROP is 
+% instead $\mathrm{Hom}_{\mathbb{Z}[X]}\bigl( 
+% (\mathbb{Z}[X]^2)^{\otimes\bullet}, 
+% (\mathbb{Z}[X]^2)^{\otimes\bullet} \bigr)$, where $X$ is a set of 
+% 16 variables (one for each element of $T$).
+% 
+% \begin{tcl}
+set varL {}
+foreach i {1 2 3 4} {
+   foreach j {1 2 3 4} {
+      lappend varL T${i}${j}
+   }
+}
+% \end{tcl}
+% The matrix elements are named $T_{ij}$ for \(i,j \in \{1,2,3,4\}\) 
+% for maximal familiarity.
+% 
+% \begin{tcl}
+interp alias {} Coeff_ring {} ::mtmtcl::rings::semigroup_algebra {
+   ::mtmtcl::rings::integers::all
+} [list ::mtmtcl::groups::power_product_monoid_1.3 [
+   list ::mtmtcl::sets::variable_set $varL {}
+]]
+interp alias {} PROP {} mtmtcl::matprop::homfdpower 2 Coeff_ring
+% \end{tcl}
+% 
+% \begin{tcl}
+set epsilon [list [
+   list [Coeff_ring basiselement [Coeff_ring basis named E]]\
+     [Coeff_ring basiselement [Coeff_ring basis named F]]
+]]
+set code [mtmtcl::latex::convertto [PROP export $epsilon {}]]
+% \end{tcl}
 % 
 % \begin{tcl}
 %</PROPcompare>

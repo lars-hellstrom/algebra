@@ -87,6 +87,9 @@
 \providecommand*{\Ldash}{%
    \hspace{0.166667em}\textemdash\hspace*{0.166667em}%
 }
+\providecommand*{\Rdash}{%
+   \hspace*{0.166667em}\textemdash\hspace{0.166667em}%
+}
 \providecommand*{\dash}{\textendash\hspace{0pt}}
 
 \newcommand{\package}[1]{\textsf{#1}}
@@ -129,9 +132,12 @@
 }
 \newcommand{\restr}[2]{#1_{\lvert #2}}
 
+\stringtypeheading{rich entry}{Rich network entries:}
+
 
 \begin{document}
 \DocInput{network2.dtx}
+\PrintIndex
 \end{document}
 %</driver>
 % \fi
@@ -154,9 +160,20 @@
 % 
 % \section{Theory and introduction}
 % 
-% Best current reference for this is the Hopf-rules paper.
-% 
-% ---
+% Best current reference for this is \emph{Network Rewriting I: The 
+% Foundation}. 
+% \iffalse
+% The main points of deviation from the formalism there are:
+% \begin{itemize}
+%   \item
+%     Indices (in particular head and tail indices) here start at $0$ 
+%     rather than $1$, since \Tcl\ uses zero-based-indexing for lists.
+%   \item
+%     Transferrence matrices are stored sparsely, as lists of (the 
+%     indices of) those positions which are $0$.
+% \end{itemize}
+% In other words, the differences are very small.
+% \fi
 % 
 % 
 % \section{Preparations}
@@ -5526,6 +5543,7 @@ proc network::pure::order_graded_components {args} {
 % 
 % 
 % \subsection{Whole component sequencing}
+% \label{Ssec:UtvidgaPartialording}
 % 
 % In order to overcome the complexity problems that the sequencing 
 % from observations suffers from, a whole-component algorithm is in 
@@ -5872,7 +5890,9 @@ proc network::pure::component_DU_levels {NW support {levelL ""}} {
 %     |ordered_graded_components| \begin{regblock}[\regstar]
 %       -levellist \word{list} \regalt
 %       -orderchunk \begin{regblock} component \regalt level 
-%         \end{regblock}
+%         \end{regblock} \regalt
+%       -prehints \word{item-pair-list} \regalt
+%       -posthints \word{item-pair-list}
 %     \end{regblock} \word{network}
 %   \end{displaysyntax}
 %   and the return value is the standard list of (components $=$) 
@@ -5886,10 +5906,16 @@ proc network::pure::component_DU_levels {NW support {levelL ""}} {
 %     computing default \texttt{-levellist}. This is slightly slower 
 %     (maybe half as fast in common cases) but produces superior 
 %     results in a fair number of cases. (LH)}
+%   \changes{2.8}{2013/02/04}{Exposing prehints and posthints 
+%     features of \texttt{cosequence\_levels}. (LH)}
 %   \begin{tcl}
 proc network::pure::ordered_graded_components {args} {
    set NW [lindex $args end]
-   set Opt(-orderchunk) component
+   array set Opt {
+      -orderchunk component
+      -prehints   {}
+      -posthints  {}
+   }
    array set Opt [lrange $args 0 end-1]
    if {![info exists Opt(-levellist)]} then {
       set Opt(-levellist) [vertex_levels4 $NW]
@@ -5915,9 +5941,9 @@ proc network::pure::ordered_graded_components {args} {
       foreach comp $compL {
          set res2 {}
          foreach level [
-            cosequence_levels {} [
+            cosequence_levels $Opt(-prehints) [
                component_DU_levels $NW $comp $Opt(-levellist)
-            ] {}
+            ] $Opt(-posthints)
          ] {
             set res3 {}
             foreach item $level {lappend res3 [lrange $item 0 1]}
@@ -5935,6 +5961,77 @@ proc network::pure::ordered_graded_components {args} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% \iffalse
+% 
+% \subsection{Continuous component sequencing}
+% 
+% This is a rather wild idea, which has one origin in the problem of 
+% finding a \emph{layout} (see Subsection~\ref{Ssec:Layout}) for a 
+% network. A layout assigns an $y$-coordinate to each level and an 
+% $x$-coordinate to each item within a level. If the widths of 
+% individual items are fixed, a sequencing of these items within a 
+% level is given, and the items are packed tightly, then the 
+% relative positions within a level are uniquely determined, but the 
+% absolute positions are not since nothing constrains the horizontal 
+% position of the slug that the level items have been fused into. 
+% Obviously some principle for positioning levels relative to each 
+% other is needed.
+% 
+% An obvious starting point for such a principle would be to look at 
+% the edges\Ldash or rather edge segments, as an edge need not go 
+% between two adjacent levels\Rdash between two levels, and a natural 
+% quantity to minimise is their combined lengths. When several 
+% lengths are to be combined in this kind of stuation, one usually 
+% does so by taking the sum of the \emph{squares} of the lengths, as 
+% that makes the algebra a lot simpler. In this situation, it for 
+% example means that only the $x$-direction distances matter, as the 
+% $y$-direction distances are constant. It also has the nice property 
+% that the tension is distributed among the edges, since \(a^2 + 0^2 
+% > (\frac{a}{2})^2 + (\frac{a}{2})^2\). From an algebraic 
+% perspective, one really only does a least squares fitting and can 
+% therefore compute the result in one go by making a suitable 
+% projection!
+% 
+% Using this quantity as the one to optimise may not work too well 
+% together with the sequencing algorithm of 
+% Subsection~\ref{Ssec:UtvidgaPartialording} however, as that has a 
+% tendency to sometimes make large jumps\Dash typically in the middle 
+% of an edge between two very distant levels. Thus one may see 
+% layouts like
+% \[
+%   \begin{matrix}
+%     a& b& c& d\\
+%     b& c& d& a\\
+%     b& c& d& a\\
+%     b& c& d& a
+%   \end{matrix}
+%   \quad\text{rather than}\quad
+%   \begin{matrix}
+%     a& b& c& d\\
+%     b& a& c& d\\
+%     b& c& a& d\\
+%     b& c& d& a
+%   \end{matrix}
+% \]
+% which humanly seems more natural; the former will have a long 
+% $a$--$a$ edge between the first two levels, and minimising the 
+% square-sum rather than e.g. the sum will in this case probably be 
+% for the worse. In order to let a square-sum objective show its full 
+% potential, it should really be allowed to influence the sequencing 
+% of levels as well as the positioning of level slugs! But the 
+% sequencing of levels is a very different beast to tame, as the 
+% space over which one optimises is discrete rather than continuous.
+% 
+% A trivial approach to optmising the sequencing would be to consider 
+% the graph with all possible sequencings as vertices, where there are 
+% edges between two sequencings that differ only by a transposition 
+% of two objects; starting at some vertex in this graph, one would look 
+% at all neighbours, move to the one with smallest value of the 
+% objective function, and repeat until a minimum is found. 
+% 
+% \fi
 % 
 % 
 % 
@@ -6639,7 +6736,7 @@ proc network::wfb::instances,region {NW corr} {
 %     is less work to generate and process this queue element that it 
 %     would be to avoid it. Generating a queue element also means it 
 %     is checked that the head\slash tail index of the edges match, 
-%     which means edge propagation needs not explicitly check this. 
+%     which means edge propagation need not explicitly check this. 
 %     \begin{tcl}
 proc network::wfb::instances,expand {corr NWG NWH vG vH} {
    set queue [list [list vertex $vG $vH]]
@@ -10084,6 +10181,7 @@ proc network::rich::drawit_bracketed {canvas appearance x0 y0 args} {
 % 
 % 
 % \subsection{Level layout}
+% \label{Ssec:Layout}
 % 
 % The level layout for networks is based on a decomposition of the 
 % network into components and the components into levels, such as 
@@ -10154,6 +10252,15 @@ namespace eval network::rich {variable level-layout-Tk_defaults {
    -edgew 5  -edgeh 10
 %   \end{tcl}
 %   The nominal width and height respectively of an edge in a level.
+%   \begin{tcl}
+   -vsizes {* {20 20}}
+%   \end{tcl}
+%   This option is a \word{vertex-sizes} lists, as explained below. 
+%   It is not used by the classical procedures (which instead have a 
+%   mandatory argument for this if they need it), but the experience 
+%   so far has been that this default is never changed, so newer 
+%   procedures will rather perfer to have an option for this.
+%   \changes{2.7}{2012/05/14}{\texttt{-vsizes} default added. (LH)}
 %   \begin{tcl}
    -haligncmd align_active_midpoints
 %   \end{tcl}
@@ -10314,6 +10421,12 @@ proc network::rich::align_active_midpoints {NW belowL aboveL} {
 %       component is an flat list of items (i.e., there is no level 
 %       grading). If not given, |graded_components| uses its default 
 %       for this.
+%     \item[-prehints]
+%       Early hints for relative order of items (`|vertex |$v$', 
+%       `|edge |$e$~\textit{level}').
+%     \item[-prehints]
+%       Late hints for relative order of items (`|vertex |$v$', 
+%       `|edge |$e$~\textit{level}').
 %   \end{ttdescription}
 %   
 %   The first order of business is to interpret options and defaults.
@@ -10334,7 +10447,9 @@ proc network::rich::make_level-layout-Tk {vsizes args} {
 %   decomposition of the network.
 %   \begin{tcl}
    set call [list [namespace parent]::pure::ordered_graded_components]
-   foreach opt {-levellist -componentlist -seqcmd -orderchunk} {
+   foreach opt {
+      -levellist -componentlist -orderchunk -prehints -posthints
+   } {
       if {[info exists Opt($opt)]} then {
          lappend call $opt $Opt($opt)
       }
@@ -10715,6 +10830,9 @@ proc network::rich::ecurve-Tk-raw_by_level {dict args} {
 %   formula for the case that knots and tangents at knots are given, 
 %   though with some extra tension to avoid certain inflexions. This 
 %   is computed by the |MetaFont_controls| helper procedure.
+%   \changes{2.6}{2011/01/21}{Not using \texttt{atleast} for MetaFont 
+%     controls, as it could lead to control points being very close 
+%     to their knots. The results look better without it! (LH)}
 %   
 %   Internal edges have one curve segment more than they got 
 %   pass-through levels (i.e., triplets in their |Node| entry), so 
@@ -10757,7 +10875,7 @@ proc network::rich::ecurve-Tk-raw_by_level {dict args} {
             set v 2
          } else {
             set seg\
-              [MetaFont_controls $x0 $y0 $ofs0 $x $y [list 0 $h 0 1] 1 1]
+              [MetaFont_controls $x0 $y0 $ofs0 $x $y [list 0 $h 0 1] 0 1]
             if {[llength $L]} then {
                set seg [concat\
                  [lrange $L end-1 end] [lrange $seg 0 1] $seg]
@@ -10773,7 +10891,7 @@ proc network::rich::ecurve-Tk-raw_by_level {dict args} {
          set ofs [lindex $Look([lindex $NW(pure) 0 $v 0])\
            1 [lindex $e 3]]
          lappend ofs 0 1
-         set seg [MetaFont_controls $x0 $y0 $ofs0 $x $y $ofs 1 1]
+         set seg [MetaFont_controls $x0 $y0 $ofs0 $x $y $ofs 0 1]
          if {[llength $L]} then {
             set seg [concat [lrange $L end-1 end] [lrange $seg 0 1] $seg]
          }
@@ -11154,20 +11272,22 @@ proc network::rich::MetaFont_controls {X0 Y0 ofs0 X3 Y3 ofs3 atleast\
 %     u ={}& \operatorname{arsinh}( \alpha t - \beta ) \\
 %     t ={}& \alpha^{-1} \sinh u + \beta/\alpha \\
 %     \frac{\mathit{dt}}{\mathit{du}} ={}& \alpha^{-1} \cosh u
-%   \end{aligned} \right\} = \\ ={}&
+%   \end{aligned} \right\} 
+%     = \\ ={}&
 %   \int_{-\operatorname{arsinh}\beta}^{\operatorname{arsinh}(\alpha-\beta)}
-%     \alpha^{-1}\cosh^2 u \, \mathit{du} = \\ ={}&
+%     \alpha^{-1}\cosh^2 u \, \mathit{du} 
+%     = \displaybreak[0]\\ ={}&
 %   \int_{-\operatorname{arsinh}\beta}^{\operatorname{arsinh}(\alpha-\beta)}
 %     \tfrac{1}{2\alpha}\cosh(2u) + \tfrac{1}{2\alpha} \, \mathit{du} 
-%     = \\ ={}&
+%     = \displaybreak[0]\\ ={}&
 %   \biggl[ \frac{1}{4\alpha} \sinh(2u) + \frac{u}{2\alpha} \biggr]
 %     _{u = \operatorname{arsinh}\beta}
 %     ^{u = \operatorname{arsinh}(\alpha-\beta)}
-%     = \\ ={}&
+%     = \displaybreak[0]\\ ={}&
 %   \biggl[ \frac{1}{2\alpha} \sinh u \cosh u + \frac{u}{2\alpha} \biggr]
 %     _{u = \operatorname{arsinh}\beta}
 %     ^{u = \operatorname{arsinh}(\alpha-\beta)}
-%     = \\ ={}&
+%     = \displaybreak[0]\\ ={}&
 %   \frac{1}{2\alpha} \Bigl(
 %     (\alpha-\beta) \sqrt{ (\alpha-\beta)^2 + 1 } + 
 %     \operatorname{arsinh}(\alpha-\beta)
@@ -11745,15 +11865,16 @@ proc network::rich::SVG_appearances {inD} {
 %    \begin{macrocode}
 %<*sdpgf>
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{sdpgf}[2009/12/02 Space-delimited PGF pictures]
+\ProvidesPackage{sdpgf}[2011/01/24 Space-delimited PGF pictures]
 \ProcessOptions
 \RequirePackage{pgfcore}
+\usepgfmodule{shapes}
 %    \end{macrocode}
 % 
 % The characteristic trait of this frontend is that it uses \TeX\ 
 % commands with \emph{space-delimited} arguments. First, this is more 
 % compact than brace-delimiting (one delimiter character per argument 
-% instead of two. Second, it permits ordinary text wrapping commands 
+% instead of two). Second, it permits ordinary text wrapping commands 
 % to reflow the code; this can do wonders for reducing the number of 
 % lines a picture takes to draw, and is thus also of great help for 
 % keeping the code visually compact (without appearing rigid).
@@ -11927,6 +12048,75 @@ proc network::rich::SVG_appearances {inD} {
 %    \end{macrocode}
 % \end{macro}
 % 
+% \begin{macro}{\SDPGF@@TR}
+%   The |\TR| command creates a text node with \texttt{rectangle} 
+%   shape and a particular anchoring at a particular point. The syntax 
+%   is
+%   \begin{quote}
+%     |\TR| \meta{x} \meta{y} \meta{angle} \meta{anchor} 
+%     \meta{label text}
+%   \end{quote}
+%   where \meta{anchor} and \meta{label text} are as for the 
+%   |\pfgnode| command. Note that these arguments may well contain 
+%   spaces themselves, so the caller must take care to brace them 
+%   when necessary. The \meta{x} and \meta{y} arguments are 
+%   coordinates in |\sdpgfunit|s, and the \meta{angle} is in degrees; 
+%   use \texttt{0} for an ordinary horizontal baseline.
+%   
+%   The node path is always discarded. The coordinate transformation 
+%   needed to put the node somewhere other than the origin is kept 
+%   within a group.
+%   
+%   \changes{2.6}{2011/01/24}{Command added. (LH)}
+%   
+%    \begin{macrocode}
+\def\SDPGF@@TR #1 #2 #3 #4 #5 {{%
+   \pgftransformxshift{#1\sdpgfunit}%
+   \pgftransformyshift{#2\sdpgfunit}%
+   \pgftransformrotate{#3}%
+   \pgfnode{rectangle}{#4}{#5}{}{\pgfusepath{discard}}%
+}}
+%    \end{macrocode}
+%   Having waded through a trace of this command, I must say I am 
+%   sorely tempted to rewrite it in terms of |\pgfqbox| and\slash or 
+%   |\pgfqboxsynced| instead\Dash there's simply no reason to put 
+%   \TeX\ through all that just for this. On the other hand, it would 
+%   make the \textsf{sdpgf} package quite a bit larger. An 
+%   interesting compromise could be to implement a |\Tr| command that 
+%   handles everything but rotation directly using |\pgfqbox| and 
+%   \TeX\ box manuoevres\dots
+% \end{macro}
+% 
+% \begin{macro}{\SDPGF@Fs}
+% \begin{macro}{\SDPGF@FS}
+%   The |\Fs| command is a compact alias for |\fontsize| (i.e., it 
+%   sets the font size). The |\FS| command does the same, and in 
+%   addition calls |\selectfont| to actually change the current font.
+%   The  syntaxes are
+%   \begin{quote}
+%     |\Fs{|\meta{units or length}|}|\\
+%     |\FS{|\meta{units or length}|}|
+%   \end{quote}
+%   since these command are typically used within a space-delimited 
+%   \meta{label text}, and would therefore be impractical to delimit 
+%   with spaces.
+%   
+%   The \meta{units \emph{or} length} part exploits a 
+%   not-so-well-known feature of |\fontsize|, namely that it takes a 
+%   \meta{dimen} as argument but will supply |pt| as default unit if 
+%   none is given. |\Fs| and |\FS| does the same, but supplies 
+%   |\sdpgfunit| as the default unit.
+%   
+%    \begin{macrocode}
+\def\SDPGF@@Fs#1{\fontsize{#1\sdpgfunit}\z@}
+\def\SDPGF@@FS#1{\SDPGF@@Fs{#1}\selectfont}
+%    \end{macrocode}
+%   The reason it works to merely insert an |\sdpgfunit| like that is 
+%   that |\fontsize| internally uses |\@defaultunits|, which causes 
+%   everything after the first syntactically valid \meta{dimen} to be 
+%   gobbled. It's a hack, but it works beautifully.
+% \end{macro}\end{macro}
+% 
 % 
 % \begin{environment}{sdpgf}
 %   The |sdpgf| environment is a |pgfpicture| environment with some 
@@ -11986,6 +12176,9 @@ proc network::rich::SVG_appearances {inD} {
    \let\S\SDPGF@@S
    \let\re\SDPGF@@re
    \let\ov\SDPGF@@ov
+   \let\TR\SDPGF@@TR
+   \let\Fs\SDPGF@@Fs
+   \let\FS\SDPGF@@FS
 }{\endpgfpicture}
 %    \end{macrocode}
 % \end{environment}
@@ -12019,30 +12212,48 @@ proc network::rich::SVG_appearances {inD} {
 %       The unit actually used in the result will be the value of 
 %       |-unit| divided by the value of |-division|; setting 
 %       |-division| to $2$ can avoid making a lot of coordinates 
-%       ending in |.5|. Defaults to |1|.
+%       ending in |.5| when not rounding. Defaults to |1|.
+%     \item[-region]
+%       Takes as value a region which may be highlighted in the 
+%       drawing. Defaults to `|{} {} {}|', i.e., the empty region.
+%     \item[-regionstyle]
+%       This option controls how a |-region| is highlighted. 
+%       If it is |colour| then the PGF colour is set to the 
+%       |-midcolour| when things part of the region are being drawn. 
+%       If it is |cutmarks| then the cut positions on the edges are 
+%       marked by short lines intersecting the edge curves at right 
+%       angles. If it is |gone| then the region is simply omitted. 
+%       The default is |cutmarks|.
+%       \changes{2.8}{2013/02/03}{Implemented showing regions in PGF,
+%         with styles of \texttt{cutmarks} and \texttt{gone}. (LH)}
+%     \item[-midcolour]
+%       The colour to use for vertices and edge-pieces in the region; 
+%       defaults to |green|. This becomes an argument of 
+%       |\pgfsetcolor|.
+%     \item[-cuthalf]
+%       Half the length of a cutmark, in canvas units. Defaults to 
+%       $3$.
 %     \iffalse
 %     \item[-round]
 %       Boolean to control whether coordinates being output should be 
 %       rounded to integers. Defaults to true.
-%     \item[-region]
-%       Takes as value a region which may be highlighted in the 
-%       drawing. Defaults to `|{} {} {}|', i.e., the empty region.
 %     \item[-incolour]
 %       The colour to use for edges on the in-boundary of the region; 
 %       defaults to |blue|.
 %     \item[-outcolour]
 %       The colour to use for edges on the out-boundary of the region; 
 %       defaults to |red|.
-%     \item[-midcolour]
-%       The colour to use for vertices, internal edges, and in\&out 
-%       edges of the region; defaults to |green|.
 %     \fi
 %   \end{ttdescription}
 %   
 %   \begin{tcl}
 %<*pkg>
 proc network::rich::as_PGF {vertexD args} {
-   array set Opt {-unit 1pt -division 1 -round 1}
+   array set Opt {
+      -unit 1pt -division 1
+      -region {{} {} {}} -regionstyle cutmarks 
+      -cuthalf 3.0 -midcolour green
+   }
    array set Opt $args
    if {[info exists Opt(-val)]} then {
       array set NW $Opt(-val)
@@ -12062,50 +12273,178 @@ proc network::rich::as_PGF {vertexD args} {
    }
    append res [format "{%s%s}" $factor $unit] \n
 %   \end{tcl}
-%   First the edges are drawn.
+%   The edges are drawn first, the vertices last. 
+%   
+%   The |-region| may cause edges to be subdivided, so the first step 
+%   in processing it must be to figure out how many pieces there are 
+%   of each edge. This information can be computed from the 
+%   \word{output-list} and \word{input-list} of the region, but this 
+%   is not straightforward as the extended labelling of edges applied 
+%   in these lists only has separate labels for the pieces \emph{in} 
+%   the region, leaving no room for labelling the pieces not in the 
+%   region. The easist way of dealing with this seems to be to 
+%   relabel the region legs so that each piece has its own label; 
+%   that implies also computing lists |OL| and |IL| of region legs 
+%   after relabelling.
 %   \begin{tcl}
-   foreach L $NW(ecurve-Tk-raw) {
-      set dataL {}
-      foreach {x y} $L {
-         lappend dataL [expr {round($x*$Opt(-division))}]\
-           [expr {round(-$y*$Opt(-division))}]
+   set OL {}
+   set IL {}
+%   \end{tcl}
+%   Recall that an extended label has the form $l+mi$, where $l$ is 
+%   the underlying edge label, $m$ is the number of edges, and $i$ is 
+%   the piece index. Making room for pieces between those that are in 
+%   the region requires doubling the $i$ part, but there are two 
+%   cases to consider. If the edge tail is in the region then a 
+%   straight doubling \(i \mapsto 2i\) is correct, but if the edge 
+%   tail is not in the region then one must make it \(i \mapsto 
+%   2i+1\) where the extra $1$ is for the piece containing the tail. 
+%   The cases where that extra $1$ should be added are precisely 
+%   those where $l$ is in the \word{input-list}, since an input leg 
+%   can only have \(i=0\) if it is the first region piece of the 
+%   edge.
+%   
+%   It is convenient to also compute the multiplicities when doing 
+%   this relabelling; the |multL| list is indexed by edge label and 
+%   its elements give the necessary multiplicities. An input leg can 
+%   be the last piece of an edge, whereas an output leg is always 
+%   followed by another piece. And then the actual \emph{multiplicity} 
+%   is one higher still, since the index starts at $0$.
+%   \begin{tcl}
+   set multL {}
+   foreach e [lindex $NW(pure) 1] {lappend multL 1}
+   foreach e [lindex $Opt(-region) 1] {
+      set l [expr {$e % [llength $multL]}]
+      set i [expr {$e / [llength $multL] * 2}]
+      if {$l in [lindex $Opt(-region) 2]} then {incr i}
+      lappend OL [expr {$l + [llength $multL]*$i}]
+      if {$i+1 >= [lindex $multL $l]} then {
+         lset multL $l [expr {$i+2}]
       }
-      foreach {x0 y0} $dataL break
-      append res [format {  \m %d %d} $x0 $y0] \n
-      foreach {x1 y1 x2 y2 x3 y3} [lrange $dataL 2 end] {
-         set a [expr {$x3 - $x0}]
-         set b [expr {$y3 - $y1}]
-         set c [expr {$x1 - $x0}]
-         set d [expr {$y1 - $y0}]
-         set e [expr {$x2 - $x3}]
-         set f [expr {$y2 - $y3}]
-         set bound [expr {0.00002 * (abs($a) + abs($b))}]
-         if {abs( $a*$d - $b*$c ) > $bound ||\
-           abs( $a*$f - $b*$e ) > $bound ||\
-           !($a||$b) && ($c||$d||$e||$f)
-         } then {
-            append res {  \C}
-            foreach {x y} [list $x1 $y1 $x2 $y2 $x3 $y3] {
-               append res [format { %d %d} [expr {$x-$x0}]\
-                 [expr {$y-$y0}]]
-               set x0 $x; set y0 $y
-            }
-            append res \n
-         } elseif {$x3 != $x0 || $y3 != $y0} then {
-            append res [format {  \L %d %d} [expr {$x3-$x0}]\
-              [expr {$y3-$y0}]] \n
-            set x0 $x3; set y0 $y3
+   }
+   foreach e [lindex $Opt(-region) 2] {
+      set l [expr {$e % [llength $multL]}]
+      set i [expr {$e / [llength $multL] * 2}]
+      if {$l in [lindex $Opt(-region) 2]} then {incr i}
+      lappend IL [expr {$l + [llength $multL]*$i}]
+      if {$i >= [lindex $multL $l]} then {
+         lset multL $l [expr {$i+1}]
+      }
+   }
+%   \end{tcl}
+%   With the multiplicities known, the |EC| array is filled in with 
+%   the |raw| curves of the pieces. The index into this array is the 
+%   extended edge label of the piece.
+%   \begin{tcl}
+   set l -1; foreach curve $NW(ecurve-Tk-raw) m $multL {incr l
+      if {$m == 1} then {
+         set EC($l) $curve
+      } else {
+         set e $l
+         foreach piece [subdivide_rawcurve $curve $m] {
+            set EC($e) $piece
+            incr e [llength $multL]
          }
       }
-      append res {  \S} \n
+   }
+%   \end{tcl}
+%   Time now approaches to start generating code, but in the |gone| 
+%   and |colour| styles those edges which are in the region should be 
+%   treated specially (not generate any code, or be coloured, 
+%   respectively). The easiest way to achieve this is to remove their 
+%   pieces from the |EC| array and instead put them in the |EC2| array. 
+%   The easiest way of finding those pieces that are not legs seems to 
+%   be to remove any piece incident with a vertex in the region, even if 
+%   that means every piece will be looked at twice.
+%   \begin{tcl}
+   if {$Opt(-regionstyle) eq "gone" || $Opt(-regionstyle) eq "colour"} then {
+      set moveL [concat $OL $IL]
+      foreach v [lindex $Opt(-region) 0] {
+         lappend moveL {*}[lindex $NW(pure) 0 $v 1]
+         foreach e [lindex $NW(pure) 0 $v 2] {
+            lappend moveL [expr {
+              $e + [llength $multL]*([lindex $multL $e]-1)
+            }]
+         }
+      }
+      foreach e $moveL {
+         if {[info exists EC($e)]} then {
+            set EC2($e) $EC($e)
+            unset EC($e)
+         }
+      }
+   }
+%   \end{tcl}
+%   Drawing the pieces is not so difficult.
+%   \begin{tcl}
+   foreach e [array names EC] {
+      append res [rawcurve_as_PFG $Opt(-division) $EC($e)]
+   }
+   if {$Opt(-regionstyle) eq "colour" && [array size EC2]} then {
+      append res {  \begin{pgfscope} }\
+        [format {\pgfsetcolor{%s}} $Opt(-midcolour)] \n
+      foreach e [array names EC2] {
+         append res [rawcurve_as_PFG $Opt(-division) $EC2($e)]
+      }
+      append res {  \end{pgfscope}} \n
+   }
+%   \end{tcl}
+%   Then comes the matter of the cutmarks. These are most easily 
+%   located as endpoints of those curve pieces which are legs of the 
+%   region. The |L| list constructed has the structure
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regstar]
+%       \word{$x$} \word{$y$} \word{$x'$} \word{$y'$}
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where $(x,y)$ is the point to cut at and $(x',y')$ is another 
+%   point on the tangent at $(x,y)$ of the curve.
+%   \begin{tcl}
+   if {$Opt(-regionstyle) eq "cutmarks"} then {
+      set L {}
+      foreach e $OL {
+         lappend L  [lindex $EC($e) 0] [lindex $EC($e) 1] \
+           [lindex $EC($e) 2] [lindex $EC($e) 3]
+      }
+      foreach e $IL {
+         lappend L  [lindex $EC($e) end-1] [lindex $EC($e) end] \
+           [lindex $EC($e) end-3] [lindex $EC($e) end-2]
+      }
+      foreach {x y xp yp} $L {
+         set r [expr {$Opt(-cuthalf)/hypot($xp-$x,$yp-$y)}]
+         set u [expr {($yp-$y)*$r}]
+         set v [expr {($x-$xp)*$r}]
+         set x1 [expr {round($Opt(-division)*($x+$u))}]
+         set x2 [expr {round($Opt(-division)*($x-$u))}]
+         set y1 [expr {-round($Opt(-division)*($y+$v))}]
+         set y2 [expr {-round($Opt(-division)*($y-$v))}]
+         append res [format {  \m %d %d \L %d %d \S}\
+           $x1 $y1 [expr {$x2-$x1}] [expr {$y2-$y1}]] \n
+      }
    }
 %   \end{tcl}
 %   Then the vertices are drawn, using code in the |topgf| namespace.
 %   \begin{tcl}
    set shape_ns [namespace parent]::shape
    set to_ns [namespace current]::topgf
+   set colourscope 0
    set n -1; foreach v [lindex $NW(pure) 0] pos $NW(vpos-Tk) {incr n
       if {$n<2} then {continue}
+      switch -- $Opt(-regionstyle) "gone" {
+         if {$n in [lindex $Opt(-region) 0]} then {continue}
+      } "colour" {
+         if {$n in [lindex $Opt(-region) 0]} then {
+            if {!$colourscope} then {
+               append res {  \begin{pgfscope}} \n\
+                 [format {  \pgfsetcolor{%s}} $Opt(-midcolour)] \n
+               set colourscope 1
+            }
+         } else {
+            if {$colourscope} then {
+               append res {  \end{pgfscope}} \n
+               set colourscope 0
+            }
+         }
+      }
       foreach {type coords opts} [lindex $Look([lindex $v 0]) 0] {
          set cmdL [info commands ${to_ns}::${type}*]
          if {[llength $cmdL] == 1} then {
@@ -12129,7 +12468,9 @@ proc network::rich::as_PGF {vertexD args} {
               of: [join [info commands ${to_ns}::\[a-zA-Z\]*] ", "]"
          }
       }
-      
+   }
+   if {$colourscope} then {
+      append res {  \end{pgfscope}} \n
    }
 %   \end{tcl}
 %   A more optimised implementation could be to collect |draw| 
@@ -12140,6 +12481,133 @@ proc network::rich::as_PGF {vertexD args} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% \begin{proc}{rawcurve_as_PGF}
+%   This procedure takes a |raw| curve as a list of coordinates and 
+%   returns \texttt{sdpgf} code for drawing that curve. The call 
+%   synax is
+%   \begin{displaysyntax}
+%     |network::rich::rawcurve_as_PGF| \word{division} \word{curve}
+%   \end{displaysyntax}
+%   where \word{division} is what the \word{curve} coordinates will 
+%   be multiplied by before they are rounded to integers.
+%   \begin{tcl}
+proc network::rich::rawcurve_as_PFG {div coordL} {
+   set dataL {}
+   foreach {x y} $coordL {
+      lappend dataL [expr {round($x*$div)}] [expr {round(-$y*$div)}]
+   }
+   foreach {x0 y0} $dataL break
+   set res [format "  \\m %d %d\n" $x0 $y0]
+   foreach {x1 y1 x2 y2 x3 y3} [lrange $dataL 2 end] {
+      set a [expr {$x3 - $x0}]
+      set b [expr {$y3 - $y0}]
+      set c [expr {$x1 - $x0}]
+      set d [expr {$y1 - $y0}]
+      set e [expr {$x2 - $x3}]
+      set f [expr {$y2 - $y3}]
+      set bound [expr {0.00002 * (abs($a) + abs($b))}]
+      if {abs( $a*$d - $b*$c ) > $bound ||\
+        abs( $a*$f - $b*$e ) > $bound ||\
+        !($a||$b) && ($c||$d||$e||$f)
+      } then {
+         append res {  \C}
+         foreach {x y} [list $x1 $y1 $x2 $y2 $x3 $y3] {
+            append res [format { %d %d} [expr {$x-$x0}]\
+              [expr {$y-$y0}]]
+            set x0 $x; set y0 $y
+         }
+         append res \n
+      } elseif {$x3 != $x0 || $y3 != $y0} then {
+         append res [format {  \L %d %d} [expr {$x3-$x0}]\
+           [expr {$y3-$y0}]] \n
+         set x0 $x3; set y0 $y3
+      }
+   }
+   append res {  \S} \n
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{subdivide_rawcurve}
+%   This procedure takes a |raw| curve and a positive integer as 
+%   argument, subdivides the curve into that many pieces (of equal 
+%   ``time'' duration), and returns the list of pieces (each a |raw| 
+%   curve itself). The call syntax is
+%   \begin{displaysyntax}
+%     |network::rich::subdivide_rawcurve| \word{curve} \word{pieces}
+%   \end{displaysyntax}
+%   It should be observed that the pieces are returned in reverse 
+%   order (highest time first), since that turns out to be what makes 
+%   most sense for the intended application of subdividing an edge 
+%   (other procedure generate edge curves going from head to tail, 
+%   but in a subdivision it makes sense to have tailmost piece first).
+%   
+%   The idea for the algorithm is to go for the last subdivision 
+%   time, and split the corresponding curve segment (computing a new 
+%   knot and its associated control points). The second half of the 
+%   split (and any subsequent segments) is immediately data for a 
+%   piece. The first half of the split replaces the original segment 
+%   (and any segments after it), and then the algorithm continues 
+%   with the previous split. Working from the end is easier since the 
+%   times are relative to the start of the coordinate list.
+%   
+%   \begin{tcl}
+proc network::rich::subdivide_rawcurve {coordL pieces} {
+   set res {}
+   set step [expr {double([llength $coordL]/6)/$pieces}]
+   set stretch 1.0
+   for {
+      set time [expr {$step*($pieces-1)}]
+   } {$time > 1e-3} {
+      set time [expr {$time - $step}]
+   } {
+%   \end{tcl}
+%   Special case: if the time is less than $10^{-3}$ from an integer, 
+%   then cut at the already existing knot. This means you can't cut a 
+%   curve into thousands of pieces with this procedure, but doing 
+%   that probably wouldn't have been a good idea anyway.
+%   \begin{tcl}
+      if {abs($time-round($time)) < 1e-3} then {
+         set knot [expr {round($time)*6}]
+         lappend res [lrange $coordL $knot end]
+         set coordL [lrange $coordL 0 [set coordL {}; expr {$knot+1}]]
+         set stretch 1.0
+         continue
+      }
+%   \end{tcl}
+%   Otherwise one must compute the fraction $t$ at which to cut the 
+%   segment. If this is the last segment, then that fraction is 
+%   furthermore to be scaled by \textit{stretch}.
+%   \begin{tcl}
+      set t [expr {($time - int($time)) *\
+        ([llength $coordL]/6 < $time+1 ? $stretch : 1)}]
+      set pos [expr {int($time)*6}]
+      set L {}
+      foreach p {0 1 2 3 4 5} {
+         lappend L [expr {(1-$t)*[lindex $coordL [expr {$pos+$p}]] +\
+           $t*[lindex $coordL [expr {$pos+$p+2}]]}]
+      }
+      foreach p {0 1 2 3 6 7} {
+         lappend L [expr {(1-$t)*[lindex $L $p] +\
+           $t*[lindex $L [expr {$p+2}]]}]
+      }
+      lappend res [lreplace $coordL 0 [expr {$pos+5}] \
+        [lindex $L end-1] [lindex $L end] \
+        [lindex $L 8] [lindex $L 9]  [lindex $L 4] [lindex $L 5]]
+      set coordL [lreplace $coordL [expr {$pos+2}] end \
+        [lindex $L 0] [lindex $L 1]  [lindex $L 6] [lindex $L 7] \
+        [lindex $L end-1] [lindex $L end]]
+      set stretch [expr {1.0/($time-int($time))}]
+   }
+   lappend res $coordL
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % 
 % 
 % \begin{tcl}
@@ -12300,10 +12768,10 @@ proc network::rich::topgf::oval {coordcmd opts ns pos div} {
 % 
 % \begin{proc}{line}
 %   Tk |line| items are expressed using |\m| and |\L| commands; the 
-%   |-smooth| option is currently not supported
+%   |-smooth| option is currently not supported.
 %   \begin{tcl}
 proc network::rich::topgf::line {coordcmd opts ns pos div} {
-   foreach {state use opts} [_opts2paint $opts 1 1] break
+   foreach {state use opts} [_opts2state $opts 1 1] break
    if {[dict exists $opts -smooth] &&\
      ![string is false [dict get $opts -smooth]]} then {
        return -code error "The -smooth option is not supported yet"
@@ -12328,9 +12796,420 @@ proc network::rich::topgf::line {coordcmd opts ns pos div} {
 %   \end{tcl}
 % \end{proc}
 % 
+% \begin{proc}{polygon}
+%   Tk |polygon| items are expressed using |\m|, |\L|, and |\h| 
+%   commands. The |-smooth| option is currently not supported.
+%   \changes{2.6}{2011/01/18}{Implemented polygons for PGF. (LH)}
+%   \begin{tcl}
+proc network::rich::topgf::polygon {coordcmd opts ns pos div} {
+   foreach {state use opts} [_opts2state $opts 0 1] break
+   if {[dict exists $opts -smooth] &&\
+     ![string is false [dict get $opts -smooth]]} then {
+       return -code error "The -smooth option is not supported yet"
+   }
+   set draw {}
+   set x0 ""; set y0 ""
+   foreach {x y} [namespace eval $ns $coordcmd $pos] {
+      if {$x0 eq ""} then {
+         set x0 [expr {round($x*$div)}]
+         set y0 [expr {round(-$y*$div)}]
+         lappend draw [format {\m %d %d} $x0 $y0]
+      } else {
+         set x [expr {round($x*$div)}]
+         set y [expr {round(-$y*$div)}]
+         lappend draw [format {\L %d %d} [expr {$x-$x0}] [expr {$y-$y0}]]
+         set x0 $x; set y0 $y
+      }
+   }
+   lappend draw {\h} $use
+   list $state $draw
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{variable}{licr_map}
+%   One basic problem is that of characters for which one would 
+%   normally use a control sequence. The relationship between 
+%   character and command are pretty arbitrary, so it is probably 
+%   best done as a |string map|. This |licr_map| variable holds a 
+%   mapping from characters to \LaTeX\ text counterparts.
+%   
+%   At the moment, this only does something for characters in the 
+%   visible ASCII range, but one could consider extending it to 
+%   larger character sets (\texttt{utf8enc.dfu} would be a good 
+%   starting point for data about this mapping).
+%   \begin{tcl}
+namespace eval network::rich::topgf {
+   variable licr_map {
+      { } ~
+%   \end{tcl}
+%   Expressing spaces as |~| is primarily good for ensuring proper 
+%   parsing, particularly avoiding that spaces are lost. It also 
+%   prevents linebreaks, but that is probably enforced by a 
+%   surrounding |\mbox| or |\fbox| anyway.
+%   \begin{tcl}
+      #   {\#}
+      $   {\textdollar }
+      %   {\%}
+      &   {\&}
+%   \end{tcl}
+%   There might be a point in transforming the quotes as well, namely 
+%   to prevent unintended ligatures, but that is not an urgent issue.
+%   \begin{tcl}
+      <   {\textless }
+      >   {\textgreater }
+      \\  {\textbackslash }
+      ^   {\textasciicircum }
+      _   {\textunderscore }
+      \{  {\textbraceleft }
+      |   {\textbar }
+      \}  {\textbraceright }
+      ~   {\textasciitilde }
+   }
+}
+%   \end{tcl}
+%   If this map yields unsatisfactory results, then the user should 
+%   extend it.
+% \end{variable}
+% 
+% \begin{proc}{text}
+%   Tk |text| items are expressed using |\TR| commands (indeed, that 
+%   command exists mainly to support |text| items).
+%   
+%   The options of |text| items are rather different from those 
+%   handled by |_opts2state|, so it seems best to have an explicit 
+%   parsing round.
+%   \begin{tcl}
+proc network::rich::topgf::text {coordcmd opts ns pos div} {
+   variable licr_map
+   set labeltext ""
+   set fontcmd ""
+   set colcmd ""
+   set anchor "center"
+   set angle 0
+   foreach {opt val} $opts {
+      switch -- $opt -anchor {
+         switch -- $val {
+            n  {set anchor north}
+            ne {set anchor "north east"}
+            e  {set anchor east}
+            se {set anchor "south east"}
+            s  {set anchor south}
+            sw {set anchor "south west"}
+            w  {set anchor west}
+            nw {set anchor "north west"}
+            c - ce - cen - cent - cente - center {
+               set anchor center
+            }
+         }
+      } -angle {
+         set angle [string trimright\
+           [string trimright [format %f $val] 0] .]
+      } -fill {
+         foreach {use col} [_colour $val] break
+         if {$use} then {
+            set colcmd "\\color{$col}"
+         } else {
+            set colcmd ""
+         }
+      } -font {
+         set fontcmd [_Tkfont $val $div]
+      } -text {
+         set labeltext [string map $licr_map $val]
+      }
+   }
+%   \end{tcl}
+%   The coordinates are on the other hand very straightforward. The 
+%   most trouble is to handle spaces in arguments.
+%   \begin{tcl}
+   foreach {x y} [namespace eval $ns $coordcmd $pos] break
+   set draw {\TR}
+   append draw " " [expr {round($x*$div)}] " " [expr {-round($y*$div)}]
+   if {[string match "* *" $anchor]} then {
+      set anchor "{$anchor}"
+   }
+   set text "$fontcmd$colcmd"
+   if {[string match {*[A-Za-z]} $text] &&\
+     [string match {[A-Za-z]*} $labeltext]} then {
+      append text {\/}
+   }
+   append text $labeltext
+   if {[string match "* *" $text]} then {set text "{$text}"}
+   append draw " " $angle " " $anchor " " $text
+   return [list {} [list $draw]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{_Tkfont}
+%   This procedure converts a Tk font description to \LaTeX\ commands 
+%   making an equivalent font selection. The call syntax is
+%   \begin{displaysyntax}
+%     |_Tkfont| \word{font description} \word{division}
+%   \end{displaysyntax}
+%   and the return value is just \LaTeX\ code.
+%   
+%   Since Tk implements several font description formats, matching it 
+%   fully is a bit tricky. Right now only the option--value form is 
+%   supported. Others could be supported through a helper command 
+%   that converts to option--value form, as that could be shared with 
+%   the SVG counterpart of this command.
+%   
+%   The settings for the various NFSS axes are collected in the |A| 
+%   array, which contains actual setting commands.
+%   \begin{tcl}
+proc network::rich::topgf::_Tkfont {descr div} {
+   dict for {opt val} $descr {
+      switch -- $opt -family {
+%   \end{tcl}
+%   The standard families |Times|, |Helvetica|, and |Courier| are 
+%   not taken literally, but rather as aliases for |\rmdefault|, 
+%   |\sfdefault|, and |\ttdefault|. 
+%   \begin{tcl}
+         case -- $val Times {
+            set A(family) {\fontfamily{\rmdefault}}
+         } Courier {
+            set A(family) {\fontfamily{\ttdefault}}
+         } Times {
+            set A(family) {\fontfamily{\sfdefault}}
+         }
+      } -size {
+         if {$val>0} then {
+            set A(size) "\\Fs\{[string trimright [string trimright\
+              [format %f $val] 0] .]bp\}"
+%   \end{tcl}
+%   Yes, Tk points are translated to \TeX\ |bp|. The difference is 
+%   tiny, but one might as well do it right.
+%   \begin{tcl}
+         } else {
+            set A(size) [format {\Fs{%s}} [expr {-$val*$div}]]
+         }
+      } -weight {
+         case -- $val normal {
+            set A(series) {\fontseries{\mddefault}}
+         } bold {
+            set A(series) {\fontseries{\bfdefault}}
+         }
+      } -slant {
+         case -- $val roman {
+            set A(shape) {\fontshape{n}}
+         } italic {
+            set A(shape) {\fontshape{it}}
+         }
+      }
+   }
+%   \end{tcl}
+%   Then the commands are combined into a command string, which sets 
+%   the parameters in reverse order of how they appear in \TeX\ font 
+%   command names.
+%   \begin{tcl}
+   set res [append A(size) ""][append A(shape) ""][append A(series) ""]
+   append res [append A(family) ""] {\selectfont}
+%   \end{tcl}
+%   Finally some mappings are made to fold |\selectfont| into another 
+%   command, if possible.
+%   \begin{tcl}
+   set res [string map {
+      {\fontfamily{\rmdefault}\selectfont} {\rmfamily}
+      {\fontfamily{\sfdefault}\selectfont} {\sffamily}
+      {\fontfamily{\ttdefault}\selectfont} {\ttfamily}
+      {\fontseries{\mddefault}\selectfont} {\mdseries}
+      {\fontseries{\bfdefault}\selectfont} {\bfseries}
+      {\fontshape{n}\selectfont}           {\upshape}
+      {\fontshape{it}\selectfont}          {\itshape}
+   } $res]
+   regsub {^\\Fs(\{[0-9a-z]*\})\\selectfont$} $res {\\FS\1} res
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \setnamespace{network::rich}
+% 
+% \begin{proc}{layout_as_PGF}
+%   The |layout_as_PGF| procedure produces \LaTeX\ code displaying the 
+%   \emph{layout} of a rich network (but not the network as such). 
+%   The rich network must have the following entries:
+%   \begin{ttdescription}
+%     \item[level-layout-Tk]
+%       This is the basic source of information about the position of 
+%       items in the network layout. Items are drawn as rectangles.
+%     \item[pure]
+%       Is used to translate vertex item numbers to decorations, so 
+%       that their sizes can be determined.
+%     \item[ecurve-Tk-raw]
+%       This is used for determining links between levels: a link is 
+%       a curve segment where the control points do not coincide with 
+%       the knot points.
+%     \item[bbox-Tk]
+%       This provides the bounding box.
+%   \end{ttdescription}
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |network::rich::layout_as_PGF| \word{vertex-sizes} 
+%     \begin{regblock}[\regplus] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{vertex-sizes} is, as with |make_level-layout-Tk|, 
+%   a pattern--size list.
+%   
+%   The available options are
+%   \begin{ttdescription}
+%     \item[-val] Standard pass-network-by-value option.
+%     \item[-var] Standard pass-network-by-variable option.
+%     \item[-unit]
+%       \LaTeX\ length corresponding to the unit in the network.
+%     \item[-division]
+%       The unit actually used in the result will be the value of 
+%       |-unit| divided by the value of |-division|; setting 
+%       |-division| to $2$ can avoid making a lot of coordinates 
+%       ending in |.5|. Defaults to |1|.
+%     \item[-itemboxcol]
+%       The colour of item boxes. Defaults to |red|.
+%     \item[-linkthickness]
+%       The thickness of link lines. Defaults to not being set.
+%   \end{ttdescription}
+%   In addition, the |-edgew| and |-edgeh| options of 
+%   |level-layout-Tk_defaults| are taken note of.
+%   
+%   \begin{tcl}
+proc network::rich::layout_as_PGF {vertexSizes args} {
+   variable level-layout-Tk_defaults
+   array set Opt ${level-layout-Tk_defaults}
+   array set Opt {-unit 1pt -division 1 -round 1 -itemboxcol red}
+   array set Opt $args
+   if {[info exists Opt(-val)]} then {
+      array set NW $Opt(-val)
+   } elseif {[info exists Opt(-var)]} then {
+      upvar 1 $Opt(-var) NW
+   } else {
+      error "Must specify -val or -var"
+   }
+   set factor 1.0; set unit pt
+   scan $Opt(-unit) %f%s factor unit
+   set factor [expr {$factor/$Opt(-division)}]
+%   \end{tcl}
+%   Coordinates are collected explicitly for a bounding box 
+%   calculation, since the leg-item boxes actually extend beyond the 
+%   network bounding box.
+%   \begin{tcl}
+   foreach {x y} $NW(bbox-Tk) {
+      append xL [expr {round($x*$Opt(-division))}]
+      append yL [expr {round(-$y*$Opt(-division))}]
+   }
+%   \end{tcl}
+%   First the items are drawn, since one wants these to be below the 
+%   links in stacking order.
+%   \begin{tcl}
+   set res {  \begin{pgfscope}} \n
+   set texcol [topgf::_colour $Opt(-itemboxcol)]
+   if {[lindex $texcol 0]} then {
+      append res [format {    \pgfsetcolor{%s}} [lindex $texcol 1]] \n
+   }
+   foreach {component bbox} $NW(level-layout-Tk) {
+      foreach {level ymid hlvl} $component {
+         foreach item $level {
+            switch -- [lindex $item 0] "edge" {
+               set w $Opt(-edgew)
+               set h $Opt(-edgeh) ; #[expr {2*$hlvl}] 
+            } "vertex" {
+               set annot [lindex $NW(pure) 0 [lindex $item 1] 0]
+               foreach {pat sizes} $vertexSizes {
+                  if {[string match $pat $annot]} then {
+                     foreach {w h} $sizes break
+                     break
+                  }
+               }
+            }
+            set x0 [expr {round($factor*([lindex $item 2] - 0.5*$w))}]
+            set y0 [expr {round($factor*(-$ymid - 0.5*$h))}]
+            set w [expr {round($factor*$w)}]
+            set h [expr {round($factor*$h)}]
+            append res\
+              [format {    \re %d %d %d %d \S} $x0 $y0 $w $h] \n
+            lappend xL $x0 [expr {$x0 + $w}]
+            lappend yL $y0 [expr {$y0 + $h}]
+         }
+      }
+   }
+   append res {  \end{pgfscope}} \n
+%   \end{tcl}
+%   Then the links are drawn. This is inside a |pgfscope| where the 
+%   line widths and line caps are set.
+%   \begin{tcl}
+   append res {  \begin{pgfscope}} \n
+   if {[info exists Opt(-linkthickness)]} then {
+      if {![regexp {[A-Za-z]} $Opt(-linkthickness)]} then {
+         set Opt(-linkthickness) [format {%s\sdpgfunit}\
+           [expr {$factor*$Opt(-linkthickness)}]]
+      }
+      append res\
+        [format {    \pgfsetlinewidth{%s}} $Opt(-linkthickness)] \n
+   }
+   append res {    \pgfsetroundcap} \n
+   foreach L $NW(ecurve-Tk-raw) {
+      set dataL {}
+      foreach {x y} $L {
+         lappend dataL [expr {round($x*$Opt(-division))}]\
+           [expr {round(-$y*$Opt(-division))}]
+      }
+      foreach {x0 y0} $dataL break
+      foreach {x1 y1 x2 y2 x3 y3} [lrange $dataL 2 end] {
+         set a [expr {$x3 - $x0}]
+         set b [expr {$y3 - $y0}]
+         set c [expr {$x1 - $x0}]
+         set d [expr {$y1 - $y0}]
+         set e [expr {$x2 - $x3}]
+         set f [expr {$y2 - $y3}]
+         if {hypot($c,$d) > 0.00002 || hypot($e,$f) > 0.00002} then {
+            append res\
+              [format {    \m %d %d \L %d %d \S} $x0 $y0 $a $b] \n
+         }
+         set x0 $x3; set y0 $y3
+      }
+   }
+   append res {  \end{pgfscope}} \n
+%   \end{tcl}
+%   Finally wrap it all up with bounding box data.
+%   \begin{tcl}
+   set xL [lsort -integer $xL]
+   set yL [lsort -integer $yL]
+   format "\\begin{sdpgf}{%d}{%d}{%d}{%d}{%s}{%s}\n%s\\end{sdpgf}" \
+     [lindex $xL 0] [lindex $yL end] [lindex $xL end] [lindex $yL 0]\
+     $factor $unit $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % \begin{tcl}
 %</pkg>
 % \end{tcl}
+% 
+% 
+% \section{Minor utility procedures}
+% 
+% \begin{proc}{network_as_LaTeX}
+%   Together with |network::pure::construct|, this is very convenient 
+%   when one is writing papers.
+%   \begin{tcl}
+%<*util>
+variable vertex_sizes {* {20 20}}
+proc network_as_LaTeX {NW args} {
+   set A(pure) $NW
+   variable Hopf_appearance
+   variable vertex_sizes
+   network::rich::make_level-layout-Tk $vertex_sizes {*}$args -var A
+   network::rich::vpos-Tk_by_level -var A
+   network::rich::ecurve-Tk-raw_by_level $Hopf_appearance {*}$args -var A
+   return "\\left\[ [
+     network::rich::as_PGF $Hopf_appearance {*}$args -var A
+   ] \\right\]"
+}
+%</util>
+%   \end{tcl}
+% \end{proc}
 % 
 % \begin{thebibliography}{8}
 % 

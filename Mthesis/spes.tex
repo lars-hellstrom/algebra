@@ -1,0 +1,162 @@
+\documentclass{article}
+
+\usepackage[swedish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{times}
+
+\hyphenation{acyc-li-ci-teten}
+
+\begin{document}
+
+\title{Specifikation f\"or ett examensarbete i datavetenskap}
+\author{Lars Hellstr\"om}
+\maketitle
+
+\section{Bakgrund}
+
+Bakgrunden till detta arbete \"ar ett p\r{a}g\r{a}ende 
+forskningsprojekt i gr\"anslandet mellan matematik och datavetenskap, 
+vilket under 2011 bland annat har resulterat i en VR-ans\"okan med 
+titeln \emph{Kretsomskrivning} (eng. \emph{Circuit Rewriting}) och 
+huvuds\"okande Frank Drewes. I detta projekt representeras till 
+exempel algebraiska uttryck eller programfragment som kretsar, vilka 
+\"ar riktat acykliska men i \"ovrigt saknar grafstrukturella 
+begr\"ansningar; i synnerhet \"ar de i allm\"anhet inte tr\"ad, utan 
+tenderar att uppvisa f\"orgreningar, sammanfl\"oden och korsningar 
+p\r{a} ett s\"att som g\"or det icke-trivialt att konstruera en 
+\"oversk\r{a}dlig presentation. Dessutom producerar 
+omskrivningsprocessen stora m\"angder av dessa kretsar, s\r{a} det 
+\"ar n\"odv\"andigt att presentationer kan genereras automatiskt.
+
+En mycket naturlig form f\"or presentation \"ar den grafiska, med 
+noder i kretsen som grindar i ett kopplingsschema och 
+f\"orbindelser dememellan som kanter i en graf. Acycliciteten 
+inneb\"ar att grindarna kan placeras in i distinkta lager s\r{a} att 
+de mottar indata endast fr\r{a}n tidigare lager och producerar utdata 
+endast f\"or senare lager; problemet att d\"arvidlag s\"oka en s\r{a} 
+kompakt indelning i lager som m\"ojligt kan formuleras som ett 
+linj\"arprogram och denna l\"osning finns implementerad sedan 
+n\r{a}gra \r{a}r. D\"aremot finns det inget uppenbart svar p\r{a} hur 
+grindarna skall ordnas inom ett lager; man vill helst att logiska 
+grannar fr\r{a}n n\"arliggande lager skall vara n\"ara varandra 
+\"aven visuellt, men det finns varken n\r{a}gon uppenbar formulering 
+av eller l\"osning p\r{a} detta layoutproblem. En heuristisk metod 
+\"ar f\"or n\"arvarande i bruk, men dess l\"osningar inneh\r{a}ller 
+ibland kanter som synes g\"ora m\"arkliga omv\"agar, s\r{a} 
+uppenbarligen finns det utrymme f\"or f\"orb\"attringar.
+
+Vad som g\"or problemet besv\"arligt \"ar att dess dominanta 
+frihetsgrader \"ar huvudsakligen diskreta (i vilken ordning placerar 
+man elementen inom de olika lagren?) och d\"armed delar upp 
+s\"okrummet i ett otal fall (i en krets med $5$ lager om $7$ element i 
+varje finns det \(7!^5 \approx 3{,}25 \cdot 10^{18}\) s\"att att 
+ordna elementen). \r{A} andra sidan s\r{a} tenderar naturliga 
+m\r{a}lfunktioner (till exempel sammanlagd l\"angd av alla kanter) 
+snarast att vara kontinuerliga och sv\r{a}ra att uppskatta 
+utifr\r{a}n partiella konfigurationer (vilket \"ar vad 
+branch-and-bound skulle beh\"ova). Slutligen \"ar det f\"ormodligen 
+inte n\"ov\"andigt att alltid hitta den b\"asta l\"osningen, s\r{a} 
+l\"ange som den man hittar \"ar bra.
+
+\section{M\r{a}l och metoder}
+
+M\r{a}let med detta arbete \"ar att utv\"ardera en specifik 
+l\"osningsheuristik -- som faller inom den klass av metoder som 
+relaxerar diskreta variabler till att vara kontinuerliga, l\"oser 
+det erh\r{a}llna kontinuerliga optimeringsproblemet, och sedan s\"oker 
+en diskret l\"osning n\"ara den kontinuerliga -- f\"or layoutproblemet. 
+N\"armare best\"amt skall ordningsf\"oljderna kodas som 
+permutationer och permutationerna ses som matriser i en l\"amplig 
+matrisgrupp. Det kontinuerliga minimat kan s\"okas med en vanlig 
+gradientmetod och en n\"araliggande diskret l\"osning kan sedan 
+s\"okas genom att gradvis p\r{a}f\"ora en straffpotential som tvingar 
+matriselementen mot $0$ eller $1$.
+
+Arbetets metod \"ar att f\"orst implementera den ovan beskrivna 
+heuristiken och sedan pr\"ova densamma. Exempel p\r{a} s\r{a}dana 
+prov \"ar:
+\begin{enumerate}
+  \item
+    \"Ar det kontinuerliga optima som metoden hittar unikt, eller 
+    bara ett av m\r{a}nga? Detta kan unders\"okas genom att pr\"ova 
+    ett stort antal startpunkter f\"or s\"okningen; om alla hittar 
+    samma optimum \"ar det en god chans att det \"ar unikt. Om alla 
+    optima visar sig ha samma v\"arde p\r{a} m\r{a}lfunktionen \"ar 
+    de f\"ormodligen lika goda l\"osningar (detta kan ibland h\"anda 
+    till f\"oljd av symmetrier i den underliggande kreten), men 
+    skulle v\"ardet variera starkt s\r{a} har metoden ett problem.
+  \item
+    \"Ar de diskreta l\"osningar som erh\r{a}lls i n\"arheten av 
+    motsvarande kontinuerliga, eller kan de hamna l\r{a}ngt 
+    d\"arifr\r{a}n? H\"ar kan man bed\"omma b\r{a}de avst\r{a}nd 
+    i s\"okrummet och skillnad i m\r{a}lfunktionen. F\"or att 
+    heuristiken skall kunna betraktas som lyckad s\r{a} borde det 
+    inte vara n\r{a}gra avsev\"arda skillnader mellan kontinuerliga 
+    och diskreta l\"osningar p\r{a} optimeringsproblemet.
+  \item
+    Upplever en m\"anniska att de layouter som metoden producerar 
+    \"ar naturliga? H\"ar kan man utg\r{a} ifr\r{a}n en corpus av 
+    kretsar och fr\r{a}ga i hur h\"og andel av dessa man skulle vilja 
+    \"andra p\r{a} den layout heuristiken har producerat.
+  \item
+    \"Ar heuristiken tillr\"ackligt snabb f\"or att kunna anv\"andas 
+    praktiskt?
+\end{enumerate}
+F\"or att arbetet skall vara genomf\"ort skall en implementation ha 
+tagits fram och de ovanst\r{a}ende fr\r{a}gorna besvarats. En 
+brasklapp kan dock vara att om implementationen visar sig vara 
+opraktiskt l\r{a}ngsam s\r{a} kan man kanske n\"oja sig med ett 
+mindre underlag f\"or unders\"okningarna av l\"osningskvalitet.
+
+
+\section{Avancerade kurser p\r{a} vilka arbetet baseras}
+
+\begin{description}
+  \item[Differentialgeometri D (MATD04)]
+    M\r{a}nga variabler i den kontinuerliga relaxionen \"ar 
+    specificerade att vara matriser ur en viss grupp. Detta inneb\"ar 
+    att de s\"okrum som gradientmetoden r\"or sig i inte \"ar 
+    n\r{a}got affint eller vektorrum, utan en m\r{a}ngfald, med allt 
+    vad det inneb\"ar av tangentrum som \"andrar sig fr\r{a}n punkt 
+    till punkt och Lie-teori.
+  \item[Kvantinformation D (5FY052)]
+    Det jag tar med mig h\"arifr\r{a}n \"ar v\"al mest en vana vid 
+    unit\"ara matriser och de knep man kan utf\"ora med dessa.
+\end{description}
+
+
+\section{Resurser}
+
+\begin{itemize}
+  \item
+    M\"ojliga handledare har vidtalats \fbox{\strut\kern5cm}
+  \item
+    Matematikinstitutionens bibliotek \"ar tillg\"angligt f\"or mig.
+\end{itemize}
+
+
+\section{Sekretess}
+
+Ingen del av arbetet kommer att vara hemlig.
+
+
+\section{Vetenskapligt djup}
+
+F\"or att s\"akerst\"alla vetenskapligt djup skall f\"oljande 
+\r{a}tg\"arder vidtagas:
+\begin{itemize}
+  \item
+    Implementationen skall utf\"oras meddelst literat programmering. 
+  \item
+    N\"ar abstrakta formler skall oms\"attas i kod kommer en 
+    h\"arledning att vara inkluderad, alternativt en extern referens 
+    ges till l\"amplig k\"alla i den vetenskapliga litteraturen. 
+  \item
+    Fr\r{a}gor om stabilitet relativt brus i den underliggande 
+    numeriken kommer att beaktas.
+  \item
+    Den utv\"ardering av den implementerade heuristikens resultat som 
+    beskrivits ovan har som syfte att pr\"ova dess kvalitet.
+\end{itemize}
+
+\end{document}

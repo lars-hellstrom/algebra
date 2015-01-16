@@ -78,7 +78,7 @@
 % packages.
 % \begin{tcl}
 %<*docstrip.tcl::catalogue>
-pkgProvide mtmtcl::rings:integers 1.0 integers
+pkgProvide mtmtcl::rings::integers 1.0 integers
 %</docstrip.tcl::catalogue>
 %<*integers>
 package require Tcl 8.5
@@ -541,6 +541,15 @@ proc mtmtcl::rings::integers::make_modulo {n} {
 % 
 % \subsection{``Real'' numbers}
 % 
+%   \begin{tcl}
+%<docstrip.tcl::catalogue>pkgProvide mtmtcl::rings::float 1.0 float
+%<*float>
+package require Tcl 8.5
+package require mtmtcl::openmath 1.1
+package require API 1.0
+% \end{tcl}
+% 
+% 
 % \begin{ensemble}{float}
 %   \setnamespace{mtmtcl::rings}
 %   Like integers, a structure for floating-point numbers can be 
@@ -553,13 +562,13 @@ namespace eval ::tcl::mathop {
       = 
       + neg - 0 iszero integer.
       * 
-      1 ^ 
+      1 inverse ^
       canonise
       /
       export import
    } -map {
       API {
-         ::APIutil::API {
+         ::API::static {
             equality 1.1
             "additive group" {2.2 1.2}
             ring {2.0 1.0}
@@ -573,7 +582,7 @@ namespace eval ::tcl::mathop {
             division 1.0
             canonise 1.1
             export 2.0
-            export 1.0
+            import 1.0
          }
       }
       =   ==
@@ -586,7 +595,7 @@ namespace eval ::tcl::mathop {
       ^   **
       canonise +
       export ::mtmtcl::rings::float_export
-      import ::mtmtcl::rings::float_import
+      import {::mtmtcl::openmath::float_value 1}
    } -command ::mtmtcl::rings::float
 }
 %   \end{tcl}
@@ -644,52 +653,12 @@ proc ::mtmtcl::rings::float_export {elem attr} {
    binary scan [binary format Q $elem] H* hex
    list OMF [dict create hex $hex] {}
 %</hexfloat>
-%<!hexfloat>   list OMF [dict create dec [expr {double($elem)}] {}
+%<!hexfloat>   list OMF [dict create dec [expr {double($elem)}]] {}
 }
-%     \end{tcl}
-%   \end{proc}
-%   
-%   \begin{proc}{float_import}
-%     Conversely, this procedure implements the \APIref+{import}{1.0} 
-%     interface for |float|s. The call syntax is thus
-%     \begin{displaysyntax}
-%       |::mtmtcl::rings::float::import| \word{path} \word{data-tree} 
-%     \end{displaysyntax}
-%     and it accepts not only |OMF| elements, but also |integer| and 
-%     |OMI| elements, and skips |OMATTR| wrappers around the number 
-%     in question.
-%     \begin{tcl}
-proc ::mtmtcl::rings::float_import {path tree} {
-   while {[lindex $tree 0] eq "OMATTR"} {
-      set tree [lindex $tree 2 1]
-   }
-   switch -- [lindex $tree 0] "OMF" {
-%     \end{tcl}
-%     See |mtmtcl::present::tpp::OMF| for the concerns encountered 
-%     when parsing an |OMF| element. It's possible though that it 
-%     should be refactored into a separate procedure somewhere in 
-%     the |mtmtcl::openmath| namespace.
-%     \begin{tcl}
-      if {[dict exists $attr dec]} then {
-         scan [dict get $attr dec] %g value
-      } else {
-         binary scan [binary format H* [dict get $attr hex]] Q value
-      }
-      return $value
-   } "integer" - "OMI" {
-      if {![catch {
-         integer_import $path $tree
-      } value]} then {
-         return [expr {double($value)}]
-      }
-   }
-   return -code error -errorcode [list API import EDOM $path $tree]\
-     "Not a float"
-}
+%</float>
 %     \end{tcl}
 %   \end{proc}
 % \end{ensemble}
-% 
 % 
 % 
 % \section{Modules}
@@ -841,6 +810,12 @@ proc ::mtmtcl::rings::float_import {path tree} {
 % \end{APIspec}
 % 
 % 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::rings::free_rank_n_module 1.0 basicmodule
+%</docstrip.tcl::catalogue>
+% \end{tcl}
+% 
 % \begin{proc}{free_rank_n_module}
 %   This procedure implements $R^n$ (the free $R$-module of rank $n$) 
 %   for a given associative ring with unit $R$ and natural number 
@@ -853,6 +828,10 @@ proc ::mtmtcl::rings::float_import {path tree} {
 %   $R$. Most methods are simply pointwise operations on these lists.
 %   
 %   \begin{tcl}
+%<*basicmodule>
+package require API 1.0
+package require mtmtcl::sets::finite_ordinal 1.0
+namespace eval ::mtmtcl::rings {}
 proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
    switch -- $method {
 %   \end{tcl}
@@ -1101,6 +1080,7 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
       }
    }
 }
+%</basicmodule>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -1270,6 +1250,79 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 % \fi
 % 
 % 
+% \begin{APIspec}{inner product space}{1.1}
+%   An inner product is a biliear operation which maps a pair of 
+%   ``vectors'' back to a scalar. Version~1.1 of this interface 
+%   satisfies version~2.1 of the \APIref{ring-module}{2.1} interface.
+%   
+%   \begin{APIdescription}{module}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%     \begin{APImethod}{neg}
+%       \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{scalar}
+%       \word{submethod} \word{argument}\regstar
+%     \end{APImethod}
+%     \begin{APImethod}{.}
+%       \word{scalar} \word{element}
+%     \end{APImethod}
+%       These methods are as required by the 
+%       \APIref+{ring-module}{2.1} interface.
+%       
+%     \begin{APImethod}{innerprod}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       Given two elements of the \meta{module} $M$, this method 
+%       returns an element of `\texttt{$M$~scalar}'. It is congruent, 
+%       i.e., if $u$ and $u'$ are \texttt{=}-equal elements of $M$, and 
+%       $v$ and $v'$ likewise are \texttt{=}-equal elements of $M$, then
+%       \begin{displaysyntax}
+%         [$M$ innerprod $u$ $v$]\par
+%         [$M$ innerprod $u'$ $v'$]
+%       \end{displaysyntax}
+%       are `|scalar =|'-equal.
+%       
+%       In addition, the \texttt{innerprod} operation is symmetric 
+%       and bilinear, i.e., for any \(u,v,w \in M\) and $r$ in 
+%       \texttt{$M$~scalar}, the two formulae
+%       \begin{displaysyntax}
+%         [$M$ innerprod $u$ $v$]\par
+%         [$M$ innerprod $v$ $u$]
+%       \end{displaysyntax}
+%       are `|scalar =|'-equal, as are
+%       \begin{displaysyntax}
+%         [$M$ innerprod [$M$ + $u$ $v$] $w$]\par
+%         [$M$ scalar + [$M$ innerprod $u$ $w$] [$M$ innerprod $v$ $w$]]
+%       \end{displaysyntax}
+%       and
+%       \begin{displaysyntax}
+%         [$M$ innerprod [$M$ . $r$ $v$] $w$]\par
+%         [$M$ scalar * $r$ [$M$ innerprod $v$ $w$]]
+%       \end{displaysyntax}
+%   \end{APIdescription}
+%   
+%   It is not required that the inner product of some $u$ with itself 
+%   is nonnegative\Ldash there is not enough structure present to 
+%   make such a claim\Rdash nor that such an inner product is nonzero 
+%   for nonzero $u$ (definiteness). A Loretzian metric (i.e., inner 
+%   product) would fail both of these requirements, but not this 
+%   interface.
+%   
+%   What will typically not fit this interface are complex-valued 
+%   inner products, as these are sesquilinear rather than bilinear 
+%   and conjuage symmetric rather than fully symmetric. 
+% \end{APIspec}
+% 
+% 
+% 
+% 
 % \section{Algebras}
 % 
 % \begin{APIspec}{ring-algebra}{2.0}
@@ -1304,15 +1357,27 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %       The |*| method satisfies the \APIref+{ring}{2.0} interface. In 
 %       addition, the three expressions
 %       \begin{displaysyntax}
-%         [$R$ * [$R$ scalar . $r$ $a$] $b$]\par
-%         [$R$ * $a$ [$R$ scalar . $r$ $b$]]\par
-%         [$R$ scalar . $r$ [$R$ * $a$ $b$]]
+%         [$R$ * [$R$ . $r$ $a$] $b$]\par
+%         [$R$ * $a$ [$R$ . $r$ $b$]]\par
+%         [$R$ . $r$ [$R$ * $a$ $b$]]
 %       \end{displaysyntax}
 %       are |=|-equal for all elements $a$ and $b$ of the 
 %       \meta{algebra} $R$ and every element $r$ of $R$| scalar|.
 %   \end{APIdescription}
 % \end{APIspec}
 % 
+% 
+% \subsection{Semigroup algebras}
+% 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::rings::semigroup_algebra 1.0 SemigroupAlgebra
+%</docstrip.tcl::catalogue>
+%<*SemigroupAlgebra>
+package require Tcl 8.5
+package require API 1.0
+namespace eval ::mtmtcl::rings {}
+% \end{tcl}
 % 
 % \begin{proc}{semigroup_algebra}
 %   This procedure implements a semigroup algebra structure, with 
@@ -1722,6 +1787,7 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %   \begin{tcl}
    }
 }
+%</SemigroupAlgebra>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -1775,5 +1841,471 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 %   \end{APIdescription}
 % \end{APIspec}
 % \fi
+% 
+% 
+% \subsection{Complex numbers}
+% 
+% The field of complex numbers $\mathbb{C}$ can of course be viewed 
+% purely as a ring, but it is (among other things) also an 
+% $\mathbb{R}$-algebra and may therefore expose such an interface.
+% 
+% It would be possible to define a generic ``complexification'' 
+% constructor and define the complex numbers as the result of 
+% applying that to |::mtmtcl::rings::float|, but complex numbers are 
+% frequent enough that it makes sense to hardwire the arithmetic 
+% instead.
+% 
+% \setnamespace{mtmcl::rings}
+% \begin{ensemble}{complex}
+%   Unsurprisingly, a complex number is going to be implemented as a 
+%   two element list of |double|s, where the first element is the 
+%   real part and the second is the imaginary part.
+%   
+%   \begin{tcl}
+%<docstrip.tcl::catalogue>pkgProvide mtmtcl::rings::complex 1.1 complex
+%<*complex>
+package require Tcl 8.5
+package require mtmtcl::openmath 1.1
+package require API 1.0
+package require mtmtcl::rings::float 1.0
+package require mtmtcl::sets::finite_ordinal 1.0
+namespace eval ::mtmtcl::rings::complex {
+%   \end{tcl}
+%   
+%   Since most operations can be implemented as simple |expr| 
+%   commands, it makes sense to only implement the most basic binary 
+%   form of them. This implies it will support 
+%   \APIref+{equality}{1.0}, \APIref+{additive group}{2.0}, 
+%   
+%   \begin{proc}{=}
+%     \begin{tcl}
+   proc = {z w} {
+      expr {[lindex $z 0] == [lindex $w 0] &&\
+        [lindex $z 1] == [lindex $w 1]}
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{+}
+%     \begin{tcl}
+   proc + {z w} {
+      list [expr {[lindex $z 0] + [lindex $w 0]}] \
+        [expr {[lindex $z 1] + [lindex $w 1]}]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{neg}
+%     \begin{tcl}
+   proc neg {z} {
+      list [::tcl::mathop::- [lindex $z 0]]\
+        [::tcl::mathop::- [lindex $z 1]]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{0}
+%     \begin{tcl}
+   proc 0 {} {list 0.0 0.0}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{-}
+%     Subtraction is a natural operation to define, completing 
+%     support for \APIref+{additive group}{2.0.1}.
+%     \begin{tcl}
+   proc - {z w} {
+      list [expr {[lindex $z 0] - [lindex $w 0]}] \
+        [expr {[lindex $z 1] - [lindex $w 1]}]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{canonise}
+%     Canonising complex numbers is perhaps not so common, but it 
+%     doesn't hurt to add it. The purpose of |::tcl::mathop::+| is to 
+%     canonise the |double| values.
+%     \begin{tcl}
+   proc canonise {z} {
+      list [::tcl::mathop::+ [lindex $z 0]]\
+        [::tcl::mathop::+ [lindex $z 1]]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{*}
+%     \begin{tcl}
+   proc * {z w} {
+      list [
+         expr {[lindex $z 0]*[lindex $w 0] - [lindex $z 1]*[lindex $w 1]}
+      ] [
+         expr {[lindex $z 0]*[lindex $w 1] + [lindex $z 1]*[lindex $w 0]}
+      ]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{1}
+%     \begin{tcl}
+   proc 1 {} {list 1.0 0.0}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   Next on the list of field operations would be division, but it is 
+%   natural to define a few other things first.
+%   
+%   \begin{proc}{abs}
+%     The absolute value is preferably computed using |hypot|. This 
+%     is a map \(\mathbb{C} \longrightarrow \mathbb{R}\).
+%     \begin{tcl}
+   proc abs {z} {::tcl::mathfunc::hypot {*}$z}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{abssqr}
+%     The absolute value squared, on the other hand, is a matter of 
+%     multiplication and addition.
+%     \begin{tcl}
+   proc abssqr {w} {
+      expr {[lindex $w 0]*[lindex $w 0] +\
+        [lindex $w 1]*[lindex $w 1]}
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{/}
+%   \begin{proc}{inverse}
+%     The division $z/w$ is implemented as \texttt{[complex * $z$ 
+%     [complex inverse $w$]]}, where |inverse| is the inverse in the 
+%     multiplicative group $\mathbb{C}\setminus\{0\}$ and computed 
+%     using the formula $\bar{w} \big/ \lvert w\rvert^2$. It is 
+%     however |inverse| that fulfills \APIref{division}{1.0} 
+%     interface requirements of throwing an error when the 
+%     denominator is $0$.
+%     \begin{tcl}
+   proc / {z w} {* $z [inverse $w]}
+   proc inverse {w} {
+      set abs2 [abssqr $w]
+      if {$abs2 == 0} then {
+         return -code error -errorcode {API division nosolution}\
+           "Division by zero"
+      }
+      return [list [expr {[lindex $w 0] / $abs2}]\
+        [expr {-[lindex $w 1] / $abs2}]]
+   }
+%     \end{tcl}
+%   \end{proc}\end{proc}
+%   
+%   \begin{proc}{conjugate}
+%     The main concern for the operation of conjugating a complex 
+%     number is the matter of what to call it.
+%     \begin{tcl}
+   proc conjugate {z} {
+      list [lindex $z 0] [::tcl::mathop::- [lindex $z 1]]
+   }
+%     \end{tcl}
+%     |conjugate| is a very elementary name, which however reappears in 
+%     more advanced settings such as the Hermitian conjugate. An 
+%     alternative name could be |star| or |involution|, as $\mathbb{C}$ 
+%     is a very small $C^*$-algebra; this is star as in the adjoint of 
+%     an operator. 
+%   \end{proc}
+%   
+%   
+%   \begin{proc}{export}
+%     The basic export format for a complex number is as a pair of 
+%     real and imaginary part, so one would use 
+%     \OMSref{complex1}{complex_cartesian} for this.
+%     \begin{tcl}
+   proc export {z attrs} {
+      list OMA $attrs [list [
+         list OMS [dict replace $attrs cd complex1 name complex_cartesian] {}
+      ] [
+         ::mtmtcl::rings::float_export [lindex $z 0] $attrs
+      ] [
+         ::mtmtcl::rings::float_export [lindex $z 1] $attrs
+      ]]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{cartesian}
+%     Conversely, it is reasonable to have a method that constructs a 
+%     complex number from its real and imaginary parts. It is named 
+%     |cartesian| after the above OM symbol.
+%     \begin{tcl}
+   proc cartesian {re im} {
+      list [::tcl::mathfunc::double $re] [::tcl::mathfunc::double $im]
+   }
+%     \end{tcl}
+%     The explicit |double| calls ensure that the number will behave 
+%     correctly with respect to division.
+%   \end{proc}
+%   
+%   \begin{proc}{Re}
+%   \begin{proc}{Im}
+%     Having done the construction of a complex number from real and 
+%     imaginary parts, one might as well also do the opposite. Note 
+%     that the |Re| and |Im| methods return a |double|, i.e.~(if one 
+%     wishes to put it abstractly), an element of the 
+%     |::mtmtcl::rings::float| structure.
+%     \begin{tcl}
+   proc Re {z} {lindex $z 0}
+   proc Im {z} {lindex $z 1}
+%     \end{tcl}
+%   \end{proc}\end{proc}
+%   
+%   
+%   \begin{proc}{import}
+%     Importing data is, as usual, much trickier than exporting it. 
+%     First, there's the usual part of throwing away surrounding 
+%     \texttt{OMATTR} nodes.
+%     \begin{tcl}
+   proc import {path tree} {
+      while {[lindex $tree 0] eq "OMATTR"} {
+         set tree [lindex $tree 2 1]
+      }
+      ::mtmtcl::openmath::OMAS_switch $tree {
+%     \end{tcl}
+%     When reaching a non-\texttt{OMATTR} node, there are two basic 
+%     cases: If it is an |OMA| node then it may natively be a complex 
+%     number, but otherwise the only way for it to be something 
+%     relevant is that it is the real part of something that can be 
+%     parsed as a float, so hand all such cases over to 
+%     |::mtmtcl::openmath::float_value|.
+%     \begin{tcl}
+         if {[catch {
+            ::mtmtcl::openmath::float_value 1 $path $tree
+         } res dict]} then {
+            return -code error -options $dict "Not a complex number"
+         } else {
+            return [list $res 0.0]
+         }
+%     \end{tcl}
+%     The two applications that are valid symbols in this main case 
+%     are (i)~the above \OMSref{complex1}{complex_cartesian} and 
+%     (ii)~its sibling \OMSref{complex1}{complex_polar}. Either way, 
+%     there must be a total of three children, and the last two must 
+%     have a float value.
+%     \begin{tcl}
+      } http://www.openmath.org/cd/complex1#complex_cartesian {
+         if {[llength [lindex $tree 2]] == 3} then {
+            return [list [
+               ::mtmtcl::openmath::float_value 1 $path\
+                 [lindex $tree 2 1]
+            ] [
+               ::mtmtcl::openmath::float_value 1 $path\
+                 [lindex $tree 2 2]
+            ]]
+         }
+      } http://www.openmath.org/cd/complex1#complex_polar {
+         if {[llength [lindex $tree 2]] == 3} then {
+            return [polar [
+               ::mtmtcl::openmath::float_value 1 $path\
+                 [lindex $tree 2 1]
+            ] [
+               ::mtmtcl::openmath::float_value 1 $path\
+                 [lindex $tree 2 2]
+            ] rad]
+         }
+      } 
+      return -code error -errorcode [list API import EDOM $path $tree]\
+        "Not a complex number"
+   }
+%     \end{tcl}
+%     One further thing one could consider accepting would be the 
+%     explicit OpenMath symbol for the imaginary unit, but if 
+%     accepting that, then why not the sibling symbols for $0$, $1$, 
+%     $\pi$, and $e$ as well? There seems to be little practical 
+%     value in this.
+%   \end{proc}
+%   
+%   \begin{proc}{polar}
+%     On the other hand, it makes sense to offer a method that 
+%     constructs a complex number from a polar representation. This 
+%     method has the call syntax
+%     \begin{displaysyntax}
+%       complex polar \word{radius} \word{angle} 
+%       \word{angle-unit}\regopt
+%     \end{displaysyntax}
+%     The \word{radius} is the absolute value of the complex number 
+%     to construct and \word{angle} is its argument (counterclockwise 
+%     from the positive real axis). The \word{angle-unit} must be one 
+%     of |rad| (radians, the default) and |deg| (degrees), and 
+%     specifies the unit of \word{angle}.
+%     \begin{tcl}
+   proc polar {r theta {unit rad}} {
+      if {$unit eq "deg"} then {
+         set theta [expr {acos(-1)/180*$theta}]
+      }
+      return [list [expr {$r*cos($theta)}] [expr {$r*sin($theta)}]]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{Arg}
+%     For going the opposite way, |abs| already returns the 
+%     \word{radius} of the polar representation of a complex number, 
+%     so what is missing is the argument. This is spelt with a 
+%     capital A, since it is the principal branch of the argument.
+%     \begin{tcl}
+   proc Arg {z} {::tcl::mathfunc::atan2 [lindex $z 1] [lindex $z 0]}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{exp}
+%   \begin{proc}{Log}
+%     While we're at that, we might as well throw in implementations 
+%     of the complex exponential function |exp| and the 
+%     principal branch of the logarithm function |Log|.
+%     \begin{tcl}
+   proc Log {z} {
+      list [::tcl::mathfunc::log [abs $z$]] [Arg $z]
+   }
+   proc exp {z} {
+      set r [::tcl::mathfunc::exp [lindex $z 0]]
+      list [expr {$r * cos([lindex $z 1])}] [expr {$r * sin([lindex $z 1])}] 
+   }
+%     \end{tcl}
+%   \end{proc}\end{proc}
+%   
+%   \begin{proc}{named}
+%     But back to things covered by an established interface. That 
+%     the complex number |named i| is the imaginary unit was more or 
+%     less promised in the commentary to that interface, so one 
+%     should better make sure it is so.
+%     \begin{tcl}
+   proc named {name} {
+      switch -- $name "i" {
+         return {0.0 1.0}
+      }
+      return -code error "Unknown element name: $name"
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   A case could be made for equipping the complex numbers with the 
+%   interface of a \APIref{direct product}{1.1} of the real numbers 
+%   with themselves, but for now I don't quite see a use-case.
+%   
+%   \begin{tclcommand}{alias}{scalar}
+%     As mentioned above, |complex| has the interface of a real 
+%     vector space, where the |scalar| structure is |float|.
+%     \begin{tcl}
+   interp alias {} [namespace current]::scalar {} ::mtmtcl::rings::float
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{proc}{.}
+%     A vector space structure requires a scalar multiple operation.
+%     \begin{tcl}
+   proc . {t z} {
+      list [expr {$t * [lindex $z 0]}] [expr {$t * [lindex $z 1]}]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   The standard basis for $\mathbb{C}$ is obviously $\{1,i\}$, but 
+%   the matter of how that basis should be indexed is not so 
+%   obvious. It would seem appropriate to somehow use the named 
+%   symbols \OMSref{alg1}{one} and \OMSref{nums1}{i} as the elements 
+%   of the index set, but I don't have a finite-set-of-symbols 
+%   structure yet (|mtmtcl::sets::variable_set| is a set of 
+%   \emph{variables} rather than symbols).
+%   
+%   \begin{tclcommand}{alias}{basis}
+%     Another approach, which greatly simplifies the implementation 
+%     of related methods, is to let the index set be $\{0,1\}$; this 
+%     means the index values can really be used as list indices into 
+%     the |complex| elements.
+%     \begin{tcl}
+   interp alias {} [namespace current]::basis {}\
+     ::mtmtcl::sets:finite_ordinal 2
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{proc}{coeff}
+%     For example, getting the coefficient of a basis element is a 
+%     superficially wrapped |lindex|.
+%     \begin{tcl}
+   proc coeff {i z} {lindex $z $i}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{basiselement}
+%     Similarly, one can use a single |lreplace| to produce a basis 
+%     element.
+%     \begin{tcl}
+   proc basiselement {i} {lreplace {0.0 0.0} $i $i 1.0}
+%     \end{tcl}
+%     An alternative approach would be to index into a list of the 
+%     basis elements.
+%   \end{proc}
+%   
+%   \begin{proc}{support}
+%     Constructing the support is only mildly more complicated.
+%     \begin{tcl}
+   proc support {z} {
+      set res {}
+      set i 0; foreach x $z {
+         if {$x != 0} then {lappend res $i}
+         incr i
+      }
+      return $res
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{iszero}
+%     While at that, one may as well do an |iszero| test too.
+%     \begin{tcl}
+   proc iszero {z} {
+      expr {[lindex $z 0]==0 && [lindex $z 1]==0}
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{distance}
+%     Another operation that it makes sense for complex numbers to 
+%     support is |distance|, which turns them into a \APIref{metric 
+%     space}{1.2}.
+%     \begin{tcl}
+   proc distance {z w} {
+      expr {hypot(
+        [lindex $z 0] - [lindex $w 0], [lindex $z 1] - [lindex $w 1]
+      )}
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   
+%   \begin{tcl}
+
+   interp alias {} [namespace current]::API {} ::APIutil::API {
+      equality 1.0
+      "additive group" 2.0.1
+      canonise 1.1
+      export 2.0
+      import 1.0
+      "named element" 1.0
+      semigroup 1.0
+      monoid 1.0
+      ring 2.0
+      division 1.0
+      ring-module 2.1
+      "free ring-module" 2.1
+      ring-algebra 2.0
+      "metric space" 1.2
+   }
+   namespace export *
+   namespace ensemble create -prefix no
+}
+%</complex>
+%   \end{tcl}
+%   The issue of \emph{which} |double| values are legal as elements 
+%   of this ring is one that gets surprisingly technical. One might 
+% 
+% \end{ensemble}
+% 
 %
 \endinput

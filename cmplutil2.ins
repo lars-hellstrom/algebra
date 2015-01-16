@@ -26,38 +26,129 @@ the true source is the file from which this one was generated.
 \askforoverwritefalse
 
 % Actually make the .tcl file. 
-% This is a combined file which contains several supporting packages.
-% Also, it contains the settings and congruences for Hopf algebra 
-% with twist.
 \generate{
+   \file{cmplbraid.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{groups.dtx}{pkg}
+      \from{rings.dtx}{integers,float}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,BraidMatrix,stats,splitnewrule,lazier,%
+         eventbug,testserver}
+   }
+% This is a combined file which contains several supporting packages.
+   \file{cmplutil.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}{vsquare,Tk,stats,splitnewrule,lazier,eventbug}
+   }
+% The following all contains the settings and congruences for 
+% specific problems.
+   \file{cmplfrob.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,Frobenius,coproduct,stats,splitnewrule,lazier,%
+         eventbug,testserver}
+   }
+   \file{cmplfrobnoweb.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,Frobenius,coproduct,stats,splitnewrule,lazier,eventbug}
+   }
+%    \file{cmplhopf.tcl}{
+%       \from{network2.dtx}{pkg}
+%       \from{export.dtx}{openmath,xmlgen,pkg}
+%       \from{rings.dtx}{integers,float}
+%       \from{props.dtx}{pkg}
+%       \from{heap.dtx}{pkg,skiplist}
+%       \from{cmplutil2.dtx}
+%         {vsquare,Tk,Hopf,twist,stats,splitnewrule,lazier,pairmap,eventbug}
+%    }
    \file{cmplhopf.tcl}{
       \from{network2.dtx}{pkg}
-      \from{export.dtx}{openmath,xmlgen}
-      \from{rings.dtx}{integers}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float}
       \from{props.dtx}{pkg}
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}
-        {vsquare,Tk,Hopf,twist,stats,splitnewrule,lazier,pairmap}
+        {vsquare,noTk,Hopf,twist,untwist,stats,splitnewrule,lazier,pairmap,%
+          eventbug,testserver,zlib}
    }
-   \file{cmplhopftrig.tcl}{
+   \file{cmplhopftk.tcl}{
       \from{network2.dtx}{pkg}
-      \from{export.dtx}{openmath,xmlgen}
-      \from{rings.dtx}{integers}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float}
       \from{props.dtx}{pkg}
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}
-        {vsquare,Tk,Hopf,cocomplex,stats,splitnewrule,lazier,pairmap,zlib}
+        {vsquare,Tk,Hopf,twist,untwist,stats,splitnewrule,lazier,pairmap,%
+          eventbug,testserver,zlib}
    }
+%    \file{cmplweak.tcl}{
+%       \from{network2.dtx}{pkg}
+%       \from{export.dtx}{openmath,xmlgen,pkg}
+%       \from{rings.dtx}{integers,float}
+%       \from{heap.dtx}{pkg,skiplist}
+%       \from{cmplutil2.dtx}
+%         {vsquare,Tk,WeakAss,stats,splitnewrule,lazier,eventbug}
+%    }
+%    \file{cmplhopftrig.tcl}{
+%       \from{network2.dtx}{pkg}
+%       \from{export.dtx}{openmath,xmlgen,pkg}
+%       \from{rings.dtx}{integers,float}
+%       \from{props.dtx}{pkg}
+%       \from{heap.dtx}{pkg,skiplist}
+%       \from{cmplutil2.dtx}
+%         {vsquare,Tk,Hopf,cocomplex,stats,splitnewrule,lazier,pairmap,zlib}
+%    }
    \file{cmplhomass.tcl}{
       \from{network2.dtx}{pkg}
       \from{export.dtx}{openmath,xmlgen,pkg}
-      \from{rings.dtx}{integers}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
       \from{props.dtx}{pkg}
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}
-        {vsquare,Tk,HomAss,stats,splitnewrule,zlib} %,lazier,pairmap
+        {vsquare,Tk,HomAss,aishom,stats,splitnewrule,%lazier,pairmap,
+          eventbug,testserver,zlib}
    }
+   \file{cmplhomleibtk.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,HomLeib,twist,untwist,stats,splitnewrule,lazier,pairmap,%
+          eventbug,testserver,zlib}
+   }
+%    \file{cmpltransp.tcl}{
+%       \from{network2.dtx}{pkg}
+%       \from{export.dtx}{openmath,xmlgen,pkg}
+%       \from{rings.dtx}{integers,float}
+%       \from{props.dtx}{pkg}
+%       \from{heap.dtx}{pkg,skiplist}
+%       \from{cmplutil2.dtx}
+%         {vsquare,Tk,Transposition,stats,splitnewrule}
+%    }
 }
 
 
-\end
+\endbatchfile

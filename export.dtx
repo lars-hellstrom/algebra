@@ -110,12 +110,36 @@
 % \begin{tcl}
 %<docstrip.tcl::catalogue>pkgIndex openmath
 %<*openmath>
-package provide mtmtcl::openmath 1.0
+package require Tcl 8.5
+package provide mtmtcl::openmath 1.1
 % \end{tcl}
 % 
-% \subsection{Generating (near-)OpenMath}
 % 
 % \setnamespace{mtmtcl::openmath}
+% 
+% \begin{proc}{tailcall}
+%   In some places below the |tailcall| command is used because it 
+%   is the most efficient way of achieving what needs to be done, but 
+%   this does not prevent supporting \Tcllogo\,8.5 because the 
+%   necessary aspects of the core |tailcall| command can be faked 
+%   there.
+%   \begin{tcl}
+namespace eval mtmtcl::openmath {
+   if {[namespace which tailcall] eq ""} then {
+      proc tailcall {args} {
+         uplevel 2 [list ::catch $args ::mtmtcl::openmath::res\
+           ::mtmtcl::openmath::opts]
+         dict incr ::mtmtcl::openmath::opts -level 2
+         return -options $::mtmtcl::openmath::opts\
+           $::mtmtcl::openmath::res
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Generating (near-)OpenMath}
 % 
 % \begin{ensemble}{OM}
 %   While it is possible to construct (near-)OpenMath objects using 
@@ -308,6 +332,220 @@ proc mtmtcl::openmath::OM::UATTR {core args} {
 %     \end{tcl}
 %   \end{ensproc}
 % \end{ensemble}
+% 
+% 
+% \subsection{Parsing (near-)OpenMath}
+% 
+% The following commands perform simple parsing of nodes in OpenMath 
+% and near-OpenMath data-trees. Latter subsections contain commands 
+% that can be appropriate for more complex parsing problems.
+% 
+% \begin{proc}{gettext}
+%   The |gettext| command walks through a data-tree and concatenates 
+%   all the \describestring*+[node type]{#text} nodes found in it. 
+%   This is typically used where a node is only supposed to contain 
+%   text, and one doesn't want to mandate that all of it is in a 
+%   single |#text| child. The call syntax is
+%   \begin{displaysyntax}
+%     gettext \word{tree} \word{join-string}\regopt
+%   \end{displaysyntax}
+%   where the \word{join-string} will be put between each |#text| 
+%   leaf. It defaults to a space.
+%   \begin{tcl}
+proc mtmtcl::openmath::gettext {tree {how " "}} {
+   set res {}
+   set stack [list {}]
+   while {[llength $stack]} {
+      set path [lindex $stack end]
+      set stack [lreplace $stack [set stack end] end]
+      set node [lindex $tree $path]
+      switch -- [lindex $node 0] "#text" {
+         lappend res [lindex $node 1]
+      } default {
+         lappend path 2
+         for {set n [llength [lindex $node 2]]} {$n>0} {} {
+            lappend stack [linsert $path end [incr n -1]]
+         }
+      }
+   }
+   return [join $res $how]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{symbol_URI}
+%   This command returns the URI corresponding to an \texttt{OMS} 
+%   node. It has the call syntax
+%   \begin{displaysyntax}
+%     |symbol_URI| \word{tree} \begin{regblock}[\regstar] \word{option} 
+%     \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   The implemented \word{option}s are
+%   \begin{ttdescription}
+%     \item[-cdbase]
+%       The |cdbase| value to use, if none is specified. Defaults to 
+%       `|http://www.openmath.org/cd|'.
+%     \item[-skipattr]
+%       Boolean controlling whether |OMATTR| wrappers around the 
+%       |OMS| should be silently ignored. Defaults to true.
+%     \item[-otherwise]
+%       If the \word{tree} (even after possibly skipping |OMATTR|s) 
+%       is not an |OMS|, then return this \word{value}. Otherwise an 
+%       error is thrown in this situation.
+%   \end{ttdescription}
+%   \begin{tcl}
+proc mtmtcl::openmath::symbol_URI {node args} {
+   array set O {-cdbase http://www.openmath.org/cd -skipattr 1}
+   array set O $args
+   if {$O(-skipattr)} then {
+      while {[lindex $node 0] eq "OMATTR"} {
+         set node [lindex $node 2 1]
+      }
+   }
+   if {[lindex $node 0] eq "OMS"} then {
+      set res [dict get [lindex $node 1] cd]
+      append res \# [dict get [lindex $node 1] name]
+      if {[dict exists [lindex $node 1] cdbase]} then {
+         return [dict get [lindex $node 1] cdbase]/$res
+      } else {
+         return $O(-cdbase)/$res
+      }
+   } elseif {[info exists O(-otherwise)]} then {
+      return $O(-otherwise)
+   } else {
+      return -code error "Not an OM symbol: $node"
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{OMAS_switch}
+%   This procedure is a kind of |switch| for 
+%   \texttt{OMA}--\texttt{OMS} combinations. The call syntax is
+%   \begin{displaysyntax}
+%     |OMAS_switch| \word{tree} \word{else}
+%     \begin{regblock}[\regplus] \word{pattern} \word{script} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{tree} is a data-tree suspected to be of the form
+%   \begin{displaysyntax}
+%     <OMA><OMS \dots
+%   \end{displaysyntax}
+%   The \word{pattern}s are glob-style patterns which are matched 
+%   against the URI for the symbol; the entire block of patterns and 
+%   scripts are handed over to |switch|, so the |default| pattern 
+%   and |-| bodies work as usual. \word{else} is a script which is 
+%   evaluated if the \word{tree} does not have an |OMA| at the root.
+%   
+%   The \texttt{OMS} parsing is done by |symbol_URI| with 
+%   |-otherwise ""| as only option, so \texttt{OMATTR}s are skipped 
+%   and \texttt{cdbase} defaults to the OpenMath default. The case of 
+%   an \texttt{OMA} node with a first child that is not a symbol 
+%   would therefore be handled by a \word{script} with empty 
+%   \word{pattern}.
+%   \begin{tcl}
+proc mtmtcl::openmath::OMAS_switch {tree else args} {
+   if {[lindex $tree 0] ne "OMA"} then {
+      tailcall ::if 1 then $else
+   } else {
+      tailcall\
+        ::switch -glob -- [symbol_URI $tree -otherwise ""] $args
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{integer_value}
+%   This procedure takes a data-tree encoding an integer value as 
+%   argument. It parses and returns that value (or throws an error if 
+%   it wasn't an integer).
+%   It understands both \describestring*+[node type]{integer} and 
+%   \describestring*+[node type]{OMI} nodes, but the former is 
+%   preferred. It also skips any |OMATTR| nodes that may surround 
+%   the element.
+%   
+%   This procedure is deliberately designed such that it can be used 
+%   to implement the \APIref+{import}{1.0} interface (for integer 
+%   values). Therefore the call syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::openmath::integer_value| \word{path} \word{data-tree}
+%   \end{displaysyntax}
+%   where the \word{path} is only used when throwing \texttt{API 
+%   import EDOM} errors.
+%     
+%   \begin{tcl}
+proc mtmtcl::openmath::integer_value {path tree} {
+   while {[lindex $tree 0] eq "OMATTR"} {
+      set tree [lindex $tree 2 1]
+   }
+   switch -- [lindex $tree 0] "integer" {
+      set value [dict get [lindex $tree 1] value]
+      if {[string is integer -strict $value]} then {return $value}
+   } "OMI" {
+      set str [gettext $tree]
+      regsub -all {\s} $str {} str
+      if {[regsub {[Xx]} $str {} str] ?\
+        [scan $str %llx value] : [scan $str %lld value]} then {
+         return $value
+      }
+   }
+   return -code error -errorcode [list API import EDOM $path $tree]\
+     "Not an integer"
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{float_value}
+%   This procedure takes a data-tree encoding an float value as 
+%   argument. It parses and returns that value (or throws an error if 
+%   it wasn't a float).
+%   It also skips any |OMATTR| nodes that may surround 
+%   the element.
+%   
+%   This procedure is deliberately designed such that it can be used 
+%   to implement the \APIref+{import}{1.0} interface (for float 
+%   values). Therefore the call syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::openmath::float_value| \word{integers?} \word{path} 
+%     \word{data-tree}
+%   \end{displaysyntax}
+%   where the \word{path} is only used when throwing \texttt{API 
+%   import EDOM} errors. The \word{integers?} (which could be supplied 
+%   as part of a command prefix) controls the extent to which integer 
+%   values are accepted as floats. If it is |0| then they are not 
+%   accepted, if it is |1| then they are accepted but converted to 
+%   doubles before returned, and if it is |2| then they are passed 
+%   through as-is.
+%   
+%   \begin{tcl}
+proc mtmtcl::openmath::float_value {intQ path tree} {
+   while {[lindex $tree 0] eq "OMATTR"} {
+      set tree [lindex $tree 2 1]
+   }
+   switch -- [lindex $tree 0] "OMF" {
+      if {[dict exists $attr dec]} then {
+         scan [dict get $attr dec] %g value
+      } else {
+         binary scan [binary format H* [dict get $attr hex]] Q value
+      }
+      return $value
+   } "integer" - "OMI" {
+      if {$intQ && ![catch {
+         integer_value $path $tree
+      } value]} then {
+         if {$intQ==2} then {
+            return $value
+         } else {
+            return [::tcl::mathfunc::double $value]
+         }
+      }
+   }
+   return -code error -errorcode [list API import EDOM $path $tree]\
+     "Not a float"
+}
+%   \end{tcl}
+% \end{proc}
 % 
 % 
 % \subsection{Cleaning OpenMath}
@@ -971,39 +1209,6 @@ proc mtmtcl::openmath::oma {tree args} {
 %   \end{tcl}
 % \end{proc}
 % 
-% \begin{proc}{gettext}
-%   The |gettext| command walks through a data-tree and concatenates 
-%   all the \describestring*+[node type]{#text} nodes found in it. 
-%   This is typically used where a node is only supposed to contain 
-%   text, and one doesn't want to mandate that all of it is in a 
-%   single |#text| child. The call syntax is
-%   \begin{displaysyntax}
-%     gettext \word{tree} \word{join-string}\regopt
-%   \end{displaysyntax}
-%   where the \word{join-string} will be put between each |#text| 
-%   leaf. It defaults to a space.
-%   \begin{tcl}
-proc mtmtcl::openmath::gettext {tree {how " "}} {
-   set res {}
-   set stack [list {}]
-   while {[llength $stack]} {
-      set path [lindex $stack end]
-      set stack [lreplace $stack [set stack end] end]
-      set node [lindex $tree $path]
-      switch -- [lindex $node 0] "#text" {
-         lappend res [lindex $node 1]
-      } default {
-         lappend path 2
-         for {set n [llength [lindex $node 2]]} {$n>0} {} {
-            lappend stack [linsert $path end [incr n -1]]
-         }
-      }
-   }
-   return [join $res $how]
-}
-%   \end{tcl}
-% \end{proc}
-% 
 % \begin{tcl}
 namespace eval mtmtcl::openmath {
    namespace export *
@@ -1065,8 +1270,8 @@ proc mtmtcl::support::xml_from_tree {tree args} {
       set Opt(-charmap) {< &lt; > &gt; & &amp; ' &apos; \" &quot;}
    } else {
       foreach char {< > & ' \"} entity {&lt; &gt; &amp; &apos; &quot;} {
-         if {![dict exists $O(-charmap) $char]} then {
-            dict set $O(-charmap) $char $entity
+         if {![dict exists $Opt(-charmap) $char]} then {
+            dict set $Opt(-charmap) $char $entity
          }
       }
    }
@@ -1121,6 +1326,8 @@ proc mtmtcl::support::xml_from_treenode {tree sep indent map} {
 % \end{tcl}
 % 
 % 
+% 
+% 
 % \section{Presenting expressions}
 % 
 % Although the (near-)OpenMath data-trees generated by the |export| 
@@ -1156,7 +1363,8 @@ namespace eval mtmtcl::present {
 % that are made include:
 % \begin{enumerate}
 %   \item
-%     Removal of pointless ones and zeroes.
+%     Removal of pointless ones and zeroes. (Note: Zeroes aren't much 
+%     removed, at the moment.)
 %   \item
 %     Expansion of numbers (particularly floating-point numbers in 
 %     mantissa--exponent notation). This process is supposed to equip 
@@ -2053,8 +2261,12 @@ proc mtmtcl::present::decorate::OMATTR {args} {
 %   regexp mode then makes it feasible to constrain against list 
 %   element boundaries using `|^|' and `|$|'.
 %   
-%   No \word{body} will be evaluated if the current node lacks 
-%   |mtmtcl:path| attribute.
+%   If the current node lacks |mtmtcl:path| attribute, and there is a 
+%   final \texttt{default} pattern, then its \word{body} is 
+%   evaluated. Since there are regular expressions (such as |.*|) 
+%   which match anything, this makes it possible to distinguish those 
+%   cases, but usually one wants to treat `no |mtmtcl:path| attribute' 
+%   and `unrecognised |mtmtcl:path| attribute' as equivalent.
 %   \begin{tcl}
 proc mtmtcl::present::decorate::mtmtcl:path {args} {
    upvar 1 _tree tree _paths paths
@@ -2063,6 +2275,16 @@ proc mtmtcl::present::decorate::mtmtcl:path {args} {
       uplevel 1 [list ::switch -regexp -- [
          join [dict get $attr mtmtcl:path] \n
       ]] $args
+   } else {
+      if {[llength $args] == 1} then {
+         set args [lindex $args 0]
+      }
+      if {[llength $args] % 2} then {
+         return -code error "extra switch pattern with no body"
+      }
+      if {[lindex $args end-1] eq "default"} then {
+         uplevel 1 [lindex $args end]
+      }
    }
 }
 %   \end{tcl}
@@ -4499,9 +4721,9 @@ namespace eval mtmtcl::latex::make::tool {
    }
 }
 %   \end{tcl}
-%   Now for the latin-1 range. `{`!}' doesn't normally seem to be 
-%   available as a math character, and the same holds for the cent, 
-%   currency, Yen, and broken bar signs.
+%   Now for the latin-1 range. `\textexclamdown' doesn't normally seem 
+%   to be available as a math character, and the same holds for the 
+%   cent, currency, Yen, and broken bar signs.
 %   \begin{tcl}
 append mtmtcl::latex::make::tool::mathchar_map {
    \u00A3 {\pounds }
@@ -4524,7 +4746,7 @@ append mtmtcl::latex::make::tool::mathchar_map {
 %   Remaining characters in the |\u00B?| range are cedilla, 
 %   superscript $1$, masculine ordinal, right-pointing guillement, 
 %   the $\frac{1}{4}$, $\frac{1}{2}$, and $\frac{3}{4}$ fractions, 
-%   and `\textexclamdown', but none of these make much sense here.
+%   and `\textquestiondown', but none of these make much sense here.
 %   
 %   If accented letters are to be supported, we've got a ton of work 
 %   ahead; it is probably best handled through a dynamic extension 
