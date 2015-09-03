@@ -279,6 +279,7 @@ proc ::network::ulayout::tangent_angles {G v1 v2} {
 % \end{proc}
 % 
 % 
+% \subsubsection{Selecting a starting point}
 % 
 % In the case \(n=2\), the group $\mathrm{U}^\mathbf{1}(n)$ is a 
 % circle that can be parametrised as
@@ -297,7 +298,7 @@ proc ::network::ulayout::tangent_angles {G v1 v2} {
 % \end{smallmatrix} \right)$. Such midpoints are natural candidates 
 % for starting points in that they have no bias for either 
 % permutation, but how might one generalise this to \(n>2\)? There 
-% are at least two possibilities.
+% are at least two ways of just repeating that \(n=2\) solution.
 % 
 % \begin{proc}{bigXpoint}
 %   One is to let the matrix components have the form
@@ -473,6 +474,344 @@ proc ::network::ulayout::permute_point_rows {permL point} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% A shortcoming that is common to both the ``Big X'' and the ``Small X'' 
+% styles of matrices is however that only some matrix elements start 
+% out nonzero; while the unitary matrices certainly may be regarded as 
+% some kind of superposition of permutations, they are still rather 
+% far from being a superposition of all permutations. Is it possible 
+% to do better?
+% 
+% One way of interpreting a requirement of equal weight to all 
+% permutations is that every matrix element should have the same real 
+% part, which indeed is a property of the \(n=2\) midpoint. 
+% For \(P \in \mathrm{U}^\mathbf{1}(n)\) this implies 
+% \(\operatorname{Re}(P) = \frac{1}{n}J\) by \(P\mathbf{1} = 
+% \mathbf{1}\), so apparently that \(P = \frac{1}{n}J + i A\) for 
+% some \(A \in \mathbb{R}^{n \times n}\). It follows from 
+% \(\mathbf{0} = P\mathbf{1} - \mathbf{1} = (\frac{1}{n}J +\nobreak 
+% iA) \mathbf{1} - \mathbf{1} = \frac{1}{n}J \mathbf{1} - \mathbf{1} 
+% + iA \mathbf{1} = iA \mathbf{1}\) that \(A \mathbf{1} = \mathbf{0}\) 
+% and hence \(AJ = 0\). Then the unitarity condition reduces to
+% \[
+%   I =
+%   P P^* =
+%   (\frac{1}{n}J + iA) (\frac{1}{n}J - i A^\mathrm{T}) =
+%   \frac{1}{n}J - i\frac{1}{n} J A^\mathrm{T} + i \frac{1}{n} A J
+%     + A A^\mathrm{T} =
+%   \frac{1}{n}J + A A^\mathrm{T}
+% \]
+% which can be interpreted geometrically as conditions on the inner 
+% products of the rows of $A$: the inner product of two distinct rows 
+% is $-n^{-1}$ (so the angle is obtuse), whereas the inner product of 
+% a row with itself is $1 - n^{-1}$. In other words, each row is a 
+% vector of length $\sqrt{1 - n^{-1}}$ and the angle between any two 
+% distinct rows is $\arccos \frac{-1}{n-1}$. That \(A \mathbf{1} = 
+% \mathbf{0}\) furthermore implies that all the rows are orthogonal 
+% to $\mathbf{1}$. Is such an arrangement of vectors possible to 
+% find? Yes, but it only works out because the angle is exactly this 
+% one; the vectors end up being the vertices of a symmetric 
+% $(n -\nobreak 1)$-dimensional simplex.
+% 
+% Basically, if $\mathbf{a}_1,\dotsc,\mathbf{a}_k$ are vectors that 
+% meet these conditions on norm and angles, and \(k+1 < n\), then one 
+% can make it work no matter what the angle is by adjusting the 
+% component in a new perpendicular direction; only for the $n$th 
+% vector $\mathbf{a}_n$ will the angle be critical. What one does 
+% before that is to start out with the negative of the sum 
+% \(\mathbf{u} = \sum_{j=1}^k \mathbf{a}_j\), which is rescaled to get 
+% the right inner product with earlier vectors. The norm of the 
+% vector can then be adjusted by adding a component in a fresh 
+% orthogonal direction $\mathbf{v}$. For any \(j \leqslant k\) it 
+% follows that \(\mathbf{u}^\mathrm{T} \mathbf{a}_j = 1 - kn^{-1} = 
+% (n -\nobreak k) n^{-1}\), so any \(\mathbf{a}_{k+1} = 
+% \frac{-1}{n-k} \mathbf{u} + \lambda \mathbf{v}\) where $\mathbf{v}$ 
+% is orthogonal to all of $\mathbf{a}_1,\dotsc,\mathbf{a}_k$ will 
+% have \(\mathbf{a}_{k+1}^\mathrm{T} \mathbf{a}_j = -n^{-1}\) for \(j 
+% \leqslant k\). For the norm one finds 
+% \(\lVert\mathbf{u}\rVert^2 = 
+% \sum_{r,s=1}^k \mathbf{a}_r^\mathrm{T}\mathbf{a}_s = 
+% k (1 -\nobreak n^{-1}) - k(k -\nobreak 1)n^{-1} = k - k^2n^{-1} = 
+% k (n -\nobreak k) n^{-1}\), whence
+% \[
+%   \lVert\mathbf{a}_{k+1}\rVert^2 =
+%   \mathbf{a}_{k+1}^\mathrm{T} \mathbf{a}_{k+1} =
+%   \frac{1}{(n-k)^2} k (n -\nobreak k) n^{-1} + 
+%   \lambda^2 \lVert\mathbf{v}\rVert^2 =
+%   \frac{k}{(n-k)n} + \lambda^2 \lVert\mathbf{v}\rVert^2 
+%   \text{.}
+% \]
+% If \(\lVert\mathbf{v}\rVert = 1\) this implies
+% \[
+%   \lambda^2 = 
+%   1 - n^{-1} - \frac{k}{(n-k)n} =
+%   \frac{(n-k)n - (n-k) - k}{(n-k)n} =
+%   \frac{n - k - 1}{n-k} \text{,}
+% \]
+% which is positive for \(k+1 < n\) and zero for \(k+1 = n\).
+% 
+% \begin{proc}{uniform_matrix}
+%   This procedure has the call syntax
+%   \begin{quote}
+%     |::network::ulayout::uniform_matrix| \word{n}
+%   \end{quote}
+%   and it returns a matrix in $\mathrm{U}^\mathbf{1}(n)$ that has 
+%   real part equal to $n^{-1}J$.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::uniform_matrix {n} {
+   if {$n<2} then {return [list [list [complex cartesian 1.0 0.0]]]}
+%   \end{tcl}
+%   
+%   As explained above, this is mostly about constructing the rows 
+%   $\{\mathbf{a}_k\}_{k=1}^n$ of the imaginary part of the matrix, 
+%   and to do so one needs to to perform arithmetic in $\mathbb{R}^n$.
+%   \begin{tcl}
+   set V [::mtmtcl::Lie::Rn::make space $n]
+%   \end{tcl}
+%   One practical complication is that one needs an orthonormal basis 
+%   of $\mathbb{R}^n$ where one vector is parallel to $\mathbf{1}$. A 
+%   convenient way of finding that is to use as basis some reflection 
+%   $\{\mathbf{f}_k\}_{k=1}^n$ of the standard basis 
+%   $\{\mathbf{e}_k\}_{k=1}^n$, as reflection is a linear 
+%   transformation that preserves orthonormality. Let \(\mathbf{w} = 
+%   \mathbf{1} - \sqrt{n}\mathbf{e}_n\) and reflect in the hyperplane 
+%   through the origin that is perpendicular to $\mathbf{w}$, as this 
+%   makes $\mathbf{f}_n$ parallel to $\mathbf{1}$. For \(k < n\) the 
+%   reflected vector becomes
+%   \begin{multline*}
+%     \mathbf{f}_k
+%     = 
+%     \bigl( I - 2 \lVert\mathbf{w}\rVert^{-2} \mathbf{w} 
+%       \mathbf{w}^\mathrm{T} \bigr) \mathbf{e}_k 
+%     =
+%     \mathbf{e}_k - 2 \lVert\mathbf{w}\rVert^{-2} \mathbf{w} 
+%       \mathbf{w}^\mathrm{T} \mathbf{e}_k 
+%     = \\ =
+%     \mathbf{e}_k - 2 \bigl( 
+%       \lVert\mathbf{1}\rVert^{2} 
+%       - 2 \sqrt{n} \mathbf{1}^\mathrm{T} \mathbf{e}_n
+%       + n\lVert\mathbf{e}_n\rVert^{2} 
+%     \bigr)^{-1} \bigl(
+%       \mathbf{1}^\mathrm{T} \mathbf{e}_k 
+%       - \sqrt{n}\mathbf{e}_n^\mathrm{T} \mathbf{e}_k
+%     \bigr) \mathbf{w}
+%     = \\ =
+%     \mathbf{e}_k - 2 \bigl( 2n - 2\sqrt{n} \bigr)^{-1} \mathbf{w}
+%     =
+%     \mathbf{e}_k - \frac{1}{ n - \sqrt{n} } \mathbf{w}
+%     \text{,}
+%   \end{multline*}
+%   most of which can be precomputed.
+%   \begin{tcl}
+   set w [lrepeat $n 1.0]
+   lset w end [expr {1.0 - sqrt($n)}]
+   set w_scaled [{*}$V . [expr {-1/($n-sqrt($n))}] $w]
+%   \end{tcl}
+%   In the main loop, the only vector that one needs to remember from 
+%   previous iterations is $\mathbf{u}$; the result matrix $P$ can be 
+%   constructed |row| by row, and even the vector index $k$ is 
+%   available as |[llength $res]|.
+%   \begin{tcl}
+   set n_inv [expr {1.0/$n}]
+   set u [{*}$V 0]
+   for {set res [list]} {[llength $res] < $n-1} {lappend res $row} {
+%   \end{tcl}
+%   The fresh direction vector $\mathbf{v}$ is constructed from the 
+%   scaled $\mathbf{w}$ by explicit access to the list element, to 
+%   avoid a dependency on the details of |{*}$V basis|. Note that 
+%   differences in the indexing base means $k={}$|[llength $res]| is 
+%   the right list element to access.
+%   \begin{tcl}
+      set v $w_scaled
+      lset v [llength $res] [expr {1.0 + [lindex $v [llength $res]]}]
+      set r [expr {-1.0/($n - [llength $res])}]
+      set a [{*}$V + [
+         {*}$V . $r $u
+      ] [
+         {*}$V . [expr {sqrt(1.0 + $r)}] $v
+      ]]
+      set row [list]
+      foreach im $a {
+         lappend row [complex cartesian $n_inv $im]
+      }
+      set u [{*}$V + $u $a]
+   }
+%   \end{tcl}
+%   The above would be correct also for the very last row, even 
+%   though $\mathbf{v}$ as computed is not a fresh direction, as the 
+%   factor $\lambda$ of $\mathbf{v}$ comes out as $0$ in that 
+%   iteration. But it is easier to just observe that the wanted 
+%   \(\mathbf{a}_n = -\mathbf{u}\).
+%   \begin{tcl}
+   set row [list]
+   foreach im $u {
+      lappend row [complex cartesian $n_inv [expr {-$im}]]
+   }
+   lappend res $row
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% It is actually possible to be slightly more general. Rather than 
+% considering just a fully uniform \(P = \frac{1}{n}J + iA\), one can 
+% consider a family \(P(t) = (1 -\nobreak t)I + \frac{t}{n}J + 
+% iA(t)\) for \(t \in [0,1]\) that interpolates between the identity 
+% and a uniform matrix. In this case the unitariness condition comes 
+% out as
+% \begin{multline*}
+%   0 =
+%   P(t) P(t)^* - I =
+%   \bigl( (1-t)I + \tfrac{t}{n}J + iA(t) \bigr)
+%   \bigl( (1-t)I + \tfrac{t}{n}J - iA(t)^\mathrm{T} \bigr) - I
+%   = \\ =
+%   (1-t)^2I + \tfrac{2(1-t)t}{n}J - i(1-t)A(t)^\mathrm{T} +
+%   \tfrac{t^2}{n}J - i\tfrac{t}{n} J A(t)^\mathrm{T} +
+%   i(1-t)A(t) + i \tfrac{t}{n}J A(t) + A(t)A(t)^\mathrm{T} - I
+%   = \\ =
+%   (t-2)tI + \tfrac{(2-t)t}{n}J + A(t)A(t)^\mathrm{T} 
+%   + i(1-t)\bigl( A(t) - A(t)^\mathrm{T} \bigr) \text{,}
+% \end{multline*}
+% where the imaginary part implies $A(t)$ should be symmetric. Then 
+% the real part reduces to
+% \[
+%   A(t)^2 = (2-t)t \left( I - \tfrac{1}{n}J \right) \text{,}
+% \]
+% so up to a scaling factor $\sqrt{(2-t)t}$ one can use the same 
+% matrix $A$ in a simple interpolation between the identity and a 
+% perfectly uniform matrix. Moreover, the condition that matrix 
+% needs to satisfy is primarily that it is a square root of $I - 
+% \frac{1}{n}J$, which allows for a complete analysis.
+% 
+% The matrix $\frac{1}{n}J$ has two eigenvalues: $1$ with 
+% multiplicity $1$ and eigenvector $\mathbf{1}$, and $0$ with 
+% multiplicity $n-1$ and eigenspace everything orthogonal to 
+% $\mathbf{1}$. Hence \(I - \frac{1}{n}J\) has the same eigenspaces, 
+% but reversed eigenvalues: $0$ has multiplicity $1$ whereas $1$ has 
+% multiplicity $n-1$. A square root $A$ thereof has to reproduce that 
+% behaviour visavi $\mathbf{1}$, but the other eigenspace will for a 
+% general $A$ be decomposed into two parts where one has eigenvalue 
+% $1$ and the other has eigenvalue $-1$. This allows choosing $A$ to 
+% minimise the real part variations of the vector $PMP^*\mathbf{w}$ 
+% (or $PMP^\mathrm{T}\mathbf{w}$; the variance in one is the negative 
+% of the variance of the other).
+% 
+% Let $w$ be the average width of an item, and let \(\mathbf{v} = 
+% \mathbf{w} - w\mathbf{1}\); then $\mathbf{v}$ is orthogonal to 
+% $\mathbf{1}$. Also let \(P = \frac{1}{n}J + iA\) where $A$ is 
+% symmetric, \(A\mathbf{1} = \mathbf{0}\), and \(A^2 = I - 
+% \frac{1}{n}J\). Then
+% \begin{multline*}
+%   PMP^*\mathbf{w} =
+%   PM ( \tfrac{1}{n}J - iA ) (w \mathbf{1} + \mathbf{v} ) 
+%   =
+%   PM ( w \mathbf{1} - i A \mathbf{v} ) 
+%   = \\ =
+%   ( \tfrac{1}{n}J + iA ) (w M\mathbf{1} - i M A \mathbf{v} ) 
+%   =
+%   (\tfrac{nw}{2} \mathbf{1} + AMA\mathbf{v}) +
+%   i(wAM\mathbf{1} - \tfrac{1}{n}J M A \mathbf{v})
+% \end{multline*}
+% since \(\mathbf{1}^\mathrm{T} M \mathbf{1} = \frac{n^2}{2}\). This 
+% means any variation in real position comes from the $AMA\mathbf{v}$ 
+% (which would be $-AMA\mathbf{v}$ in $PMP^\mathrm{T}\mathbf{w}$, 
+% giving the exact same variation but in the opposite direction), so 
+% that is what one would like to minimise. That $A$ is real symmetric 
+% with all eigenvalues in $\{-1,0,1\}$ makes that problem fairly easy 
+% to analyse.
+% 
+% Minimising $\Vert AMA\mathbf{v} \rVert$ is equivalent to minimising 
+% \[
+%   \Vert AMA\mathbf{v} \rVert^2 = 
+%   \mathbf{v}^\mathrm{T} A M^\mathrm{T} A^2 M A \mathbf{v} = 
+%   (A\mathbf{v})^\mathrm{T} M^\mathrm{T} 
+%     (I -\nobreak \tfrac{1}{n}J) M (A\mathbf{v})
+%   \text{.}
+% \]
+% Since $A$ has to be symmetric, the eigenspaces are orthogonal, so the 
+% subspace orthogonal to $\mathbf{1}$ decomposes into one part with 
+% eigenvalue $+1$ and one part with eigenvalue $-1$; the matrix $A$ 
+% is effectively a reflection within this subspace, and it can be 
+% \emph{any} such reflection. Since $\mathbf{v}$ belongs to this 
+% subspace, it follows that one can choose $A \mathbf{v}$ to be any 
+% vector orthogonal to $\mathbf{1}$ that has the same length as 
+% $\mathbf{v}$. The problem therefore reduces to that of finding 
+% \(\mathbf{x} \parallel A \mathbf{v}\) minimising $\mathbf{x}^\mathrm{T} 
+% M^\mathrm{T} (I -\nobreak \tfrac{1}{n}J) M \mathbf{x}$ subject to 
+% \(\lVert\mathbf{x}\rVert = 1\) and \(\mathbf{1}^\mathrm{T} 
+% \mathbf{x} = 0\).
+% 
+% For even $n$, this turns out to have a very simple solution: the 
+% $k$th element of $\mathbf{x}$ is $(-1)^{k+1} n^{-1/2}$, as that 
+% makes \(M \mathbf{x} = \frac{1}{2\sqrt{n}} \mathbf{1}\) and \((I 
+% -\nobreak \tfrac{1}{n}J) M \mathbf{x} = \mathbf{0}\); the objective 
+% function attains the value $0$. Since the matrix $I - \tfrac{1}{n}J$ 
+% is positive semidefinite, whereas $M$ is invertible, it follows that 
+% \(B =  M^\mathrm{T} (I -\nobreak \tfrac{1}{n}J) M\) is also positive 
+% semidefinite; $0$ is as low as $\mathbf{x}^\mathrm{T} B \mathbf{x}$ 
+% can get. Things are not that simple for odd $n$; it is in general 
+% not possible to attain \(\mathbf{x}^\mathrm{T} B \mathbf{x} = 0\). 
+% What complicates matters in the constraint about $\mathbf{x}$ being 
+% orthogonal to $\mathbf{1}$. It is always the case that \(\ker B = 
+% M^{-1} \cdot \ker (I -\nobreak \tfrac{1}{n}J) =
+% \{ t M^{-1} \mathbf{1} \mid\nobreak t \in\nobreak \mathbb{R} \}\), 
+% but $M^{-1}\mathbf{1}$ is only orthogonal to $\mathbf{1}$ if $n$ is 
+% even; for odd $n$ the angle is something else. This means finding 
+% the optimal $\mathbf{x}$ is not simply a matter of picking an 
+% eigenvector for the smallest eigenvalue of $B$. However the problem 
+% is not so much that looking at eigenvectors is wrong, but rather 
+% that $B$ is not the right matrix.
+% 
+% 
+% ---
+% 
+% 
+% \begin{proc}{uniform_matrix_point}
+%   What the layout problem needs is however rather a procedure for 
+%   computing a starting point that makes use of these uniform real 
+%   parts matrices. The call syntax for that procedure is
+%   \begin{displaysyntax}
+%     |network::ulayout::uniform_matrix_point|
+%     \word{widths 0} \word{wiring--widths} 
+%   \end{displaysyntax}
+%   and the return value is the point in the corresponding |domain| 
+%   which has matrix components of the above type and an 
+%   $\mathbb{R}^n$ component that aligns the level midpoints with 
+%   each other.
+%   
+%   The implementation is mostly the same as for |bigXpoint|, with 
+%   the obvious difference that |uniform_matrix| is used for all 
+%   matrix parts. Also, the results are temporarily cached so that 
+%   each matrix is only computed once. 
+%   In the following loop, |xL| is the list of \word{point} components 
+%   for the $\mathbb{R}^n$ part of the domain and |ML| is the corresponding 
+%   list of matrix parts of the point.
+%   \begin{tcl}
+proc ::network::ulayout::uniform_matrix_point {widths0 wwL} {
+   set xL {}
+   set ML {}
+   set up [complex cartesian 0.5 0.5]
+   set down [complex cartesian 0.5 -0.5]
+   foreach {dummy level} [linsert $wwL 0 "" $widths0] {
+      set w 0.0
+      foreach item_w $level {set w [expr {$w + $item_w}]}
+      if {[info exists lastwidth]} then {
+         lappend xL [expr {0.5*($lastwidth-$w)}]
+      }
+      set lastwidth $w
+      if {[llength $level] < 2} then {continue}
+      if {![info exists M([llength $level])]} then {
+         set M([llength $level]) [uniform_matrix [llength $level]]
+      }
+      lappend ML $M([llength $level])
+   }
+   return [linsert $ML 0 $xL]
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % 
 % 
 % \subsection{Optimisation in the domain}
@@ -2022,7 +2361,7 @@ proc ::network::ulayout::force2 {TS widths0 wwL point} {
 % largely seems to be the real subgroup that is to blame for this!
 % 
 % 
-% \subsubsection{Barrier against negativity}
+% \subsubsection{Penalising negativity}
 % 
 % One notable feature of unphysical arrangements seems to be that 
 % some matrix elements are negative! This means items widths are 
@@ -2045,14 +2384,14 @@ proc ::network::ulayout::force2 {TS widths0 wwL point} {
 % perfectly possible to introduce a penalty potential that acts 
 % against negative elements.
 % 
-% What the negativity barrier should guard against is negative 
+% What the negativity penalty should guard against is negative 
 % \emph{real parts} of matrix elements. The imaginary parts can be 
 % anything, and early experience even suggests that the objective 
 % function itself exerts a force that seeks to reduce these, so it is 
 % fine to forget about the imaginary parts in this discussion; we 
 % seek a function $f$ of a real variable $x$ that penalises \(x<0\). 
 % Since $0$ itself is a perfectly legal (and even most common) matrix 
-% element value, the negativity barrier $f$ should be zero for 
+% element value, the negativity penalty $f$ should be zero for 
 % nonnegative values. If one still wants it to be smooth (which feels 
 % like a good idea), then it could be taken to be on the form
 % \begin{equation}
@@ -2072,9 +2411,9 @@ proc ::network::ulayout::force2 {TS widths0 wwL point} {
 % \]
 % so let's try that for \(c=10\).
 % 
-% \begin{proc}{negativity_barrier}
+% \begin{proc}{negativity_penalty}
 %   This function computes the sum over all matrix elements of the 
-%   barrier function
+%   penalty function
 %   \[
 %     f(x) = \begin{cases}
 %       \exp \frac{ 10x+1 }{ x(x+1) }& \text{if \(x<0\),}\\
@@ -2084,10 +2423,10 @@ proc ::network::ulayout::force2 {TS widths0 wwL point} {
 %   where $x$ is the real part of the matrix element. The call syntax 
 %   is
 %   \begin{displaysyntax}
-%     |negativity_barrier| \word{point}
+%     |negativity_penalty| \word{point}
 %   \end{displaysyntax}
 %   \begin{tcl}
-proc ::network::ulayout::negativity_barrier {point} {
+proc ::network::ulayout::negativity_penalty {point} {
    set res 0.0
    foreach A [lrange $point 1 end] {
       foreach row $A {
@@ -2111,17 +2450,17 @@ proc ::network::ulayout::negativity_barrier {point} {
 % \end{proc}
 % 
 % 
-% \begin{proc}{negativity_barrier_force}
-%   The force companion of |negativity_barrier| is 
+% \begin{proc}{negativity_penalty_force}
+%   The force companion of |negativity_penalty| is 
 %   \begin{displaysyntax}
-%     |negativity_barrier_force| \word{domain} \word{point}
+%     |negativity_penalty_force| \word{domain} \word{point}
 %   \end{displaysyntax}
 %   which needs to know the underlying Lie group \word{domain} in 
 %   order to project the force correctly onto the tangent space.
 %   
 %   The |component 0| component of this force is always $0$.
 %   \begin{tcl}
-proc ::network::ulayout::negativity_barrier_force {G point} {
+proc ::network::ulayout::negativity_penalty_force {G point} {
    set res [list [{*}$G tangent component 0 0]]
    foreach P [lrange $point 1 end] {
 %   \end{tcl}
@@ -2182,7 +2521,7 @@ proc ::network::ulayout::negativity_barrier_force {G point} {
 % 
 % \begin{proc}{test_someforce}
 %   Both mathematically and implementation-wise, 
-%   |negativity_barrier_force| is simpler than |force|, so one might 
+%   |negativity_penalty_force| is simpler than |force|, so one might 
 %   think testing it should be unnecessary. The sad truth is however 
 %   that the first implementation of the even simpler 
 %   |penalty01force| had a sign error, so this modification of 
@@ -2243,6 +2582,116 @@ proc ::network::ulayout::test_someforce {G forcefun energyfun point hlimit} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% \subsubsection{Barrier againt negativity}
+% 
+% A variation on that is to introduce an outright \emph{barrier} 
+% function that tends to $\infty$ already as the matrix values tend 
+% to $0$ from the positive side. This may seem illogical, since $0$ is 
+% a necessary value in the sought permutation matrix, but it should 
+% be understood from the perspective of inner point methods: it does 
+% not matter if the barrier function forbids the actual solution 
+% sought (on account of that being located on the boundary of the 
+% domain), as long as the strength of that barrier is being scaled 
+% down during the search. The purpose of the barrier is rather to 
+% provide information also in the optimisation domain interior about 
+% the geometry of the domain boundary.
+% 
+% \begin{proc}{negativity_barrier}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |::network::ulayout::negativity_barrier| \word{weights} 
+%     \word{point}
+%   \end{displaysyntax}
+%   and it returns a weighted sum of the natural logarithms of the 
+%   real parts of the matrix elements in the \word{point}. The 
+%   \word{weights} is the list of weights to apply; there is one 
+%   weight per matrix, and the same weight is applied to all elements 
+%   of the matrix.
+%   
+%   If any one matrix element is nonpositive then this procedure 
+%   returns |Inf|, so the weights should always be positive.
+%   
+%   \begin{tcl}
+proc ::network::ulayout::negativity_barrier {weightL point} {
+   set res 0.0
+   foreach A [lrange $point 1 end] c $weightL {
+      set sum 0.0
+      foreach row $A {
+         foreach cell $row {
+            set x [lindex $cell 0]
+            if {$x <= 0} then {return Inf}
+            set sum [expr {$sum + log($x)}]
+         }
+      }
+      set res [expr {$res + $c*$sum}]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{negativity_barrier_force}
+%   The force companion of |negativity_barrier| is 
+%   \begin{displaysyntax}
+%     |negativity_barrier_force| \word{domain} 
+%     \word{weights} \word{point}
+%   \end{displaysyntax}
+%   which needs to know the underlying Lie group \word{domain} in 
+%   order to project the force correctly onto the tangent space.
+%   
+%   The |component 0| component of this force is always $0$.
+%   \begin{tcl}
+proc ::network::ulayout::negativity_barrier_force {G weightL point} {
+   set res [list [{*}$G tangent component 0 0]]
+   foreach P [lrange $point 1 end] c $weightL {
+%   \end{tcl}
+%   For subsequent components, the first order of business is to 
+%   construct the negative $B$ of the unrestricted gradient, in a 
+%   calculation that is very element-oriented. No sensible value can 
+%   be given to the force at nonpositive values, so we might as well 
+%   pick a large constant value.
+%   \begin{tcl}
+      set B {}
+      foreach row $P {
+         set brow {}
+         foreach z $row {
+            set x [lindex $z 0]
+            if {$x > 0} then {
+               lappend brow [list [expr {1.0/x}] 0.0]
+            } else {
+               lappend brow {1e10 0.0}
+            }
+         }
+         lappend B $brow
+      }
+%   \end{tcl}
+%   Then the corresponding tangent $A$ is found by means of matrix 
+%   operations. Since the tangent space at $P$ is viewed as consisting 
+%   of matrices $PA$ where $A$ is in the tangent space at the identity, 
+%   one must first multiply by \(P^{-1} = P^*\) and second project back 
+%   to the tangent space using the relevant |improve| operation. 
+%   Finally that tangent vector is scaled by the weight $c$.
+%   \begin{tcl}
+      lappend res [{*}$G tangent component [llength $res] . $c [
+         {*}$G tangent component [llength $res] improve [
+            {*}$G component [llength $res] superset * [
+               {*}$G component [llength $res] inverse $P
+            ] $B
+         ]
+      ]]
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% 
+% ---
 % 
 % 
 % \subsubsection{Enforcing non-overlap}
@@ -2460,6 +2909,7 @@ proc ::network::ulayout::overlap_force {TS widths0 wwL delta point} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
 % 
 % 
 % \subsection{Regulating the search}
@@ -4735,6 +5185,13 @@ proc ::network::ulayout::tangent_trends {nlimit itemkey G P A} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% 
+% \section{Putting things together}
+% 
+% \subsection{Experimental set-up}
+% 
 % 
 % 
 \endinput

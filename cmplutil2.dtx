@@ -272,6 +272,18 @@
 %     It is hoped that these will actually turn out to be implied by 
 %     the basic set of axioms, but if that is true then the proof 
 %     would have to be rather large.
+%   \item
+%     The \Module{division} module adds a |div| vertex, drops 
+%     all axioms about |m| and |S| vertices, and adds instead some 
+%     axioms about |div| which are derived from a formalisation of 
+%     group that takes division as the primitive operation. The idea 
+%     of this was mainly to see how difficult it is to derive the 
+%     ordinary group axioms from the ones for division, but since the 
+%     division axioms are not linear (and less linear than the 
+%     ordinary group axioms), it follows of course that one needs to 
+%     make use of the coproduct and counit to duplicate or destroy 
+%     input values as necessary, and then the best one could hope for 
+%     would be a Hopf algebra.
 % \end{itemize}
 % 
 % The \Module{HomAss} module initialising the utility with the axioms 
@@ -1034,6 +1046,17 @@ proc prepare_statements {db} {
       INSERT INTO am6iguities ( [join $L ", "] )
       VALUES ( :[join $L ", :"] )
    "]
+%     \end{tcl}
+%   \end{arrayentry}
+%   
+%   \begin{arrayentry}{DBCMD}{LastInsertNumber}
+%     The |LastInsertNumber| statement returns the rowid of the 
+%     most recently inserted row in any table. If called immediately 
+%     after a |NewAmbiguity|, that should be the |num6er| of said 
+%     ambiguity.
+%     \begin{tcl}
+   set DBCMD(LastInsertNumber)\
+     [$db prepare "SELECT last_insert_rowid();"]
 %     \end{tcl}
 %   \end{arrayentry}
 %   
@@ -4019,6 +4042,223 @@ proc pick_next_ambiguity {} {
 % \end{proc}
 % 
 % 
+% \subsection{Constructing confluence proofs}
+% 
+% Once a complete set of rules has been discovered, one might want to 
+% produce a standalone proof of this fact, that is not tainted by 
+% whatever twists and turns the original completion calculations 
+% took. The easiest way to do this is to construct a fresh set of 
+% all ambiguities and then demonstrate that they all resolve to~$0$. 
+% This exercises the above completion machinery (or at least parts of 
+% it) in slightly unconventional ways, but it is possible to maintain 
+% control of the process provided the |main_loop_stack| is not 
+% allowed to become empty. (Therefore this process is not expected to 
+% be power failure resistant.)
+% 
+% \begin{proc}{verify_confluence}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |verify_confluence| \word{new rules} \word{old rules}\regopt
+%   \end{displaysyntax}
+%   where \word{new rules} and \word{old rules} both are lists of 
+%   rule \texttt{num6er}s; the latter defaults to being empty. It 
+%   will (over some iterations of the main loop) construct 
+%   \texttt{am6iguities} for all pairs of rules where one is among 
+%   the \word{new rules} and the other is in \word{new rules} or 
+%   \word{old rules}, and have those resolved. By checking afterwards 
+%   that nothing was added to the |ru1es| table, one can be sure that 
+%   the ambiguities all resolved to $0$.
+%   
+%   The implementation makes use of the idea to reshedule itself with 
+%   a helper.
+%   \begin{tcl}
+proc verify_confluence {newL {oldL {}}} {
+   if {![llength $newL]} then {return}
+   set rule [lindex $newL 0]
+   lappend oldL $rule
+   if {[llength $newL] > 1} then {
+      push_main_task verify_confluence [lreplace $newL 0 0] $oldL
+   }
+   push_main_task verify_confluence_A $rule $oldL
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{verify_confluence_A}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |verify_confluence_A| \word{rule} \word{rule-list}
+%   \end{displaysyntax}
+%   It It will (over some iterations of the main loop) construct 
+%   \texttt{am6iguities} for all pairs of rules where one is the 
+%   \word{rule} and the other is in the \word{rule-list}, and have 
+%   those resolved.
+%   
+%   Like |verify_conflunce|, this procedure reschedules itself with 
+%   a \word{rule-list} one element shorter, until that list becomes 
+%   empty.
+%   \begin{tcl}
+proc verify_confluence_A {plus minusL} {
+   set restL [lassign $minusL minus]
+   if {[llength $restL]} then {
+      push_main_task verify_confluence_A $plus $restL
+   }
+%   \end{tcl}
+%   The rest of the procedure, which needs to process one pair of 
+%   rules, is mostly a duplication of |overlaps_between|. The main 
+%   novelty here is that whereas |overlaps_between| could rely upon 
+%   the main loop calling |pick_next_ambiguity| to start processing 
+%   of ambiguities, this procedure must instead push an explicit 
+%   command to that end upon the stack.
+%   \begin{tcl}
+   variable DBCMD
+   set prow [lindex [
+      $DBCMD(GetRu1e) allrows [dict create num6er $plus]
+   ] 0]
+   set mrow [lindex [
+      $DBCMD(GetRu1e) allrows [dict create num6er $minus]
+   ] 0]
+   variable Count
+   foreach overlap [
+      network::wfb::groomed_ambiguities\
+        [list [dict get $prow lhs] [dict get $prow feed6acks]]\
+        [list [dict get $mrow lhs] [dict get $mrow feed6acks]]
+   ] {
+      set amb [make_ambiguity [lindex $overlap 0 0]\
+        [lindex $overlap 0 1] $prow [lindex $overlap 1] $mrow\
+        [lindex $overlap 2]]
+      $DBCMD(NewAmbiguity) allrows $amb
+      if {[dict get $amb st4te] eq "A"} then {
+         push_main_task verify_confluence_B\
+           [lindex [$DBCMD(LastInsertNumber) allrows -as lists] 0 0]
+      }
+      incr Count(Aa)
+      if {[dict get $amb st4te] ne "A"} then {incr Count(a)}
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{verify_confluence_B}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |verify_confluence_B| \word{ambiguity number}
+%   \end{displaysyntax}
+%   It fetches the so numbered ambiguity from the database, prepares 
+%   it for reduction, and calls |reduce_step|. The main reason this is 
+%   even a separate procedure is to make it easy to call from 
+%   \begin{tcl}
+proc verify_confluence_B {num} {
+   variable DBCMD
+   prepare_ambiguity [lindex [
+      $DBCMD(GetAmbiguity) allrows -as dicts [dict create num6er $num]
+   ] 0]
+   tailcall reduce_step
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{begin_verify_confluence}
+%   This procedure has the same call syntax as |verify_confluence|, 
+%   but it also does some extra initialisation to better keep track 
+%   of the result, and it starts the main event loop to make sure 
+%   that things actually happen.
+%   
+%   Concretely, it has a partner command |end_verify_confluence| that 
+%   it pushes first onto the stack, that will afterwards pause the 
+%   main loop and check that everything worked as expected (no new 
+%   rules discovered). The call syntax of that is
+%   \begin{displaysyntax}
+%     |end_verify_confluence| \word{last-rule} \word{last-ambiguity}
+%   \end{displaysyntax}
+%   where \word{last-rule} and \word{last-ambiguity} are the 
+%   \texttt{num6ber}s of the last ambiguities that existed before any 
+%   new confluences were verified.
+%   \begin{tcl}
+proc begin_verify_confluence {newL {oldL {}}} {
+   variable DBCMD
+   set lastrule [lindex [
+      $DBCMD(database) allrows -as lists {
+         SELECT max(num6er) FROM ru1es
+      }
+   ] 0 0]
+   set lastamb [lindex [
+      $DBCMD(database) allrows -as lists {
+         SELECT max(num6er) FROM am6iguities
+      }
+   ] 0 0]
+   if {![string is integer -strict $lastamb]} then {
+      set lastamb -1
+   }
+   push_main_task end_verify_confluence $lastrule $lastamb
+%   \end{tcl}
+%   \emph{Then} this procedure pushes the corresponding 
+%   |verify_confluence| task and starts the main loop.
+%   \begin{tcl}
+   push_main_task verify_confluence $newL $oldL
+   tailcall completion_main_loop
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{end_verify_confluence}
+%   \begin{tcl}
+proc end_verify_confluence {begin_last_rule begin_last_amb} {
+   variable DBCMD
+   set end_last_rule [lindex [
+      $DBCMD(database) allrows -as lists {
+         SELECT max(num6er) FROM ru1es
+      }
+   ] 0 0]
+%   \end{tcl}
+%   It should hold that |begin_last_rule| and |end_last_rule| are 
+%   equal, but we'll hold off checking that for a moment.
+%   
+%   \begin{variable}{confluence_check_ambiguitiesL}
+%     It is useful to have a list of all ambiguities created as part 
+%     of this confluence check, so the procedure stores that away in 
+%     the |confluence_check_ambiguitiesL| variable. (The SELECT 
+%     statement technically returns a list of single-element lists, 
+%     so the |concat| is there to flatten them.)
+%     \begin{tcl}
+   variable confluence_check_ambiguitiesL [concat {*}[
+      $DBCMD(database) allrows -as lists {
+         SELECT num6er FROM am6iguities WHERE num6er > :last
+      } [dict create last $begin_last_amb]
+   ]]
+%     \end{tcl}
+%   \end{variable}
+%   
+%   The final reporting is done using a modal dialog in the 
+%   \Module{Tk} case, and using an |error| in the non-\Module{Tk} 
+%   case.
+%   \begin{tcl}
+%<*!Tk>
+   if {$begin_last_rule != $end_last_rule} then {
+      return -code error "Last rule before was number\ 
+        $begin_last_rule, but now it's $end_last_rule; the confluence\
+        check FAILED"
+   }
+%</!Tk>
+%<*Tk>
+   if {$begin_last_rule == $end_last_rule} then {
+      tk_messageBox -type ok -message "All ambiguities resolved."\
+        -detail "[llength $confluence_check_ambiguitiesL] resolutions\
+          have been generated."
+   } else {
+      tk_messageBox -type ok -icon warning\
+        -message "Some ambiguities did not resolve!"\
+        -detail "[expr {$end_last_rule-$begin_last_rule}] rules have\
+          been added."
+   }
+%</Tk>
+   return -code return
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
 % 
 % 
 % 
@@ -6108,6 +6348,7 @@ proc lincomb_as_LaTeX {lincomb args} {
 % \end{proc}
 % 
 % 
+% 
 % \begin{proc}{database_as_LaTeX}
 %   This procedure dumps the entire database as a \LaTeX\ document. 
 %   The call syntax is
@@ -6135,6 +6376,143 @@ proc database_as_LaTeX {fname args} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% \begin{proc}{resolution_as_LaTeX}
+%   This procedure encodes a resolution as \LaTeX; the resolution 
+%   need not have given rise to a new rule. The call syntax is
+%   \begin{displaysyntax}
+%     |resolution_as_LaTeX| \word{resolution} \word{rule-names}
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   and this returns math-mode \LaTeX\ code. The \word{resolution} is a 
+%   dictionary with the same structure as a row in the |am6iguities| 
+%   table; entries of note are:
+%   \begin{ttdescription}
+%     \item[m0n0mials]
+%       The list of networks (monomials) that may appear in the 
+%       resolution.
+%     \item[re5olution]
+%       The list of steps in the resolution. Each item is  a linear 
+%       combination of monomials, encoded as a dictionary\slash 
+%       key--value list mapping monomial index to coefficient value.
+%     \item[wh1ch]
+%       A list of rule \texttt{num6ers}. Element $i$ of this list 
+%       is applied to convert element $i$ of the \texttt{re5olution} 
+%       into element $i+1$.
+%     \item[si7e]
+%       The actual network of the ambiguity being resolved.
+%     \item[p1us\textnormal{, }m1nus]
+%       The \texttt{num6ers} of the two rules applied to the 
+%       \texttt{si7e} to generate the first step of the 
+%       \texttt{re5olution}.
+%   \end{ttdescription}
+%   The \word{rule-names} is a dictionary, where the keys are rule 
+%   \texttt{num6ers} and a value is math-mode \LaTeX\ code for a
+%   symbolic name for that rule. Rules with no entry in the 
+%   \word{rule-names} are left anonymous in the result.
+%   
+%   \begin{tcl}
+proc resolution_as_LaTeX {rD rulesD args} {
+   set res ""
+%   \end{tcl}
+%   If there is a \texttt{si7e}, then that network is shown first, 
+%   followed by a colon. This is passed through |lincomb_as_LaTeX| to 
+%   reduce the number of lines over which the network is spread out.
+%   \begin{tcl}
+   if {[dict exists $rD si7e]} then {
+      append res [lincomb_as_LaTeX [
+         dict create [dict get $rD si7e] [{*}$::coefficient 1]
+      ] {*}$args] \n
+      if {[dict exists $rD p1us]} then {
+         set no [dict get $rD p1us]
+         if {[dict exists $rulesD $no]} then {
+            set pluscode [dict get $rulesD $no]
+         }
+      }
+      if {[dict exists $rD m1nus]} then {
+         set no [dict get $rD m1nus]
+         if {[dict exists $rulesD $no]} then {
+            set minuscode [dict get $rulesD $no]
+         }
+      }
+      if {[info exists pluscode] && [info exists minuscode]} then {
+         append res "\\quad\\text{acted upon by rules \$$pluscode\$\
+           and \$$minuscode\$ yields:}\\quad" \n
+      } else {
+         append res : \n
+      }
+   }
+%   \end{tcl}
+%   Strictly speaking, that should also record the transferrence of 
+%   the ambiguity. FIXME, perhaps?
+%   
+%   Then comes the main loop over the steps of the 
+%   \texttt{re5olution} and \texttt{wh1ch}. The latter list has one 
+%   element less, so the end can be recognised by that element 
+%   picking up an empty string.
+%   \begin{tcl}
+   if {![dict exists $rD wh1ch]} then {dict set rD wh1ch {}}
+   foreach step [dict get $rD re5olution] rule [dict get $rD wh1ch] {
+      append res [
+        lincomb_as_LaTeX $step -networks [dict get $rD m0n0mials]\
+          {*}$args
+      ]
+      if {$rule ne ""} then {
+         if {[dict exists $rulesD $rule]} then {
+            append res \n "\\stackrel{[dict get $rulesD $rule]}\\to" \n
+         } else {
+            append res \n {\to} \n
+         }
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{ambiguities_as_LaTeX}
+%   This is a small wrapper around |resolution_as_LaTeX| which takes 
+%   a list of ambiguity numbers rather than their corresponding 
+%   database rows. The call syntax is
+%   \begin{displaysyntax}
+%     |ambiguities_as_LaTeX| \word{number-list} \word{rule-names}
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   The return value is a sequence of paragraphs (so text-mode 
+%   \LaTeX\ code), one for each resolution.
+%   
+%   \begin{tcl}
+proc ambiguities_as_LaTeX {numberL rulesD args} {
+   variable DBCMD
+   set res ""
+   foreach num $numberL {
+      set amb [lindex [
+         $DBCMD(GetAmbiguity) allrows -as dicts\
+           [dict create num6er $num]
+      ] 0]
+%<*zlib>
+      dict set amb m0n0mials [
+         encoding convertfrom utf-8 [zlib inflate\
+           [dict get $amb deflated_m0n0mials]]
+      ]
+%</zlib>
+      catch {
+         append res "% $num: [dict get $amb p1us], [dict get $amb m1nus]" \n
+      }
+      append res {\begin{math}} \n {  }
+      append res [string map {\n "\n  "} [
+         resolution_as_LaTeX $amb $rulesD {*}$args
+      ]] \n {\end{math}} \n\n
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % 
 % 
 % \section{Examples}
@@ -6363,6 +6741,14 @@ set vertex_appearances {
       {{0 -8}}
    }
 %</odd>
+%<*division>
+   div {
+      {polygon {offsets {0 8} {8 -8} {0 -8} {-8 8}} \
+        {-fill "" -outline black}}
+      {{-4 8}}
+      {{-3 -2 -2 -1} {5 -2 2 -1}}
+   }
+%</division>
    cup {
       {oval {square 8} {}}
       {}
@@ -6379,6 +6765,7 @@ sqlite3_init [tk_getSaveFile -initialdir ~/tmp -initialfile Hopfrules] {
 %<twist>  twist {2 2}
 %<twist&untwist>  untwist {2 2}
 %<cocomplex>  Re {0 1}  Im {0 1}
+%<division>  div {2 1}
 }
 % \end{tcl}
 % 
@@ -6575,6 +6962,15 @@ proc set_cmpcmds {} {
      [integer_biaffine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
    dict set seed1 Re [dict get $seed1 unit]
    dict set seed1 Im [dict get $seed1 unit]
+%<*division>
+%   \end{tcl}
+%   As a first stab at values for the |div| vertex, make it like the 
+%   |m| vertex but triple every component. This is to make it 
+%   strictly larger than a combination of |m| and |S|.
+%   \begin{tcl}
+   dict set seed1 div\
+     [integer_biaffine_PROP fromparts 0 3 {0 0} {{3 3}}]
+%</division>
    set map {}
    lappend map $iPROPprefix $seed1 [list flatten_biaffine $iPROPprefix]
 %   \end{tcl}
@@ -6586,6 +6982,9 @@ proc set_cmpcmds {} {
    lappend map $iPROPprefix [
       dict replace $seed1 \
         m [integer_biaffine_PROP fromparts 0 1 {0 1} {{1 1}}] \
+%<*division>
+        div [integer_biaffine_PROP fromparts 0 3 {0 3} {{3 3}}] \
+%</division>
         Delta [integer_biaffine_PROP fromparts 0 {0 1} 1 {{1} {1}}]
    ] [list flatten_biaffine $iPROPprefix]
    set blocks 2
@@ -6736,15 +7135,18 @@ if {$Count(Aa)<=0} then {
 % 
 % \begin{tcl}
 enter_congruence -short "Unit&counit" {} 1 {unit \n epsilon} -1 {}
+%<*!division>
 enter_congruence -short "Left unit" {} 1 {unit . \n m} -1 {.}
 enter_congruence -short "Right unit" {} 1 {. unit \n m} -1 {.}
 enter_congruence -short "Associative" {} 1 {m . \n m} -1 {. m \n m}
+%</!division>
 enter_congruence -short "Left counit" {} 1 {Delta \n epsilon .} -1 {.}
 enter_congruence -short "Right counit" {} 1 {Delta \n . epsilon} -1 {.}
 enter_congruence -short "Coassociative" {}\
   1 {Delta \n . Delta} -1 {Delta \n Delta .}
 enter_congruence -short "Unit&coproduct" {}\
   1 {unit \n Delta} -1 {unit unit}
+%<*!division>
 enter_congruence -short "Product&counit" {}\
   1 {m \n epsilon} -1 {epsilon epsilon}
 %<*!twist>
@@ -6759,7 +7161,55 @@ enter_congruence -short "Left formal inverse" {}\
   1 {Delta \n S . \n m} -1 {epsilon \n unit}
 enter_congruence -short "Right formal inverse" {}\
   1 {Delta \n . S \n m} -1 {epsilon \n unit}
+%</!division>
 % \end{tcl}
+% 
+% The reference division-group axioms are (writing $e$ for the group 
+% unit) that for all $x$, $y$, and $z$:
+% \begin{align*}
+%   x/x ={}& e \text{,}\\
+%   x/e ={}& x \text{,}\\
+%   (z/x) \big/ (y/x) ={}& z/y \text{.}
+% \end{align*}
+% Encoding those amounts to, in turn:
+% \begin{tcl}
+%<*division>
+enter_congruence -short "Division by same" {}\
+  1 {Delta \n div} -1 {epsilon \n unit}
+enter_congruence -short "Division by unit" {}\
+  1 {. unit \n div} -1 {.}
+enter_congruence -short "Division of fractions" {}\
+  1 {. . Delta \n . X . \n div div \n div} -1 {div epsilon}
+% \end{tcl}
+% In addition, it needs to be specified that |Delta| and |epsilon| 
+% behaves like duplication and disposal with respect to |div| (just 
+% as it normally would with respect to |m|). If anything goes really 
+% wrong, it will probably be with respect to the latter of these two.
+% \begin{tcl}
+enter_congruence -short "Division&counit" {}\
+  1 {div \n epsilon} -1 {epsilon epsilon}
+%<*nonstandardcoproduct>
+enter_congruence -short "Division&coproduct" {}\
+  1 {div \n Delta} -1 {Delta Delta \n . X . \n div div}
+%</nonstandardcoproduct>
+%<*!nonstandardcoproduct>
+enter_congruence -short "Division&coproduct" {}\
+  1 {div \n Delta} -1 {Delta Delta \n . 2X1 \n div div}
+%</!nonstandardcoproduct>
+% \end{tcl}
+% Finally, make |S| and |m| aliases for expressions that can be 
+% written using |div| alone.
+% \begin{tcl}
+enter_congruence -short "Antipode from division" {}\
+  1 {S} -1 {unit . \n div}
+enter_congruence -short "Product from division" {}\
+  1 {m} -1 {. S \n div}
+%</division>
+% \end{tcl}
+%\begin{verbatim}
+% enter_congruence -short "Division,antipode&product" {}\
+%   1 {div} -1 {. S \n m}
+%\end{verbatim}
 % 
 % The only identity given for the |untwist| is that it undoes 
 % whatever |twist| does, on both sides.

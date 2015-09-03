@@ -11666,7 +11666,7 @@ proc network::rich::tosvg::_opts2paint\
 % 
 % \begin{proc}{_colour}
 %   The |_colour| command should generally convert a Tk colour to the 
-%   corresponding SCG colour. The bare minimum is to change the empty 
+%   corresponding SVG colour. The bare minimum is to change the empty 
 %   string to |none| and leave everything else as it is:
 %   \begin{tcl}
 proc network::rich::tosvg::_colour {tkcol} {
@@ -11721,6 +11721,23 @@ proc network::rich::tosvg::line {coordcmd opts ns} {
    }
    dict set attr points [join [namespace eval $ns $coordcmd {0 0}]]
    list polyline $attr {}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{polygon}
+%   Tk |polygon| items become SVG |polygon| elements. |-smooth| items 
+%   would need to be turned into |path| elements; this is currently 
+%   detected but throws an error.
+%   \begin{tcl}
+proc network::rich::tosvg::polygon {coordcmd opts ns} {
+   foreach {attr opts} [_opts2paint $opts 0 0] break
+   if {[dict exists $opts -smooth] &&\
+     ![string is false [dict get $opts -smooth]]} then {
+       return -code error "The -smooth option is not supported yet"
+   }
+   dict set attr points [join [namespace eval $ns $coordcmd {0 0}]]
+   list polygon $attr {}
 }
 %   \end{tcl}
 % \end{proc}

@@ -123,7 +123,8 @@ $\mathbb{Z}[x]\big/ \langle x^2 - 2\rangle$~(ditto), $\mathbb{Z} +
 i\mathbb{Z}$~(Gaussian integers: Euclidean domain, ring etc.), 
 $\mathrm{M}_n(\mathbb{R})$~(real $n \times n$ matrices: ring etc.), 
 $\mathrm{GL}_n(\mathbb{R})$~(invertible real $n \times n$ matrices: a 
-group), and so on. What should be apparent from these examples is 
+group, subset of $\mathrm{M}_n(\mathbb{R})$, etc.), and so on. 
+What should be apparent from these examples is 
 that many structures naturally support more than one interface; it is 
 seldom useful to ask for a name describing all that a structure is, 
 but generally quite sufficient to pick an interface and ask whether 
@@ -131,7 +132,7 @@ the structure supports it. The case of the natural numbers should
 also make it clear that there are sometimes more than one way in which 
 a set can often be turned into a structure supporting a particular 
 interface; the ways in which one can reinterpret the basic 
-mathematical structures are surprisingly many.
+mathematical structures are surprisingly numerous.
 
 What this means in practice is that in order to multiply two 
 elements $a$ and $b$ of some algebra $\mathcal{C}$ one does not 
@@ -228,6 +229,26 @@ simplicity, the \Tcl\ syntax also provides an elegant solution to
 the problem of distinguishing between several similarly-named 
 operations that can be a major headache when describing complex 
 algebraic constructions.
+
+Some may find it a concern that \Tcl\ is not a heavily optimised or 
+optimising language, in the sense that a procedure call in \Tcl\ is 
+not nearly as fast as a corresponding function call in C, but that 
+is less important than one might think. The main reason is the above 
+observation that one level~$n$ operation usually boils down to 
+several level~$n-1$ operations, each of which in turn boil down to 
+several level~$n-2$ operations, and so on: the number of level~$n$ 
+operation steps are \emph{massively} outnumbered by the level~$0$ 
+operation steps. 
+This means dispatch (or even execution) efficiency at level $n$ has a 
+rather small impact on overall performance; what matters is 
+efficiency at level $0$ and $1$. And the nice thing about \Tcl\ here 
+is that it can just as well use implementations in some other (more 
+optimised) language for those low level operations. The idea is not 
+to use the same \Tcl\ source code for implementing the level $0$ and 
+$1$ structures while somehow swapping in other implementations of 
+primitives, but to replace the entire implementation of selected 
+time-critical level $0$ and $1$ structures by an optimised one in 
+e.g.~C, and reap the performance benefits of this.
 
 
 %     
@@ -825,7 +846,7 @@ example solutions to the most common problems (see
 Subsection~\ref{Ssec:TclValues}), and one could argue that this 
 consistutes a sort of type system, even if it is of course 
 not mandatory. In addition, a package may choose to publicly specify 
-the encoding of some data, and it is for that too useful to have a 
+the encoding of some data, and it is for that as well useful to have a 
 common body of data encoding principles and techniques for package 
 authors to employ. Some suggestions along these lines for improving 
 interoperability between packages can be found in 
@@ -895,7 +916,7 @@ against which program correctness should be judged, and on the other
 hand there is the underlying technology, which determines the 
 complexity of algorithm implementations. (There have unfortunately 
 been some widely disseminated, although by now rather old, analyses 
-of \Tcl\ whose incorrect conclusions about complexity are based on 
+of \Tcl\ whose outdated conclusions about complexity are based on 
 the formal model alone.)
 
 The formal model is simply this: \emph{everything} (i.e., every 
@@ -908,9 +929,9 @@ strings as denoting equivalent values\Ldash for example
 expecting an integer\Rdash but they may not distinguish between equal 
 values constructed in different ways. This is useful for testing and 
 debugging, since it has the corollary that ``what you see is what it 
-got'' with respect to calling of commands; providing an input value 
-as a literal string is the same as had it been constructed by some 
-complicated subroutine. It also means that the value model maps 
+got'' with respect to calling of commands; an input value constructed 
+by some complicated subroutine is always the same as some literal 
+string. It also means that the value model maps 
 straightforwardly into several fundamental models of computations, 
 particularly those of more mathematical flavour such as 
 recursive functions (on natural numbers) and Turing machines.
@@ -940,22 +961,49 @@ the requirement that every value potentially can be viewed as a string.
 The string representation can be something as raw as a hexdump of the 
 internal representation, but it can equally well be something more 
 enduring and readable, such as an OpenMath-XML encoding of the value 
-in question. 
+in question (in case the value is a mathematical object). 
 
 That the internal representation still has to live up to the promises 
 set by the formal model also has the implication that all values are 
-immutable: there's no way to change a value.
+immutable: there's no way to change a value. For composite kinds of 
+values (lists, dictionaries, \dots), there are often operations for 
+replacing or modifying a part of the value (e.g.~replace the value in 
+an element of a list by another value), but what these operations 
+formally do is always that they create a new value which is the same 
+as the old one, except in the part that was to be modified. The great 
+practical benefit of this is that if the same composite value (e.g.~a 
+matrix) is used in several parts of your program, then there is no 
+way that operations applied to it in one place (e.g.~row operations 
+to perform Gaussian elimination) can affect the value of the matrix 
+as seen in other parts of the program. This is often \emph{not} the 
+case in programming languages which employ pointers or other references 
+to mutable storage as the primary means of constructing composite 
+values (most of the mainstream is that way, really); there it is 
+instead the responsibility of the programmer (indeed, the responsibility 
+of \emph{every} programmer involved \emph{anywhere} in the codebase) to 
+restrain themselves to only using operations for immutable values, if 
+the system as a whole is to provide proper value semantics. That is 
+actually a rather tall order, and thus a rich source of potential 
+bugs! But in \Tcl\ you get the correctness of immutable values by 
+default.
+
+The elementary way to internally live up to this formal requirement 
+is to make a copy every time some value should be modified, but \Tcl\ 
+typically does better than that. If a value is \emph{shared} 
+(referenced also from somewhere else) then a copy is made before the 
+internal representation is modified, but the internal representation 
+of an unshared value can be modified directly, since the 
+make-modified-value operation would formally also consume the last 
+instance of the old value. For this reason, many make-modified-value 
+commands take the name of the variable in which the value to modified 
+is stored as argument; had they only taken the value, then the 
+internal representation would always be shared (one reference is 
+passed to the command, and one reference continues to be held by the 
+variable).
 
 
-% ; the closest equivalent of `type' that one finds is 
-% `set of values (strings) which are valid in a particular circumstance 
-% (for example, constitute valid input to a particular command)', and 
-% as it happens that is very much the case also in mathematics.
 
-% Ultimately, what one deals with is always \emph{encodings} in computer 
-% memory of mathematical elements rather than the elements 
-% themselves. 
-
+---
 
 
 \section{Interpreting interface specifications}
@@ -1288,7 +1336,7 @@ as something which is introduced ad hoc to build a collection.
 
 There can conversely also be a need to have a notation for forming a 
 list from separate words, if some operation requires such a list as an 
-argument. One basic may of doing this is to use \Tcl's list 
+argument. One basic way of doing this is to use \Tcl's list 
 construction command |list|, since
 \begin{displaysyntax}
   [list $a_1$ \dots\ $a_n$]
@@ -1300,8 +1348,8 @@ list elements between braces, like so:\footnote{
 }
 \begin{displaysyntax}
   switch \meta{options}\regopt\ \word{string}
-  |{|\begin{regblock}[\regplus] \word{pattern} \word{body} 
-  \end{regblock}|}|
+  |{| \begin{regblock}[\regplus] \word{pattern} \word{body} 
+  \end{regblock} |}|
 \end{displaysyntax}
 
 

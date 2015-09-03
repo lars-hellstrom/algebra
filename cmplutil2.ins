@@ -27,24 +27,12 @@ the true source is the file from which this one was generated.
 
 % Actually make the .tcl file. 
 \generate{
-   \file{cmplbraid.tcl}{
-      \from{network2.dtx}{pkg}
-      \from{api.dtx}{pkg}
-      \from{export.dtx}{openmath,xmlgen,pkg}
-      \from{groups.dtx}{pkg}
-      \from{rings.dtx}{integers,float}
-      \from{props.dtx}{pkg}
-      \from{heap.dtx}{pkg,skiplist}
-      \from{cmplutil2.dtx}
-        {vsquare,Tk,BraidMatrix,stats,splitnewrule,lazier,%
-         eventbug,testserver}
-   }
 % This is a combined file which contains several supporting packages.
    \file{cmplutil.tcl}{
       \from{network2.dtx}{pkg}
       \from{api.dtx}{pkg}
       \from{export.dtx}{openmath,xmlgen,pkg}
-      \from{rings.dtx}{integers,float}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
       \from{props.dtx}{pkg}
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}{vsquare,Tk,stats,splitnewrule,lazier,eventbug}
@@ -55,7 +43,7 @@ the true source is the file from which this one was generated.
       \from{network2.dtx}{pkg}
       \from{api.dtx}{pkg}
       \from{export.dtx}{openmath,xmlgen,pkg}
-      \from{rings.dtx}{integers,float}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}
         {vsquare,Tk,Frobenius,coproduct,stats,splitnewrule,lazier,%
@@ -65,25 +53,25 @@ the true source is the file from which this one was generated.
       \from{network2.dtx}{pkg}
       \from{api.dtx}{pkg}
       \from{export.dtx}{openmath,xmlgen,pkg}
-      \from{rings.dtx}{integers,float}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}
         {vsquare,Tk,Frobenius,coproduct,stats,splitnewrule,lazier,eventbug}
    }
-%    \file{cmplhopf.tcl}{
-%       \from{network2.dtx}{pkg}
-%       \from{export.dtx}{openmath,xmlgen,pkg}
-%       \from{rings.dtx}{integers,float}
-%       \from{props.dtx}{pkg}
-%       \from{heap.dtx}{pkg,skiplist}
-%       \from{cmplutil2.dtx}
-%         {vsquare,Tk,Hopf,twist,stats,splitnewrule,lazier,pairmap,eventbug}
-%    }
+   \file{cmplhopf-nozlib.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,Hopf,stats,splitnewrule,lazier,pairmap,eventbug}
+   }
    \file{cmplhopf.tcl}{
       \from{network2.dtx}{pkg}
       \from{api.dtx}{pkg}
       \from{export.dtx}{openmath,xmlgen,pkg}
-      \from{rings.dtx}{integers,float}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
       \from{props.dtx}{pkg}
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}
@@ -94,7 +82,7 @@ the true source is the file from which this one was generated.
       \from{network2.dtx}{pkg}
       \from{api.dtx}{pkg}
       \from{export.dtx}{openmath,xmlgen,pkg}
-      \from{rings.dtx}{integers,float}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
       \from{props.dtx}{pkg}
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}
@@ -104,7 +92,7 @@ the true source is the file from which this one was generated.
 %    \file{cmplweak.tcl}{
 %       \from{network2.dtx}{pkg}
 %       \from{export.dtx}{openmath,xmlgen,pkg}
-%       \from{rings.dtx}{integers,float}
+%       \from{rings.dtx}{integers,float,SemigroupAlgebra}
 %       \from{heap.dtx}{pkg,skiplist}
 %       \from{cmplutil2.dtx}
 %         {vsquare,Tk,WeakAss,stats,splitnewrule,lazier,eventbug}
@@ -112,12 +100,24 @@ the true source is the file from which this one was generated.
 %    \file{cmplhopftrig.tcl}{
 %       \from{network2.dtx}{pkg}
 %       \from{export.dtx}{openmath,xmlgen,pkg}
-%       \from{rings.dtx}{integers,float}
+%       \from{rings.dtx}{integers,float,SemigroupAlgebra}
 %       \from{props.dtx}{pkg}
 %       \from{heap.dtx}{pkg,skiplist}
 %       \from{cmplutil2.dtx}
 %         {vsquare,Tk,Hopf,cocomplex,stats,splitnewrule,lazier,pairmap,zlib}
 %    }
+   \file{cmplbraid.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{groups.dtx}{pkg}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,BraidMatrix,stats,splitnewrule,lazier,%
+         eventbug,testserver}
+   }
    \file{cmplhomass.tcl}{
       \from{network2.dtx}{pkg}
       \from{export.dtx}{openmath,xmlgen,pkg}
@@ -142,7 +142,7 @@ the true source is the file from which this one was generated.
 %    \file{cmpltransp.tcl}{
 %       \from{network2.dtx}{pkg}
 %       \from{export.dtx}{openmath,xmlgen,pkg}
-%       \from{rings.dtx}{integers,float}
+%       \from{rings.dtx}{integers,float,SemigroupAlgebra}
 %       \from{props.dtx}{pkg}
 %       \from{heap.dtx}{pkg,skiplist}
 %       \from{cmplutil2.dtx}
