@@ -694,8 +694,8 @@ proc ::network::ulayout::uniform_matrix {n} {
 % behaviour visavi $\mathbf{1}$, but the other eigenspace will for a 
 % general $A$ be decomposed into two parts where one has eigenvalue 
 % $1$ and the other has eigenvalue $-1$. This allows choosing $A$ to 
-% minimise the real part variations of the vector $PMP^*\mathbf{w}$ 
-% (or $PMP^\mathrm{T}\mathbf{w}$; the variance in one is the negative 
+% minimise the real part variations of the vector $PLP^*\mathbf{w}$ 
+% (or $PLP^\mathrm{T}\mathbf{w}$; the variance in one is the negative 
 % of the variance of the other).
 % 
 % Let $w$ be the average width of an item, and let \(\mathbf{v} = 
@@ -704,30 +704,30 @@ proc ::network::ulayout::uniform_matrix {n} {
 % symmetric, \(A\mathbf{1} = \mathbf{0}\), and \(A^2 = I - 
 % \frac{1}{n}J\). Then
 % \begin{multline*}
-%   PMP^*\mathbf{w} =
-%   PM ( \tfrac{1}{n}J - iA ) (w \mathbf{1} + \mathbf{v} ) 
+%   PLP^*\mathbf{w} =
+%   PL ( \tfrac{1}{n}J - iA ) (w \mathbf{1} + \mathbf{v} ) 
 %   =
-%   PM ( w \mathbf{1} - i A \mathbf{v} ) 
+%   PL ( w \mathbf{1} - i A \mathbf{v} ) 
 %   = \\ =
-%   ( \tfrac{1}{n}J + iA ) (w M\mathbf{1} - i M A \mathbf{v} ) 
+%   ( \tfrac{1}{n}J + iA ) (w L\mathbf{1} - i L A \mathbf{v} ) 
 %   =
-%   (\tfrac{nw}{2} \mathbf{1} + AMA\mathbf{v}) +
-%   i(wAM\mathbf{1} - \tfrac{1}{n}J M A \mathbf{v})
+%   (\tfrac{nw}{2} \mathbf{1} + ALA\mathbf{v}) +
+%   i(wAL\mathbf{1} - \tfrac{1}{n}J L A \mathbf{v})
 % \end{multline*}
-% since \(\mathbf{1}^\mathrm{T} M \mathbf{1} = \frac{n^2}{2}\). This 
-% means any variation in real position comes from the $AMA\mathbf{v}$ 
-% (which would be $-AMA\mathbf{v}$ in $PMP^\mathrm{T}\mathbf{w}$, 
+% since \(\mathbf{1}^\mathrm{T} L \mathbf{1} = \frac{n^2}{2}\). This 
+% means any variation in real position comes from the $ALA\mathbf{v}$ 
+% (which would be $-ALA\mathbf{v}$ in $PLP^\mathrm{T}\mathbf{w}$, 
 % giving the exact same variation but in the opposite direction), so 
 % that is what one would like to minimise. That $A$ is real symmetric 
 % with all eigenvalues in $\{-1,0,1\}$ makes that problem fairly easy 
 % to analyse.
 % 
-% Minimising $\Vert AMA\mathbf{v} \rVert$ is equivalent to minimising 
+% Minimising $\Vert ALA\mathbf{v} \rVert$ is equivalent to minimising 
 % \[
-%   \Vert AMA\mathbf{v} \rVert^2 = 
-%   \mathbf{v}^\mathrm{T} A M^\mathrm{T} A^2 M A \mathbf{v} = 
-%   (A\mathbf{v})^\mathrm{T} M^\mathrm{T} 
-%     (I -\nobreak \tfrac{1}{n}J) M (A\mathbf{v})
+%   \Vert ALA\mathbf{v} \rVert^2 = 
+%   \mathbf{v}^\mathrm{T} A L^\mathrm{T} A^2 L A \mathbf{v} = 
+%   (A\mathbf{v})^\mathrm{T} L^\mathrm{T} 
+%     (I -\nobreak \tfrac{1}{n}J) L (A\mathbf{v})
 %   \text{.}
 % \]
 % Since $A$ has to be symmetric, the eigenspaces are orthogonal, so the 
@@ -739,25 +739,25 @@ proc ::network::ulayout::uniform_matrix {n} {
 % vector orthogonal to $\mathbf{1}$ that has the same length as 
 % $\mathbf{v}$. The problem therefore reduces to that of finding 
 % \(\mathbf{x} \parallel A \mathbf{v}\) minimising $\mathbf{x}^\mathrm{T} 
-% M^\mathrm{T} (I -\nobreak \tfrac{1}{n}J) M \mathbf{x}$ subject to 
+% L^\mathrm{T} (I -\nobreak \tfrac{1}{n}J) L \mathbf{x}$ subject to 
 % \(\lVert\mathbf{x}\rVert = 1\) and \(\mathbf{1}^\mathrm{T} 
 % \mathbf{x} = 0\).
 % 
 % For even $n$, this turns out to have a very simple solution: the 
 % $k$th element of $\mathbf{x}$ is $(-1)^{k+1} n^{-1/2}$, as that 
-% makes \(M \mathbf{x} = \frac{1}{2\sqrt{n}} \mathbf{1}\) and \((I 
-% -\nobreak \tfrac{1}{n}J) M \mathbf{x} = \mathbf{0}\); the objective 
+% makes \(L \mathbf{x} = \frac{1}{2\sqrt{n}} \mathbf{1}\) and \((I 
+% -\nobreak \tfrac{1}{n}J) L \mathbf{x} = \mathbf{0}\); the objective 
 % function attains the value $0$. Since the matrix $I - \tfrac{1}{n}J$ 
-% is positive semidefinite, whereas $M$ is invertible, it follows that 
-% \(B =  M^\mathrm{T} (I -\nobreak \tfrac{1}{n}J) M\) is also positive 
+% is positive semidefinite, whereas $L$ is invertible, it follows that 
+% \(B =  L^\mathrm{T} (I -\nobreak \tfrac{1}{n}J) L\) is also positive 
 % semidefinite; $0$ is as low as $\mathbf{x}^\mathrm{T} B \mathbf{x}$ 
 % can get. Things are not that simple for odd $n$; it is in general 
 % not possible to attain \(\mathbf{x}^\mathrm{T} B \mathbf{x} = 0\). 
 % What complicates matters in the constraint about $\mathbf{x}$ being 
 % orthogonal to $\mathbf{1}$. It is always the case that \(\ker B = 
-% M^{-1} \cdot \ker (I -\nobreak \tfrac{1}{n}J) =
-% \{ t M^{-1} \mathbf{1} \mid\nobreak t \in\nobreak \mathbb{R} \}\), 
-% but $M^{-1}\mathbf{1}$ is only orthogonal to $\mathbf{1}$ if $n$ is 
+% L^{-1} \cdot \ker (I -\nobreak \tfrac{1}{n}J) =
+% \{ t L^{-1} \mathbf{1} \mid\nobreak t \in\nobreak \mathbb{R} \}\), 
+% but $L^{-1}\mathbf{1}$ is only orthogonal to $\mathbf{1}$ if $n$ is 
 % even; for odd $n$ the angle is something else. This means finding 
 % the optimal $\mathbf{x}$ is not simply a matter of picking an 
 % eigenvector for the smallest eigenvalue of $B$. However the problem 
@@ -855,7 +855,7 @@ proc ::network::ulayout::uniform_matrix_point {widths0 wwL} {
 % vector of item widths, one may first observe that if $1,\dotsc,n$ 
 % is the list of items from left to right, then \(z_k = 
 % \tfrac{1}{2}w_k + \sum_{j=1}^{k-1} w_j\), which can be written in 
-% matrix from as \(\mathbf{z} = M \mathbf{w}\), where $M$ is the 
+% matrix from as \(\mathbf{z} = L \mathbf{w}\), where $L$ is the 
 % matrix whose entries are $\tfrac{1}{2}$ on the main diagonal, $0$ 
 % above it, and $1$ below it. Next generalising to the case that the 
 % index (in $\mathbf{w}$ and $\mathbf{z}$) of the $k$th item from the 
@@ -869,35 +869,35 @@ proc ::network::ulayout::uniform_matrix_point {widths0 wwL} {
 % Writing $\phi(\sigma)$ for the permutation matrix counterpart of 
 % $\sigma$, the matrix form of this is
 % \begin{equation}
-%   \mathbf{z} = \phi(\sigma) M \phi(\sigma^{-1}) \mathbf{w}
+%   \mathbf{z} = \phi(\sigma) L \phi(\sigma^{-1}) \mathbf{w}
 %   \text{,}
 % \end{equation}
 % suggesting
 % \begin{equation}
-%   \mathbf{z} = P M P^{-1} \mathbf{w}
+%   \mathbf{z} = P L P^{-1} \mathbf{w}
 % \end{equation}
 % as the corresponding formula when the permutation $\phi(\sigma)$ is 
 % relaxed to a more general matrix \(P \in \mathrm{U}^\mathbf{1}(n)\).
 % 
 % 
-% \begin{proc}{PMP*w}
+% \begin{proc}{PLP*w}
 %   For unitary matrices, the inverse is more easily computed as the 
 %   Hermitian conjugate, so the above formula boils down to 
-%   \(\mathbf{z} = P M P^* \mathbf{w}\), and that is what this 
+%   \(\mathbf{z} = P L P^* \mathbf{w}\), and that is what this 
 %   procedure primarily computes. It also returns some intermediate 
 %   results as extra data.
 %   
 %   In more detail, this procedure has the call syntax
 %   \begin{displaysyntax}
-%     PMP*w \word{widths0} \word{wiring--widths} \word{point}
+%     PLP*w \word{widths0} \word{wiring--widths} \word{point}
 %   \end{displaysyntax}
 %   where \word{widths0} and \word{wiring--widths} make up the 
 %   internal representation for a layout problem (as described above) 
 %   and the \word{point} is an optimisation domain point. It returns 
 %   a combined account with the format
 %   \begin{displaysyntax}
-%     \word{point} PMP*w \word{$PMP^*\mathbf{w}$-list} 
-%     \word{$MP^*\mathbf{w}$-list} \word{$P^*\mathbf{w}$-list}
+%     \word{point} PLP*w \word{$PLP^*\mathbf{w}$-list} 
+%     \word{$LP^*\mathbf{w}$-list} \word{$P^*\mathbf{w}$-list}
 %   \end{displaysyntax}
 %   where the last three items are lists of vectors of |complex| 
 %   numbers, and the outer list level is indexed by item level (there 
@@ -907,13 +907,13 @@ proc ::network::ulayout::uniform_matrix_point {widths0 wwL} {
 %   In the implementation, $k$ is the index into \word{point} of the 
 %   current matrix component.
 %   \begin{tcl}
-proc ::network::ulayout::PMP*w {widths0 wwL point} {
+proc ::network::ulayout::PLP*w {widths0 wwL point} {
    set res {}; set res1 {}; set res2 {}
    set k 1
    foreach {wiring widths} [linsert $wwL 0 "" $widths0] {
 %   \end{tcl}
 %   If this is a trivial level (only one item) then the $P$ matrix is 
-%   the identity and the sought $P M P^* \mathbf{w}$ product is 
+%   the identity and the sought $P L P^* \mathbf{w}$ product is 
 %   simply half the only width, recast as a complex number. Deal 
 %   with that case first.
 %   \begin{tcl}
@@ -947,7 +947,7 @@ proc ::network::ulayout::PMP*w {widths0 wwL point} {
       }
       lappend res2 $v
 %   \end{tcl}
-%   The \(\mathbf{u} := M\mathbf{v}\) vector is easy to compute, 
+%   The \(\mathbf{u} := L\mathbf{v}\) vector is easy to compute, 
 %   since one merely needs to sum over previous vector elements.
 %   \begin{tcl}
       set u {}
@@ -976,29 +976,29 @@ proc ::network::ulayout::PMP*w {widths0 wwL point} {
       lappend res $t
       incr k
    }
-   return [list $point PMP*w $res $res1 $res2]
+   return [list $point PLP*w $res $res1 $res2]
 }
 %   \end{tcl}
 % \end{proc}
 % 
 % 
-% To see why the $P^*\mathbf{w}$ and $MP^*\mathbf{w}$ vectors are 
+% To see why the $P^*\mathbf{w}$ and $LP^*\mathbf{w}$ vectors are 
 % useful, one may consider the problem of computing the gradient 
 % of a function on the form \(P \mapsto f\bigl( \operatorname{Re}
-% (\mathbf{c}^* PMP^* \mathbf{w}) \bigr)\), where \(f\colon 
+% (\mathbf{c}^* PLP^* \mathbf{w}) \bigr)\), where \(f\colon 
 % \mathbf{R} \longrightarrow \mathbb{R}\) is differentiable and 
 % $\mathbf{c}$ is some constant vector. By the chain rule,
 % \[
 %   \nabla_P f\bigl( 
-%     \operatorname{Re}(\mathbf{c}^* PMP^* \mathbf{w}) 
+%     \operatorname{Re}(\mathbf{c}^* PLP^* \mathbf{w}) 
 %   \bigr) =
 %   f'\bigl( 
-%     \operatorname{Re}(\mathbf{c}^* PMP^* \mathbf{w}) 
+%     \operatorname{Re}(\mathbf{c}^* PLP^* \mathbf{w}) 
 %   \bigr)
-%   \nabla_P \operatorname{Re}(\mathbf{c}^* PMP^* \mathbf{w}) 
+%   \nabla_P \operatorname{Re}(\mathbf{c}^* PLP^* \mathbf{w}) 
 %   \text{.}
 % \]
-% The differential of $\operatorname{Re}(\mathbf{c}^* PMP^* 
+% The differential of $\operatorname{Re}(\mathbf{c}^* PLP^* 
 % \mathbf{w})$ is easy to compute in the algebro-symbolic way, by 
 % substituting $P (I +\nobreak \varepsilon A)$ for $P$, where the 
 % formal infinitesimal $\varepsilon$ satisfies \(\varepsilon^2=0\), 
@@ -1006,28 +1006,28 @@ proc ::network::ulayout::PMP*w {widths0 wwL point} {
 % results in
 % \begin{multline*}
 %   \operatorname{Re}\Bigl(
-%     \mathbf{c}^* P(I + \varepsilon A) M 
+%     \mathbf{c}^* P(I + \varepsilon A) L 
 %     \bigl( P(I + \varepsilon A) \bigr)^* \mathbf{w}
 %   \Bigr) =
 %   \operatorname{Re}\bigl(
-%     \mathbf{c}^* P(I + \varepsilon A) M 
+%     \mathbf{c}^* P(I + \varepsilon A) L 
 %     (I + \varepsilon A^*) P^* \mathbf{w}
 %   \bigr) =
 %   \operatorname{Re}\bigl(
-%     \mathbf{c}^* P(I + \varepsilon A) M 
+%     \mathbf{c}^* P(I + \varepsilon A) L 
 %     (I - \varepsilon A) P^* \mathbf{w}
 %   \bigr) = \\ =
-%   \operatorname{Re}(\mathbf{c}^* PMP^* \mathbf{w}) + 
+%   \operatorname{Re}(\mathbf{c}^* PLP^* \mathbf{w}) + 
 %   \varepsilon \operatorname{Re}( 
-%     \mathbf{c}^* P A M P^* \mathbf{w}
-%     - \mathbf{c}^* P M A P^* \mathbf{w}
+%     \mathbf{c}^* P A L P^* \mathbf{w}
+%     - \mathbf{c}^* P L A P^* \mathbf{w}
 %   )
 % \end{multline*}
 % so the differential there is
 % \[
 %   A \mapsto \operatorname{Re}( 
-%     \mathbf{c}^* P A M P^* \mathbf{w}
-%     - \mathbf{c}^* P M A P^* \mathbf{w}
+%     \mathbf{c}^* P A L P^* \mathbf{w}
+%     - \mathbf{c}^* P L A P^* \mathbf{w}
 %   )
 %   \text{.}
 % \]
@@ -1037,7 +1037,7 @@ proc ::network::ulayout::PMP*w {widths0 wwL point} {
 % ---
 % 
 % 
-% A problem with the |PMP*w| formula is however what happens when one 
+% A problem with the |PLP*w| formula is however what happens when one 
 % tries to apply it to the |bigXpoint| point: item widths are not the 
 % same in the imaginary direction as in the real direction. In fact, 
 % the ``imaginary width'' for item $k$ is exactly $w_{n+1-k}$\Dash 
@@ -1050,53 +1050,53 @@ proc ::network::ulayout::PMP*w {widths0 wwL point} {
 % The vector $\mathbf{x}_k$ of reference positions for items in level 
 % $k$ is given by
 % \begin{equation} \label{Eq:xVektor}
-%   \mathbf{x}_k = x_k \mathbf{1} + P_k M P_k^{-1} \mathbf{w}_k
+%   \mathbf{x}_k = x_k \mathbf{1} + P_k L P_k^{-1} \mathbf{w}_k
 % \end{equation}
 % where $x_k$ is the overall displacement for this level, $P_k$ is 
 % the (relaxation of permutation) matrix for this level, 
-% $\mathbf{w}_k$ is the width vector at this level, and $M$ is the 
+% $\mathbf{w}_k$ is the width vector at this level, and $L$ is the 
 % constant matrix which is $\tfrac{1}{2}$ on the main diagonal, $0$ 
 % above it, and $1$ below it.
 % 
 % 
 % \subsubsection{Original interpretation}
 % 
-% \begin{proc}{PMP*w}
+% \begin{proc}{PLP*w}
 %   Needing the explicit vector of reference positions is however not 
 %   all that common, as there are in many cases natural shortcuts to 
 %   make when setting up the actual calculations. What is very 
-%   commonly needed is on the other hand the products $P_k M P_k^* 
+%   commonly needed is on the other hand the products $P_k L P_k^* 
 %   \mathbf{w}_k$, so this procedure computes all of them in one go. 
 %   It has the call syntax
 %   \begin{displaysyntax}
-%     PMP*w \word{widths0} \word{wiring--widths} \word{point}
+%     PLP*w \word{widths0} \word{wiring--widths} \word{point}
 %   \end{displaysyntax}
 %   where \word{widths0} and \word{wiring--widths} make up the 
 %   internal representation for a layout problem (as described above) 
 %   and the \word{point} is the optimisation domain point containing 
 %   all the $P_k$ matrices. The return value is a list
 %   \begin{displaysyntax}
-%     \word{$P_k M P_k^* \mathbf{w}_k$}
-%     \word{$M P_k^* \mathbf{w}_k$}
+%     \word{$P_k L P_k^* \mathbf{w}_k$}
+%     \word{$L P_k^* \mathbf{w}_k$}
 %     \word{$P_k^* \mathbf{w}_k$}
 %   \end{displaysyntax}
-%   where e.g.~\word{$P_k M P_k^* \mathbf{w}_k$} in turn is the list 
-%   of all $P_k M P_k^* \mathbf{w}_k$ vectors (including those for 
+%   where e.g.~\word{$P_k L P_k^* \mathbf{w}_k$} in turn is the list 
+%   of all $P_k L P_k^* \mathbf{w}_k$ vectors (including those for 
 %   levels of only one item); such a vector is a list of |complex| 
-%   numbers. The \word{$M P_k^* \mathbf{w}_k$} and \word{$P_k^* 
+%   numbers. The \word{$L P_k^* \mathbf{w}_k$} and \word{$P_k^* 
 %   \mathbf{w}_k$} are lists (indexed by $k$) of these intermediate 
 %   products.
 %   
 %   In the implementation, $k$ is the index into \word{point} of the 
 %   current $P_k$ matrix.
 %   \begin{tcl}
-proc ::network::ulayout::PMP*w {widths0 wwL point} {
+proc ::network::ulayout::PLP*w {widths0 wwL point} {
    set res {}; set res1 {}; set res2 {}
    set k 1
    foreach {wiring widths} [linsert $wwL 0 "" $widths0] {
 %   \end{tcl}
 %   If this is a trivial level (only one item) then the $P$ matrix is 
-%   the identity and the sought $P_k M P_k^* \mathbf{w}_k$ product is 
+%   the identity and the sought $P_k L P_k^* \mathbf{w}_k$ product is 
 %   simply half the only width, recast as a complex number. Deal 
 %   with that case first.
 %   \begin{tcl}
@@ -1130,7 +1130,7 @@ proc ::network::ulayout::PMP*w {widths0 wwL point} {
       }
       lappend res2 $v
 %   \end{tcl}
-%   The \(\mathbf{u} := M\mathbf{v}\) vector is easy to compute, 
+%   The \(\mathbf{u} := L\mathbf{v}\) vector is easy to compute, 
 %   since one merely needs to sum over previous vector elements.
 %   \begin{tcl}
       set u {}
@@ -1166,10 +1166,10 @@ proc ::network::ulayout::PMP*w {widths0 wwL point} {
 % 
 % 
 % \begin{proc}{energy}
-%   Given |PMP*w|, it is now quite easy to compute the base objective 
+%   Given |PLP*w|, it is now quite easy to compute the base objective 
 %   function. This is called |energy| since it would be the potential 
 %   energy stored in the wiring if these were elastic (and stretched 
-%   from infinitesimal size), and the call syntax is like |PMP*w|
+%   from infinitesimal size), and the call syntax is like |PLP*w|
 %   \begin{displaysyntax}
 %     energy \word{widths0} \word{wiring--widths} \word{point}
 %   \end{displaysyntax}
@@ -1180,28 +1180,28 @@ proc ::network::ulayout::PMP*w {widths0 wwL point} {
 %     $i_{k,1}$ $j_{k,1}$ $\delta_{k,1}$ 
 %     $i_{k,2}$ $j_{k,2}$ $\delta_{k,2}$ 
 %     \dots\ 
-%     $i_{k,L_k}$ $j_{k,L_k}$ $\delta_{k,L_k}$ 
+%     $i_{k,M_k}$ $j_{k,M_k}$ $\delta_{k,M_k}$ 
 %   \end{displaysyntax}
 %   the part of the |energy| which corresponds to this wiring is
 %   \begin{equation}
-%     \sum_{l=1}^{L_k} \Bigl\vert
-%       x_k + \mathbf{e}_{j_{k,l}}^\mathrm{T} P_k M P_k^* \mathbf{w}_k
+%     \sum_{l=1}^{M_k} \Bigl\vert
+%       x_k + \mathbf{e}_{j_{k,l}}^\mathrm{T} P_k L P_k^* \mathbf{w}_k
 %       - x_{k-1} - \mathbf{e}_{i_{k,l}}^\mathrm{T} 
-%         P_{k-1} M P_{k-1}^* \mathbf{w}_{k-1}
+%         P_{k-1} L P_{k-1}^* \mathbf{w}_{k-1}
 %       + \delta_{k,l}
 %     \Bigr\vert^2
 %   \end{equation}
 %   where the unit vectors $\mathbf{e}^\mathrm{T}_i$ serve to select 
-%   an element of the $PMP^*\mathbf{w}$ vector, and the absolute 
+%   an element of the $PLP^*\mathbf{w}$ vector, and the absolute 
 %   value is needed because the quantity inside is a complex number. 
 %   Energies for separate wirings are merely added together, so the 
 %   overall structure of this procedure is merely a loop over these. 
-%   Most $P_k M P_k^* \mathbf{w}_k$ vectors are used for two wirings 
+%   Most $P_k L P_k^* \mathbf{w}_k$ vectors are used for two wirings 
 %   however, so it makes sense to compute these in one go first.
 %   
 %   \begin{tcl}
 proc ::network::ulayout::energy {widths0 wwL point} {
-   set posVecL [lindex [PMP*w $widths0 $wwL $point] 0]
+   set posVecL [lindex [PLP*w $widths0 $wwL $point] 0]
    set res 0.0
    set below [lindex $posVecL 0]
    foreach  {wiring dummy} $wwL  above [lrange $posVecL 1 end] \
@@ -1252,56 +1252,56 @@ proc ::network::ulayout::energy {widths0 wwL point} {
 % \begin{multline*}
 %   f_{1,1}(x_1,P_0,P_1) = 
 %   \Bigl\vert
-%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     + \delta
 %   \Bigr\vert^2
 %   = \\ =
 %   \begin{aligned}[t] &
 %   \overline{ (
-%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     + \delta
 %   ) } \times \\ & \qquad\qquad\qquad (
-%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     + \delta
 %   )
 %   = 
 %   \end{aligned} \\ = \begin{aligned}[t] &
 %   (
-%     x_1 + \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
-%     - \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%     x_1 + \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
+%     - \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
 %     + \delta
 %   ) \times \\ & \qquad\qquad\qquad (
-%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     x_1 + \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     + \delta
 %   )
 %   =
 %   \end{aligned} \\ = \begin{aligned}[t] &
 %   x_1^2
-%   + x_1 \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   + x_1 \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %   + 2 x_1 \delta 
-%   + x_1 \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j 
+%   + x_1 \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j 
 %     + \\ & \qquad{}
-%   + \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
-%     \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%   - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
-%     \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   + \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
+%     \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%   - \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
+%     \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     + \\ & \qquad{}
-%   + \delta \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
-%   - x_1 \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
-%   - \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i 
-%     \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%   + \delta \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
+%   - x_1 \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
+%   - \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i 
+%     \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
 %     + \\ & \qquad{}
-%   + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
-%     \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
-%   - \delta \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
-%   + \delta \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%   + \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
+%   - \delta \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
+%   + \delta \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
 %     + \\ & \qquad{}
-%   - \delta \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   - \delta \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %   + \delta^2 
 %   \end{aligned}
 % \end{multline*}
@@ -1322,85 +1322,85 @@ proc ::network::ulayout::energy {widths0 wwL point} {
 % (any term with two $\varepsilon$ factors vanish) where
 % \begin{align*}
 %   \mathrm{d}_x f_{1,1}(x_1,P_0,P_1)(a) ={}& (
-%     2x_1 + \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     2x_1 + \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     - \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %       + \\ & \qquad {}
 %     + 2\delta
-%     + \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
-%     - \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%     + \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
+%     - \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
 %   ) a 
 %   = \\ ={}& 
 %   2\bigl( x_1 + \delta + \operatorname{Re}(
-%      \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%      - \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%      \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%      - \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %   ) \bigr) a
 %   \text{,}
 % \end{align*}
 % and
 % \begin{multline} \label{Eq:d_{P_0}f_{1,1}}
 %   \mathrm{d}_{P_0} f_{1,1}(x_1,P_0,P_1)(A_0) = \\ =
-%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 A_0 M_0 P_0^* \mathbf{w}_0
-%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 M_0 A_0^* P_0^* \mathbf{w}_0
-%   - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
-%     \mathbf{e}_i^\mathrm{T} P_0 A_0 M_0 P_0^* \mathbf{w}_0
+%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 A_0 L_0 P_0^* \mathbf{w}_0
+%   - x_1 \mathbf{e}_i^\mathrm{T} P_0 L_0 A_0^* P_0^* \mathbf{w}_0
+%   - \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
+%     \mathbf{e}_i^\mathrm{T} P_0 A_0 L_0 P_0^* \mathbf{w}_0
 %   + \\ 
-%   - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
-%     \mathbf{e}_i^\mathrm{T} P_0 M_0 A_0^* P_0^* \mathbf{w}_0
-%   - x_1 \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* \mathbf{e}_i
-%   - x_1 \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* \mathbf{e}_i
+%   - \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
+%     \mathbf{e}_i^\mathrm{T} P_0 L_0 A_0^* P_0^* \mathbf{w}_0
+%   - x_1 \mathbf{w}_0^* P_0 A_0 L_0^* P_0^* \mathbf{e}_i
+%   - x_1 \mathbf{w}_0^* P_0 L_0^* A_0^* P_0^* \mathbf{e}_i
 %   + \\ 
-%   - \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* \mathbf{e}_i 
-%     \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%   - \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* \mathbf{e}_i 
-%     \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
+%   - \mathbf{w}_0^* P_0 A_0 L_0^* P_0^* \mathbf{e}_i 
+%     \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%   - \mathbf{w}_0^* P_0 L_0^* A_0^* P_0^* \mathbf{e}_i 
+%     \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
 %   + \\ 
-%   + \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* \mathbf{e}_i
-%     \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
-%   + \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* \mathbf{e}_i
-%     \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%   + \mathbf{w}_0^* P_0 A_0 L_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
+%   + \mathbf{w}_0^* P_0 L_0^* A_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %   + \\ 
-%   + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
-%     \mathbf{e}_i^\mathrm{T} P_0 A_0 M_0 P_0^* \mathbf{w}_0
-%   + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
-%     \mathbf{e}_i^\mathrm{T} P_0 M_0 A_0^* P_0^* \mathbf{w}_0
+%   + \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 A_0 L_0 P_0^* \mathbf{w}_0
+%   + \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
+%     \mathbf{e}_i^\mathrm{T} P_0 L_0 A_0^* P_0^* \mathbf{w}_0
 %   + \\ 
-%   - \delta \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* \mathbf{e}_i
-%   - \delta \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* \mathbf{e}_i
-%   - \delta \mathbf{e}_i^\mathrm{T} P_0 A_0 M_0 P_0^* \mathbf{w}_0
-%   - \delta \mathbf{e}_i^\mathrm{T} P_0 M_0 A_0^* P_0^* \mathbf{w}_0
+%   - \delta \mathbf{w}_0^* P_0 A_0 L_0^* P_0^* \mathbf{e}_i
+%   - \delta \mathbf{w}_0^* P_0 L_0^* A_0^* P_0^* \mathbf{e}_i
+%   - \delta \mathbf{e}_i^\mathrm{T} P_0 A_0 L_0 P_0^* \mathbf{w}_0
+%   - \delta \mathbf{e}_i^\mathrm{T} P_0 L_0 A_0^* P_0^* \mathbf{w}_0
 %   = \\ =
-%   \mathbf{w}_0^* P_0 A_0 M_0^* P_0^* ( 
+%   \mathbf{w}_0^* P_0 A_0 L_0^* P_0^* ( 
 %     - x_1 \mathbf{e}_i
-%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     - \delta \mathbf{e}_i
 %   ) + \\ {}+
-%   \mathbf{w}_0^* P_0 M_0^* A_0^* P_0^* (
+%   \mathbf{w}_0^* P_0 L_0^* A_0^* P_0^* (
 %     - x_1 \mathbf{e}_i
-%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     - \delta \mathbf{e}_i
 %   ) + \\ {}+
 %   (
 %     - x_1 \mathbf{e}_i^\mathrm{T}
-%     - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%     - \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
 %       \mathbf{e}_i^\mathrm{T}
-%     + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%     + \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
 %       \mathbf{e}_i^\mathrm{T}
 %     - \delta \mathbf{e}_i^\mathrm{T}
-%   ) P_0 A_0 M_0 P_0^* \mathbf{w}_0 + \\ {}+
+%   ) P_0 A_0 L_0 P_0^* \mathbf{w}_0 + \\ {}+
 %   (
 %     - x_1 \mathbf{e}_i^\mathrm{T}
-%     - \mathbf{w}_1^* P_1 M_1^* P_1^* \mathbf{e}_j
+%     - \mathbf{w}_1^* P_1 L_1^* P_1^* \mathbf{e}_j
 %       \mathbf{e}_i^\mathrm{T}
-%     + \mathbf{w}_0^* P_0 M_0^* P_0^* \mathbf{e}_i
+%     + \mathbf{w}_0^* P_0 L_0^* P_0^* \mathbf{e}_i
 %       \mathbf{e}_i^\mathrm{T}
 %     - \delta \mathbf{e}_i^\mathrm{T}
-%   ) P_0 M_0 A_0^* P_0^* \mathbf{w}_0
+%   ) P_0 L_0 A_0^* P_0^* \mathbf{w}_0
 % \end{multline}
 % with the $\mathrm{d}_{P_1}$ term being similar; $f_{1,1}$ is 
-% preserved if $P_0$, $M_0$, $\mathbf{w}_0$, and $i$ switch places 
-% with $P_1$, $M_1$, $\mathbf{w}_1$, and $j$ respectively, and $x_1$ 
+% preserved if $P_0$, $L_0$, $\mathbf{w}_0$, and $i$ switch places 
+% with $P_1$, $L_1$, $\mathbf{w}_1$, and $j$ respectively, and $x_1$ 
 % and $\delta$ changes sign, so making these changes in an expression 
 % for $\mathrm{d}_{P_0}f_{1,1}$ will produce an expression for 
 % $\mathrm{d}_{P_1}f_{1,1}$. 
@@ -1456,91 +1456,91 @@ proc ::network::ulayout::energy {widths0 wwL point} {
 % where
 % \begin{align*}
 %   \mathbf{u}_1 ={}&  P_0^* \mathbf{w}_0 \text{,}\\
-%   \mathbf{v}_1 ={}& M_0^* P_0^* ( 
+%   \mathbf{v}_1 ={}& L_0^* P_0^* ( 
 %     - x_1 \mathbf{e}_i
-%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     - \delta \mathbf{e}_i
 %   ) \text{,}\\
-%   \mathbf{u}_2 ={}& -M_0 P_0^* \mathbf{w}_0 \text{,}\\
+%   \mathbf{u}_2 ={}& -L_0 P_0^* \mathbf{w}_0 \text{,}\\
 %   \mathbf{v}_2 ={}& P_0^* (
 %     - x_1 \mathbf{e}_i
-%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     - \delta \mathbf{e}_i
 %   ) \text{,}\\
 %   \mathbf{u}_3 ={}& P_0^* (
 %     - x_1 \mathbf{e}_i
-%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     - \delta \mathbf{e}_i
 %   ) \text{,}\\
-%   \textbf{v}_3 ={}& M_0 P_0^* \mathbf{w}_0 \text{,} \\ 
-%   \textbf{u}_4 ={}& M_0^* P_0^* (
+%   \textbf{v}_3 ={}& L_0 P_0^* \mathbf{w}_0 \text{,} \\ 
+%   \textbf{u}_4 ={}& L_0^* P_0^* (
 %     - x_1 \mathbf{e}_i
-%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 M_1 P_1^* \mathbf{w}_1
-%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 M_0 P_0^* \mathbf{w}_0
+%     - \mathbf{e}_i \mathbf{e}_j^\mathrm{T} P_1 L_1 P_1^* \mathbf{w}_1
+%     + \mathbf{e}_i \mathbf{e}_i^\mathrm{T} P_0 L_0 P_0^* \mathbf{w}_0
 %     - \delta \mathbf{e}_i
 %   ) \text{,}\\
 %   \textbf{v}_4 ={}& - P_0^* \mathbf{w}_0 \text{.}
 % \end{align*}
 % The point of this presentation (and of not factoring out 
 % $\mathbf{e}_i$ as well) is that it can trivially be extended to the 
-% full \(\nabla_{P_0} f_1 = \sum_{l=1}^{L_1} \nabla_{P_0} f_{1,l}\) by 
+% full \(\nabla_{P_0} f_1 = \sum_{l=1}^{M_1} \nabla_{P_0} f_{1,l}\) by 
 % taking
 % \begin{align*}
-%   \mathbf{u}_3 ={}& P_0^* \sum_{l=1}^{L_1} (
+%   \mathbf{u}_3 ={}& P_0^* \sum_{l=1}^{M_1} (
 %     - x_1 \mathbf{e}_{i_{1,l}}
 %     - \mathbf{e}_{i_{1,l}} \mathbf{e}_{j_{1,l}}^\mathrm{T}
-%       P_1 M_1 P_1^* \mathbf{w}_1
+%       P_1 L_1 P_1^* \mathbf{w}_1
 %     + \mathbf{e}_{i_{1,l}} \mathbf{e}_{i_{1,l}}^\mathrm{T} 
-%       P_0 M_0 P_0^* \mathbf{w}_0
+%       P_0 L_0 P_0^* \mathbf{w}_0
 %     - \delta_{1,l} \mathbf{e}_{i_{1,l}}
 %   )
 %   = \\ ={}& P_0^* \Biggl(
-%     - \sum_{l=1}^{L_1} (x_1 + \delta_{1,l}) \mathbf{e}_{i_{1,l}}
+%     - \sum_{l=1}^{M_1} (x_1 + \delta_{1,l}) \mathbf{e}_{i_{1,l}}
 %     - \biggl(
-%       \sum_{l=1}^{L_1} \mathbf{e}_{i_{1,l}} \mathbf{e}_{j_{1,l}}^\mathrm{T}
-%       \biggr) P_1 M_1 P_1^* \mathbf{w}_1
+%       \sum_{l=1}^{M_1} \mathbf{e}_{i_{1,l}} \mathbf{e}_{j_{1,l}}^\mathrm{T}
+%       \biggr) P_1 L_1 P_1^* \mathbf{w}_1
 %     + \\ & \qquad\qquad\qquad\qquad\qquad\qquad{}
 %     + \biggl(
-%       \sum_{l=1}^{L_1} \mathbf{e}_{i_{1,l}} \mathbf{e}_{i_{1,l}}^\mathrm{T}
-%       \biggr) P_0 M_0 P_0^* \mathbf{w}_0
+%       \sum_{l=1}^{M_1} \mathbf{e}_{i_{1,l}} \mathbf{e}_{i_{1,l}}^\mathrm{T}
+%       \biggr) P_0 L_0 P_0^* \mathbf{w}_0
 %   \Biggr)
 %   \text{,}\\
-%   \mathbf{u}_4 ={}& M_0^* \mathbf{u}_3 
+%   \mathbf{u}_4 ={}& L_0^* \mathbf{u}_3 
 %   \text{,}\\
 %   \mathbf{v}_2 ={}& \mathbf{u}_3 
 %   \text{,}\\
-%   \mathbf{v}_1 ={}& M_0^* \mathbf{v}_2 = \mathbf{u}_4 \text{.}
+%   \mathbf{v}_1 ={}& L_0^* \mathbf{v}_2 = \mathbf{u}_4 \text{.}
 % \end{align*}
 % For a generic $P_k$, one thus wants to compute \(\nabla_{P_k}f = 
 % \sum_{r=1}^4 \mathbf{u}_r(k) \mathbf{v}_r(k)^*\) where
 % \begin{align*}
 %   \mathbf{u}_1(k) ={}& P_k^* \mathbf{w}_k \text{,}\\
-%   \mathbf{u}_2(k) ={}& - M_k P_k^* \mathbf{w}_k \text{,}
+%   \mathbf{u}_2(k) ={}& - L_k P_k^* \mathbf{w}_k \text{,}
 %     \displaybreak[0]\\
 %   \mathbf{u}_3(k) ={}& P_k^* \Biggl(
-%     \sum_{l=1}^{L_k} (x_k + \delta_{k,l}) \mathbf{e}_{j_{k,l}}
-%     - \sum_{l=1}^{L_{k+1}} (x_{k+1} + \delta_{k+1,l}) 
+%     \sum_{l=1}^{M_k} (x_k + \delta_{k,l}) \mathbf{e}_{j_{k,l}}
+%     - \sum_{l=1}^{M_{k+1}} (x_{k+1} + \delta_{k+1,l}) 
 %       \mathbf{e}_{i_{k+1,l}}
 %     + \\ & \qquad{}
 %     - \biggl(
-%       \sum_{l=1}^{L_k} \mathbf{e}_{j_{k,l}} \mathbf{e}_{i_{k,l}}^\mathrm{T}
-%       \biggr) P_{k-1} M_{k-1} P_{k-1}^* \mathbf{w}_{k-1}
+%       \sum_{l=1}^{M_k} \mathbf{e}_{j_{k,l}} \mathbf{e}_{i_{k,l}}^\mathrm{T}
+%       \biggr) P_{k-1} L_{k-1} P_{k-1}^* \mathbf{w}_{k-1}
 %     + \\ & \qquad{}
 %     + \biggl(
-%       \sum_{l=1}^{L_k} \mathbf{e}_{j_{k,l}} \mathbf{e}_{j_{k,l}}^\mathrm{T}
-%       + \sum_{l=1}^{L_{k+1}} \mathbf{e}_{i_{k+1,l}} 
+%       \sum_{l=1}^{M_k} \mathbf{e}_{j_{k,l}} \mathbf{e}_{j_{k,l}}^\mathrm{T}
+%       + \sum_{l=1}^{M_{k+1}} \mathbf{e}_{i_{k+1,l}} 
 %       \mathbf{e}_{i_{k+1,l}}^\mathrm{T} 
-%       \biggr) P_k M_k P_k^* \mathbf{w}_k
+%       \biggr) P_k L_k P_k^* \mathbf{w}_k
 %     + \\ & \qquad{}
-%     - \biggl( \sum_{l=1}^{L_{k+1}} \mathbf{e}_{i_{k+1,l}} 
+%     - \biggl( \sum_{l=1}^{M_{k+1}} \mathbf{e}_{i_{k+1,l}} 
 %       \mathbf{e}_{j_{k+1,l}}^\mathrm{T} \biggr) 
-%       P_{k+1} M_{k+1} P_{k+1}^* \mathbf{w}_{k+1}
+%       P_{k+1} L_{k+1} P_{k+1}^* \mathbf{w}_{k+1}
 %   \Biggr)
 %   \text{,} \displaybreak[0]\\
-%   \mathbf{u}_4(k) ={}& M_k^* \mathbf{u}_3(k)
+%   \mathbf{u}_4(k) ={}& L_k^* \mathbf{u}_3(k)
 %   \text{,}\\
 %   \mathbf{v}_1(k) ={}& \mathbf{u}_4(k) \text{,}\\
 %   \mathbf{v}_2(k) ={}& \mathbf{u}_3(k) \text{,}\\
@@ -1613,11 +1613,11 @@ proc ::network::ulayout::energy {widths0 wwL point} {
 %   \word{Lie algebra}.
 %   
 %   The first order of business is to compute all the 
-%   $P_kM_kP_k^*\mathbf{w}_k$ products. For calculating the gradient, 
+%   $P_kL_kP_k^*\mathbf{w}_k$ products. For calculating the gradient, 
 %   the partial products are needed as well.
 %   \begin{tcl}
 proc ::network::ulayout::force {TS widths0 wwL point} {
-   set products [PMP*w $widths0 $wwL $point]
+   set products [PLP*w $widths0 $wwL $point]
 %   \end{tcl}
 %   Then there is a loop, mostly over the wirings, which computes two 
 %   kinds of things: \(\mathbf{N} = -\nabla_x f$ and the vectors 
@@ -1702,7 +1702,7 @@ proc ::network::ulayout::force {TS widths0 wwL point} {
 %   For the final step in computing the gradient, one must take into 
 %   account what is immediately available from earlier calculations: 
 %   \(\mathbf{u}_1(k) = P_k^* \mathbf{w}_k\), \(\mathbf{v}_3(k) = 
-%   M_kP_k^*\mathbf{w}_k\), and $\mathbf{u}_3(k)$. What should be 
+%   L_kP_k^*\mathbf{w}_k\), and $\mathbf{u}_3(k)$. What should be 
 %   computed here is
 %   \begin{multline*}
 %     - \nabla_{P_k} f =
@@ -1710,26 +1710,26 @@ proc ::network::ulayout::force {TS widths0 wwL point} {
 %       \mathbf{u}_2 \mathbf{v}_2^* + \mathbf{u}_3 \mathbf{v}_3^* +
 %       \mathbf{u}_4 \mathbf{v}_4^* \texttt{]}
 %     = \\ =
-%     \texttt{[improve } {-}\mathbf{u}_1 (M^* \mathbf{u}_3)^* 
+%     \texttt{[improve } {-}\mathbf{u}_1 (L^* \mathbf{u}_3)^* 
 %       + \mathbf{v}_3 \mathbf{u}_3^* - \mathbf{u}_3 \mathbf{v}_3^* 
-%       + (M^* \mathbf{u}_3) \mathbf{u}_1^*
+%       + (L^* \mathbf{u}_3) \mathbf{u}_1^*
 %     \texttt{]}
 %     = \\ =
 %     \texttt{[improve } 2\mathbf{v}_3 \mathbf{u}_3^* 
-%       + 2(M^* \mathbf{u}_3) \mathbf{u}_1^*
+%       + 2(L^* \mathbf{u}_3) \mathbf{u}_1^*
 %     \texttt{]}
 %   \end{multline*}
 %   where the last step takes advantage of the antihermitian part 
 %   operation in |improve|.
 %   
-%   One final complication is how to compute \(\mathbf{u}_4 = M^* 
-%   \mathbf{u}_3\) (or rather $2M^*\mathbf{u}_3$, since multiplying 
+%   One final complication is how to compute \(\mathbf{u}_4 = L^* 
+%   \mathbf{u}_3\) (or rather $2L^*\mathbf{u}_3$, since multiplying 
 %   by $2$ at the vector stage is less work than doing it at the 
-%   matrix stage). $M$ is real so \(M^* = M^\mathrm{T}\), but that 
+%   matrix stage). $L$ is real so \(L^* = L^\mathrm{T}\), but that 
 %   matrix is not explicitly available for performing a 
 %   matrix--vector multiplication. Instead one may observe that 
-%   $M^*\mathbf{u}_3$ may be computed using the same cumulative sum 
-%   approach as was used for multiplication by $M$ in |PMP*w|, 
+%   $L^*\mathbf{u}_3$ may be computed using the same cumulative sum 
+%   approach as was used for multiplication by $L$ in |PLP*w|, 
 %   provided that one |lreverse|s the vector before and after.
 %   \begin{tcl}
       set uu4 {}
@@ -1830,16 +1830,16 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 % \subsubsection{Transpose interpretation}
 % 
 % The original matrix-formulation of the position vector for a level 
-% given above is $PMP^*\mathbf{w}$, because if $P$ corresponds to the 
+% given above is $PLP^*\mathbf{w}$, because if $P$ corresponds to the 
 % permutation mapping a horizontal ordinal position to item index, then 
 % it is the inverse permutation that maps an item index to a 
 % horizontal ordinal position, and this is what one needs to turn the 
 % vector $\mathbf{w}$ indexed by item index into the vector 
-% $P^{-1}\mathbf{w}$ indexed by horizontal ordinal position that $M$ 
+% $P^{-1}\mathbf{w}$ indexed by horizontal ordinal position that $L$ 
 % expects to act upon. Since $P$ is unital, \(P^{-1} = P^*\) and we 
 % get a nice polynomial expression for the energy. A problem with 
-% this interpretation can however be that $PMP^{-1}$ is a similarity 
-% tranformation, and $M$ is a rather extreme matrix: its sole 
+% this interpretation can however be that $PLP^{-1}$ is a similarity 
+% tranformation, and $L$ is a rather extreme matrix: its sole 
 % eigenvalue $\tfrac{1}{2}$ has algebraic multiplicity $n$ but its 
 % geometric multiplicity is only $1$ (the eigenspace consists of the 
 % multiples of $\mathbf{e}_1$)! This makes many natural arrangements 
@@ -1851,14 +1851,14 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 % requiring separate mechanisms to enforce physical realism.
 % 
 % There is however no technical need for the position matrix formula to 
-% be $PMP^{-1}\mathbf{w}$\Dash anything is possible as long as it 
+% be $PLP^{-1}\mathbf{w}$\Dash anything is possible as long as it 
 % coincides with this one for strict permutation matrices! This opens 
 % up rather extensive avenues for generalisations\Ldash one that goes 
 % very far is that \(z^n = z\) for \(z \in \{0,1\}\), and that higher 
 % powers therefore might be introduced fairly arbitrarily in the 
 % formula\Rdash but a more conservative modification is to replace 
 % the Hermitian conjugate $P^*$ by the plain old transpose 
-% $P^\mathrm{T}$ to yield $PMP^\mathrm{T}\mathbf{w}$. There is a 
+% $P^\mathrm{T}$ to yield $PLP^\mathrm{T}\mathbf{w}$. There is a 
 % slight justification for using the transpose in the fact that 
 % inverting a permutation corresponds to switching roles for rows and 
 % columns, and if \(P \in \mathrm{U}^\mathbf{1}(n)\) then 
@@ -1878,25 +1878,25 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 %       \tfrac{1 + e^{i\theta}}{2}
 %   \end{bmatrix}
 %   \quad\text{and}\quad
-%   M' = \begin{bmatrix}
+%   L' = \begin{bmatrix}
 %     \tfrac{1}{2} & \mathbf{0}^\mathrm{T}& 0 \\
-%     \mathbf{1}& M & \mathbf{0}\\
+%     \mathbf{1}& L & \mathbf{0}\\
 %     1 & \mathbf{1}^\mathrm{T}& \tfrac{1}{2}
 %   \end{bmatrix}
 % \end{equation}
 % where on one hand \(P \in \mathrm{U}^\mathbf{1}(n)\) and \(\theta \in 
-% \mathbb{R}\) are arbitrary, and on the other $M$ is the matrix with 
+% \mathbb{R}\) are arbitrary, and on the other $L$ is the matrix with 
 % side $n$ that has $\tfrac{1}{2}$ on the diagonal, $1$ below it, and
-% $0$ above it. Calculating the product $P' M' (P')^\mathrm{T}$, 
+% $0$ above it. Calculating the product $P' L' (P')^\mathrm{T}$, 
 % one gets
 % \[
-%   P' M' = \begin{bmatrix}
+%   P' L' = \begin{bmatrix}
 %     \tfrac{1}{2} \tfrac{1 + e^{i\theta}}{2} + 
 %       \tfrac{1 - e^{i\theta}}{2} &
 %     \tfrac{1 - e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
 %     \tfrac{1}{2} \tfrac{1 - e^{i\theta}}{2}
 %     \\
-%     P \mathbf{1} & PM & \mathbf{0}
+%     P \mathbf{1} & PL & \mathbf{0}
 %     \\
 %     \tfrac{1}{2} \tfrac{1 - e^{i\theta}}{2} + 
 %       \tfrac{1 + e^{i\theta}}{2} &
@@ -1907,7 +1907,7 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 %     \tfrac{1 - e^{i\theta}}{2} \mathbf{1}^\mathrm{T}&
 %     \tfrac{1 - e^{i\theta}}{2}
 %     \\
-%     \mathbf{1}& PM& \mathbf{0}
+%     \mathbf{1}& PL& \mathbf{0}
 %     \\
 %     \tfrac{3}{4} + \tfrac{1}{4} e^{i\theta} &
 %     \tfrac{1 + e^{i\theta}}{2} \mathbf{1}^\mathrm{T} &
@@ -1916,7 +1916,7 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 % \]
 % and
 % \begin{multline*}
-%   P' M' (P')^\mathrm{T} 
+%   P' L' (P')^\mathrm{T} 
 %   = \\ =
 %   \begin{bmatrix}
 %     \frac{3 - e^{i\theta}}{4} \frac{1 + e^{i\theta}}{2} +
@@ -1926,7 +1926,7 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 %       \tfrac{1 - e^{i\theta}}{4} \tfrac{1 + e^{i\theta}}{2}
 %     \\
 %     \frac{1 + e^{i\theta}}{2} \mathbf{1} &
-%     P M P^\mathrm{T} &
+%     P L P^\mathrm{T} &
 %     \frac{1 - e^{i\theta}}{2} \mathbf{1}
 %     \\
 %     \frac{3 + e^{i\theta}}{4} \frac{1 + e^{i\theta}}{2} +
@@ -1942,7 +1942,7 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 %     \tfrac{1 - e^{i\theta}}{2}
 %     \\
 %     \frac{1 + e^{i\theta}}{2} \mathbf{1} &
-%     P M P^\mathrm{T} &
+%     P L P^\mathrm{T} &
 %     \frac{1 - e^{i\theta}}{2} \mathbf{1}
 %     \\
 %     \frac{1 + e^{i\theta}}{2} &
@@ -1960,8 +1960,8 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 %     0 & \mathbf{0}^\mathrm{T} & 0
 %   \end{bmatrix}
 % \end{multline*}
-% where \(Q = PMP^\mathrm{T} - \tfrac{1}{2}J\). This means the product 
-% $P' M' (P')^\mathrm{T} \mathbf{w}$ can be described as if it was 
+% where \(Q = PLP^\mathrm{T} - \tfrac{1}{2}J\). This means the product 
+% $P' L' (P')^\mathrm{T} \mathbf{w}$ can be described as if it was 
 % determined by a mechanism of two circles and two rods. 
 % The outer circle has diameter $\mathbf{1}^\mathrm{T} \mathbf{w}$ 
 % and has its midpoint fixed at the point $\tfrac{1}{2} 
@@ -1996,7 +1996,7 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 % \]
 % is used instead of the transpose in the product
 % \begin{multline*}
-%   P' M' (P')^* 
+%   P' L' (P')^* 
 %   = \\ =
 %   \begin{bmatrix}
 %     \frac{3 - e^{i\theta}}{4} \frac{1 + e^{-i\theta}}{2} +
@@ -2006,7 +2006,7 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 %       \tfrac{1 - e^{i\theta}}{4} \tfrac{1 + e^{-i\theta}}{2}
 %     \\
 %     \frac{1 + e^{-i\theta}}{2} \mathbf{1} &
-%     P M P^* &
+%     P L P^* &
 %     \frac{1 - e^{-i\theta}}{2} \mathbf{1}
 %     \\
 %     \frac{3 + e^{i\theta}}{4} \frac{1 + e^{-i\theta}}{2} +
@@ -2022,7 +2022,7 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 %     \tfrac{4 - 2e^{-i\theta} - 2e^{i\theta}}{8}
 %     \\
 %     \frac{1 + e^{-i\theta}}{2} \mathbf{1} &
-%     P M P^* &
+%     P L P^* &
 %     \frac{1 - e^{-i\theta}}{2} \mathbf{1}
 %     \\
 %     \frac{4 + 2e^{-i\theta} + 2e^{i\theta}}{8} &
@@ -2042,7 +2042,7 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 %     0 & \mathbf{1}^\mathrm{T} & 1
 %   \end{bmatrix} + \begin{bmatrix}
 %     0 & \mathbf{0}^\mathrm{T} & 0 \\
-%     \mathbf{0} & PMP^* - \tfrac{1}{2}J & \mathbf{0}\\
+%     \mathbf{0} & PLP^* - \tfrac{1}{2}J & \mathbf{0}\\
 %     0 & \mathbf{0}^\mathrm{T} & 0
 %   \end{bmatrix}
 %   \text{.}
@@ -2056,39 +2056,39 @@ proc ::network::ulayout::test_force {G w0 wwL point hlimit} {
 % ---
 % 
 % 
-% \begin{proc}{PMPtw}
-%   If the products $P_k M P_k^\mathrm{T} \mathbf{w}_k$ are going to 
+% \begin{proc}{PLPtw}
+%   If the products $P_k L P_k^\mathrm{T} \mathbf{w}_k$ are going to 
 %   be used for item positions, then these ought to be computed using 
-%   a transpose counterpart of |PMP*w|. This has the call syntax
+%   a transpose counterpart of |PLP*w|. This has the call syntax
 %   \begin{displaysyntax}
-%     PMPtw \word{widths0} \word{wiring--widths} \word{point}
+%     PLPtw \word{widths0} \word{wiring--widths} \word{point}
 %   \end{displaysyntax}
 %   where \word{widths0} and \word{wiring--widths} make up the 
 %   internal representation for a layout problem and the \word{point} 
 %   is the optimisation domain point containing all the $P_k$ matrices. 
 %   The return value is a list
 %   \begin{displaysyntax}
-%     \word{$P_k M P_k^\mathrm{T} \mathbf{w}_k$}
-%     \word{$M P_k^\mathrm{T} \mathbf{w}_k$}
+%     \word{$P_k L P_k^\mathrm{T} \mathbf{w}_k$}
+%     \word{$L P_k^\mathrm{T} \mathbf{w}_k$}
 %     \word{$P_k^\mathrm{T} \mathbf{w}_k$}
 %   \end{displaysyntax}
-%   where e.g.~\word{$P_k M P_k^\mathrm{T} \mathbf{w}_k$} in turn is 
-%   the list of all $P_k M P_k^\mathrm{T} \mathbf{w}_k$ vectors 
+%   where e.g.~\word{$P_k L P_k^\mathrm{T} \mathbf{w}_k$} in turn is 
+%   the list of all $P_k L P_k^\mathrm{T} \mathbf{w}_k$ vectors 
 %   (including those for levels of only one item); such a vector is a 
-%   list of |complex| numbers. The \word{$M P_k^\mathrm{T} \mathbf{w}_k$} 
+%   list of |complex| numbers. The \word{$L P_k^\mathrm{T} \mathbf{w}_k$} 
 %   and \word{$P_k^\mathrm{T} \mathbf{w}_k$} are lists (indexed by $k$) 
 %   of these intermediate products.
 %   
 %   In the implementation, $k$ is the index into \word{point} of the 
 %   current $P_k$ matrix.
 %   \begin{tcl}
-proc ::network::ulayout::PMPtw {widths0 wwL point} {
+proc ::network::ulayout::PLPtw {widths0 wwL point} {
    set res {}; set res1 {}; set res2 {}
    set k 1
    foreach {wiring widths} [linsert $wwL 0 "" $widths0] {
 %   \end{tcl}
 %   If this is a trivial level (only one item) then the $P$ matrix is 
-%   the identity and the sought $P_k M P_k^\mathrm{T} \mathbf{w}_k$ 
+%   the identity and the sought $P_k L P_k^\mathrm{T} \mathbf{w}_k$ 
 %   product is simply half the only width, recast as a complex number. 
 %   Deal with that case first.
 %   \begin{tcl}
@@ -2105,7 +2105,7 @@ proc ::network::ulayout::PMPtw {widths0 wwL point} {
 %   \end{tcl}
 %   Otherwise one should begin with the \(P_k^\mathrm{T} \mathbf{w}_k 
 %   =: \mathbf{v}\) product; this is the only step where this 
-%   procedure differs from |PMP*w|. Technically this is a 
+%   procedure differs from |PLP*w|. Technically this is a 
 %   straightforward vector--matrix product, but since $\mathbf{w}_k$ 
 %   is a real vector it seems a bit unnecessary to use |vMprod|, so 
 %   the calculation is unrolled as a loop.
@@ -2122,7 +2122,7 @@ proc ::network::ulayout::PMPtw {widths0 wwL point} {
       }
       lappend res2 $v
 %   \end{tcl}
-%   The \(\mathbf{u} := M\mathbf{v}\) vector is easy to compute, 
+%   The \(\mathbf{u} := L\mathbf{v}\) vector is easy to compute, 
 %   since one merely needs to sum over previous vector elements.
 %   \begin{tcl}
       set u {}
@@ -2158,10 +2158,10 @@ proc ::network::ulayout::PMPtw {widths0 wwL point} {
 % 
 % 
 % \begin{proc}{energy2}
-%   Given |PMPtw|, it is now quite easy to compute the transpose 
+%   Given |PLPtw|, it is now quite easy to compute the transpose 
 %   interpretation objective function. This is called |energy2|, and 
 %   is exactly the same as |energy|, except for the fact that it uses 
-%   |PMPtw| rather than |PMP*w|. The call syntax is
+%   |PLPtw| rather than |PLP*w|. The call syntax is
 %   \begin{displaysyntax}
 %     energy2 \word{widths0} \word{wiring--widths} \word{point}
 %   \end{displaysyntax}
@@ -2169,7 +2169,7 @@ proc ::network::ulayout::PMPtw {widths0 wwL point} {
 %   
 %   \begin{tcl}
 proc ::network::ulayout::energy2 {widths0 wwL point} {
-   set posVecL [lindex [PMPtw $widths0 $wwL $point] 0]
+   set posVecL [lindex [PLPtw $widths0 $wwL $point] 0]
    set res 0.0
    set below [lindex $posVecL 0]
    foreach  {wiring dummy} $wwL  above [lrange $posVecL 1 end] \
@@ -2209,11 +2209,11 @@ proc ::network::ulayout::energy2 {widths0 wwL point} {
 %   \word{Lie algebra}.
 %   
 %   The first order of business is to compute all the 
-%   $P_kM_kP_k^*\mathbf{w}_k$ products. For calculating the gradient, 
+%   $P_kL_kP_k^*\mathbf{w}_k$ products. For calculating the gradient, 
 %   the partial products are needed as well.
 %   \begin{tcl}
 proc ::network::ulayout::force2 {TS widths0 wwL point} {
-   set products [PMPtw $widths0 $wwL $point]
+   set products [PLPtw $widths0 $wwL $point]
 %   \end{tcl}
 %   Then there is a loop, mostly over the wirings, which computes two 
 %   kinds of things: \(\mathbf{N} = -\nabla_x f$ and the vectors 
@@ -2298,7 +2298,7 @@ proc ::network::ulayout::force2 {TS widths0 wwL point} {
 %   For the final step in computing the gradient, one must take into 
 %   account what is immediately available from earlier calculations: 
 %   \(\mathbf{u}_1(k) = P_k^* \mathbf{w}_k\), \(\mathbf{v}_3(k) = 
-%   M_kP_k^*\mathbf{w}_k\), and $\mathbf{u}_3(k)$. What should be 
+%   L_kP_k^*\mathbf{w}_k\), and $\mathbf{u}_3(k)$. What should be 
 %   computed here is
 %   \begin{multline*}
 %     - \nabla_{P_k} f =
@@ -2306,26 +2306,26 @@ proc ::network::ulayout::force2 {TS widths0 wwL point} {
 %       \mathbf{u}_2 \mathbf{v}_2^* + \mathbf{u}_3 \mathbf{v}_3^* +
 %       \mathbf{u}_4 \mathbf{v}_4^* \texttt{]}
 %     = \\ =
-%     \texttt{[improve } {-}\mathbf{u}_1 (M^* \mathbf{u}_3)^* 
+%     \texttt{[improve } {-}\mathbf{u}_1 (L^* \mathbf{u}_3)^* 
 %       + \mathbf{v}_3 \mathbf{u}_3^* - \mathbf{u}_3 \mathbf{v}_3^* 
-%       + (M^* \mathbf{u}_3) \mathbf{u}_1^*
+%       + (L^* \mathbf{u}_3) \mathbf{u}_1^*
 %     \texttt{]}
 %     = \\ =
 %     \texttt{[improve } 2\mathbf{v}_3 \mathbf{u}_3^* 
-%       + 2(M^* \mathbf{u}_3) \mathbf{u}_1^*
+%       + 2(L^* \mathbf{u}_3) \mathbf{u}_1^*
 %     \texttt{]}
 %   \end{multline*}
 %   where the last step takes advantage of the antihermitian part 
 %   operation in |improve|.
 %   
-%   One final complication is how to compute \(\mathbf{u}_4 = M^* 
-%   \mathbf{u}_3\) (or rather $2M^*\mathbf{u}_3$, since multiplying 
+%   One final complication is how to compute \(\mathbf{u}_4 = L^* 
+%   \mathbf{u}_3\) (or rather $2L^*\mathbf{u}_3$, since multiplying 
 %   by $2$ at the vector stage is less work than doing it at the 
-%   matrix stage). $M$ is real so \(M^* = M^\mathrm{T}\), but that 
+%   matrix stage). $L$ is real so \(L^* = L^\mathrm{T}\), but that 
 %   matrix is not explicitly available for performing a 
 %   matrix--vector multiplication. Instead one may observe that 
-%   $M^*\mathbf{u}_3$ may be computed using the same cumulative sum 
-%   approach as was used for multiplication by $M$ in |PMP*w|, 
+%   $L^*\mathbf{u}_3$ may be computed using the same cumulative sum 
+%   approach as was used for multiplication by $L$ in |PLP*w|, 
 %   provided that one |lreverse|s the vector before and after.
 %   \begin{tcl}
       set uu4 {}
@@ -2729,10 +2729,10 @@ proc ::network::ulayout::negativity_barrier_force {G weightL point} {
 %     \word{delta} \word{point}
 %   \end{displaysyntax}
 %   
-%   Much of the actual math is, as ususal, taken care of by |PMP*w|.
+%   Much of the actual math is, as ususal, taken care of by |PLP*w|.
 %   \begin{tcl}
 proc ::network::ulayout::overlap_energy {widths0 wwL delta point} {
-   set zVecL [lindex [PMP*w $widths0 $wwL $point] 0]
+   set zVecL [lindex [PLP*w $widths0 $wwL $point] 0]
 %   \end{tcl}
 %   For levels with less than three elements, there is nothing to 
 %   worry about.
@@ -2767,38 +2767,38 @@ proc ::network::ulayout::overlap_energy {widths0 wwL delta point} {
 % to some $P$) of the above $E$. Unlike |energy| it is not 
 % polynomial, so it is not obvious that one can proceed as for 
 % |force|, but one may notice that $E$ is a sum of terms on the form 
-% $f\bigl( \lvert \mathbf{c}^* P M P^* \mathbf{w} \rvert^2 \bigr)$. By 
+% $f\bigl( \lvert \mathbf{c}^* P L P^* \mathbf{w} \rvert^2 \bigr)$. By 
 % ordinary rules of differentiation it then follows that
 % \begin{multline*}
 %   \nabla_P E =
-%   f'\bigl( \lvert \mathbf{c}^* P M P^* \mathbf{w} \rvert^2 \bigr)
-%   \nabla_P \lvert \mathbf{c}^* P M P^* \mathbf{w} \rvert^2
+%   f'\bigl( \lvert \mathbf{c}^* P L P^* \mathbf{w} \rvert^2 \bigr)
+%   \nabla_P \lvert \mathbf{c}^* P L P^* \mathbf{w} \rvert^2
 %   = \\ =
-%   f'\bigl( \lvert \mathbf{c}^* P M P^* \mathbf{w} \rvert^2 \bigr)
-%   \nabla_P ( \mathbf{w}^\mathrm{T} P M^* P^* \mathbf{c}
-%     \mathbf{c}^* P M P^* \mathbf{w} )
+%   f'\bigl( \lvert \mathbf{c}^* P L P^* \mathbf{w} \rvert^2 \bigr)
+%   \nabla_P ( \mathbf{w}^\mathrm{T} P L^* P^* \mathbf{c}
+%     \mathbf{c}^* P L P^* \mathbf{w} )
 % \end{multline*}
 % and hence the same basic ideas as for |force| apply also in this 
 % case; pretty much the same pairs vectors will provide the directions, 
 % and the role of $f$ becomes to adjust which magnitudes they are given.
 % 
 % As for |force|, the differential of $\mathbf{w}^\mathrm{T} P 
-% M^* P^* \mathbf{c} \mathbf{c}^* P M P^* \mathbf{w}$ consists of 
+% L^* P^* \mathbf{c} \mathbf{c}^* P L P^* \mathbf{w}$ consists of 
 % four terms (one for each $P$) and can be written as \(A \mapsto 
 % \sum_{r=1}^4 \mathbf{u}_r^* A \mathbf{v}_r\) for
 % \begin{align*}
 %   \mathbf{u}_1^* ={}& \mathbf{w}^\mathrm{T} P \text{,}&
-%   \mathbf{v}_1 ={}& M^* P^* \mathbf{c} \mathbf{c}^* P M P^* \mathbf{w}
+%   \mathbf{v}_1 ={}& L^* P^* \mathbf{c} \mathbf{c}^* P L P^* \mathbf{w}
 %     \text{,}\\
-%   \mathbf{u}_2^* ={}& -\mathbf{w}^\mathrm{T} P M^* \text{,}&
-%   \mathbf{v}_2 ={}& P^* \mathbf{c} \mathbf{c}^* P M P^* \mathbf{w}
+%   \mathbf{u}_2^* ={}& -\mathbf{w}^\mathrm{T} P L^* \text{,}&
+%   \mathbf{v}_2 ={}& P^* \mathbf{c} \mathbf{c}^* P L P^* \mathbf{w}
 %     \text{,}\displaybreak[0]\\
-%   \mathbf{u}_3^* ={}& \mathbf{w}^\mathrm{T} P M^* P^* \mathbf{c} 
+%   \mathbf{u}_3^* ={}& \mathbf{w}^\mathrm{T} P L^* P^* \mathbf{c} 
 %     \mathbf{c}^* P \text{,}&
-%   \mathbf{v}_3 ={}& M P^* \mathbf{w}
+%   \mathbf{v}_3 ={}& L P^* \mathbf{w}
 %     \text{,}\\
-%   \mathbf{u}_4^* ={}& -\mathbf{w}^\mathrm{T} P M^* P^* \mathbf{c} 
-%     \mathbf{c}^* P M \text{,}&
+%   \mathbf{u}_4^* ={}& -\mathbf{w}^\mathrm{T} P L^* P^* \mathbf{c} 
+%     \mathbf{c}^* P L \text{,}&
 %   \mathbf{v}_4 ={}& P^* \mathbf{w}
 %     \text{,}
 % \end{align*}
@@ -2812,10 +2812,10 @@ proc ::network::ulayout::overlap_energy {widths0 wwL delta point} {
 % \mathbf{v}_2^*$ where
 % \begin{align*}
 %   \mathbf{u}_1 ={}& P^* \mathbf{w} \text{,}\\
-%   \mathbf{v}_2 ={}& P^* \mathbf{c} \mathbf{c}^* P M P^* \mathbf{w}
+%   \mathbf{v}_2 ={}& P^* \mathbf{c} \mathbf{c}^* P L P^* \mathbf{w}
 %     \text{,}\\
-%   \mathbf{v}_1 ={}& M^* \mathbf{v}_2 \text{,}\\
-%   \mathbf{v}_3 ={}& M P^* \mathbf{w} \text{.}
+%   \mathbf{v}_1 ={}& L^* \mathbf{v}_2 \text{,}\\
+%   \mathbf{v}_3 ={}& L P^* \mathbf{w} \text{.}
 % \end{align*}
 % What varies between different pairs of items is merely the 
 % $\mathbf{c}$ vector, so that can be collected into the calculation 
@@ -2837,9 +2837,9 @@ proc ::network::ulayout::overlap_energy {widths0 wwL delta point} {
 %   \begin{tcl}
 proc ::network::ulayout::overlap_force {TS widths0 wwL delta point} {
    set res [list [{*}$TS component 0 0]]
-   lassign [PMP*w $widths0 $wwL $point] PMPwL MPwL PwL
+   lassign [PLP*w $widths0 $wwL $point] PLPwL LPwL PwL
    foreach {dummy wVec} [linsert $wwL 0 "" $widths0]  u1 $PwL \
-     v3 $MPwL  zVec $PMPwL {
+     v3 $LPwL  zVec $PLPwL {
       if {[llength $wVec] < 2} then {
          continue
       } elseif {[llength $wVec] == 2} then {
@@ -2848,7 +2848,7 @@ proc ::network::ulayout::overlap_force {TS widths0 wwL delta point} {
       }
 %   \end{tcl}
 %   The multiplication of $\sum_k \alpha_k \mathbf{c}_k \mathbf{c}_k^*$ 
-%   by \(\mathbf{z} = PMP^*\mathbf{w}\) is structured as $\sum_k 
+%   by \(\mathbf{z} = PLP^*\mathbf{w}\) is structured as $\sum_k 
 %   (\alpha_k \mathbf{c}_k^* \mathbf{z}) \mathbf{c}_k$ rather than a 
 %   matrix--vector product, since the value of the coefficient 
 %   $\alpha_k$ depends on the product $\mathbf{c}_k^* \mathbf{z}$ and 
@@ -2881,7 +2881,7 @@ proc ::network::ulayout::overlap_force {TS widths0 wwL delta point} {
       }
 %   \end{tcl}
 %   The rest is done more with matrix-level operations, with the 
-%   exception of the $M^* \mathbf{v}_2$ matrix--vector product.
+%   exception of the $L^* \mathbf{v}_2$ matrix--vector product.
 %   \begin{tcl}
       set v2 [{*}$TS component [llength $res] superset Mcvprod\
         [lindex $point [llength $res]] $ccz]
@@ -3654,7 +3654,7 @@ proc ::network::ulayout::round_by_selecting_ones {point} {
 %   \begin{tcl}
 proc ::network::ulayout::permutations_from_realpart {widths0 wwL point} {
    set res [lrange $point 0 0]
-   set xVecL [lindex [PMP*w $widths0 $wwL $point] 0]
+   set xVecL [lindex [PLP*w $widths0 $wwL $point] 0]
    foreach xVec $xVecL {
       if {[llength $xVec] < 2} then {continue}
       set L {}
@@ -3948,10 +3948,10 @@ proc ::network::ulayout::logarithmic1force {G ignorelist point} {
 %     |imaginary_energy| \word{widths0} \word{wiring--widths} 
 %     \word{point}
 %   \end{displaysyntax}
-%   and the implementation is an obvious application of |PMP*w|.
+%   and the implementation is an obvious application of |PLP*w|.
 %   \begin{tcl}
 proc ::network::ulayout::imaginary_energy {w0 wwL point} {
-   set zVecL [lindex [PMP*w $w0 $wwL $point] 0]
+   set zVecL [lindex [PLP*w $w0 $wwL $point] 0]
    set res 0.0
    foreach zVec $zVecL {
       foreach z $zVec {
@@ -3975,17 +3975,17 @@ proc ::network::ulayout::imaginary_energy {w0 wwL point} {
 % The energy associated with the $k$th item in a level can be 
 % expressed as
 % \[
-%   \bigl( \operatorname{Re} ( \mathbf{c}^* P M P^* \mathbf{w}) 
+%   \bigl( \operatorname{Re} ( \mathbf{c}^* P L P^* \mathbf{w}) 
 %   \bigr)^2
 % \]
 % where \(\mathbf{c} = i \mathbf{e}_k\). The inner parenthesis here 
-% has the differential $\mathbf{c}^* P A M P^* \mathbf{w} - 
-% \mathbf{c}^* P M A P^* \mathbf{w}$, so the chain rule says that the 
+% has the differential $\mathbf{c}^* P A L P^* \mathbf{w} - 
+% \mathbf{c}^* P L A P^* \mathbf{w}$, so the chain rule says that the 
 % differential of the whole thing is
 % \[
-%   2 \operatorname{Re} ( \mathbf{c}^* P M P^* \mathbf{w}) 
-%   \operatorname{Re} (\mathbf{c}^* P A M P^* \mathbf{w} - 
-%     \mathbf{c}^* P M A P^* \mathbf{w})
+%   2 \operatorname{Re} ( \mathbf{c}^* P L P^* \mathbf{w}) 
+%   \operatorname{Re} (\mathbf{c}^* P A L P^* \mathbf{w} - 
+%     \mathbf{c}^* P L A P^* \mathbf{w})
 %   \text{.}
 % \]
 % Since this has the form \(\operatorname{Re}(\mathbf{u}_1^* A 
@@ -3993,10 +3993,10 @@ proc ::network::ulayout::imaginary_energy {w0 wwL point} {
 % for
 % \begin{align*}
 %   \mathbf{u}_1^* ={}& 
-%     2 \operatorname{Re} ( \mathbf{c}^* P M P^* \mathbf{w})
+%     2 \operatorname{Re} ( \mathbf{c}^* P L P^* \mathbf{w})
 %     \mathbf{c}^* P \text{,}\\
-%   \mathbf{v}_1 ={}& M P^* \mathbf{w} \text{,}\\
-%   \mathbf{u}_2^* ={}& \mathbf{u}_1^* M \text{,}\\
+%   \mathbf{v}_1 ={}& L P^* \mathbf{w} \text{,}\\
+%   \mathbf{u}_2^* ={}& \mathbf{u}_1^* L \text{,}\\
 %   \mathbf{v}_2 ={}& P^* \mathbf{w} \text{,}
 % \end{align*}
 % it follows that the corresponding $\mathbf{C}^{n \times n}$ gradient 
@@ -4005,15 +4005,15 @@ proc ::network::ulayout::imaginary_energy {w0 wwL point} {
 % \begin{multline*}
 %   \mathbf{u}_1 = 
 %   2 P^* \mathbf{c} 
-%     \operatorname{Re} ( \mathbf{c}^* P M P^* \mathbf{w}) =
+%     \operatorname{Re} ( \mathbf{c}^* P L P^* \mathbf{w}) =
 %   2 P^* \mathbf{e}_k i \operatorname{Re} ( -i \mathbf{e}_k^\mathrm{T}
-%     P M P^* \mathbf{w}) = \\ =
+%     P L P^* \mathbf{w}) = \\ =
 %   2 P^* \mathbf{e}_k i \operatorname{Im} (\mathbf{e}_k^\mathrm{T}
-%     P M P^* \mathbf{w}) \text{,}
+%     P L P^* \mathbf{w}) \text{,}
 % \end{multline*}
 % one sees that the $\mathbf{u}_1$ terms corresponding to different 
 % items can conveniently be added together. The combined 
-% $\mathbf{u}_1$ can be computed as $2 P^* G P M P^* \mathbf{w}$, 
+% $\mathbf{u}_1$ can be computed as $2 P^* G P L P^* \mathbf{w}$, 
 % where $G$ is the $\mathbb{R}$-linear operator that replaces the 
 % real parts of all the vector elements by $0$.
 % 
@@ -4034,12 +4034,12 @@ proc ::network::ulayout::imaginary_energy {w0 wwL point} {
 %   \begin{tcl}
 proc ::network::ulayout::imaginary_force {TS widths0 wwL point} {
    set res [list [{*}$TS component 0 0]]
-   lassign [PMP*w $widths0 $wwL $point] PMPwL MPwL PwL
+   lassign [PLP*w $widths0 $wwL $point] PLPwL LPwL PwL
    foreach {dummy wVec} [linsert $wwL 0 "" $widths0]  v2 $PwL \
-     v1 $MPwL  zVec $PMPwL {
+     v1 $LPwL  zVec $PLPwL {
       if {[llength $wVec] < 2} then {continue}
 %   \end{tcl}
-%   The following loop computes \(\mathbf{y} = 2QPMP^*\mathbf{w}\). 
+%   The following loop computes \(\mathbf{y} = 2QPLP^*\mathbf{w}\). 
 %   \begin{tcl}
       set yVec {}
       foreach z $zVec {
@@ -4136,8 +4136,8 @@ proc ::network::ulayout::imaginary_force {TS widths0 wwL point} {
 %   items within each level are sorted by their $x$-coordinates 
 %   (increasing order), otherwise they are returned in the same order 
 %   as they appear in the \word{item-key}. If the \word{transpose?} 
-%   is true then the item coordinates are computed using |PMPtw| 
-%   rather than |PMP*w|.
+%   is true then the item coordinates are computed using |PLPtw| 
+%   rather than |PLP*w|.
 %   
 %   The scaling is typically delayed, meaning most $x$-coordinates 
 %   handled below are expressed in the \word{unit}.
@@ -4146,9 +4146,9 @@ proc ::network::ulayout::levels_with_xcoord\
   {point widths0 wwL itemKey unit sorted transpose {boundaryVar ""}} {
    set xVecL [lindex [
       if {$transpose} then {
-         PMPtw $widths0 $wwL $point
+         PLPtw $widths0 $wwL $point
       } else {
-         PMP*w $widths0 $wwL $point
+         PLP*w $widths0 $wwL $point
       }
    ] 0]
    set res {}

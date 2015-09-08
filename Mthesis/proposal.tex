@@ -219,7 +219,7 @@
   \DefOrd[*{level}]{Level} $k$ in the graded network $(G,\ell)$ is 
   defined to be the set
   \begin{equation*}
-    L_k = \begin{cases}
+    M_k = \begin{cases}
       \setOf[\big]{ e \in E }{ h(e) = 0 }& \text{if \(k=\ell(0)\),}\\
       \setOf[\big]{ e \in E }{ t(e) = 1 }& \text{if \(k=\ell(1)\),}\\
       \setOf[\big]{ v \in V }{ \ell(v) = k } \cupd
@@ -229,8 +229,8 @@
      \end{cases}
   \end{equation*}
   of items of $G$. A link $(e,k)$ should be though of as connecting 
-  a head item ($h(e)$ or $e$) in $L_k$ to a tail item ($t(e)$ or $e$) in 
-  $L_{k+1}$. 
+  a head item ($h(e)$ or $e$) in $M_k$ to a tail item ($t(e)$ or $e$) in 
+  $M_{k+1}$. 
 \end{definition}
 
 \begin{figure}
@@ -300,7 +300,7 @@
       to each level $k$ from $\ell(0)$ to $\ell(1)$ inclusive: a 
       vertical coordinate $y_k$;
     \item
-      to each pair $(i,k)$, where \(i \in L_k\) is an item in level 
+      to each pair $(i,k)$, where \(i \in M_k\) is an item in level 
       $k$: a horizontal coordinate $x_{(i,k)}$;
     \item
       to each link $q$: a head endpoint $(x'_q, y'_q)$ and a tail 
@@ -325,13 +325,13 @@
       x''_{(e,k)}\) and $y_{k+1} - y''_{(e,k)}$ is independent of $k$ 
       and $e$.
     \item \label{Biv3:Schema}
-      If \(i,j \in L_k\) are distinct, then \(\norm{ x_{(i,k)} - 
+      If \(i,j \in M_k\) are distinct, then \(\norm{ x_{(i,k)} - 
       x_{(j,k)} } \geqslant \delta > 0\), where $\delta$ may depend on 
       $i$ and $j$.
     \item
       Similarly, \(y_{k+1} - y_k \geqslant \mathit{\Delta y}_k\), where 
-      $\mathit{\Delta y}_k$ may depend on the items in $L_k$ and 
-      $L_{k+1}$.
+      $\mathit{\Delta y}_k$ may depend on the items in $M_k$ and 
+      $M_{k+1}$.
   \end{enumerate}
 \end{definition}
 
@@ -358,7 +358,7 @@ of the layout $\mc{L}$ for a particular layout scheme. This scheme
 will be the \emDefOrd{tight} layout scheme, which essentially consists 
 of conditions \ref{Biv1:Schema} and \ref{Biv2:Schema} above, coupled 
 with a slightly strengthened form of \ref{Biv3:Schema} to the effect 
-that the items in each level are tightly packed; at least $\norm{L_k}-1$ 
+that the items in each level are tightly packed; at least $\norm{M_k}-1$ 
 of the inequalities for level $k$ are in fact equalities.
 
 Under the tight layout scheme, the free variables of the problem are 
@@ -370,9 +370,9 @@ reduced to the following:
     makes sense to fix \(x_{\ell(0)} = 0\), as the origin for the 
     coordinate system is irrelevant for how natural a layout looks.
   \item
-    For each level, an ordering of $L_k$, which can be encoded as a 
-    bijection \(\sigma_k\colon [m_k] \Fpil L_k\) where \(m_k = 
-    \norm{L_k}\); the idea is that $\sigma_k(j)$ is the $j$th item 
+    For each level, an ordering of $M_k$, which can be encoded as a 
+    bijection \(\sigma_k\colon [m_k] \Fpil M_k\) where \(m_k = 
+    \norm{M_k}\); the idea is that $\sigma_k(j)$ is the $j$th item 
     (counting from the left) in level $k$.
 \end{itemize}
 The relation between these variables and the ones of a general layout 
@@ -383,7 +383,7 @@ are that
     \tfrac{1}{2} w_{\sigma(j-1)} + \tfrac{1}{2} w_{\sigma(j)}
     \quad\text{for \(j>1\),}
 \end{align}
-where $w_i$ for \(i \in L_k\) denotes ``the width of item $i$''\Dash 
+where $w_i$ for \(i \in M_k\) denotes ``the width of item $i$''\Dash 
 a design parameter in the layout scheme. Normally, $w_i$ will have 
 one value if \(i \in E\) and be determined by $D(i)$ if $i$ is a 
 vertex.
@@ -420,7 +420,7 @@ $\mathit{\Delta x}''_q$ are constants, it follows that
   (\vek{x}' - \vek{x}'')^2 =
   (N' \vek{x} - N''\vek{x} + \vek{\Delta x})^2
 \end{equation}
-where \(\vek{x} = (x_{(i,k)})_{i \in L_k, k \in \Z}\), 
+where \(\vek{x} = (x_{(i,k)})_{i \in M_k, k \in \Z}\), 
 \(\vek{\Delta x} = (\mathit{\Delta x}'_q -\nobreak 
 \mathit{\Delta x}''_q)_{q \in Q(G,\ell)}\), and the two matrices $N'$ 
 and $N''$ are defined by
@@ -440,7 +440,7 @@ one $-1$ in each row), but for the continuation it is more convenient
 to split the vector $\vek{x}$ into separate parts for each level. 
 Thus defining
 \begin{align*}
-  \vek{x}_k ={}& (x_{(i,k)})_{i \in L_k} \text{,}\\
+  \vek{x}_k ={}& (x_{(i,k)})_{i \in M_k} \text{,}\\
   \vek{\Delta x}_k ={}& (\mathit{\Delta x}'_{(e,k)} - 
     \mathit{\Delta x}''_{(e,k)} )_{(e,k) \in Q(G,\ell)} \\
   (N'_k)_{e,i} ={}& \begin{cases}
@@ -461,7 +461,7 @@ one gets
 
 The next step is to express $\vek{x}_k$ in terms of the reference 
 position $x_k$, permutation $\sigma_k$, and width vector \(\vek{w}_k 
-= (w_i)_{i \in L_k}\). Defining the matrix counterpart $P_k$ of 
+= (w_i)_{i \in M_k}\). Defining the matrix counterpart $P_k$ of 
 $\sigma_k$ through
 \begin{equation}
   (P_k)_{i,j} = \begin{cases}
@@ -473,10 +473,10 @@ it however turns out that $P_k^{-1} \vek{w}_k$ is a vector with the
 width of the leftmost item in the first position, the second leftmost 
 item in the second position, etc. Hence the vector of \emph{positions} 
 of the horizontally first, second, third, etc. items is $x_k\vek{1} + 
-M P_k^{-1} \vek{w}_k$, where $\vek{1}$ denotes the vector with all 
-elements equal to $1$, and $M$ is the matrix on the form
+L P_k^{-1} \vek{w}_k$, where $\vek{1}$ denotes the vector with all 
+elements equal to $1$, and $L$ is the matrix on the form
 \begin{equation}
-  M = \begin{pmatrix}
+  L = \begin{pmatrix}
     \frac{1}{2} & 0 & 0 & \ldots & 0 \\
     1 & \frac{1}{2} & 0 & \ldots & 0 \\
     1 & 1 & \frac{1}{2} & \ldots & 0 \\
@@ -487,13 +487,13 @@ elements equal to $1$, and $M$ is the matrix on the form
 i.e., all elements on the main diagonal are $\frac{1}{2}$, all above 
 it are $0$, and all below it are $1$. This implies
 \begin{equation}
-  \vek{x}_k = x_k \vek{1} + P_k M P_k^{-1} \vek{w}_k
+  \vek{x}_k = x_k \vek{1} + P_k L P_k^{-1} \vek{w}_k
 \end{equation}
 and hence
 \begin{equation} \label{Eq3:Malfunktion}
   (\vek{x}' - \vek{x}'')^2 = \sum_{k=\ell(0)}^{\ell(1)-1} 
-  \Bigl( (x_k-x_{k+1})\vek{1} + N'_k P_k M P_k^{-1} \vek{w}_k 
-    - N''_k P_{k+1} M P_{k+1}^{-1} \vek{w}_{k+1} + \vek{\Delta x}_k
+  \Bigl( (x_k-x_{k+1})\vek{1} + N'_k P_k L P_k^{-1} \vek{w}_k 
+    - N''_k P_{k+1} L P_{k+1}^{-1} \vek{w}_{k+1} + \vek{\Delta x}_k
   \Bigr)^2
 \end{equation}
 wherein the variables are the $x_k$ and $P_k$ for 
@@ -501,7 +501,7 @@ wherein the variables are the $x_k$ and $P_k$ for
 $\vek{\Delta x}_k$ are have numerical values that combine layout 
 parameters according to the underlying graded network, whereas the 
 constant matrices $N'_k$ and $N''_k$ are some manner of incidence 
-matrices independent of such parameters, and $M$ only has to adjust 
+matrices independent of such parameters, and $L$ only has to adjust 
 its sides to match the network at hand.
 
 
@@ -529,7 +529,7 @@ discrete problem. Indeed, if one takes
 \end{equation*}
 then for a uniform width vector \(\vek{w} = \transpose{(1,1)}\)
 \begin{align*}
-  P M P^{-1} \vek{w} ={}&
+  P L P^{-1} \vek{w} ={}&
   \begin{pmatrix}
     \sinh t & -\cosh t \\ \cosh t & -\sinh t
   \end{pmatrix}
@@ -564,7 +564,7 @@ handled. Since this \(P \in \mathrm{SL}(n)\), both it and
 $\mathrm{GL}(n)$ are out as candidate groups.
 Another problem that this example highlights is the lack of 
 convergence, as far as the optimum point is concerned: as \(t \Lpil 
-\infty\), the elements of $P$ diverge, even though $P M P^{-1} \vek{w}$ 
+\infty\), the elements of $P$ diverge, even though $P L P^{-1} \vek{w}$ 
 approaches $\vek{0}$. \emph{Without ever reaching it!} The infimum is 
 never attained, because it lies at infinity.
 
@@ -576,8 +576,8 @@ compact matrix groups in $\R^{n \times n}$ and $\C^{n \times n}$
 respectively. They furthermore have the desirable property that they 
 preserve vector length, which appears to be a major part of what went 
 wrong in the example; if $P$ (and thus $P^{-1}$) preserves vector 
-length, then \(\Norm{M^{-1}}^{-1} \norm{\vek{w}} \leqslant 
-\norm{P M P^{-1} \vek{w}} \leqslant \Norm{M} \norm{\vek{w}}\).
+length, then \(\Norm{L^{-1}}^{-1} \norm{\vek{w}} \leqslant 
+\norm{P L P^{-1} \vek{w}} \leqslant \Norm{L} \norm{\vek{w}}\).
 
 Another topological hurdle in the choice of matrix group is that it 
 must be connected, and unfortunately this rules out all real matrix 
@@ -598,7 +598,7 @@ a vector of \emph{widths} like $\vek{w}$. Taking \(\vek{w} =
 \transpose{(1,1,1)}\) and \(P = \left( \begin{smallmatrix} 1 & 0 & 0 
 \\ 0 & 0 & 1 \\ 0 & -1 & 0 \end{smallmatrix} \right)\), one gets
 \begin{multline*}
-  P M P^{-1} \vek{w} =
+  P L P^{-1} \vek{w} =
   \begin{pmatrix} 1&0&0 \\ 0&0&1 \\ 0&-1&0 \end{pmatrix}
   \begin{pmatrix} \frac{1}{2} & 0 & 0\\ 1 & \frac{1}{2} & 0 \\
     1 & 1 & \frac{1}{2} \end{pmatrix}
@@ -638,7 +638,15 @@ width are precisely those that map the all-ones vector $\vek{1}$ to
 itself. Those matrices form a 
 subgroup of $\mathrm{U}(n)$, which may be denoted $\UOne(n)$. Letting 
 $P$ range over $\UOne(n)$ rather than the whole of $\mathrm{U}(n)$ 
-will likely give a better approximation of the discrete problem.
+will likely give a better approximation of the discrete 
+problem.\footnote{
+  Later experience has however revealed that it is not a panacea. In 
+  higher dimensions (starting at \(n=3\)), it still gives enough 
+  flexibility that some widths can be turned effectively negative, 
+  and moreover that flexibility cannot be eliminated by further 
+  restricting the group. Other measures are needed to further 
+  penalise matrices producing unnatural layouts.
+}
 
 Restricting to a subgroup does however reraise the question of 
 whether there is a continuous path from one permutation to another. 
