@@ -7291,6 +7291,11 @@ set vertex_appearances {
       {{0 8}}
       {{0 -8}}
    }
+   b {
+      {polygon {offsets {0 11} {11 0} {0 -11} {-11 0}} {}} 
+      {{0 11}}
+      {{0 -11}}
+   }
    e1 {
       {rectangle {square 8} {}
        text {offsets {0 0}} {-font {-size -10} -text e1}} 
@@ -7325,6 +7330,7 @@ sqlite3_init [
 ] {
   a {1 1}  m {2 1}  
 %<constants>  e1 {0 1}  e2 {0 1}  e3 {0 1}
+%<bihomass>  b {1 1}
 }
 % \end{tcl}
 % 
@@ -7433,7 +7439,8 @@ proc heightlex_cmpkey {map input NW} {
 proc set_cmpcmds {} {
    variable RS
    set RS(cmpkeycmd) [list [namespace which heightlex_cmpkey] {
-      m M a a
+      m M  a a
+%<bihomass>      b b
    } .]
    set inputs [llength [lindex $RS(si7e) 0 1 1]]
    set RS(cmpcmds) [lrepeat $inputs [list ::tcl::mathop::-]]
@@ -7565,14 +7572,23 @@ if {$Count(Aa)>0} then {return}
 % \end{tcl}
 % 
 % \begin{tcl}
-%<*HomAss>
+%<*HomAss&!bihomass>
 enter_congruence -short "Hom-associative" {} 1 {m a \n m} -1 {a m \n m}
-%</HomAss>
+%</HomAss&!bihomass>
+%<*HomAss&bihomass>
+enter_congruence -short "Bi-Hom-associative" {} 1 {m b \n m} -1 {a m \n m}
+%</HomAss&bihomass>
 %<*HomLeib>
 enter_congruence -short "Hom-Leibniz" {}\
   1 {a m \n m} -1 {m a \n m} 1 {. X \n m a \n m}
 %</HomLeib>
-%<aishom>enter_congruence -short "Hom-associative" {} 1 {m \n a} -1 {a a \n m}
+%<*aishom>
+enter_congruence -short "Hom-associative" {} 1 {m \n a} -1 {a a \n m}
+%<*bihomass>
+enter_congruence -short "BiHom-associative" {} 1 {m \n b} -1 {b b \n m}
+enter_congruence -short "Homs commute" {} 1 {a \n b} -1 {b \n a}
+%</bihomass>
+%</aishom>
 %</HomAss,HomLeib>
 % \end{tcl}
 % 
@@ -7668,6 +7684,7 @@ proc top_down_contains {signature args} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
 % 
 % 
 % \begin{proc}{bottom_up_DFA}
@@ -7988,8 +8005,375 @@ proc cull_vector {vector maxdeg} {
    }
    return $res
 }
+% \end{tcl}
+% 
+% Alternative approach, which uses a ``partial semigroup'' instead of 
+% the full semigroup of power products. Products not in the partial 
+% semigroup are signalled by a |continue| return, which has the 
+% correct effect on the algebra |*| method.
+% \begin{tcl}
+proc truncated_power_products {varlist maxdeg method args} {
+   switch -- $method * {
+      set res [::mtmtcl::groups::power_product_monoid_1.3\
+        [list ::mtmtcl::sets::variable_set $varlist {}] * {*}$args]
+      if {[::tcl::mathop::+ {*}$res] <= $maxdeg} then {
+         return $res
+      } else {
+         return -code continue
+      }
+   } default {
+      tailcall ::mtmtcl::groups::power_product_monoid_1.3\
+        [list ::mtmtcl::sets::variable_set $varlist {}]\
+        $method {*}$args
+   }
+}
+interp alias {} Poly_ring {} ::mtmtcl::rings::semigroup_algebra {
+   ::mtmtcl::rings::integers::all
+} [list ::truncated_power_products {a b m} 8]
 %</HomAss,WeakAss>
 % \end{tcl}
+% 
+% 
+% \subsubsection{Characterising rules}
+% 
+% My distinct impression is that all the rules derived from the 
+% hom-associative axiom have the form of a strongly hom-associative 
+% axiom plus some extra padding, but is that empirically true? What 
+% strong hom-associative axioms arise this way? (Hypothesis: all that 
+% are on normal form.) And what does the padding look like?
+% 
+% \begin{proc}{classify_homass_rule}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |classify_homass_rule| \word{rule-dict}
+%   \end{displaysyntax}
+%   where the \word{rule-dict} \textsc{must} include the |lhs| and 
+%   |rhs| entires. It returns a list classifying the rule, one of
+%   \begin{displaysyntax}
+%     strong-root-padded \word{strong core} \word{root padding}\par
+%     strong-padded \word{strong core} \word{full lhs}\par
+%     other
+%   \end{displaysyntax}
+%   where the \word{strong core} is the left hand side of the strong 
+%   core of the rule, in Polish notation with |1| for any input. The 
+%   \word{full lhs} is likewise in Polish notation. The 
+%   \word{root padding} is in Polish notation, with |!| for the input 
+%   where the \word{strong core} would be spliced in.
+%   
+%   First check that the right hand side has exactly one term.
+%   \begin{tcl}
+%<*HomAss>
+proc classify_homass_rule {D} {
+   if {[dict size [dict get $D rhs]] != 1} then {
+      return other
+   }
+%   \end{tcl}
+%   Next convert the networks to Polish notation, and locate the point 
+%   where the two strings are different.
+%   \begin{tcl}
+   set NW2 [lindex [dict keys [dict get $D rhs]] 0]
+   set equal 1
+   set prefix ""
+   set left ""
+   set right ""
+   foreach item1 [lindex [NW_to_Polish [dict get $D lhs]] 1] \
+           item2 [lindex [NW_to_Polish $NW2] 1] {
+      if {$item1 ne $item2} then {set equal 0}
+      if {[regexp {^[0-9]+$} $item1]} then {set item1 1}
+      if {[regexp {^[0-9]+$} $item2]} then {set item2 1}
+      if {$equal} then {
+         append prefix $item1
+      } else {
+         append left $item1
+         append right $item2
+      }
+   }
+%   \end{tcl}
+%   We expect the |left| to begin with the |a| on the left side of a 
+%   canyon, followed by the right side of the canyon and the matching 
+%   |m| on the right side. Swapping those two operations should 
+%   recreate the |right|, otherwise we are in an |other| case.
+%   \begin{tcl}
+   if {!([
+      regexp {^a1([am]*)m11(.*)$} $left "" middle suffix
+   ] && $right eq "m11${middle}a1${suffix}")} then {
+      return other
+   }
+%   \end{tcl}
+%   The next problem is to locate the |m| at the bottom of the 
+%   canyon, which is part of the |prefix|. In the 
+%   |strong-root-padded| case, that |m| is the last that is not 
+%   followed by a |1|. Otherwise one can make it be such an |m| by 
+%   removing any |m11| or |a1| from the string.
+%   \begin{tcl}
+   set snipped 0
+   set p $prefix
+   while {![regexp {m(m1|a)*$} $p l]} {
+      set p [string map {m11 1 a1 1} $p]
+      incr snipped
+      if {$snipped > [string length $prefix]} then {
+         error "This shouldn't happen!"
+      }
+   }
+   set r [string map {a "" m 1} $middle]
+   if {![string match "$r*" $suffix]} then {incr snipped}
+   set core "${l}a1${middle}m11${r}"
+   if {$snipped} then {
+      return [list strong-padded $core ${prefix}${left}]
+   } else {
+      return [list strong-root-padded $core [
+         string range $prefix 0 end-[string length $l]
+      ]![
+         string range $suffix [string length $r] end
+      ]]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{homass_core_distribution}
+%   This procedure returns a nested dictionary that groups rules 
+%   according to their strong core. The primary key in that 
+%   dictionary is the \word{strong core}, as returned by 
+%   |classify_homass_rule|. The secondary key is the |num6er| of a 
+%   rule with such a core. The value is one of
+%   \begin{description}
+%     \item[just]
+%       if the strong rule is true in weakly hom-associative algebras,
+%     \item[padded]
+%       if the strong core needs to be padded to yield an identity of 
+%       weakly hom-associative algebras,
+%     \item[other]
+%       if this rule does not fit the pattern for a strongly 
+%       hom-associative axiom (this probably won't happen).
+%   \end{description}
+%   There are no arguments. This procedure reads the database 
+%   directly, using commands in the |DBCMD| array.
+%   
+%   \begin{tcl}
+proc homass_core_distribution {} {
+   variable DBCMD
+   set ruleL [$DBCMD(ActiveRu1e) allrows -as lists]
+   set res {}
+   foreach num $ruleL {
+      set D [lindex [
+         $DBCMD(GetRu1e) allrows [dict create num6er $num]
+      ] 0]
+      set type [classify_homass_rule $D]
+      switch -- [lindex $type 0] strong-padded {
+         dict set res [lindex $type 1] $num padded
+      } strong-root-padded {
+         if {[lindex $type 2] eq "!"} then {
+            dict set res [lindex $type 1] $num just
+         } else {
+            dict set res [lindex $type 1] $num padded
+         }
+      } default {
+         dict set res "" $num other
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{Polish_to_scan}
+%   This procedure takes a Polish notation string for a plane tree 
+%   (any digit is valid and just marks an input) and generates a 
+%   corresponding list of scan-lines, almost as expected by 
+%   |network::pure::construct| except that lines are separate list 
+%   elements rather than ranges separated by newline elements.
+%   
+%   The scanlines are built in the array |L|, which is indexed by 
+%   numeric level ($0$ being the bottom level). |prefixL| is what a 
+%   new level should implicitly start out as, if it turns out to be 
+%   needed; is consists of zero or more |.| elements, for inputs that 
+%   have already been reached. The |stack| is the stack of levels.
+%   \begin{tcl}
+proc Polish_to_scan {str} {
+   set L(0) {}
+   set stack [list 0]
+   set prefixL {}
+   foreach ch [split $str ""] {
+      switch -- $ch "a" - "b" - "m" {
+         if {[lindex $stack end] >= [array size L]} then {
+            set L([array size L]) $prefixL
+         }
+         set lvl [lindex $stack end]
+         lappend L($lvl) $ch
+         incr lvl
+         set stack [lreplace $stack end end $lvl {*}[
+            if {$ch eq "m"} then {list $lvl}
+         ]]
+      } default {
+         lappend prefixL .
+         for {set lvl [lindex $stack end]} {$lvl < [array size L]}\
+           {incr lvl} {lappend L($lvl) .}
+         set stack [lreplace $stack end end]
+      }
+   }
+   return [lmap lvl [
+      lsort -integer -decreasing [array names L]
+   ] {set L($lvl)}]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{coregroup_to_LaTeX}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |coregroup_to_LaTeX| \word{channel} \word{core} 
+%     \word{instance-dict} \begin{regblock}[\regstar] \word{option} 
+%     \word{value} \end{regblock}
+%   \end{displaysyntax}
+%   It writes to the \word{channel} \LaTeX-code presenting a group of 
+%   rules with common core \word{core} (list of scanlines). The numbers 
+%   of the rules in that group are the keys in the 
+%   \word{instance-dict}, and the values are as set by 
+%   |homass_core_distribution|.
+%   
+%   The \LaTeX-code generated has the structure:
+%   \begin{quote}
+%     |\subsection{Signature |\dots|}|\\
+%     |\[|\\
+%     \meta{core rule lhs} |\to| \meta{core rule rhs}\\
+%     |\]|\\
+%     For each instance: the rule number, and the lhs with the core 
+%     highlighted.
+%   \end{quote}
+%   
+%   Data is taken from the database, and relies upon the |DBCMD| 
+%   array being initialised.
+%   
+%   \begin{tcl}
+proc coregroup_to_LaTeX {F core instancesD args} {
+   array set O {-ruleslimit 100}
+   array set O $args
+   variable DBCMD
+   set signature [string map {. "" { } "" ! " "} [
+      join [lrange $core 1 end-1] !
+   ]]
+   if {$signature ne ""} then {
+      puts $F "\\subsection{Signature \\texttt{$signature}}"
+   }
+   puts $F {\[}
+   set NWL [network::pure::construct $DBCMD(signature)\
+     [join $core { \n }]]
+   puts $F [network_as_LaTeX $NWL {*}$args]
+   puts $F {\to}
+   set rcore $core
+   lset rcore 0 [string map {"a m" "m a"} [lindex $rcore 0]]
+   set NWR [network::pure::construct $DBCMD(signature)\
+     [join $rcore { \n }]]
+   puts $F [network_as_LaTeX $NWR {*}$args]
+   puts $F {\]}
+   if {[dict size $instancesD] == 0} then {
+      puts $F {There are no rules with this core signature.}
+      puts $F \n
+      return
+   } elseif {[dict size $instancesD] == 1 &&\
+     [dict values $instancesD] eq "just"} then {
+      puts $F "This is just rule [dict keys $instancesD],\
+        valid in any hom-associative algebra."
+      puts $F \n
+      return
+   }
+   puts $F "This core has (so far) been found in\
+     [dict size $instancesD] distinct rules.\n"
+   set count 0
+   foreach num [lsort -integer [dict keys $instancesD]] {
+      puts $F "Rule $num:"
+      set D [lindex [
+         $DBCMD(GetRu1e) allrows [dict create num6er $num]
+      ] 0]
+      set NW [dict get $D lhs]
+%   \end{tcl}
+%   The following tweaks the presentation by putting each vertex on 
+%   its lowest possible level (instead of that level wich would make 
+%   the total length of all edges as short as possible, which is the 
+%   default), since the level is an invariant in hom-associative 
+%   algebras (without assuming the |a| operation is a homomorphism).
+%   \begin{tcl}
+      set minlevelL [lrepeat [llength [lindex $NW 0]] ""]
+      set lvl 0
+      foreach L [network::pure::minimal_grading $NW] {
+         foreach item $L {
+            if {[lindex $item 0] eq "vertex"} then {
+               lset minlevelL [lindex $item 1] $lvl
+            }
+         }
+         incr lvl
+      }
+      set whereL [network::wfb::instances [list $NW {}] [list $NWL {}]]
+      if {![llength $whereL]} then {
+         puts $F {\textbf{Confusion: Core not a subnetwork here!}}
+      } else {
+         puts $F {\begin{math}}
+         puts $F [join [
+            lmap region $whereL {
+               network_as_LaTeX $NW {*}$args -region $region\
+                 -levellist $minlevelL
+            }
+         ] {, }]
+         puts $F {\end{math}.}
+      }
+      incr count
+      if {$count >= $O(-ruleslimit)} then {
+         puts $F "\nThat makes $count rules, which seems plenty."
+         puts $F {Adjust the \texttt{-ruleslimit} if you want to see\
+           more of them.}
+         break
+      }
+      if {$count % 10 == 0} then {
+         puts $F ""
+      }
+   }
+   puts $F \n
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{dump_coregroups_as_LaTeX}
+%   This is a top-level command, which generates a full document 
+%   presenting the rules in the database from a 
+%   strong-coregroup-centric perspective. The call syntax is
+%   \begin{displaysyntax}
+%     |dump_coregroups_as_LaTeX| \word{target file name} 
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc dump_coregroups_as_LaTeX {filename args} {
+   set coregroups [homass_core_distribution]
+   set sortgroupL [lmap core [dict keys $coregroups] {
+      if {$core eq ""} then {continue}
+      set scan [Polish_to_scan $core]
+      list [llength $scan] [string map {. "" { } ""} [join $scan ""]]\
+        $scan $core
+   }]
+   set sortgroupL [lsort -index 0 -integer [lsort -index 1 $sortgroupL]]
+   set F [open $filename w]
+   puts $F {\documentclass{article}}
+   puts $F {\usepackage{sdpgf}}
+   puts $F {\begin{document}}
+   puts $F {\tableofcontents}
+   puts $F {\sloppy}
+   set last 0
+   foreach key $sortgroupL {
+      if {[lindex $key 0] > $last} then {
+         set last [lindex $key 0]
+         puts $F "\\section{Height $last cores}"
+      }
+      coregroup_to_LaTeX $F [lindex $key 2]\
+        [dict get $coregroups [lindex $key 3]] {*}$args
+   }
+   puts $F {\end{document}}
+   close $F
+}
+%</HomAss>
+%   \end{tcl}
+% \end{proc}
 % 
 % 
 % \subsubsection{Weak associative algebras}

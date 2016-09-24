@@ -138,9 +138,10 @@ proc mtmtcl::adaptors::equality::variadic_equal {prefix args} {
 %     \end{regblock}
 %   \end{displaysyntax}
 %   and the return value is the constructed command prefix. 
-%   Currently, the only option supported is 
-%   \describeopt+{to-1.1}{-strict}, which takes a boolean value and 
-%   defaults to false.
+%   Currently, the only option supported is \texttt{-strict}, which 
+%   takes a boolean value and defaults to false. Strictness refers 
+%   to adherence to the API mechanism in general; see below for 
+%   details on what this means.
 %   
 %   First check the basics: If \meta{base} already supports 
 %   version~1.1 of \texttt{equality}, then it is the wanted result. 
@@ -167,10 +168,10 @@ proc mtmtcl::adaptors::equality::to-1.1 {base args} {
    set lambda [list {base API subcmd args}]
 %   \end{tcl}
 %   What it does with other subcommands than |=| and |API| depends on 
-%   the |-strict| setting; in the non-strict case, it maps all other 
-%   subcommands to their \meta{base} counterparts and presumes no 
-%   other interface is affected by the redefinition of |=| (and also 
-%   that the interfaces are static).
+%   the \describeopt+{to-1.1}{-strict} setting; in the non-strict case, 
+%   it maps all other subcommands to their \meta{base} counterparts 
+%   and presumes no other interface is affected by the redefinition of 
+%   |=| (and also that the interfaces are static).
 %   \begin{tcl}
    if {[dict exists $args -strict] && [dict get $args -strict]} then {
       lappend lambda {

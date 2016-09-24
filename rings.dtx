@@ -70,20 +70,141 @@
 %   ditto version~2.0.
 % \end{APIspec}
 % 
+% During the \APIref+{ring}{1.0} timeframe, there was no definition 
+% of a \texttt{field} interface however, so major version 1 is still 
+% available in that case. The main reason to define a \texttt{field} 
+% interface at this point is that several basic rings also happen to 
+% be fields.
+% 
+% \begin{APIspec}{field}{1.0}
+%   A |field| is an associative and commutative division ring.
+%   
+%   \begin{APIdescription}{field}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies the |equality|~v\,1.0 interface.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{1}
+%     \end{APImethod}
+%       The |1| and |*| methods are as required by the 
+%       \APIref+{monoid}{1.0} interface . This says |*| is associative.
+%       
+%       The |*| is also commutative, i.e., for any two elements $a$ 
+%       and $b$ of a \meta{field} $F$, the two expressions
+%       \begin{displaysyntax}
+%         [$F$ * $a$ $b$]\par
+%         [$F$ * $b$ $a$]
+%       \end{displaysyntax}
+%       are |=|-equal.
+%       
+%     \begin{APImethod}{+}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%     \begin{APImethod}{0}
+%     \end{APImethod}
+%     \begin{APImethod}{neg}
+%       \word{element}
+%     \end{APImethod}
+%       The |+|, |0|, |neg|, and |*| methods are as required by the 
+%       \APIref{ring}{2.0} interface version 2.0.
+%       
+%     \begin{APImethod}{/}
+%       \word{numerator} \word{denominator}
+%     \end{APImethod}
+%       The |/| method satisfies the \APIref+{division}{1.0} 
+%       interface. In addition, this method will not throw an error 
+%       unless the \word{denominator} is zero.
+%       
+%       \begin{remark}
+%         That amounts to saying that \(ax = b\) has a solution $x$ 
+%         for any nonzero $a$. In particular there is a solution 
+%         $a^{-1}$ to \(a a^{-1} = 1\), and thus if $x_1$ and $x_2$ 
+%         satisfy \(a x_1 = b = a x_2\) then
+%         \[
+%           x_1 = (a a^{-1}) x_1 = a^{-1} (a x_1) = a^{-1} b =
+%           a^{-1} (a x_2) = (a a^{-1}) x_2 = x_2
+%           \text{,}
+%         \]
+%         hence this solution is unique.
+%         
+%         It follows from the \APIref{ring}{2.0} interface that 
+%         \texttt{[$F$ * [$F$ 0] $a$]} is zero for all $a$, and thus 
+%         there is no solution to \(ax = b\) when \(a=0\) and \(b 
+%         \neq 0\), which means |/| must throw the |API division\
+%         nosolution| error for $b/0$. It does \emph{not} follow 
+%         that it must throw an error for $0/0$, since \(0x = 0\) 
+%         actually has solutions, but it \emph{may} throw the 
+%         |API division unimplemented| error in that case.
+%       \end{remark}
+%       
+%     \begin{APImethod}{inverse}
+%       \word{element}
+%     \end{APImethod}
+%       For any nonzero \word{element} $a$ of a \meta{field} $F$, 
+%       the two expressions
+%       \begin{displaysyntax}
+%         [$F$ / [$F$ 1] $a$]\par
+%         [$F$ inverse $a$]
+%       \end{displaysyntax}
+%       are |=|-equal.
+%       
+%       \begin{remark}
+%         This means that the \APIref{subset}{1.0} of a |field| 
+%         consisting of the nonzero elements will be a 
+%         \APIref{group}{1.0}. There is however no requirement in 
+%         the |field| interface to realise this possibility.
+%       \end{remark}
+%   \end{APIdescription}
+%   With the possible exception of |/| (in the case $0/0$), all 
+%   methods are congruent.
+% \end{APIspec}
+% 
 % 
 % \subsection{Integers}
 % 
-% The ring of integers is provided by the |mtmtcl::rings::integers| 
-% package, which has dependencies on the |mtmtcl::rings| and |API| 
-% packages.
+% The |mtmtcl::rings::integers| package provides two types of ring: 
+% the ring $\mathbb{Z}$ of all integers, and rings $\mathbb{Z}_n$ of 
+% integers-modulo-$n$. The main public commands of the package are 
+% the structure generators
+% \begin{displaysyntax}
+%   mtmtcl::rings::integers::make\par
+%   mtmtcl::rings::integers::|make_modulo| \word{n}
+% \end{displaysyntax}
+% which return command prefixes for the structures for $\mathbb{Z}$ 
+% and $\mathbb{Z}_n$ respectively.
+% 
+% As of version~1.2, the package also provides a command
+% \begin{displaysyntax}
+%   mtmtcl::rings::integers::nonnegative \word{method} 
+%   \word{arg}\regstar
+% \end{displaysyntax}
+% which is a fixed structure for the set of nonnegative integers 
+% ($\mathbb{N}$) as a \APIref+{subset}{1.1} of $\mathbb{Z}$.
+% 
 % \begin{tcl}
 %<*docstrip.tcl::catalogue>
-pkgProvide mtmtcl::rings::integers 1.0 integers
+pkgProvide mtmtcl::rings::integers 1.2 integers
 %</docstrip.tcl::catalogue>
 %<*integers>
 package require Tcl 8.5
 package require mtmtcl::openmath
 package require API 1.0
+catch {package require math::numtheory}
+% \end{tcl}
+% The |math::numtheory::isprime| command is used to check whether a 
+% modulo-$n$ ring should also be a \APIref{field}{1.0}, but this is 
+% rather peripheral, so all code related to that is wrapped in 
+% |catch|es for a soft fallback should |math::numtheory| be 
+% unavailable.
+% 
+% The purpose of setting a |namespace path| for 
+% |::mtmtcl::rings:inegers| is to access |mtmtcl::openmath| commands 
+% without the |mtmtcl| prefix.
+% \begin{tcl}
 namespace eval ::mtmtcl::rings::integers {
    namespace path ::mtmtcl
 }
@@ -215,6 +336,48 @@ proc mtmtcl::rings::integers::make {} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% \begin{ensemble}{nonnegative}
+%   The |nonnegative| ensemble has five methods, but four of them 
+%   are redirections.
+%   \begin{tcl}
+namespace eval mtmtcl::rings::integers::nonnegative {
+   namespace ensemble create -map [dict create \
+%   \end{tcl}
+%   The name of the |superset| is determined dynamically.
+%   \begin{tcl}
+      superset [::mtmtcl::rings::integers::make] \
+%   \end{tcl}
+%   Equality testing is done using the superset |=|.
+%   \begin{tcl}
+      = [list {*}[::mtmtcl::rings::integers::make] =] \
+%   \end{tcl}
+%   Ditto conversion to canonical form.
+%   \begin{tcl}
+      canonise [list {*}[::mtmtcl::rings::integers::make] canonise] \
+%   \end{tcl}
+%   The main API claimed support for is \APIref+{subset}{1.1}, but 
+%   \APIref{equality}{1.0} and \APIref{canonise}{1.1} are thrown in 
+%   for good measure.
+%   \begin{tcl}
+      API {::API::static {subset 1.1  equality 1.0  canonise 1.1}} \
+   ] -subcommands {superset member = canonise API}
+%   \end{tcl}
+%   
+%   \begin{proc}{member}
+%     This means the only ground method that needs to be implemented 
+%     is |member|.
+%     \begin{tcl}
+   proc member {integer} {expr {$integer >= 0}}
+%     \end{tcl}
+%     However, it could just as well have been implemented using a 
+%     |-map| to |apply|.
+%   \end{proc}
+%   
+%   \begin{tcl}
+}
+%   \end{tcl}
+% \end{ensemble}
 % 
 % 
 % 
@@ -506,13 +669,15 @@ proc ::mtmtcl::rings::integers::modulo {n API method args} {
 % 
 % \begin{proc}{make_modulo}
 %   This constructor takes the characteristic $n$ as only argument 
-%   and verifies that it is valid.
+%   and verifies that it is valid. It also tries to check whether $n$ 
+%   is a prime, and if so declares the structure to additionally be a 
+%   \APIref{field}{1.0}.
 %   \begin{tcl}
 proc mtmtcl::rings::integers::make_modulo {n} {
    if {$n != round($n) || $n < 2} then {
       return -code error "The characteristic must be at least 2"
    }
-   list [namespace which modulo] $n {
+   set API {
        equality 1.0
        canonise 1.1
        autocanonical 1.0
@@ -527,13 +692,16 @@ proc mtmtcl::rings::integers::make_modulo {n} {
 %</groupDecomposition>
        export 2.0
        import 1.0
-    }
+   }
+   catch {
+      if {[::math::numtheory::isprime $n]} then {
+         dict set API field 1.0
+      }
+   }
+   return [list [namespace which modulo] $n $API]
 }
 %</integers>
 %   \end{tcl}
-%   In the long term, it should also check whether $n$ is a prime, 
-%   and if so extend the API with a |field| interface, but this will 
-%   do for the moment.
 % \end{proc}
 % 
 % 
@@ -579,7 +747,7 @@ namespace eval ::tcl::mathop {
 %   fit the description when $0$ is involved. Supporting |group| is 
 %   however no reason not to also support \APIref{division}{1.0}.
 %   \begin{tcl}
-            division 1.0
+            division 1.0 field 1.0
             canonise 1.1
             export 2.0
             import 1.0
@@ -659,6 +827,408 @@ proc ::mtmtcl::rings::float_export {elem attr} {
 %     \end{tcl}
 %   \end{proc}
 % \end{ensemble}
+% 
+% 
+% \subsection{Fractions}
+% 
+% Another important field is the field $\mathbb{Q}$ of rational 
+% numbers. The preferable presentation of these is as quotients of 
+% two integers, which calls for a corresponding interface.
+% 
+% \begin{APIspec}{fraction}{1.0}
+%   The |fraction| interface provides for decomposing elements into 
+%   numerator and denominator, and for constructing elements from a 
+%   numberator and a denominator.
+%   
+%   \begin{APIdescription}{set of fractions}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies the |equality|~v\,1.0 interface.
+%       
+%     \begin{APImethod}{fracdomain}
+%       \word{submethod} \word{argument}\regstar
+%     \end{APImethod}
+%       The |fracdomain| method accesses the underlying structure 
+%       that numerators and denominators belong to.
+%       
+%     \begin{APImethod}{frac}
+%       \word{numerator} \word{denominator}
+%     \end{APImethod}
+%       This method constructs a fraction element from a 
+%       \word{numerator} and \word{denominator} from the 
+%       |fracdomain|, or throws an error if that combination of 
+%       \word{numerator} and \word{denominator} is invalid or 
+%       unsupported.
+%       
+%     \begin{APImethod}{numer}
+%       \word{fraction}
+%     \end{APImethod}
+%     \begin{APImethod}{denom}
+%       \word{fraction}
+%     \end{APImethod}
+%       These two methods extract the numerator and denominator 
+%       respectively of a \word{fraction}.
+%       
+%       For any \meta{set of fractions} $F$ and element $x$ of $F$, 
+%       it holds that
+%       \begin{displaysyntax}
+%         [$F$ frac [$F$ numer $x$] [$F$ denom $x$]]\par
+%         $x$
+%       \end{displaysyntax}
+%       are |=|-equal.
+%       
+%       \begin{remark}
+%         The converse does not hold; you cannot expect to always 
+%         get back the same |numer|ator from a |frac|tion as you used 
+%         to construct it.
+%       \end{remark}
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% Note that the \APIref{fraction}{1.0} interface abstains from 
+% axiomatising many of the properties that would be true for a field 
+% of fractions constructed from an integral domain: equality in the 
+% set of fractions is not related to arithmetic operations in the 
+% |fracdomain|, indeed, neither the set of fractions nor the 
+% |fracdomain| is required to possess any arithmetic operations 
+% whatsoever. 
+% 
+% Having specified how to build and decompose fractions, an immediate 
+% application is to build rational numbers. |Q| (for $\mathbb{Q}$) is 
+% used as the part of the package and namespace name that says 
+% `rational', since this looks right in the code.
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::rings::Q 1.0 rationals
+%</docstrip.tcl::catalogue>
+%<*rationals>
+package require Tcl 8.5
+package require mtmtcl::rings::integers 1.0
+package require mtmtcl::openmath 1.1
+package require API 1.0
+% \end{tcl}
+% 
+% \begin{ensemble}{Q}
+%   A rational number $a/b$ is encoded as a pair `$a$ $b$', where \(b 
+%   \neq 0\).
+%   
+%   \begin{tcl}
+namespace eval ::mtmtcl::rings::Q {
+%   \end{tcl}
+%   
+%   \begin{procmethod}{0}
+%     Zero is $0/1$.
+%     \begin{tcl}
+   proc 0 {} {return {0 1}}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{iszero}
+%     Something is zero when the numerator is $0$.
+%     \begin{tcl}
+   proc iszero {frac} {expr {[lindex $frac 0] == 0}}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{=}
+%     More generally, \(a/b = c/d\) when \(ad = bc\).
+%     \begin{tcl}
+   proc = {ab cd} {
+      expr {[lindex $ab 0]*[lindex $cd 1] ==\
+        [lindex $ab 1]*[lindex $cd 0]}
+   }
+%     \end{tcl}
+%     There seems little point in complicating that with checks for 
+%     the denominator being $0$, as that constitutes errors in the 
+%     operands. (The results in those cases are that any $a/0$ and 
+%     $c/0$ are considered equal, and $0/0$ is equal to everything.)
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{canonise}
+%     The canonical form of a fraction $a/b$ is $a'/b'$ such that 
+%     \(\gcd(a',b') = 1\), \(b' > 0\), and of course \(a'/b' = a/b\). 
+%     To that end, $d$ is first made a greatest common divisor of $a$ 
+%     and $b$; we allow $d$ to be negative here, but will switch sign 
+%     later if necessary. The algorithm used is that of Euclid, and 
+%     overall the complexity should be quadratic; the built-in modulo 
+%     operation may itself be quadratic in general, but in the small 
+%     quotient regime where Euclid's algorithm primarily ends up 
+%     using it, the built-in modulo operation is actually linear.
+%     \begin{tcl}
+   proc canonise {frac} {
+      lassign $frac d r
+      while {$r != 0} {
+         set r [expr {$d % [set d $r]}]
+      }
+      set r [expr {[lindex $frac 1] / $d}]
+      if {$r < 0} then {
+         set r [::tcl::mathop::- $r]
+         set d [::tcl::mathop::- $d]
+      }
+      return [list [expr {[lindex $frac 0] / $d}] $r]
+   }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{+}
+%     Addition is implemented as a zero-or-more terms operation, i.e.,
+%     \begin{displaysyntax}
+%       ::mtmtcl::rings::Q + \word{term}\regstar
+%     \end{displaysyntax}
+%     It is implemented in the naive way, using the formula
+%     \[
+%       \frac{n_1}{d_1} + \frac{n_2}{d_2} = 
+%       \frac{n_1 d_2 + n_2 d_1}{d_1 d_2}
+%     \]
+%     followed by |canonise|ing to cancel factors common to numerator 
+%     and denominator.
+%     \begin{tcl}
+   proc + {args} {
+      set sum {0 1}
+      foreach term $args {
+         lassign $sum n1 d1
+         lassign $term n2 d2
+         set sum [list [expr {$n1*d2 + $n2*$d1}] [expr {$d1*d2}]]
+      }
+      canonise $sum
+   }
+%     \end{tcl}
+%     Though simple, this may seem like an inefficient implementation 
+%     since it uses the trivial common denominator $d_1 d_2$ rather 
+%     than the least common multiple, therefore sometimes working 
+%     with larger intermediate results than necessary. However the 
+%     cost of computing the least common multiple would not really be 
+%     offset by gains in other parts of the calculation.
+%     
+%     Realistically the dominant part of the calculation of a 
+%     two-term sum is going to be the $\gcd$ calculation. Suppose 
+%     that has complexity $\sim c n^2$ for operands up to $n$ bits 
+%     large. Now consider adding two fractions where the numerators 
+%     and denominators are up to $n$ bits in size. Without computing 
+%     the least common multiple, the final $\gcd$ calculation will 
+%     operate on integers of up to $2n$ bits, and so have complexity 
+%     $\sim 4cn^2$. The $\gcd$ calculation for the initial least 
+%     common multiple would 
+%     have complexity $\sim cn^2$, and may avoid a factor of size 
+%     $k$~(say) bits in the intermediate results, reducing the 
+%     complexity of the final $\gcd$ to \(\sim c (2n -\nobreak k)^2 = 
+%     4cn^2 - 4ckn + ck^2\). The net effect is a loss for all \(k < 
+%     \frac{1}{4} n\)! Moreover the worst-case complexity of $\sim 
+%     cn^2$ for Euclid's algorithm occurs precisely when the 
+%     arguments are coprime; if the $\gcd$ turns out to be $k$ bits 
+%     large then the bound on the number of iterations drops by some 
+%     $O(k)$. This has not even begun to consider averaging over 
+%     different numbers of equal bitsize; in that significant fraction 
+%     of cases where the integers involved are coprime, a $\gcd$ 
+%     calculations will achieve nothing.
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{neg}
+%     Negation is done by negating the numerator, so that canonical 
+%     input produces canonical output.
+%     \begin{tcl}
+   proc neg {ab} {
+      list [::tcl::mathop::- [lindex $ab 0]] [lindex $ab 1]
+   }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{-}
+%     Subtraction is just addition with a sign flip, specialised for 
+%     the case of two operands.
+%     \begin{tcl}
+   proc - {t1 t2} {
+      lassign $t1 n1 d1
+      lassign $t2 n2 d2
+      canonise [list [expr {$n1*d2 - $n2*$d1}] [expr {$d1*d2}]]
+   }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{*}
+%     Multiplication is just to multiply all numerators together and 
+%     multiply all denominators together, followed by |canonise|. It 
+%     is straightforward to do as a zero-or-more operands operation.
+%     \begin{tcl}
+   proc * {args} {
+      set n 1
+      set d 1
+      foreach f $args {
+         set n [expr {$n * [lindex $f 0]}]
+         set d [expr {$d * [lindex $f 1]}]
+      }
+      canonise [list $n $d]
+   }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{1}
+%     The unit operation |1| also has a one-argument form for 
+%     `integer multiple of unit'.
+%     \begin{tcl}
+   proc 1 {{multiple 1}} {list $multiple 1}
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{inverse}
+%     Inversion is just to check that the number isn't zero, and swap 
+%     numerator with denominator.
+%     \begin{tcl}
+   proc inverse {ab} {
+      if {[lindex $ab 0] != 0} then {
+         return [lreverse $ab]
+      } else {
+         return -code error -errorcode {API division nosolution}\
+           "0 is not invertible"
+      }
+   }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{/}
+%     Division is like multiplication, with the second operand 
+%     swapped, after one checks for division-by-zero. But for strict 
+%     adherence to the |division| API, one must use a slightly 
+%     different |-errorcode| for dividing $0$ by $0$; since this 
+%     happens in an error case, there is no speed penalty for that.
+%     \begin{tcl}
+   proc / {ab cd} {
+      if {[lindex $cd 0] == 0} then {
+         return -code error -errorcode [
+            list API division [lindex {nosolution unimplemented}\
+              [expr {[lindex $ab 0] == 0}]]
+         ] "divide by zero"
+      }
+      canonise [list [expr {[lindex $ab 0]*[lindex $cd 1]}]\
+        [expr {[lindex $ab 1]*[lindex $cd 0]}]]
+   }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{numer}
+%   \begin{procmethod}{denom}
+%     Decomposing a fraction is just picking out the right part.
+%     \begin{tcl}
+   proc numer {ab} {lindex $ab 0}
+   proc denom {ab} {lindex $ab 1}
+%     \end{tcl}
+%   \end{procmethod}\end{procmethod}
+%   
+%   \begin{proc}{frac}
+%     The denominator is checked for being zero when a fraction is 
+%     constructed, and the whole is canonised.
+%     \begin{tcl}
+   proc frac {numer denom} {
+      if {$denom == 0} then {
+         return -code error -errorcode {API fraction bad-denom}\
+           "zero denominator"
+      } else {
+         canonise [list $numer $denom]
+      }
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{procmethod}{export}
+%     The normal OpenMath (or at least MathML) way to encode a 
+%     rational number is to use the \OMSref{nums1}{rational} symbol.
+%     \begin{tcl}
+   proc export {ab attr} {
+      set res [
+         ::mtmtcl::openmath::OM AS nums1 rational [
+            ::mtmtcl::openmath::OM I [lindex $ab 0]
+         ] [
+            ::mtmtcl::openmath::OM I [lindex $ab 1]
+         ]
+      ]
+      lset res 1 $attr
+      return $res
+   }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{procmethod}{import}
+%     Thus the converse |import| operation should at least support 
+%     objects in terms of \OMSref{nums1}{rational}, but it is quite 
+%     reasonable to also allow \OMSref{arith1}{divide} since that 
+%     ends up being effectively the same thing, and we may even 
+%     throw in \OMSref{opnode}{divide} for the same reason (even 
+%     though it is highly unlikely to become relevant, it costs 
+%     almost nothing).
+%     
+%     The tricky matter is what else to allow. Integers don't require 
+%     implementing anything new, and should be expected in input, so 
+%     we'd better support that! One could (for convenience) also 
+%     support floating-point numbers, but there one encounters the 
+%     problem of whether to consider them as the dyadic numbers they 
+%     technically are, or the (often decimal) fractions the user 
+%     might expect, so it's probably easier to just not go there.
+%     
+%     \begin{tcl}
+   proc import {path tree} {
+      ::mtmtcl::openmath::OMAS_switch $tree {
+         return [
+            list [::mtmtcl::openmath::integer_value $path $tree] 1
+         ]
+      } http://www.openmath.org/cd/nums1#rational -\
+        http://www.openmath.org/cd/arith1#divide -\
+        http://www.openmath.org/cd/opnode#divide {
+         if {[llength [lindex $tree 2]] != 3} then {
+            return -code error -errorcode [
+               list API import EDOM $path $tree
+            ] "wrong # operands for nums1#rational"
+         }
+         set numer [::mtmtcl::openmath::integer_value $path\
+           [lindex $tree 2 1]]
+         set denom [::mtmtcl::openmath::integer_value $path\
+           [lindex $tree 2 2]]
+         return [canonise [list $numer $denom]]
+      } default {
+         return -code error -errorcode [
+            list API import EDOM $path $tree
+         ] "I don't know how this OMA produces a rational number"
+      }
+   }
+%     \end{tcl}
+%   \end{procmethod}
+%   
+%   \begin{tcl}
+   namespace ensemble create -prefix no -commands {
+      0 iszero = + neg - * 1 inverse /
+      canonise
+      numer denom frac fracdomain
+      export import
+   } -map [dict create\
+      fracdomain [::mtmtcl::rings::integers::make]\
+      API {::API::static {
+            equality 1.0
+            canonise 1.1
+            export 2.0
+            import 1.0
+            fraction 1.0
+%   \end{tcl}
+%   This structure does \emph{not} support major version~1 of 
+%   \APIref{additive group}{1.0}, because |-| does not have a unary 
+%   form.
+%   \begin{tcl}
+            "additive group" 2.2
+            ring 2.0
+            semigroup 1.2  monoid 1.2  group 1.2
+            division 1.0  field 1.0
+      }}
+   ]
+%   \end{tcl}
+%   
+% \end{ensemble}
+% 
+% \begin{tcl}
+}
+%</rationals>
+% \end{tcl}
+% 
+% 
+% 
 % 
 % 
 % \section{Modules}
@@ -1372,12 +1942,22 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 % \begin{tcl}
 %<*docstrip.tcl::catalogue>
 pkgProvide mtmtcl::rings::semigroup_algebra 1.0 SemigroupAlgebra
+pkgProvide mtmtcl::rings::semigroup_algebra 1.1 {SemigroupAlgebra ens}
 %</docstrip.tcl::catalogue>
 %<*SemigroupAlgebra>
-package require Tcl 8.5
+%<+ens>package require Tcl 8.6
+%<-ens>package require Tcl 8.5
+% \end{tcl}
+% The modern ensemblified version of a semigroup algebra structure is 
+% an ensemble with parameters, and thus requires \Tcllogo\,8.6.
+% \begin{tcl}
 package require API 1.0
+%<ens>package require mtmtcl::openmath 1.0
 namespace eval ::mtmtcl::rings {}
 % \end{tcl}
+% 
+% But first let's implement the old |semigroup_algebra| structure, 
+% for compatibility.
 % 
 % \begin{proc}{semigroup_algebra}
 %   This procedure implements a semigroup algebra structure, with 
@@ -1842,6 +2422,518 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 % \end{APIspec}
 % \fi
 % 
+% \subsubsection{Ensemblified implementation}
+% 
+% \setnamespace{mtmtcl::rings::semigroup_algebra}
+% \begin{ensemble}{ens}
+%   The main implementation ensemble takes six parameters: the 
+%   scalar ring |R|, a command prefix |iszero| performing test for 
+%   equality to $0$ in |R|, the semigroup |S|, two booleans |c1| and 
+%   |c2| signalling whether canonisation is required in various 
+%   circumstances, and the API dictionary. This dictates the 
+%   following definitions:
+%   \begin{tcl}
+%<*SemigroupAlgebra&ens>
+namespace eval mtmtcl::rings::semigroup_algebra::ens {
+   namespace ensemble create -parameters {R iszero S c1 c2 API} -map {
+      API {::API::nstatic 5}
+   }
+}
+%   \end{tcl}
+%   However, we'll hold off on specifying the list of subcommands 
+%   until the end.
+%   
+%   \begin{proc}{=}
+%     Equality is tested by comparing entry by entry. It is forgiving 
+%     for entries with an explicit zero coefficient, since the 
+%     overhead of this for canonical representations is at most one 
+%     ring comparison (if canonical arguments have you do that 
+%     comparison, you will then immediately discover that the answer 
+%     is no).
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::= {R iszero S c1 c2 API lD rD} {
+   dict for {k v} $lD {
+      if {![dict exists $rD $k]} then {
+         if {![{*}$iszero $v]} then {return 0}
+      } elseif {[{*}$R = $v [dict get $rD $k]]} then {
+         dict unset rD $k
+      } else {
+         return 0
+      }
+   }
+   dict for {k v} $rD {
+      if {![{*}$iszero $v]} then {return 0}
+   }
+   return 1
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{+}
+%     Addition can be made variadic with little effort, since the 
+%     algebra elements themselves are collections of terms.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::+ {R iszero S c1 c2 API args} {
+   if {![llength $args]} then {return {}}
+   foreach term [lassign $args sum] {
+      dict for {k v} $term {
+         if {[dict exists $sum $k]} then {
+            dict set sum $k [{*}$R + [dict get $sum $k] $v]
+         } else {
+            dict set sum $k $v
+         }
+      }
+   }
+   foreach k [dict keys $sum] {
+      if {[{*}$iszero [dict get $sum $k]]} then {
+         dict unset sum $k
+      }
+   }
+   return $sum
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{neg}
+%     Negation is easy, since one only has to switch the sign of 
+%     every coefficient.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::neg {R iszero S c1 c2 API arg} {
+   set res [dict create]
+   dict for {k v} $arg {
+      dict set res $k [{*}$R neg $v]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{-}
+%     Subtraction makes use of subtraction in the underlying 
+%     coefficient ring. If that doesn't support \APIref+{additive 
+%     group}{2.0.1}, then neither will the semigroup algebra.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::- {R iszero S c1 c2 API res term} {
+   dict for {k v} $term {
+      if {[dict exists $res $k]} then {
+         dict update res $k s {
+            set s [{*}$R - $s $v]
+            if {[{*}$iszero $s]} then {unset s}
+         }
+      } else {
+         dict set res $k [{*}$R neg $v]
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{0}
+%     The zero value is an empty dictionary.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::0 {R iszero S c1 c2 API} {
+   return {}
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{.}
+%     Multiplication by scalar is straightforward.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::. {R iszero S c1 c2 API r a} {
+   set res [dict create]
+   dict for {k v} $a {
+      set rv [{*}$R * $r $v]
+      if {![{*}$iszero $rv]} then {dict set res $k $rv}
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{*}
+%     The algebra multiplication operation is conceptually done in 
+%     the trivial way, by expanding both factors:
+%     \begin{equation*}
+%       \biggl( \sum_{\mu \in S_1} a_\mu \mu \biggr)
+%       \biggl( \sum_{\nu \in S_2} b_\nu \nu \biggr) =
+%       \sum_{\mu \in S_1} \sum_{\nu \in S_2} (a_\mu b_\nu) (\mu\nu)
+%       \text{.}
+%     \end{equation*}
+%     Since this gives rise to one nested loop per factor, it would 
+%     be somewhat awkward to make variadic.
+%     
+%     The definition of the |c2| boolean is that it is true when the 
+%     \word{semigroup} product of two keys are to undergo 
+%     canonisation. Mnemonically, this is |c2| because |*| takes two 
+%     operands.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::*\
+  {R iszero S c1 c2 API left right} {
+   set res [dict create]
+   dict for {lk lv} $left {
+      dict for {rk rv} $right {
+         set lrv [{*}$R * $lv $rv]
+         if {$c2} then {
+            set lrk [{*}$S canonise [{*}$S * $lk $rk]]
+         } else {
+            set lrk [{*}$S * $lk $rk]
+         }
+         if {[dict exists $res $lrk]} then {
+            dict set res $lrk [{*}$R + [dict get $res $lrk] $lrv]
+         } else {
+            dict set res $lrk $lrv
+         }
+         
+      }
+   }
+   foreach k [dict keys $res] {
+      if {[{*}$iszero [dict get $res $k]]} then {
+         dict unset res $k
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%     Notable here is that the implementation does all |iszero| tests 
+%     at the end, rather than when adding terms together. This is 
+%     because that avoids doing the test more than once for each 
+%     term in the result, which typically reduces the number of ring 
+%     structure calls actually made since several pairs of terms from 
+%     the two operands usually contribute to the same term in the 
+%     result.
+%   \end{proc}
+%   
+%   \begin{proc}{1}
+%     The semigroup algebra has a unit iff the semigroup is a monoid. 
+%     When this unit exists, it consists of the coefficient unit 
+%     times the semigroup unit.
+%     
+%     The definition of the |c1| boolean is that it is true when the 
+%     \word{semigroup} unit is to undergo canonisation.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::1 {R iszero S c1 c2 API} {
+   return [dict create [
+      if {$c1} then {{*}$S canonise [{*}$S 1]} else {{*}$S 1}
+   ] [{*}$R 1]]
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   Other operations taking a \word{semigroup} element and turning it 
+%   into a dictionary key always canonise. For |coeff| and 
+%   |basiselement|, this is because the only case in which it could 
+%   be avoided is that the \word{semigroup} structure is 
+%   \APIref{onlycanonical}{1.0}, and in that case the |canonise| 
+%   method can be made very cheap. By contrast, the |*| and |1| 
+%   operations can be simplified also when the \word{semigroup} is 
+%   some manner of autocanonical. Technically a similar argument could 
+%   be made for the |named| and |/| operations, but the number of 
+%   canonisations that would be saved for these is much smaller than 
+%   for |*| (with comparable input sizes), so it is not clearly worth 
+%   bothering. |1| is similar to |named| in that it only does one 
+%   canonisation, but |1| is called from lots of places, so it makes 
+%   sense to optimise it.
+%   
+%   \begin{proc}{scalar}
+%     The |scalar| method gives access to the coefficient ring.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::scalar {R iszero S c1 c2 API args} {
+   tailcall {*}$R {*}$args
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{basis}
+%     The |basis| method gives access to monomial semigroup.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::basis {R iszero S c1 c2 API args} {
+   tailcall {*}$S {*}$args
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{support}
+%     The support for an element is a native |dict| subcommand.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::support {R iszero S c1 c2 API a} {
+   dict keys $a
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{coeff}
+%     The |coeff| method is almost a |dict get|, but sometimes it 
+%     needs to supply a $0$ by itself.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::coeff {R iszero S c1 c2 API k a} {
+   set k [{*}$S canonise $k]
+   if {[dict exists $a $k]} then {
+      return [dict get $a $k]
+   } else {
+      return [{*}$R 0]
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{basiselement}
+%     Converting a semigroup element to the corresponding algebra 
+%     element is a matter of equipping it with a unit coefficient, 
+%     but to stay on the safe side the semigroup element must also be 
+%     canonised.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::basiselement {R iszero S c1 c2 API k} {
+   dict create [{*}$S canonise $k] [{*}$R 1]
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{iszero}
+%     At this point, the thing missing to satisfy 
+%     \APIref+{additive group}{2.1} is the |iszero| method. This is 
+%     made tolerant for zero coefficients.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::iszero {R iszero S c1 c2 API a} {
+   dict for {k v} $a {
+      if {![{*}$iszero $v]} then {return 0}
+   }
+   return 1
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{named}
+%     The |named| method is a shorthand for applying |basiselement| 
+%     to the result of the |named| method of the semigroup; the 
+%     algebra does not add any names of its own.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::named {R iszero S c1 c2 API k} {
+   dict create [{*}$S canonise [{*}$S named $k]] [{*}$R 1]
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{/}
+%     Having a division-by-monomial operation is convenient for 
+%     factoring.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::/ {R iszero S c1 c2 API numer denom} {
+   if {[dict size $denom] != 1} then {
+      return -code error -errorcode {API division unimplemented}\
+        "Sorry, I only know how to handle single term denominators"
+   }
+%     \end{tcl}
+%     This relies heavily on having division in the underlying ring 
+%     and semigroup, and will in particular error out if any 
+%     coefficient or monomial errors out. Each term in the numerator 
+%     gives rise to a separate term in the result, since only 
+%     $k = {}$\texttt{[$S$ * $\mathit{sd}$ $x$]} can give rise to a 
+%     result term with key $x$.
+%     \begin{tcl}
+   lassign [dict get $denom] sd rd
+   set res {}
+   dict for {k v} $numer {
+      dict set res [{*}$S canonise [{*}$S / $k $sd]]\
+        [{*}$R / $v $rd]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{export}
+%     The part of the internal representation that this structure 
+%     needs to convert for export is the formal linear combination, 
+%     since that is what is represented. The sum is addition 
+%     throughout, even if the coefficients are negative, since a 
+%     general coefficient ring doesn't have a concept of negative; 
+%     if the minuses are to be extracted, then that should probably 
+%     be done at a later stage. For now the multiplication by scalar 
+%     is represented by the \texttt{arith1} \texttt{times} symbol, 
+%     but this isn't quite right as it isn't really an associative 
+%     operation.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::export\
+  {R iszero S c1 c2 API elemD attr} {
+   set battr $attr
+   set cattr $attr
+   set mattr [dict replace $attr  cd arith1  name times]
+   set aattr [dict replace $attr  cd arith1  name plus]
+   dict lappend battr mtmtcl:path basis
+   dict lappend cattr mtmtcl:path scalar
+   dict lappend mattr mtmtcl:path .
+   dict lappend aattr mtmtcl:path +
+   set mnode        [list OMS $mattr {}]
+   set childL [list [list OMS $aattr {}]]
+   dict for {k v} $elemD {
+      lappend childL [
+         list OMA $attr [list $mnode\
+           [{*}$R export $v $cattr] [{*}$S export $k $battr]]
+      ]
+   }
+   return [list OMA $attr $childL]
+}
+%     \end{tcl}
+%     
+%     It would probably be a good idea to present the terms in some 
+%     predictable order rather than the dict insertion order, but again 
+%     it is hard to express this generally. Canonising an element 
+%     before exporting it is probably the most practical solution, 
+%     but one could also consider providing a method that would 
+%     reorder the terms based on some custom order of semigroup 
+%     elements.
+%   \end{proc}
+%   
+%   \begin{proc}{canonise}
+%     A similar concern exists for canonisation of values, since this 
+%     means the terms have to be ordered somehow. An |lsort\
+%     -dictionary| of the string representations is one way to do 
+%     that, which probably isn't very mathematically meaningful, but 
+%     which still might look sort-of intuitive to the user.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::canonise {R iszero S c1 c2 API a} {
+   set res [dict create]
+   foreach k [lsort -dictionary [dict keys $a]] {
+      set r [dict get $a $k]
+      if {![{*}$iszero $r]} then {
+         dict set res $k [{*}$R canonise $r]
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   
+%   \begin{tcl}
+namespace ensemble configure mtmtcl::rings::semigroup_algebra::ens\
+  -commands {
+   API = + neg - 0 . * 1 iszero / 
+   scalar basis support coeff basiselement 
+   named export canonise
+}
+%   \end{tcl}
+%   
+% \end{ensemble}
+% 
+% \begin{proc}{make}
+%   This brings us to the matter of a |make| command for semigroup 
+%   algebras, which has the call syntax
+%   \begin{displaysyntax}
+%     |mtmtcl::rings::semigroup_algebra::make| \word{ring} 
+%     \word{semigroup}
+%   \end{displaysyntax}
+%   and as usual returns the command prefix for the semigroup algebra.
+%   
+%   The \word{iszero}-prefix either refers to an underlying |iszero| 
+%   subcommand, or to a comparison with an explicit (and thus cached) 
+%   zero value.
+%   \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::make {R S} {
+   if {[{*}$R API "additive group" 2.1]} then {
+      set iszero [list {*}$R iszero]
+   } else {
+      set iszero [list {*}$R = [{*}$R 0]]
+   }
+%   \end{tcl}
+%   The |c1| and |c2| booleans need more tests to set.
+%   \begin{tcl}
+   if {[{*}$S API onlycanonical 1.0] || ![{*}$S API canonise 1.0]} then {
+      set c1 0
+      set c2 0
+   } else {
+   }
+%   \end{tcl}
+%   The API is computed by a call to |API::dynamic|.
+%   \begin{tcl}
+   set API [::API::dynamic {} {
+%   \end{tcl}
+%   The first interface to consider is \APIref{equality}{1.0}. 
+%   Version~1.1 would require |=| to be variadic, which it is not, 
+%   but what is required for version~1.0? Arguably only that the 
+%   \word{ring} supports the same!
+%   \begin{tcl}
+      equality {1.0 {
+         eval {{*}$R API equality 1.0}
+      }}
+%   \end{tcl}
+%   There is a reasonable concern that equality of algebra elements 
+%   involves canonicity of semigroup elements, and therefore should 
+%   require the \word{semigroup} to support the 
+%   \APIref{canonise}{1.1} interface, but this is rather an aspect of 
+%   the definition of valid algebra element\Dash it is assumed 
+%   throughout that semigroup elements being used as keys in the 
+%   dictionary \emph{are} on canonical form, and as long as this 
+%   assumption holds no further processing of the keys are needed 
+%   when determining equality. The same is true for all linear 
+%   structure operations: they perform their operations on formal 
+%   linear combinations of keys, regardless of any interpretation of 
+%   these keys.
+%   
+%   The next step on the structural ladder is the \APIref{additive 
+%   group}{2.0} interface. As mentioned above, the |-| operation is 
+%   what determines whether higher versions of this are supported.
+%   \begin{tcl}
+      "additive group" {
+         2.0 {eval {{*}$R API "additive group" 2.0}}
+         2.1 {eval {{*}$R API "additive group" 2.0.1}}
+      }
+%   \end{tcl}
+%   After that comes the module structure step, which requires that 
+%   the \word{ring} is an associative ring with unit. Since this is 
+%   a composite test (\APIref{ring}{2.0} \emph{and} 
+%   \APIref{monoid}{1.0}) which figures for several interfaces, it is 
+%   wrapped up as the named test \texttt{scalars}.
+%   \begin{tcl}
+      ring-module        {2.1 {test scalars}}
+      "free ring-module" {2.1 {test scalars}}
+%   \end{tcl}
+%   
+%   Now it is time to consider the |*| operation. 
+%   
+%   ---
+%   \begin{tcl}
+      ring {2.0 {
+         test scalars  test semigroup
+      }}
+      ring-algebra {2.0 {
+         test scalars  test semigroup
+      }}
+      semigroup {2.0 {
+         test scalars  test semigroup
+      }}
+      monoid {1.0 {
+         test scalars
+         eval {{*}$S API monoid 1.0}
+      }}
+      export {2.0 {
+         eval {{*}$R API export 2.0}
+         eval {{*}$S API export 2.0}
+      }}
+      division {1.0 {
+         eval {{*}$R API division 1.0}
+         eval {{*}$S API division 1.0}
+      }}
+   } {
+      scalars {
+         eval {{*}$R API ring 2.0}
+         eval {{*}$R API monoid 1.0}
+      }
+      semigroup {
+         eval {{*}$S API semigroup 1.0}
+      }
+   }]
+   return [list [namespace current]::end $R $iszero $S $c1 $c2 $API]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tcl}
+%</SemigroupAlgebra&ens>
+% \end{tcl}
+% 
 % 
 % \subsection{Complex numbers}
 % 
@@ -2302,9 +3394,6 @@ namespace eval ::mtmtcl::rings::complex {
 }
 %</complex>
 %   \end{tcl}
-%   The issue of \emph{which} |double| values are legal as elements 
-%   of this ring is one that gets surprisingly technical. One might 
-% 
 % \end{ensemble}
 % 
 %

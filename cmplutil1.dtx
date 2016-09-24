@@ -2635,6 +2635,7 @@ clear_rules
 set vertex_types {
   Delta {1 2}  epsilon {1 0}  S {1 1}  m {2 1}  unit {0 1}
 %<twist>  twist {2 2}
+%<division>  div {2 1}
 }
 set vertex_appearances {
    m {
@@ -2667,6 +2668,12 @@ set vertex_appearances {
         line {offsets {5.657 -5.657} {-5.657 5.657}} {}} 
       {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
       {{-5.657 -5.657 -1 -1} {5.657 -5.657 1 -1}}
+   }
+   div {
+      {polygon {offsets {0 8} {8 -8} {0 -8} {-8 8}} \
+        {-fill "" -outline black}}
+      {{-4 8}}
+      {{-3 -2 -2 -1} {5 -2 2 -1}}
    }
 }
 % \end{tcl}
@@ -2761,6 +2768,7 @@ proc score_network {NW feedbacks} {
 % The following is a bialgebra rule, but putting it first may help 
 % avoid creating stray edges.
 % \begin{tcl}
+%<*!division>
 add_rule {} pure [
    network::pure::construct $vertex_types {unit \r epsilon}
 ] pure [
@@ -2845,6 +2853,7 @@ add_rule {} pure [
 ] pure [
    network::pure::construct $vertex_types {epsilon unit}
 ]
+%</!division>
 %</Hopf>
 % \end{tcl}
 % 
@@ -2865,6 +2874,71 @@ add_rule {} pure [
    network::pure::construct $vertex_types {.}
 ]
 %</Hopf4>
+% \end{tcl}
+% 
+% \begin{tcl}
+%<*division>
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit \n epsilon}
+] pure [
+   network::pure::construct $vertex_types {}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \n epsilon .}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \n . epsilon}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \n . Delta}
+] pure [
+   network::pure::construct $vertex_types {Delta \n Delta .}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit \n Delta}
+] pure [
+   network::pure::construct $vertex_types {unit unit}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {Delta \n div}
+] pure [
+   network::pure::construct $vertex_types {epsilon \n unit}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {. unit \n div}
+] pure [
+   network::pure::construct $vertex_types {.}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {. . Delta \n . X . \n div div \n div}
+] pure [
+   network::pure::construct $vertex_types {div epsilon}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {div \n epsilon}
+] pure [
+   network::pure::construct $vertex_types {epsilon epsilon}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {div \n Delta}
+] pure [
+   network::pure::construct $vertex_types {Delta Delta \n . 2X1 \n div div}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {unit . \n div}
+] pure [
+   network::pure::construct $vertex_types {S}
+]
+add_rule {} pure [
+   network::pure::construct $vertex_types {. S \n div}
+] pure [
+   network::pure::construct $vertex_types {m}
+]
+%</division>
 % \end{tcl}
 % 
 % 
@@ -3046,6 +3120,8 @@ set Hopf_value_1(S)\
   [integer_biaffine_PROP fromparts 0 0 0 2]
 set Hopf_value_1(twist)\
   [integer_biaffine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
+set Hopf_value_1(div)\
+  [integer_biaffine_PROP fromparts 0 3 {0 0} {{3 3}}]
 %   \end{tcl}
 % \end{arrayvar}
 % 
@@ -3061,6 +3137,7 @@ set Hopf_value_1(twist)\
 array set Hopf_value_2 [array get Hopf_value_1]
 set Hopf_value_2(m)     [integer_biaffine_PROP fromparts 0 1 {0 1} {{1 1}}]
 set Hopf_value_2(Delta) [integer_biaffine_PROP fromparts 0 {0 1} 1 {{1} {1}}]
+set Hopf_value_2(div)   [integer_biaffine_PROP fromparts 0 3 {0 3} {{3 3}}]
 %   \end{tcl}
 % \end{arrayvar}
 % 

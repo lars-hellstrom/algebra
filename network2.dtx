@@ -12240,16 +12240,25 @@ proc network::rich::SVG_appearances {inD} {
 %       If it is |cutmarks| then the cut positions on the edges are 
 %       marked by short lines intersecting the edge curves at right 
 %       angles. If it is |gone| then the region is simply omitted. 
+%       If it is |thickness| then the thickness of edges in the 
+%       region is set according to the |-regionlinewidth|. 
 %       The default is |cutmarks|.
 %       \changes{2.8}{2013/02/03}{Implemented showing regions in PGF,
 %         with styles of \texttt{cutmarks} and \texttt{gone}. (LH)}
+%       \changes{2.9}{2016/06/13}{Implemented \texttt{thickness} 
+%         style of region highlighting. Had apparently already 
+%         implemented \texttt{colour}. (LH)}
+%     \item[-cuthalf]
+%       Half the length of a cutmark, in canvas units. Defaults to 
+%       $3$.
+%     \item[-regionlinewidth]
+%       The linewidth for edges in the region, if highlighting it by 
+%       |thickness|; a \TeX\ dimen. Defaults to |2\pgflinewidth|, 
+%       i.e., twice the current width.
 %     \item[-midcolour]
 %       The colour to use for vertices and edge-pieces in the region; 
 %       defaults to |green|. This becomes an argument of 
 %       |\pgfsetcolor|.
-%     \item[-cuthalf]
-%       Half the length of a cutmark, in canvas units. Defaults to 
-%       $3$.
 %     \iffalse
 %     \item[-round]
 %       Boolean to control whether coordinates being output should be 
@@ -12269,7 +12278,8 @@ proc network::rich::as_PGF {vertexD args} {
    array set Opt {
       -unit 1pt -division 1
       -region {{} {} {}} -regionstyle cutmarks 
-      -cuthalf 3.0 -midcolour green
+      -cuthalf 3.0  -midcolour green  
+      -regionlinewidth {2\pgflinewidth}
    }
    array set Opt $args
    if {[info exists Opt(-val)]} then {
@@ -12373,7 +12383,7 @@ proc network::rich::as_PGF {vertexD args} {
 %   be to remove any piece incident with a vertex in the region, even if 
 %   that means every piece will be looked at twice.
 %   \begin{tcl}
-   if {$Opt(-regionstyle) eq "gone" || $Opt(-regionstyle) eq "colour"} then {
+   if {$Opt(-regionstyle) in {gone colour thickness}} then {
       set moveL [concat $OL $IL]
       foreach v [lindex $Opt(-region) 0] {
          lappend moveL {*}[lindex $NW(pure) 0 $v 1]
@@ -12396,13 +12406,22 @@ proc network::rich::as_PGF {vertexD args} {
    foreach e [array names EC] {
       append res [rawcurve_as_PFG $Opt(-division) $EC($e)]
    }
-   if {$Opt(-regionstyle) eq "colour" && [array size EC2]} then {
-      append res {  \begin{pgfscope} }\
-        [format {\pgfsetcolor{%s}} $Opt(-midcolour)] \n
-      foreach e [array names EC2] {
-         append res [rawcurve_as_PFG $Opt(-division) $EC2($e)]
+   if {[array size EC2]} then {
+      switch -- $Opt(-regionstyle) "colour" {
+         append res {  \begin{pgfscope} }\
+           [format {\pgfsetcolor{%s}} $Opt(-midcolour)] \n
+         foreach e [array names EC2] {
+            append res [rawcurve_as_PFG $Opt(-division) $EC2($e)]
+         }
+         append res {  \end{pgfscope}} \n
+      } "thickness" {
+         append res {  \begin{pgfscope} }\
+           [format {\pgfsetlinewidth{%s}} $Opt(-regionlinewidth)] \n
+         foreach e [array names EC2] {
+            append res [rawcurve_as_PFG $Opt(-division) $EC2($e)]
+         }
+         append res {  \end{pgfscope}} \n
       }
-      append res {  \end{pgfscope}} \n
    }
 %   \end{tcl}
 %   Then comes the matter of the cutmarks. These are most easily 

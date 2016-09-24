@@ -502,6 +502,76 @@ proc ::network::ulayout::permute_point_rows {permL point} {
 %     + A A^\mathrm{T} =
 %   \frac{1}{n}J + A A^\mathrm{T}
 % \]
+% which is easier to interpret if switching to a coordinate system 
+% where $\mathbf{1}$ is along one of the axes. Let \(\mathbf{c} = 
+% \mathbf{1} - \sqrt{n} \mathbf{e}_n\) and \(T = I - 
+% \frac{2}{\lVert\mathbf{c}\rVert^2} \mathbf{c} 
+% \mathbf{c}^\mathrm{T}\) be the Householder transformation that maps 
+% $\mathbf{1}$ to $\sqrt{n}\mathbf{e}_n$ and vice versa. Then 
+% \(TAT \mathbf{e}_n = n^{-1/2} TA \mathbf{1} = \mathbf{0}\) and 
+% similarly \((TAT)^\mathrm{T} \mathbf{e}_n = 
+% T A^\mathrm{T} T \mathbf{e}_n = n^{-1/2} T A^\mathrm{T} \mathbf{1} 
+% = \mathbf{0}\), so row and column $n$ of $TAT$ is zero. Moreover
+% \[
+%   TAT (TAT)^\mathrm{T} =
+%   T A A^\mathrm{T} T =
+%   T \bigl( I - \frac{1}{n}J \bigr) T = 
+%   T^2 - \frac{1}{n} T \mathbf{1} \mathbf{1}^\mathrm{T} T = 
+%   I - \mathbf{e}_n \mathbf{e}_n^\mathrm{T}
+%   \text{,}
+% \]
+% so $TAT$ is an orthogonal matrix with side $n-1$ padded with an 
+% extra row and column of zeroes. Letting $R$ be the first $n-1$ 
+% columns of $T$, it follows that the valid imaginary parts $A$ are 
+% those that can be expressed as $R Q R^\mathrm{T}$ for some 
+% orthogonal matrix $Q$ with side $n-1$.
+% 
+% 
+% \begin{proc}{uniform_matrix}
+%   The simplest choice of such a matrix would be to let $Q$ be the 
+%   identity, in which case \(A = R R^\mathrm{T} = 
+%   T (I -\nobreak \mathbf{e}_n \mathbf{e}_n^\mathrm{T}) T =
+%   T^2 - \frac{1}{n} \mathbf{1} \mathbf{1}^\mathrm{T} =
+%   I - \frac{1}{n}J\); a rather obvious possibility if considering 
+%   that this matrix is both a projection (hence idempotent) and 
+%   symmetric.
+%   
+%   To compute the corresponding $P$ matrix \(n^{-1}J + i(I -\nobreak 
+%   n^{-1}J)\), there is a procedure with call syntax
+%   \begin{quote}
+%     |::network::ulayout::uniform_matrix| \word{n}
+%   \end{quote}
+%   There is really only two matrix elements, so we'd better 
+%   precompute these.
+%   \begin{tcl}
+proc ::network::ulayout::uniform_matrix {n} {
+   set ninv [expr {1.0/$n}]
+   set diag [complex cartesian $ninv [expr {1-$ninv}]]
+   set offdiag [complex cartesian $ninv [expr {-$ninv}]]
+%   \end{tcl}
+%   Building the matrix is a straightforward double loop.
+%   \begin{tcl}
+   set res [list]
+   while {[llength $res] < $n} {
+      set row [list]
+      while {[llength $row] < $n} {
+         if {[llength $res] == [llength $row]} then {
+            lappend row $diag
+         } else {
+            lappend row $offdiag
+         }
+      }
+      lappend res $row
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% 
+% ---
+% 
 % which can be interpreted geometrically as conditions on the inner 
 % products of the rows of $A$: the inner product of two distinct rows 
 % is $-n^{-1}$ (so the angle is obtuse), whereas the inner product of 
@@ -550,111 +620,6 @@ proc ::network::ulayout::permute_point_rows {permL point} {
 %   \frac{n - k - 1}{n-k} \text{,}
 % \]
 % which is positive for \(k+1 < n\) and zero for \(k+1 = n\).
-% 
-% \begin{proc}{uniform_matrix}
-%   This procedure has the call syntax
-%   \begin{quote}
-%     |::network::ulayout::uniform_matrix| \word{n}
-%   \end{quote}
-%   and it returns a matrix in $\mathrm{U}^\mathbf{1}(n)$ that has 
-%   real part equal to $n^{-1}J$.
-%   
-%   \begin{tcl}
-proc ::network::ulayout::uniform_matrix {n} {
-   if {$n<2} then {return [list [list [complex cartesian 1.0 0.0]]]}
-%   \end{tcl}
-%   
-%   As explained above, this is mostly about constructing the rows 
-%   $\{\mathbf{a}_k\}_{k=1}^n$ of the imaginary part of the matrix, 
-%   and to do so one needs to to perform arithmetic in $\mathbb{R}^n$.
-%   \begin{tcl}
-   set V [::mtmtcl::Lie::Rn::make space $n]
-%   \end{tcl}
-%   One practical complication is that one needs an orthonormal basis 
-%   of $\mathbb{R}^n$ where one vector is parallel to $\mathbf{1}$. A 
-%   convenient way of finding that is to use as basis some reflection 
-%   $\{\mathbf{f}_k\}_{k=1}^n$ of the standard basis 
-%   $\{\mathbf{e}_k\}_{k=1}^n$, as reflection is a linear 
-%   transformation that preserves orthonormality. Let \(\mathbf{w} = 
-%   \mathbf{1} - \sqrt{n}\mathbf{e}_n\) and reflect in the hyperplane 
-%   through the origin that is perpendicular to $\mathbf{w}$, as this 
-%   makes $\mathbf{f}_n$ parallel to $\mathbf{1}$. For \(k < n\) the 
-%   reflected vector becomes
-%   \begin{multline*}
-%     \mathbf{f}_k
-%     = 
-%     \bigl( I - 2 \lVert\mathbf{w}\rVert^{-2} \mathbf{w} 
-%       \mathbf{w}^\mathrm{T} \bigr) \mathbf{e}_k 
-%     =
-%     \mathbf{e}_k - 2 \lVert\mathbf{w}\rVert^{-2} \mathbf{w} 
-%       \mathbf{w}^\mathrm{T} \mathbf{e}_k 
-%     = \\ =
-%     \mathbf{e}_k - 2 \bigl( 
-%       \lVert\mathbf{1}\rVert^{2} 
-%       - 2 \sqrt{n} \mathbf{1}^\mathrm{T} \mathbf{e}_n
-%       + n\lVert\mathbf{e}_n\rVert^{2} 
-%     \bigr)^{-1} \bigl(
-%       \mathbf{1}^\mathrm{T} \mathbf{e}_k 
-%       - \sqrt{n}\mathbf{e}_n^\mathrm{T} \mathbf{e}_k
-%     \bigr) \mathbf{w}
-%     = \\ =
-%     \mathbf{e}_k - 2 \bigl( 2n - 2\sqrt{n} \bigr)^{-1} \mathbf{w}
-%     =
-%     \mathbf{e}_k - \frac{1}{ n - \sqrt{n} } \mathbf{w}
-%     \text{,}
-%   \end{multline*}
-%   most of which can be precomputed.
-%   \begin{tcl}
-   set w [lrepeat $n 1.0]
-   lset w end [expr {1.0 - sqrt($n)}]
-   set w_scaled [{*}$V . [expr {-1/($n-sqrt($n))}] $w]
-%   \end{tcl}
-%   In the main loop, the only vector that one needs to remember from 
-%   previous iterations is $\mathbf{u}$; the result matrix $P$ can be 
-%   constructed |row| by row, and even the vector index $k$ is 
-%   available as |[llength $res]|.
-%   \begin{tcl}
-   set n_inv [expr {1.0/$n}]
-   set u [{*}$V 0]
-   for {set res [list]} {[llength $res] < $n-1} {lappend res $row} {
-%   \end{tcl}
-%   The fresh direction vector $\mathbf{v}$ is constructed from the 
-%   scaled $\mathbf{w}$ by explicit access to the list element, to 
-%   avoid a dependency on the details of |{*}$V basis|. Note that 
-%   differences in the indexing base means $k={}$|[llength $res]| is 
-%   the right list element to access.
-%   \begin{tcl}
-      set v $w_scaled
-      lset v [llength $res] [expr {1.0 + [lindex $v [llength $res]]}]
-      set r [expr {-1.0/($n - [llength $res])}]
-      set a [{*}$V + [
-         {*}$V . $r $u
-      ] [
-         {*}$V . [expr {sqrt(1.0 + $r)}] $v
-      ]]
-      set row [list]
-      foreach im $a {
-         lappend row [complex cartesian $n_inv $im]
-      }
-      set u [{*}$V + $u $a]
-   }
-%   \end{tcl}
-%   The above would be correct also for the very last row, even 
-%   though $\mathbf{v}$ as computed is not a fresh direction, as the 
-%   factor $\lambda$ of $\mathbf{v}$ comes out as $0$ in that 
-%   iteration. But it is easier to just observe that the wanted 
-%   \(\mathbf{a}_n = -\mathbf{u}\).
-%   \begin{tcl}
-   set row [list]
-   foreach im $u {
-      lappend row [complex cartesian $n_inv [expr {-$im}]]
-   }
-   lappend res $row
-   return $res
-}
-%   \end{tcl}
-% \end{proc}
-% 
 % It is actually possible to be slightly more general. Rather than 
 % considering just a fully uniform \(P = \frac{1}{n}J + iA\), one can 
 % consider a family \(P(t) = (1 -\nobreak t)I + \frac{t}{n}J + 
@@ -792,8 +757,6 @@ proc ::network::ulayout::uniform_matrix {n} {
 proc ::network::ulayout::uniform_matrix_point {widths0 wwL} {
    set xL {}
    set ML {}
-   set up [complex cartesian 0.5 0.5]
-   set down [complex cartesian 0.5 -0.5]
    foreach {dummy level} [linsert $wwL 0 "" $widths0] {
       set w 0.0
       foreach item_w $level {set w [expr {$w + $item_w}]}
@@ -2594,7 +2557,7 @@ proc ::network::ulayout::test_someforce {G forcefun energyfun point hlimit} {
 % not matter if the barrier function forbids the actual solution 
 % sought (on account of that being located on the boundary of the 
 % domain), as long as the strength of that barrier is being scaled 
-% down during the search. The purpose of the barrier is rather to 
+% down during the search. The purpose of a barrier is rather to 
 % provide information also in the optimisation domain interior about 
 % the geometry of the domain boundary.
 % 
@@ -2604,11 +2567,11 @@ proc ::network::ulayout::test_someforce {G forcefun energyfun point hlimit} {
 %     |::network::ulayout::negativity_barrier| \word{weights} 
 %     \word{point}
 %   \end{displaysyntax}
-%   and it returns a weighted sum of the natural logarithms of the 
-%   real parts of the matrix elements in the \word{point}. The 
-%   \word{weights} is the list of weights to apply; there is one 
-%   weight per matrix, and the same weight is applied to all elements 
-%   of the matrix.
+%   and it returns a weighted sum of the negative of the natural 
+%   logarithms of the real parts of the matrix elements in the 
+%   \word{point}. The \word{weights} is the list of weights to apply; 
+%   there is one weight per matrix, and the same weight is applied to 
+%   all elements of the matrix.
 %   
 %   If any one matrix element is nonpositive then this procedure 
 %   returns |Inf|, so the weights should always be positive.
