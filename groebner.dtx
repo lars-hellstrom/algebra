@@ -1,0 +1,1647 @@
+% \iffalse
+%<*driver>
+\documentclass{mtmtcl}
+\begin{document}
+\DocInput{groebner.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% \title{Gr\"obner basis utilities}
+% \author{Lars Hellstr\"om}
+% \maketitle
+% 
+% 
+% \section{The monoid of power products}
+% 
+% An important building block in any library for Gr\"obner basis 
+% computations is the monoid of power products, since much of the 
+% control logic is focused on the monomials. From the power products, 
+% it is a simple matter of applying 
+% |mtmtcl::rings::semigroup_algebra| to produce the actual ring of 
+% polynomials.
+% 
+% In the long run, it will probably be appropriate to define an 
+% interface for such power product monoids, but for now it is 
+% perfectly adequate to informally specify the expected interface.
+% \begin{APIdescription}{monoid}
+%   \begin{APImethod}{=}
+%     \word{element} \word{element}
+%   \end{APImethod}
+%   \begin{APImethod}{*}
+%     \word{element} \word{element}
+%   \end{APImethod}
+%   \begin{APImethod}{1}
+%   \end{APImethod}
+%     First, the |=|, |*|, and |1| methods are as expected for the 
+%     \APIref+{monoid}{1.0} interface. In addition, the |*| operation 
+%     is supposed to be commutative. (Commutativity is needed for 
+%     Dickson's Lemma, which in the classical proof provides for 
+%     termination of the Buchberger algorithm. There are 
+%     generalisations---classes of rings where the monoid of monomials 
+%     satisfy the conclusion without being commutative---but those 
+%     are better left for future extensions, if supporting them is at 
+%     all feasible. Commutativity also simplifies the statement of other 
+%     things in the framework.)
+%     
+%   \begin{APImethod}{/}
+%     \word{element} \word{element}
+%   \end{APImethod}
+%     Second, the |/| method is as expected for the 
+%     \APIref{division}{1.0} interface. In particular, the error 
+%     conditions will be relied upon when testing whether one element 
+%     divides another.
+%     
+%   \begin{APImethod}{3gcd}
+%     \word{element} \word{element}
+%   \end{APImethod}
+%     Third, there is a three-part greatest common divisor operation, 
+%     returning a list of four\footnote{
+%       The reason for the initial keyword element is that if 
+%       generalising this operation to noncommutative monoids, then 
+%       there arise a couple of additional possibilities for how the 
+%       operand arguments may be composed from the result factors: 
+%       $ld$ might be the second \word{element}, or it might happen 
+%       that one \word{element} is $ldr$ and the other just $d$. The 
+%       most natural way of capturing such variations is with a 
+%       separate keyword element, so by including one also in the 
+%       easier commutative case, a route to generalisation lies open. 
+%       Note however that in the free 
+%       associative case, this kind of operation may want to return 
+%       several results ($ab^3$ and $b^3a$ have \emph{four} different 
+%       overlaps\Ldash $ab^3a$, $ab^4a$, $ab^5a$, and $b^3ab^3$\Rdash 
+%       each of which must be investigated); thus future-proofing this 
+%       is not trivial.
+%     } elements
+%     \begin{displaysyntax}
+%       commutative $l$ $d$ $r$
+%     \end{displaysyntax}
+%     where $d$ is the $\gcd$, $ld$ is the left \word{element}, and 
+%     $rd$ is the right \word{element}. This is useful when computing 
+%     S-polynomials.
+%     
+%   \begin{APImethod}{multidegree}
+%     \word{element}
+%   \end{APImethod}
+%     Finally, the |multidegree| method returns the list of integers 
+%     that constitute the multidegree vector of the \word{element}. 
+%     This is used for ordering the monomials for identifying the 
+%     leading monomial, but that order is not a built-in property of 
+%     the power product monoid (doing things that way would create a 
+%     formal mess out of any operation changing the order).
+% \end{APIdescription}
+% 
+% Those should be the only methods needed to carry out the Buchberger 
+% algorithm, but other operations may of course need additional 
+% methods.
+% 
+% 
+% \subsection{Dense encoding power product monoid}
+% 
+% \setnamespace{mtmtcl::groups::power_products}
+% \begin{ensemble}{dense}
+%   The |dense| implementation of power products encodes elements as 
+%   lists of exponents. This mostly simplifies implementation, but 
+%   does make the intermediate values a bit tricky to read.
+%   
+%   \begin{displaysyntax}
+%     |::mtmcl::groups::power_products::dense| \word{varlist} 
+%     \word{method} \word{arg}\regstar
+%   \end{displaysyntax}
+%   The \word{varlist} parameter is the list of names of the 
+%   variables (as used for the |OMV|s when |export|ing elements).
+%   
+%   \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::groups::power_products::dense 1.0 ppdense
+%</docstrip.tcl::catalogue>
+%<*ppdense>
+package require Tcl 8.6
+package require mtmtcl::openmath 1.1
+package require API 1.0
+package require mtmtcl::rings::integers 1.2
+namespace eval ::mtmtcl::rings::power_products::dense {
+%   \end{tcl}
+%   
+%   \begin{tcl}
+   namespace ensemble create -parameters {varlist} -subcommands {
+      = * 1 / canonise
+      3gcd multidegree 
+      named {* decomposition} ^ *^ 
+      no.components index tuple component
+      export
+      API
+   } -map {
+      API {::API::staticn 1 {
+         equality 1.0  canonise 1.1
+         monoid 1.3  semigroup 1.3
+         division 1.0
+         export 2.0
+         named 1.0
+         "direct product" 1.1
+%   \end{tcl} 
+%   Supporting \APIref+{direct product}{1.1} requires that the 
+%   components have equality.
+%   \begin{tcl} 
+         "commutative *"    1.0
+         "autocanonical *"  1.0
+         "autocanonical 1"  1.0
+      }}
+   }
+%   \end{tcl} 
+%   
+%   
+%   \subsubsection{The Buchberger methods}
+%   
+%   \begin{proc}{=}
+%     Testing for equality is merely a matter of looping over the 
+%     exponents. It could be made variadic without too much work, by 
+%     using the variadiacy of |tcl::mathop::==|, but this doesn't seem 
+%     overly needed.
+%     \begin{tcl}
+   proc = {varlist a b} {
+      foreach ai $a bi $b {
+         if {$ai != $bi} then {return 0}
+      }
+      return 1
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{*}
+%     This, too, could be made variadic, but for now it is strictly 
+%     binary.
+%     \begin{tcl}
+   proc * {varlist a b} {
+      set res {}
+      foreach ai $a bi $b {
+         lappend res [expr {$ai+$bi}]
+      }
+      return $res
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{1}
+%     The unit is the first method that needs to use the 
+%     \word{varlist}.
+%     \begin{tcl}
+   proc 1 {varlist} {lrepeat [llength $varlist] 0}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{/}
+%     Division is similar to multiplication, with checks for the 
+%     result being nonnegative.
+%     \begin{tcl}
+   proc / {varlist a b} {
+      set res {}
+      foreach ai $a bi $b {
+         lappend res [expr {$ai-$bi}]
+         if {[lindex $res end] < 0} then {
+            return -code error -errorcode {API division nosolution}\
+              "Does not divide at index [expr {[llength $res]-1}]"
+         }
+      }
+      return $res
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{canonise}
+%     Canonisation uses the fact that the unary |tcl::mathop::+| 
+%     canonises integers.
+%     \begin{tcl}
+   proc canonise {varlist a} {
+      lmap ai $a {::tcl::mathop::+ $ai}
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{multidegree}
+%     With this encoding, the |multidegree| operation is merely an 
+%     identity operation.
+%     \begin{tcl}
+   proc multidegree {varlist a} {return $a}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{3gcd}
+%     The three-way $\gcd$ is quite straightforward, since the same 
+%     test as determines what the minimum of two exponent is also 
+%     tells which calculation should be made for the two remainder 
+%     factors.
+%     \begin{tcl}
+   proc 3gcd {varlist a b} {
+      set d {}; set l {}; set r {}
+      foreach ai $a bi $b {
+         if {$ai <= $bi} then {
+            lappend d $ai
+            lappend l 0
+            lappend r [expr {$bi-$ai}]
+         } else {
+            lappend d $bi
+            lappend l [expr {$ai-$bi}]
+            lappend r 0
+         }
+      }
+      return [list commutative $l $d $r]
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   
+%   \subsubsection{Named elements}
+%   
+%   One expected way of obtaining elements in the power product 
+%   monoid is to use the variable names.
+%   
+%   \begin{proc}{named}
+%     One could use |lsearch| to locate the specified variable, but 
+%     it is anyway necessary to build the whole value, so a loop is 
+%     not unreasonable.
+%     \begin{tcl}
+   proc named {varlist name} {
+      set res {}
+      set found 0
+      foreach var $varlist {
+         if {$name eq $var} then {
+            lappend res [set found 1]
+         } else {
+            lappend res 0
+         }
+      }
+      if {$found} then {
+         return $res
+      } else {
+         return -code error "Unknown element name \"$name\",\
+           must be one of: [join $varlist ", "]"
+      }
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{* decomposition}
+%     It is also expected to provide a \verb*"* decomposition" 
+%     method, even though this structure cannot claim support for 
+%     the \APIref{generated group}{1.0} interface since it is only a 
+%     monoid. The return value does not include generators with $0$ 
+%     exponent, since a variant which presents data that way seems 
+%     useful.
+%     \begin{tcl}
+   proc {* decomposition} {varlist a} {
+      set res {}
+      foreach var $varlist exponent $a {
+         if {$exponent} then {
+            lappend res $var $exponent
+         }
+      }
+      return $res
+   }
+%     \end{tcl}
+%     
+%   \end{proc}
+%   
+%   \begin{proc}{^}
+%   \begin{proc}{*^}
+%     Having implemented decomposition, it is natural to also provide 
+%     the almost-inverse |*^| operation, and then the plain power |^| 
+%     becomes a given as well.
+%     \begin{tcl}
+   proc ^ {varlist a n} {
+      lmap ai $a {expr {$ai*$n}}
+   }
+   proc *^ {varlist args} {
+      set i 0
+      lmap var $varlist {
+         set sum 0
+         foreach {base exp} $args {
+            incr sum [expr {[lindex $base $i] * $exp}]
+         }
+         incr i
+         set sum
+      }
+   }
+%     \end{tcl}
+%   \end{proc}\end{proc}
+%   
+%   
+%   \subsubsection{Tuple methods}
+%   
+%   It is useful to also let the user describe a power product as a 
+%   tuple of natural numbers, by way of the \APIref{direct 
+%   product}{1.0} interface.
+%   
+%   \begin{proc}{no.components}
+%     The number of components is equal to the number of variables.
+%     \begin{tcl}
+   proc no.components {varlist} {llength $varlist}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{index}
+%     The |index| method is of course just an |lindex|.
+%     \begin{tcl}
+   proc index {varlist i a} {lindex $a $i}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{tuple}
+%     The |tuple| method would correspondingly be roughly |list|, but 
+%     the |args| mechanism of a proc does that for us, so most of the 
+%     actual implementation is about sanity checking the data.
+%     \begin{tcl}
+   proc tuple {varlist args} {
+      if {[llength $args] != [llength $varlist]} then {
+         return -code error "Got [llength $args] exponents, expected\
+           [llength $varlist]"
+      }
+      foreach a $args {
+         if {$a < 0} then {
+            return -code error "Negative exponents not permitted"
+         }
+      }
+      return $args
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{component}
+%     The |component| method maps everything to 
+%     |mtmtcl::rings::integers::nonnegative| regardless of which 
+%     component is selected. The proc is mostly for getting rid of 
+%     ignored arguments.
+%     \begin{tcl}
+   proc component {varlist index args} {
+      tailcall ::mtmtcl::rings::integers::nonnegative {*}$args
+   }
+%     \end{tcl}
+%   \end{proc}
+%   
+%   
+%   \subsubsection{Export and import}
+%   
+%   The exported form of an element is an \OMSref{arith1}{times} of 
+%   factors that are either an explicit variable, or a 
+%   \OMSref{arith1}{power}. However for the unity element, it is 
+%   \OMSref{alg1}{one}, since it can be argued that 
+%   \OMSref{arith1}{times} is specified as not having a nullary form.
+%   
+%   \begin{proc}{export}
+%     This is adapted from the |export| method of the old 
+%     |power_product_monoid_1.3| structure. It probably inserts too 
+%     many attributes.
+%     \begin{tcl}
+   proc export {varlist a attr} {
+      set pattr [dict replace $attr  cd arith1  name power]
+      set mattr [dict replace $attr  cd arith1  name times]
+      dict lappend pattr mtmtcl:path ^
+      dict lappend mattr mtmtcl:path *
+      set pow [list OMS $pattr {}]
+      set childL [list [list OMS $mattr {}]]
+      foreach name $varlist exponent $a {
+         set omv [::mtmtcl::openmath::OM V $name]
+         if {$exponent == 1} then {
+            lappend childL $omv
+         } elseif {$exponent > 1} then {
+            lappend childL [list OMA $attr [list $pow $omv [
+               ::mtmtcl::openmath::OM I $exponent
+            ]]]
+         }
+      }
+      if {[llength $childL]} then {
+         return [list OMA $attr $childL]
+      } else {
+         return [::mtmtcl::openmath::OM S alg1 one]
+      }
+   }   
+%     \end{tcl}
+%   \end{proc}
+%   
+%   Let's hold off on |import|, for now.
+%   \begin{tcl}
+}
+%   \end{tcl}
+% \end{ensemble}
+% 
+% \begin{proc}{make_dense}
+%   The |make_dense| procedure is a utility that constructs the 
+%   command prefix for a dense encoding power product structure. The 
+%   call syntax is
+%   \begin{displaysyntax}
+%     |make_dense| \word{varlist}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc mtmtcl::groups::power_products::make_dense {varlist} {
+   list [namespace which dense] $varlist
+}
+%</ppdense>
+%   \end{tcl}
+%   It probably would make sense to have a |power_products::make| 
+%   command which just takes a switch for whether the encoding should 
+%   be dense or sparse, but that's a later matter.
+% \end{proc}
+% 
+% 
+% \section{Polynomial accumulators}
+% 
+% In reduction (or generalised division, as it is sometimes called in 
+% the Gr\"obner basis literature), it is useful to keep polynomials 
+% not as plain dicts mapping power products to their coefficients, 
+% but as maps where the terms are ordered so that the leading one is 
+% readily available. A convenient data structure for this is the 
+% |heap::skiplist|.
+% 
+% When doing this, you're not treating the polynomials as values, but 
+% rather as mutable objects. The purpose of these objects may be to 
+% store a value, but only so that it can be efficiently operated 
+% upon, and not all of the operations are algebraic in flavour. This 
+% kind of thingie is called an \emph{accumulator}, and it is supposed 
+% to have the interface:
+% \begin{APIdescription}{accumulator}
+%   \begin{APImethod}{clear}
+%   \end{APImethod}
+%     This method sets the value of the accumulator to $0$. There is 
+%     no particular return value.
+%     
+%   \begin{APImethod}{value}
+%   \end{APImethod}
+%     This method returns the polynomial currently stored in the 
+%     accumulator, as a dictionary mapping monomials to their 
+%     coefficients. The accumulator contents are not affected.
+%     
+%   \begin{APImethod}{add}
+%     \word{polynomial}
+%   \end{APImethod}
+%   \begin{APImethod}{addmult}
+%     \word{scalar} \word{monomial} \word{polynomial}
+%     \word{monomial}\regopt
+%   \end{APImethod}
+%     The \word{polynomial} is a dictionary mapping monomials to 
+%     coefficients. The \word{scalar} is an element of the coeffient 
+%     ring. The \word{monomial}s is are elements of the underlying 
+%     monoid of monomials; the second \word{monomial} defaults to the 
+%     unit. In the case of |add| the \word{polynomial} is added to the 
+%     current contents of the accumulator. In the case of |addmult| 
+%     the thing added is the \word{scalar} times the first 
+%     \word{monomial} times the \word{polynomial} times the second 
+%     \word{monomial}. There is no particular return value.
+%     
+%   \begin{APImethod}{pop}
+%   \end{APImethod}
+%   \begin{APImethod}{peek}
+%   \end{APImethod}
+%     These two methods return the leading term of the accumulator, 
+%     and the |pop| method additionally removes that term (thus 
+%     modifying the accumulator value). The return value is a list
+%     \begin{displaysyntax}
+%       \begin{regblock}[\regopt]
+%         \word{monomial} \word{coefficient}
+%       \end{regblock}
+%     \end{displaysyntax}
+%     which is empty iff the value of the accumulator was already $0$.
+% \end{APIdescription}
+% 
+% 
+% \subsection{A skiplist accumulator}
+% 
+% \setnamespace{mtmtcl::rings::semigroup_algebra}
+% \begin{tclcommand}{class}{accumulator}
+%   The objects of the |accumulator| class are accumulators in the 
+%   sense explained above. The constructor syntax is
+%   \begin{displaysyntax}
+%     accumulator new \word{scalar ring} \word{monomial monoid} 
+%     \word{heap-prefix} \word{order-prefix}
+%   \end{displaysyntax}
+%   where the \word{scalar ring} is some associative and commutative 
+%   \APIref{ring}{2.0} with unit, \word{monomial monoid} is some 
+%   \APIref{monoid}{1.0} with |multidegree| operation, the 
+%   \word{heap-prefix} is a command prefix for accessing a heap, and 
+%   the \word{order-prefix} is a command prefix that expects a 
+%   |multidegree| list as argument and returns the sort key (a list 
+%   of numbers) that the ring element are to be ordered by.
+%   
+%   \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::rings::semigroup_algebra::accumulator 1.0 sgacc
+%</docstrip.tcl::catalogue>
+%<*sgacc>
+package require Tcl 8.6
+package require heap 1.0
+package require heap::skiplist 1.1
+namespace eval mtmtcl::rings::semigroup_algebra {}
+oo::class create mtmtcl::rings::semigroup_algebra::accumulator
+%   \end{tcl}
+%   \setnamespace{\meta{accumulator}}
+%   
+%   \begin{variable}{Ring}
+%   \begin{variable}{Monoid}
+%   \begin{variable}{HeapPrefix}
+%   \begin{variable}{KeyPrefix}
+%     The |Ring|, |Monoid|, |HeapPrefix|, and |KeyPrefix| variables 
+%     hold those arguments of the constructor.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator variable\
+  Ring Monoid HeapPrefix KeyPrefix
+%     \end{tcl}
+%     These are effectively constants in the accumulator object.
+%   \end{variable}\end{variable}\end{variable}\end{variable}
+%   
+%   \begin{variable}{Skiplist}
+%     The (pointer to the header node of the) skiplist is stored in 
+%     the |Skiplist| variable.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator variable\
+  Skiplist
+%     \end{tcl}
+%     The sort key of the skiplist is precisely what is returned by 
+%     the |KeyPrefix| command, and each element is compared using 
+%     |::tcl::mathop::-|. The entries in the skiplist are pairs
+%     \begin{displaysyntax}
+%       \word{coefficient} \word{monomial}
+%     \end{displaysyntax}
+%     where the \word{coefficient} must be nonzero. The \word{monomial} 
+%     is included because we do not (in general) have a way of 
+%     recreating it from the sort key (or even from the 
+%     |multidegree|).
+%   \end{variable}
+%   
+%   \begin{variable}{IsZero}
+%     The |IsZero| variable contains a command prefix with the syntax
+%     \begin{displaysyntax}
+%       \meta{IsZero} \word{ring element}
+%     \end{displaysyntax}
+%     which tests whether a \word{ring element} is $0$. This is done 
+%     using |iszero| if that is available, and using |=| otherwise.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator variable\
+  IsZero
+%     \end{tcl}
+%   \end{variable}
+%   
+%   \begin{tclcommand}{constructor}{}
+%     This brings us to the constructor.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator constructor\
+  {ring monoid heap order} {
+   if {![{*}$ring API ring 2.0]} then {
+      return -code error "This is not a ring: $ring"
+   }
+   set Ring $ring
+   if {![{*}$monoid API monoid 1.0]} then {
+      return -code error "This is not a monoid: $monoid"
+   }
+   set Monoid $monoid
+   set HeapPrefix $heap
+   set KeyPrefix $order
+   set Skiplist [heap::skiplist::create $HeapPrefix {*}[
+      lrepeat [llength [
+         {*}$KeyPrefix [{*}$Monoid multidegree [{*}$Monoid 1]]
+      ]] [list ::tcl::mathop::-]
+   ]]
+   if {[{*}$Ring API "additive group" 2.1]} then {
+      set IsZero [list {*}$Ring iszero]
+   } else {
+      set IsZero [list {*}$Ring = [{*}$Ring 0]]
+   }
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{destructor}{}
+%     Since the constructor creates a skiplist in some external heap, 
+%     the destructor must destroy it.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator destructor {
+   heap::skiplist::destroy $HeapPrefix $Skiplist
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{clear}
+%     The |clear| method makes use of the |empty| operation for 
+%     skiplists. That is slightly faster than popping off elements 
+%     until the list is empty.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator method clear {} {
+   heap::skiplist::empty $HeapPrefix $Skiplist
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{value}
+%     The |value| method is mostly a matter of putting data in the 
+%     right format.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator method value {} {
+   set res [dict create]
+   foreach {key entry} [
+      heap::skiplist::contents $HeapPrefix $Skiplist
+   ] {
+      dict set res [lindex $entry 1] [lindex $entry 0]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{pop}
+%     The |pop| method similarly is a matter of putting data in the 
+%     right format.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator method pop {} {
+   set raw [heap::skiplist::pop $HeapPrefix $Skiplist]
+   if {[llength $raw]} then {
+      return [list [lindex $entry 1] [lindex $entry 0]]
+   } else {
+      return
+   }
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{peek}
+%     The |peek| method is the same, except in using |peek| to access 
+%     the skiplist.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator method peek {} {
+   set raw [heap::skiplist::peek $HeapPrefix $Skiplist]
+   if {[llength $raw]} then {
+      return [list [lindex $entry 1] [lindex $entry 0]]
+   } else {
+      return
+   }
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{add}
+%     The |add| method is an application of |heap::skiplist::update|.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator method\
+  add {poly} {
+   dict for {mu r} $poly {
+      heap::skiplist::update $HeapPrefix $Skiplist\
+        [{*}$KeyPrefix [{*}$Monoid multidegree $mu]] entry {
+         if {[info exists entry]} then {
+            set r [{*}$Ring + $r [lindex $entry 0]]
+            if {[{*}$IsZero $r]} then {
+               unset entry
+            } else {
+               lset entry 0 $r
+            }
+         } elseif {![{*}$IsZero $r]} then {
+            set entry [list $r $mu]
+         }
+      }
+   }
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{addmult}
+%     The |addmult| method is almost the same as |add|, except that 
+%     the entries in the \word{polynomial} are multiplied by their 
+%     respective factors before the skiplist entry is |update|d.
+%     \begin{tcl}
+oo::define mtmtcl::rings::semigroup_algebra::accumulator method\
+  addmult {s nu poly args} {
+   if {[llength $args] > 1} then {
+      return -code error "Wrong \# of arguments, must be:\
+        addmult s nu1 poly ?nu2?"
+   }
+   dict for {mu r} $poly {
+      set mu [{*}$Monoid * $nu $mu]
+      if {[llength $args]} then {
+         set mu [{*}$Monoid * $mu [lindex $args 0]]
+      }
+      set r [{*}$Ring * $s $r]
+      heap::skiplist::update $HeapPrefix $Skiplist\
+        [{*}$KeyPrefix [{*}$Monoid multidegree $mu]] entry {
+         if {[info exists entry]} then {
+            set r [{*}$Ring + $r [lindex $entry 0]]
+            if {[{*}$IsZero $r]} then {
+               unset entry
+            } else {
+               lset entry 0 $r
+            }
+         } elseif {![{*}$IsZero $r]} then {
+            set entry [list $r $mu]
+         }
+      }
+   }
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   And that's all there is to it!
+%   \begin{tcl}
+%</sgacc>
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% 
+% \section{Monomial orders}
+% 
+% It is convenient to have some predefined \meta{order-prefix} 
+% commands to throw in for experimentation, even if ``production'' 
+% work might require facilities for defining customised orders. Then 
+% again, it could also turn out that the following standard 
+% orders suffice quite far.
+% 
+% \begin{tcl} 
+%<*Groebner>
+namespace eval Groebner {}
+% \end{tcl}
+% \setnamespace{Groebner}
+% For lack of a better home for them, the procedures are placed in 
+% the |Groebner| namespace.
+% 
+% \begin{tclcommand}{alias}{lexicographic}
+%   Simply returning the multidegree as sort key would be a 
+%   lexicographic order, but reversing the multidegree might yield 
+%   more convenient results. The rationale for this is that it makes 
+%   the last variable the largest, which is desirable for two 
+%   reasons. First, the rightmost position in a product of variables 
+%   is often the most significant one (earlier variables are more 
+%   coefficient-like). Second, variables are often spontaneously being 
+%   enumerated with the most interesting first and conversely least 
+%   interesting last; hence if one wishes to eliminate variables 
+%   (which is the primary application of a lexicographic order) then 
+%   one wants the last variable to be eliminated first, which means 
+%   it must be the largest.
+%   \begin{tcl}
+interp alias {} Groebner::lexicographic {} lreverse
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% \begin{proc}{deglex}
+%   The degree-lexicographic order compares first by total degree, 
+%   and then lexicographically as above. Since total degree and the 
+%   first $n-1$ variable degrees determine the last variable degree, 
+%   it becomes unnecessary to include that in the return value.
+%   \begin{tcl}
+proc Groebner::deglex {degL} {
+   list [::tcl::mathop::+ {*}$degL] {*}[lreverse [lreplace $degL 0 0]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{degrevlex}
+%   The degree-reverse-lexicographic order compares first by total 
+%   degree, and then by the negative of the variable degrees. Not 
+%   reversing the multidegree list here results in the same relative 
+%   order between the variables as for |deglex| and |lexicographic|, 
+%   but the variable that should not contribute an element to the 
+%   sort key here is the last (largest) one.
+%   \begin{tcl}
+proc Groebner::degrevlex {degL} {
+   list [::tcl::mathop::+ {*}$degL]\
+     {*}[lmap d [lreplace $degL end end] {expr {-$d}}]
+}
+%</Groebner>
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \section{Rewriting}
+% 
+% Instead of plain polynomials, the elements of the (incomplete) 
+% Gr\"obner basis are kept as rewrite rules, i.e., pairs
+% \begin{displaysyntax}
+%   \word{monomial} \word{polynomial}
+% \end{displaysyntax}
+% where the rule is that \word{monomial}${}\to{}$\word{polynomial}.
+% 
+% Even if a rewrite system is perfectly fine to treat as a simple 
+% list of rules, there are certain advantages of storing it in a 
+% mutable object. One is that the most common use of a rewrite system 
+% is to have it \emph{act} upon a value, rather than to treat the 
+% rewrite system as a value itself. Another is that this set-up allows 
+% for advanced implementations where information is collected about 
+% which rules are most likely to be useful in which situations; this 
+% can have a notable effect on the practical performance, even if it 
+% likely does not change the asymptotics of anything.
+% 
+% Turning a rewrite system into an opaque object does however raise 
+% the issue that this object has sufficient methods that one can run 
+% an efficient completion procedure against it. Minimum requirements 
+% are that rules can be added at any time and that the list of all 
+% rules can be retrieved (so that one may compute the new critical 
+% pairs), but in practice one also wants to be able to \emph{remove} 
+% rules that are subsumed by more recently added rules. This suggests 
+% that rules are assigned identifiers---not only to eliminate the 
+% problem of deciding when two rules are equal, but more importantly 
+% to make it practical to discard critical pairs formed using rules 
+% that have been removed. 
+% 
+% Therefore, a rewrite system is an object with the following methods:
+% \begin{APIdescription}{rewrite system}
+%   \begin{APImethod}{reduce}
+%     \word{polynomial}
+%   \end{APImethod}
+%     This method reduces the \word{polynomial} to normal form modulo 
+%     the rewrite system, and returns that normal form.
+%     
+%   \begin{APImethod}{addrule}
+%     \word{monomial} \word{polynomial}
+%   \end{APImethod}
+%     This method adds a new rule, whose left hand side is the 
+%     \word{monomial} and whose right hand side is the 
+%     \word{polynomial}. The return value is an identifier, which 
+%     will be used in future calls to uniquely identify the rule just 
+%     added; identifiers for rules that are removed will not be 
+%     reused unless the rewrite system is |clear|ed in between.
+%     
+%     In addition, rewrite systems that make use of an order on the 
+%     monomials should check that the proposed rule is compatible 
+%     with that order, and throw an error if it is not.
+%     
+%     The purpose of assigning permanent identifiers to rules is to 
+%     support running completion on the rewrite system; weeding out 
+%     critical pairs corresponding to a dropped rule can be costly, 
+%     but observing that the next critical pair on the list was 
+%     formed from a rule that has subsequently been removed is fairly 
+%     cheap.
+%     
+%   \begin{APImethod}{exists}
+%     \word{rule identifier}
+%   \end{APImethod}
+%     Returns |1| if the rule specified by the \word{rule identifier} 
+%     still exists, |0| if it does not.
+%     
+%   \begin{APImethod}{get}
+%     \word{rule identifier}
+%   \end{APImethod}
+%     Returns the pair \word{monomial} \word{polynomial} of the rule 
+%     specified by that identifier, or throws an error if that rule 
+%     no longer exists.
+%     
+%   \begin{APImethod}{dump}
+%   \end{APImethod}
+%     This method returns the complete rewrite system as a list
+%     \begin{displaysyntax}
+%       \begin{regblock}[\regstar] \word{identifier} \word{monomial} 
+%       \word{polynomial} \end{regblock}
+%     \end{displaysyntax}
+%     
+%   \begin{APImethod}{removerule}
+%     \word{rule identifier}
+%   \end{APImethod}
+%     This method makes sure the rule with that identifier are no 
+%     longer part of the rewrite system. It returns |1| if the rule 
+%     was removed, |0| if it didn't exist.
+%     
+%   \begin{APImethod}{clear}
+%   \end{APImethod}
+%     This method removes all rules from a rewrite system. Rule 
+%     identifiers \emph{may} be reused again after clearing the 
+%     rewrite system.
+% \end{APIdescription}
+% 
+% For didactical and proof\slash certificate purposes, it is also 
+% useful to have a method that records the history of a reduction. A 
+% natural format of this can be
+% \begin{APIdescription}{rewrite system}
+%   \begin{APImethod}{reducerecord}
+%     \word{polynomial}
+%   \end{APImethod}
+%     Returns a pair
+%     \begin{displaysyntax}
+%       \word{reduced-polynomial} \word{record}
+%     \end{displaysyntax}
+%     where the \word{record} in turn is a list
+%     \begin{displaysyntax}
+%       \begin{regblock}[\regstar] \word{scalar} \word{monomial} 
+%       \word{rule identifier} \end{regblock}
+%     \end{displaysyntax}
+%     The \word{reduced-polynomial} $g$ is the normal form of the 
+%     \word{polynomial} $f$ modulo the \meta{rewrite system}, as with 
+%     the |reduce| method. Writing $r_i$ for the $i$th \word{scalar}, 
+%     $\mu_i$ for the $i$th \word{monomial}, and $p_i$ for the 
+%     difference $\mathit{lhs} - \mathit{rhs}$ of the rule with the 
+%     $i$th \word{rule identifier}, the identity these data satisfy is
+%     \[
+%       f = g + \sum_i r_i \mu_i p_i
+%       \text{.}
+%     \]
+% \end{APIdescription}
+% 
+% Another useful thing is a method that builds a rule from just a 
+% polynomial, by separating the leading term to make a left hand 
+% side. In theory this does not require an integrated method, as the 
+% same end can be reached by making an |addrule| call, but that 
+% would mean the term order comparisons would unnecessarily be done 
+% twice. Hence there should also be a method
+% \begin{APIdescription}{rewrite system}
+%   \begin{APImethod}{addrulefrompoly}
+%     \word{polynomial}
+%   \end{APImethod}
+%     This method adds a new rule, whose left hand side is the 
+%     leading monomial of the \word{polynomial} and whose right hand 
+%     side is such that the difference between left and right hand 
+%     side is a scalar multiple of the \word{polynomial}. The return 
+%     value is the identifier for the new rule. Errors are thrown 
+%     only if the \word{polynomial} is zero or the leading 
+%     coefficient of it is noninvertible.
+% \end{APIdescription}
+% 
+% 
+% \subsection{A rewrite system class}
+% 
+% \setnamespace{Groebner}
+% \begin{tclcommand}{class}{rewrite_system}
+%   The |Groebner::rewrite_system| class implements the above 
+%   interface for rewrite systems. Objects are created with
+%   \begin{displaysyntax}
+%     |Groebner::rewrite_system| new \word{ring} \word{monoid} 
+%     \word{heap} \word{order}
+%   \end{displaysyntax}
+%   where all four arguments are command prefixes implementing 
+%   underlying structures or operations. The \word{ring} is a 
+%   \APIref{ring}{2.0}. The \word{monoid} is a 
+%   
+%   \begin{tcl} 
+%<*Groebner>
+package require heap::skiplist 1.1
+package require mtmtcl::rings::semigroup_algebra::accumulator 1.0
+package require mtmtcl::rings::semigroup_algebra 1.1
+namespace eval Groebner {}
+oo::class create Groebner::rewrite_system
+%   \end{tcl}
+%   
+%   \setnamespace{\meta{rewrite~system}}
+%   
+%   
+%   \begin{variable}{Ring}
+%   \begin{variable}{Monoid}
+%   \begin{variable}{HeapPrefix}
+%   \begin{variable}{KeyPrefix}
+%     The |Ring|, |Monoid|, |HeapPrefix|, and |KeyPrefix| variables 
+%     hold those arguments of the constructor.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system variable\
+  Ring Monoid HeapPrefix KeyPrefix
+%     \end{tcl}
+%     These are effectively constants in the rewrite system object, 
+%     just as they are in the |semigroup_algebra::accumulator| class.
+%   \end{variable}\end{variable}\end{variable}\end{variable}
+%   
+%   \begin{variable}{Accumulator}
+%     The rewrite system uses an accumulator for its |reduce| 
+%     operation, and since it expects to have full reign over that, 
+%     that accumulator must be owned by the rewrite system. The name 
+%     of the accumulator object is stored in the |Accumulator| 
+%     variable.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system variable Accumulator
+%     \end{tcl}
+%   \end{variable}
+%   
+%   \begin{variable}{RulesL}
+%   \begin{variable}{RulesSkip}
+%     The |RulesL| variable stores the list of rewrite rules; the 
+%     rule identifiers are indices into this list. Elements for 
+%     removed rules are set to the empty list. Elements for extant 
+%     rules are pairs
+%     \begin{displaysyntax}
+%       \word{lhs} \word{rhs}
+%     \end{displaysyntax}
+%     where the \word{lhs} is a monomial and the \word{rhs} is a 
+%     polynomial.
+%     
+%     The identifiers of the extant rules are additionally stored in 
+%     a skiplist whose sort key is computed from the \word{lhs} using 
+%     the |KeyPrefix| and compared using |::tcl::mathop::-|. The 
+%     purpose of this data structure is speed up reduction, by not 
+%     testing rules whose left hand sides are too large to divide the 
+%     top monomial in the accumulator.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system variable RulesL RulesSkip
+%     \end{tcl}
+%   \end{variable}\end{variable}
+%   
+%   \begin{tclcommand}{method}{reducerecord}
+%   \begin{tclcommand}{method}{reduce}
+%     The best way to illustrate the point of the above is to get on 
+%     to the implementation of the main operation |reduce|, since 
+%     everything else is trivial access to these data structures.
+%     
+%     As it turns out, the overhead to do |reducerecord| is trivial 
+%     (just don't throw away data after you've used them), so 
+%     |reduce| can efficiently be implemented as a call to 
+%     |reducerecord|.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method reduce {poly} {
+   lindex [my reducerecord $poly] 0
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%     The first step is quite obvious: take the polynomial, store it 
+%     into the accumulator.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method reducerecord {poly} {
+   $Accumulator clear
+   $Accumulator add $poly
+%     \end{tcl}
+%     The main loop is over the terms of the accumulator, which is 
+%     being treated like a prioriqueue. There is also an inner loop 
+%     over rules, which are tested against the current term that had 
+%     been |pop|ped off. However, this inner loop is running somewhat 
+%     independently of the main loop, in that it does not start over 
+%     just because the outer loop advances, but rather continues at 
+%     the point it left off; the inner loop termination (outer loop 
+%     advancement) condition is that the inner loop has tried all 
+%     plausible rules, not that it has reached a particular position 
+%     in the list of rules.
+%     
+%     |curP| is the pointer to the current rule in |RulesSkip|. 
+%     |topP| is the pointer to the most recent restart position for 
+%     |curP|; this is what |curP| jumped back to the last time it 
+%     reached the end of the list. |active_rules| is a (possibly 
+%     outdated) length of the tail of the list, counting from |topP|; 
+%     |new_active| is a value that is incremented for each list 
+%     element visited, and will replace |active_rules| when reaching 
+%     the end of the list. |no_action| counts how many rules have 
+%     been tried against the current term without effect; when this 
+%     reaches |active_rules|, then the current term has been found to 
+%     be irreducible and can be added to the result.
+%     \begin{tcl}
+   set res [dict create]
+   set record {}
+   set topP $RulesSkip
+   set curP no
+   set active_rules [set new_active Inf]
+%     \end{tcl}
+%     That initial |new_active| value is what will really become the 
+%     |active_rules| value used in the first main loop iteration; the 
+%     initial |active_rules| value will be replaced during the first 
+%     inner loop iteration.
+%     \begin{tcl}
+   while {[llength [
+      set term [$Accumulator pop]
+   ]]} {
+      for {set no_action 0} {$no_action < $active_rules} {incr no_action} {
+%     \end{tcl}
+%     |curP| is advanced at the end of the inner loop, but handling 
+%     |curP| reaching the end of the list is done here at the 
+%     beginning.
+%     \begin{tcl}
+         if {!$curP} then {
+            set topP [heap::skiplist::search $HeapPrefix $RulesSkip $topP [
+               {*}$KeyPrefix [{*}$Monoid multidegree [lindex $term 0]]
+            ]]
+            if {!$topP} then {set active_rules 0; break}
+            set curP $topP
+            set active_rules $new_active
+            set new_active 0
+         }
+%     \end{tcl}
+%     Once |curP| is known to point to (the identifier of) a rule, 
+%     the actual computation step is surprisingly quick.
+%     \begin{tcl}
+         set ruleid [heap::skiplist::value $HeapPrefix $RulesSkip $curP]
+         set rule [lindex $RulesL $ruleid]
+         if {![catch {
+            {*}$Monoid / [lindex $term 0] [lindex $rule 0]
+         } quot]} then {
+            $Accumulator addmult [lindex $term 1] $quot\
+              [lindex $rule 1]
+            lappend record [lindex $term 1] $quot $ruleid
+            set term {}
+            break
+%     \end{tcl}
+%     Setting |term| to empty signals that the current term has been 
+%     dealt with. |break|ing here has the effect that a successful 
+%     rule for one term is the first rule tried against the next term 
+%     as well.
+%     \begin{tcl}
+         }
+         set curP [heap::skiplist::succ $HeapPrefix $RulesSkip $curP]
+         incr new_active
+      }
+      if {[llength $term]} then {
+         dict set res [lindex $term 0] [lindex $term 1]
+      }
+   }
+   return [list $res $record]
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{addrule}
+%     Next comes the operation of adding a rule to the system. First 
+%     step is to check it for compatibility.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method addrule {lhs rhs} {
+   set lkey [{*}$KeyPrefix [{*}$Monoid multidegree $lhs]]
+   dict for {mu coeff} $rhs {
+      set rkey [{*}$KeyPrefix [{*}$Monoid multidegree $mu]]
+      set ok 0
+      foreach l $lkey r $rkey {
+         if {$l > $r} then {
+            set ok 1
+            break
+         } elseif {$l < $r} then {
+            break
+         }
+      }
+      if {!$ok} then {
+         return -code error "Rule not compatible with order"
+      }
+   }
+%     \end{tcl}
+%     Then actually adding the rule is quite straightforward.
+%     \begin{tcl}
+   set res [llength $RulesL]
+   lappend RulesL [list $lhs $rhs]
+   heap::skiplist::insert $HeapPrefix $RulesSkip $lkey $res
+   return $res
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{addrulefrompoly}
+%     A convenient variation on that would be to manufacture a rule 
+%     from a polynomial, i.e., to split off the largest term and make 
+%     a left hand side out of that (adjusting all other coefficients 
+%     accordingly). The call syntax here is
+%     \begin{displaysyntax}
+%       \meta{rewrite system} addrulefrompoly \word{polynomial}
+%     \end{displaysyntax}
+%     where the \word{polynomial} is a dictionary mapping monomials 
+%     to their coefficients, which must be nonzero.
+%     
+%     The first step is to identify the leading term. Non-leading 
+%     terms are collected in the |rest| list.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method addrulefrompoly {polynomial} {
+   set lkey {}
+   set rest {}
+   dict for {mu coeff} $polynomial {
+      set rkey [{*}$KeyPrefix [{*}$Monoid multidegree $mu]]
+      if {![llength $lkey]} then {
+         set lkey $rkey
+         set lmu $mu
+         set lcoeff $coeff
+      } else {
+         set ok 0
+         foreach l $lkey r $rkey {
+            if {$l > $r} then {
+               set ok 1
+               break
+            } elseif {$l < $r} then {
+               break
+            }
+         }
+         if {$ok} then {
+            lappend rest $mu $coeff
+         } else {
+            lappend rest $lmu $lcoeff
+            set lkey $rkey
+            set lmu $mu
+            set lcoeff $coeff
+         }
+      }
+   }
+   if {![llength $lkey]} then {
+      return -code error "There is no leading term"
+   }
+%     \end{tcl}
+%     The second step is to adjust the coefficients in the |rest| by 
+%     multiplying them by minus one over |lcoeff|.
+%     \begin{tcl}
+   set factor [{*}$Ring neg [{*}$Ring / [{*}$Ring 1] $lcoeff]]
+   set rhs [dict create]
+   foreach {mu coeff} $rest {
+      dict set rhs $mu [{*}$Ring * $factor $coeff]
+   }
+%     \end{tcl}
+%     Then actually adding the rule is again straightforward.
+%     \begin{tcl}
+   set res [llength $RulesL]
+   lappend RulesL [list $lmu $rhs]
+   heap::skiplist::insert $HeapPrefix $RulesSkip $lkey $res
+   return $res
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{exists}
+%     Checking whether a rule still exists is trivial.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method exists {id} {
+   return [expr {[llength [lindex $RulesL $id]] != 0}]
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{get}
+%     Retrieving a rule is likewise trivial.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method get {id} {
+   if {[llength [lindex $RulesL $id]]} then {
+      return [lindex $RulesL $id]
+   } else {
+      return -code error "Rule $id does not exist"
+   }
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{dump}
+%     Dumping the rewrite system is slightly more work. In this 
+%     implementation the extant rules are found by reading the 
+%     skiplist, which adds the value of returning them in size order 
+%     (however the specified interface does not require them to be in 
+%     any particular order).
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method dump {} {
+   set res {}
+   foreach {key id} [heap::skiplist::contents $HeapPrefix $RulesSkip] {
+      lappend res $id [lindex $RulesL $id 0] [lindex $RulesL $id 1]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{removerule}
+%     Removing a single rule is more complicated than one maybe 
+%     thinks at first, because it has to be removed from the skiplist 
+%     as well, and it's not guaranteed that the left hand side 
+%     uniquely identifies a rule---there may be several entries with 
+%     the same key. However, the |updateall| command makes it easy to 
+%     remove precisely that entry which has the specified identifier 
+%     as value.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method removerule {id} {
+   if {[llength [lindex $RulesL $id]]} then {
+      heap::skiplist::updateall $HeapPrefix $RulesSkip [
+         {*}$KeyPrefix [{*}$Monoid multidegree [lindex $RulesL $id 0]]
+      ] L {
+         set L [lsearch -inline -all -not -integer $L $id]
+      }
+      lset RulesL $id {}
+      return 1
+   } else {
+      return 0
+   }
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{clear}
+%     Clearing the list of rules is comparatively easy.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system method clear {} {
+   heap::skiplist::empty $HeapPrefix $RulesSkip
+   set RulesL {}
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{destructor}{}
+%     Since the object uses external storage for two things, namely the 
+%     accumulator and the skiplist, these are things that the 
+%     destructor must deallocate.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system destructor {
+   heap::skiplist::destroy $HeapPrefix $RulesSkip
+   $Accumulator destroy
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{constructor}{}
+%     Conversely, the constructor must allocate those things.
+%     \begin{tcl}
+oo::define Groebner::rewrite_system constructor\
+  {ring monoid heap order} {
+   if {![{*}$ring API ring 2.0]} then {
+      return -code error "This is not a ring: $ring"
+   }
+   set Ring $ring
+   if {![{*}$monoid API monoid 1.0]} then {
+      return -code error "This is not a monoid: $monoid"
+   }
+   set Accumulator [
+      ::mtmtcl::rings::semigroup_algebra_accumulator new\
+        $ring $monoid $heap $order
+   ]
+   set Monoid $monoid
+%     \end{tcl}
+%     \begin{variable}{heapstore}
+%       If the \word{heap} is nonempty then it is used as the command 
+%       prefix for accessing the heap to use, otherwise a new heap is 
+%       created which stores its data in the |heapstore| variable of 
+%       the rewriting system object. The |heapstore| variable is 
+%       always referenced using full namespace qualification, so it 
+%       is not imported into the local contexts of methods.
+%       \begin{tcl}
+   if {[llength $heap]} then {
+      set HeapPrefix $heap
+   } else {
+      set HeapPrefix [heap::makecmd [self namespace]::heapstore -prefix 1]
+   }
+%       \end{tcl}
+%     \end{variable}
+%     \begin{tcl}
+   set KeyPrefix $order
+   set RulesSkip [heap::skiplist::create $HeapPrefix {*}[
+      lrepeat [llength [
+         {*}$KeyPrefix [{*}$Monoid multidegree [{*}$Monoid 1]]
+      ]] [list ::tcl::mathop::-]
+   ]]
+   set RulesL {}
+%     \end{tcl}
+%     In addition, it is convenient if the object provides commands for 
+%     accessing the underlying structures. 
+%     
+%     \begin{tclcommand}{method}{scalar}
+%     \begin{tclcommand}{method}{monoid}
+%     \begin{tclcommand}{method}{polynomial}
+%       The first batch of these deal with the related algebraic 
+%       structures: the underlying ring of scalars, the underlying 
+%       monoid of monomials, and the algebra of polynomials that builds 
+%       upon them. The first two of these were given, whereas the last 
+%       is constructed as a semigroup algebra.
+%       \begin{tcl}
+   oo::objdefine [self] forward scalar {*}$Ring
+   oo::objdefine [self] forward monoid {*}$Monoid
+   oo::objdefine [self] forward polynomial {*}[
+      mtmtcl::rings::semigroup_algebra::make $Ring $Monoid
+   ]
+%       \end{tcl}
+%     \end{tclcommand}\end{tclcommand}\end{tclcommand}
+%     
+%     \begin{tclcommand}{method}{heap}
+%     \begin{tclcommand}{method}{tosortkey}
+%       The |heap| method gives access to the heap prefix that is one 
+%       of the arguments passed to the constructor. The |tosortkey| 
+%       method is similarly the a way of calling the prefix for 
+%       converting a multidegree to a sort key. The utility is perhaps 
+%       not so large for the latter, but it doesn't hurt to provide it.
+%       \begin{tcl}
+   oo::objdefine [self] forward heap {*}$HeapPrefix
+   oo::objdefine [self] forward tosortkey {*}$KeyPrefix
+%       \end{tcl}
+%     \end{tclcommand}\end{tclcommand}
+%     
+%     \begin{tcl}
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   A more meaningful way of exercising the key prefix would be to 
+%   provide an operation that directly compares two monomials, or 
+%   more generally an operation that extracts the leading term from a 
+%   general polynomial, but those operations are not core aspects of 
+%   the functioning of a rewriting system, so they are not provided 
+%   here. Practically, they could be bundled up as a mixin class.
+% \end{tclcommand}
+% 
+% 
+% \subsection{Critical pairs and completion}
+% 
+% One very important operation on a rewriting system is that of 
+% completing it, which in the commutative case is usually done using 
+% the Buchberger algorithm; other (better) algorithms are known, but 
+% this is the most elementary. The big catch of the completion 
+% operation is that it may take a very long time (and also a lot of 
+% memory)\Dash computing Gr\"obner bases is \emph{way beyond} 
+% NP-hard! Therefore it seems wise to make the state of the 
+% computation persistent and let the primary operation be one which 
+% advances the computation one step. This suggests that the 
+% completion computation is encapsuled in an object.
+% 
+% Should the completion calculation be built into the rewrite system? 
+% One could certainly do it like that, but there are also reasons not 
+% to. The completion calculation is not an integral part of the 
+% rewrite system operation, but rather a (rather resource-hungry) 
+% step in its initialisation; being able to dispose of the completion 
+% calculation when one is done with it seems a good idea. Therefore 
+% the completion object is instead one that takes a rewrite system as 
+% argument upon creation, and works by performing operations on that 
+% rewrite system.
+% 
+% \begin{tclcommand}{class}{Buchberger}
+%   The |Grobner::Buchberger| class implements running the Buchberger 
+%   algorithm on a |Grobner::rewrite_system|.
+%   \begin{tcl}
+oo::class create Groebner::Buchberger
+%   \end{tcl}
+%   \setnamespace{\meta{Buchberger}}
+%   
+%   The call syntax for the |Buchberger| constructor is
+%   \begin{displaysyntax}
+%     Groebner::Buchberger new \word{rewrite system object}
+%     \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where the \word{rewrite system object} is the rewrite system to 
+%   operate on. There is no interface for reattaching to a different 
+%   rewrite system; one instance of this class is to be used for one 
+%   completion calculation, and that's it.
+%   
+%   The options can be used to further configure the operation of the 
+%   object. The supported options are
+%   \begin{ttdescription}
+%     \item[-heap]
+%       If this is empty (the default) then the object will utilise 
+%       the same heap as the rewrite system object. If this is |self| 
+%       then it will create a separate internal heap to use. If this 
+%       is any other value then that is assumed to be a valid 
+%       \word{heap-prefix} and used as such.
+%     \item[-record]
+%       Takes a boolean value. If true, the object remembers how each 
+%       polynomial in the preliminary Gr\"obner basis was computed. 
+%       The default is false, since this can be a lot of data to 
+%       store.
+%   \end{ttdescription}
+%   
+%   \begin{variable}{RewriteSystem}
+%   \begin{variable}{HeapPrefix}
+%     The |RewriteSystem| and |HeapPrefix| variables hold those 
+%     arguments of the constructor.
+%     \begin{tcl}
+oo::define Groebner::Buchberger variable RewriteSystem HeapPrefix
+%     \end{tcl}
+%   \end{variable}\end{variable}
+%   
+%   
+%   
+%   \begin{tclcommand}{constructor}{}
+%     The first part of the constructor is about setting up the data 
+%     structures.
+%     \begin{tcl}
+oo::define Groebner::Buchberger constructor {rwsys args} {
+   set RewriteSystem $rwsys
+   array set Opt {-heap {}}
+   array set Opt $args
+   switch -- $Opt(-heap) "" {
+      set HeapPrefix [list $RewriteSystem heap]
+   } "self" {
+      set HeapPrefix [heap::makecmd [self namespace]::heap -prefix 1]
+%     \end{tcl}
+%     \begin{variable}{heap}
+%       If an object variable named |heap| exists, then it is used 
+%       for storing the heap used by this object. It is not imported 
+%       into the local scopes of methods, because it is always fully 
+%       namespace-qualified when accessed (and only accessed through 
+%       commands in the |heap| package). The heap need not be 
+%       explicitly destroyed, because it will go away when the object 
+%       is destroyed.
+%     \end{variable}
+%     \begin{tcl}
+   } default {
+      set HeapPrefix $Opt(-heap)
+   }
+%     \end{tcl}
+%     
+%     \begin{tclcommand}{method}{Queue}
+%       Apart from the rewrite system, the main data structure 
+%       utilised by the Buchberger algorithm is a prioriqueue of 
+%       critical pairs, which (of course) is implemented as a 
+%       skiplist. Instead of keeping the header of that skiplist in a 
+%       variable, we here provide a method |Queue| for calling the 
+%       ensemble for accessing it; the header pointer is embedded in 
+%       the method forwarding definition.
+%       \begin{tcl}
+   oo::objdefine [self] forward Queue ::heap::skiplist::p $HeapPrefix [
+      heap::skiplist::create $HeapPrefix {*}[
+         lrepeat [llength [
+            $RewriteSystem tosortkey\
+              [$RewriteSystem monoid multidegree [$RewriteSystem monoid 1]]
+         ]] [list ::tcl::mathop::-]
+      ]
+   ]
+%       \end{tcl}
+%       The sort keys are as in the |rewrite_system| skiplist 
+%       computed from particular monomials by way of multidegree and 
+%       the sortkey-prefix, but here there will be an extra step of 
+%       negating each sort key element. The purpose of that is to 
+%       place the smallest monomials at the head of the queue, so 
+%       that they get processed first.
+%       
+%       The sort key values are lists on one of the two forms
+%       \begin{displaysyntax}
+%         overlap $\mu_1$ $\mu_2$ $\mu_3$ \word{rule 1} \word{rule 2}
+%         \par
+%         inclusion \word{polynomial} \word{rule-id}
+%         \word{derivation}\regopt
+%       \end{displaysyntax}
+%       The first form is a normal critical pair formed by the rules 
+%       with identifiers \word{rule 1} and \word{rule 2}; the 
+%       monomial $\mu_1\mu_2\mu_3$ is the least common multiple of 
+%       their left hand sides, $\mu_1\mu_2$ is the left hand side of 
+%       \word{rule 1} and $\mu_2\mu_3$ is the left hand side of 
+%       \word{rule 2}. The second form of critical pair is generated 
+%       when a rule is dropped because its left hand side is 
+%       divisible by the left hand side of another rule: the 
+%       \word{polynomial} is the $\mathit{rhs}-\mathit{lhs}$ of the 
+%       dropped rule,\footnote{
+%         This is a micro-optimisation, which is hopefully not 
+%         premature. Mathematically, it would be more natural to 
+%         provide the $\mathit{lhs}-\mathit{rhs}$, but that typically 
+%         requires more negations to compute.
+%       } the \word{rule-id} is the identifier it used to 
+%       have as rule, and the \word{derivation} is (if included) how 
+%       the \word{polynomial} was derived from given generators of 
+%       the ideal.
+%     \end{tclcommand}
+%     
+%     
+%     \begin{tcl}
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{destructor}{}
+%     All the constructor has to do is destroy the critical pairs 
+%     queue.
+%     \begin{tcl}
+oo::define Groebner::Buchberger destructor {
+   my Queue destroy
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{makepair}
+%     This method examines whether a pair of rules give rise to a 
+%     critical pair, and if so enqueues that critical pair, possibly 
+%     dropping one of the rules. The call syntax is
+%     \begin{displaysyntax}
+%       my makepair \word{id1} \word{lhs1} \word{rhs1} \word{id2} 
+%       \word{lhs2} \word{rhs2}
+%     \end{displaysyntax}
+%     and the return value is $1$ if a critical pair was enqueued, 
+%     $0$ otherwise. 
+%     
+%     \begin{tcl}
+oo::define Groebner::Buchberger method {id1 lhs1 rhs1 id2 lhs2 rhs2} {
+   set gcd [$RewriteSystem monoid 3gcd $lhs1 $lhs2]
+   if {[lindex $gcd 0] ne "commutative"} then {
+      return -code error "Don't know how to deal with a 3gcd of type:\
+        [lindex $gcd 0]"
+   }
+   set unit [$RewriteSystem monoid 1]
+   if {[$RewriteSystem monoid = $unit [lindex $gcd 2]]} then {
+      return 0
+%     \end{tcl}
+%     That the middle part of a 3-way GCD is unit means the two 
+%     operands are coprime; no critical pair is needed.
+%     \begin{tcl}
+   } elseif {[$RewriteSystem monoid = $unit [lindex $gcd 1]]} then {
+%     \end{tcl}
+%     That the left part of a 3-way GCD is unit means the middle part 
+%     is in fact the \word{lhs1}, and that apparently divides 
+%     \word{lhs2}. Unless the \word{id2} rule has already been 
+%     dropped, it should be dropped and an |inclusion| critical pair 
+%     generated.
+%     \begin{tcl}
+      if {![$RewriteSystem exists $id2]} then {return 0}
+      $RewriteSystem removerule $id2
+      set pair [list inclusion [
+         $RewriteSystem polynomial - $rhs2\
+           [$RewriteSystem polynomial basiselement $lhs2]
+      ] $id2]
+      set mu $lhs2
+%     \end{tcl}
+%     There is also an opposite case for dropping rule \word{id1}.
+%     \begin{tcl}
+   } elseif {[$RewriteSystem monoid = $unit [lindex $gcd 3]]} then {
+      if {![$RewriteSystem exists $id1]} then {return 0}
+      $RewriteSystem removerule $id1
+      set pair [list inclusion [
+         $RewriteSystem polynomial - $rhs1\
+           [$RewriteSystem polynomial basiselement $lhs1]
+      ] $id1]
+      set mu $lhs1
+   } else {
+%     \end{tcl}
+%     But the main case is that of an |overlap|, which is what 
+%     S-polynomials are made from.
+%     \begin{tcl}
+      set pair [list overlap {*}[lrange $gcd 1 3] $id1 $id2]
+      set mu [$RewriteSystem monoid * $lhs1 [lindex $gcd 3]]
+   }
+   my Queue insert [lmap a [
+      $RewriteSystem tosortkey [$RewriteSystem monoid multidegree $mu]
+   ] {expr {-$a}}] $pair
+   return 1
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   
+% \end{tclcommand}
+% 
+% 
+% 
+% ---
+% 
+% 
+%   
+endinput

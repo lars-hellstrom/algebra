@@ -1,0 +1,54 @@
+% cmplutil1.ins --- DOCSTRIP installation script for 
+% network completion utility 1 (network2.dtx,cmplutil1.dtx)
+\input docstrip
+
+% Redefine the \MetaPrefix; it should be something which starts a
+% until-end-of-line comment:
+\edef\MetaPrefix{\string#\string#}
+
+
+% Redefine the file preamble and postamble; this is necessary because 
+% otherwise the old \metaPrefix is inserted at the beginning of these 
+% lines.
+\preamble
+
+In other words:
+**************************************
+* This Source is not the True Source *
+**************************************
+the true source is the file from which this one was generated.
+
+\endpreamble
+
+\postamble
+\endpostamble
+
+\askforoverwritefalse
+
+% Actually make the .tcl file. 
+% This is a combined file which contains several supporting packages.
+% Also, it contains the settings and congruences for Hopf algebra 
+% with twist.
+\generate{
+%    \file{cmplutil1frob.tcl}{
+%       \from{network2.dtx}{pkg}
+%       \from{cmplutil1.dtx}{util1,stdout,Frobenius}
+%    }
+%    \file{cmpl1hopf.tcl}{
+%       \from{network2.dtx}{pkg}
+%       \from{cmplutil1.dtx}{util1,stdout,Hopf,HopfObsolete}
+%    }
+   \file{cmpl1hopfdiv.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
+      \from{props.dtx}{pkg}
+      \from{cmplutil1.dtx}{util1,stdout,Hopf,division}
+   }
+}
+
+
+\endbatchfile
+
+

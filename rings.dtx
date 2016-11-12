@@ -235,7 +235,8 @@ namespace eval ::tcl::mathop {
             equality 1.1
             "additive group" {2.2 1.2}
             ring {2.0 1.0}
-            semigroup 1.2  monoid 1.2
+            magma 1.1 semigroup 1.2  monoid 1.2 
+            "commutative *" 1.0
             canonise 1.1
             division 1.0
             export 2.0
@@ -681,8 +682,10 @@ proc mtmtcl::rings::integers::make_modulo {n} {
        equality 1.0
        canonise 1.1
        autocanonical 1.0
+       magma 1.1
        semigroup 1.1
        monoid 1.1
+       "commutative *" 1.0
        "additive group" 2.2
        ring 2.0
        division 1.0
@@ -740,7 +743,8 @@ namespace eval ::tcl::mathop {
             equality 1.1
             "additive group" {2.2 1.2}
             ring {2.0 1.0}
-            semigroup 1.2  monoid 1.2  group 1.2
+            "commutative *" 1.0
+            magma 1.1 semigroup 1.2  monoid 1.2  group 1.2
 %   \end{tcl}
 %   Unlike the case with |integer|, it is reasonable for |float| to 
 %   claim it is a \APIref{group}{1.2}, even though it doesn't quite 
@@ -1021,7 +1025,10 @@ namespace eval ::mtmtcl::rings::Q {
 %     $O(k)$. This has not even begun to consider averaging over 
 %     different numbers of equal bitsize; in that significant fraction 
 %     of cases where the integers involved are coprime, a $\gcd$ 
-%     calculations will achieve nothing.
+%     calculation will achieve nothing, but still carry the full cost 
+%     penalty.
+%     
+%     It simply doesn't seem worth it.
 %   \end{procmethod}
 %   
 %   \begin{procmethod}{neg}
@@ -1214,7 +1221,8 @@ namespace eval ::mtmtcl::rings::Q {
 %   \begin{tcl}
             "additive group" 2.2
             ring 2.0
-            semigroup 1.2  monoid 1.2  group 1.2
+            magma 1.1 semigroup 1.2  monoid 1.2  group 1.2
+            "commutative *" 1.0
             division 1.0  field 1.0
       }}
    ]
@@ -1630,7 +1638,7 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %     \begin{tcl}
       API {
          if {[{*}$R API ring 1.0] && [{*}$R API monoid 1.0]} then {
-            ::APIutil::API {
+            ::API::static {
                equality 1.1
                ring-module 2.1
                "additive group" 2.1
@@ -1638,7 +1646,7 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
                "direct product" 1.0
             } {*}$args
          } else {
-            ::APIutil::API {} {*}$args
+            ::API::static {} {*}$args
          }
       }
 %     \end{tcl}
@@ -1887,7 +1895,7 @@ proc ::mtmtcl::rings::free_rank_n_module {R n method args} {
 %   
 %   What will typically not fit this interface are complex-valued 
 %   inner products, as these are sesquilinear rather than bilinear 
-%   and conjuage symmetric rather than fully symmetric. 
+%   and conjugate symmetric rather than fully symmetric. 
 % \end{APIspec}
 % 
 % 
@@ -1951,7 +1959,7 @@ pkgProvide mtmtcl::rings::semigroup_algebra 1.1 {SemigroupAlgebra ens}
 % The modern ensemblified version of a semigroup algebra structure is 
 % an ensemble with parameters, and thus requires \Tcllogo\,8.6.
 % \begin{tcl}
-package require API 1.0
+package require API 1.1
 %<ens>package require mtmtcl::openmath 1.0
 namespace eval ::mtmtcl::rings {}
 % \end{tcl}
@@ -2317,7 +2325,55 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
          }
          return [::APIutil::API $D {*}$args]
 %</old>
-%<*!old>
+%<*!old&!API1>
+         ::API::dynamic $args {
+            scalars {{
+               eval {{*}$R API ring 2.0}
+               eval {{*}$R API monoid 1.0}
+               eval {{*}$R API "additive group" 2.1}
+            }}
+            basis {{
+               eval {{*}$S API semigroup 1.0}
+            }}
+            "additive group" {2.1 {test scalars}}
+            ring-module       {2.1 {test scalars}}
+            "free ring-module" {2.1 {test scalars}}
+            equality          {1.0 {test scalars}}
+            ring-algebra {2.0 {
+               test scalars  
+               test basis
+            }}
+            ring {2.0 {
+               test scalars  
+               test basis
+            }}
+            semigroup {2.0 {
+               test scalars  
+               test basis
+            }}
+            monoid {1.0 {
+               test scalars
+               eval {{*}$S API monoid 1.0}
+            }}
+            export {2.0 {
+               eval {{*}$R API export 2.0}
+               eval {{*}$S API export 2.0}
+            }}
+            division {1.0 {
+               eval {{*}$R API division 1.0}
+               eval {{*}$S API division 1.0}
+            }}
+         }
+%</!old&!API1>
+%     \end{tcl}
+%     Version~1 of the API package had a slightly different syntax for 
+%     |API::dynamic|, but this procedure was the only one that even 
+%     made use of that command. Preserved below is the original call; 
+%     the above is a minimal edit to make the old tests work, but 
+%     does not take advantage of new features. Nor are the tests 
+%     mathematically sharp.
+%     \begin{tcl}
+%<*!old&API1>
          ::API::dynamic $args {
             "additive group" {2.1 {test scalars}}
             ring-module       {2.1 {test scalars}}
@@ -2354,7 +2410,7 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
                eval {{*}$S API semigroup 1.0}
             }
          }
-%</!old>
+%</!old&API1>
       }
 %     \end{tcl}
 %   \end{procmethod}
@@ -2427,7 +2483,7 @@ proc mtmtcl::rings::semigroup_algebra {R S method args} {
 % \setnamespace{mtmtcl::rings::semigroup_algebra}
 % \begin{ensemble}{ens}
 %   The main implementation ensemble takes six parameters: the 
-%   scalar ring |R|, a command prefix |iszero| performing test for 
+%   scalar ring |R|, a command prefix |iszero| performing tests for 
 %   equality to $0$ in |R|, the semigroup |S|, two booleans |c1| and 
 %   |c2| signalling whether canonisation is required in various 
 %   circumstances, and the API dictionary. This dictates the 
@@ -2534,6 +2590,20 @@ proc mtmtcl::rings::semigroup_algebra::ens::- {R iszero S c1 c2 API res term} {
 %     \begin{tcl}
 proc mtmtcl::rings::semigroup_algebra::ens::0 {R iszero S c1 c2 API} {
    return {}
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{iszero}
+%     At this point, the thing missing to satisfy 
+%     \APIref+{additive group}{2.1} is the |iszero| method. This is 
+%     made tolerant for zero coefficients.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens::iszero {R iszero S c1 c2 API a} {
+   dict for {k v} $a {
+      if {![{*}$iszero $v]} then {return 0}
+   }
+   return 1
 }
 %     \end{tcl}
 %   \end{proc}
@@ -2690,20 +2760,6 @@ proc mtmtcl::rings::semigroup_algebra::ens::basiselement {R iszero S c1 c2 API k
 %     \end{tcl}
 %   \end{proc}
 %   
-%   \begin{proc}{iszero}
-%     At this point, the thing missing to satisfy 
-%     \APIref+{additive group}{2.1} is the |iszero| method. This is 
-%     made tolerant for zero coefficients.
-%     \begin{tcl}
-proc mtmtcl::rings::semigroup_algebra::ens::iszero {R iszero S c1 c2 API a} {
-   dict for {k v} $a {
-      if {![{*}$iszero $v]} then {return 0}
-   }
-   return 1
-}
-%     \end{tcl}
-%   \end{proc}
-%   
 %   \begin{proc}{named}
 %     The |named| method is a shorthand for applying |basiselement| 
 %     to the result of the |named| method of the semigroup; the 
@@ -2751,7 +2807,7 @@ proc mtmtcl::rings::semigroup_algebra::ens::/ {R iszero S c1 c2 API numer denom}
 %     general coefficient ring doesn't have a concept of negative; 
 %     if the minuses are to be extracted, then that should probably 
 %     be done at a later stage. For now the multiplication by scalar 
-%     is represented by the \texttt{arith1} \texttt{times} symbol, 
+%     is represented by the \OMSref{arith1}{times} symbol, 
 %     but this isn't quite right as it isn't really an associative 
 %     operation.
 %     \begin{tcl}
@@ -2791,19 +2847,26 @@ proc mtmtcl::rings::semigroup_algebra::ens::export\
 %     means the terms have to be ordered somehow. An |lsort\
 %     -dictionary| of the string representations is one way to do 
 %     that, which probably isn't very mathematically meaningful, but 
-%     which still might look sort-of intuitive to the user.
+%     still has a chance of looking sort-of intuitive to the user.
 %     \begin{tcl}
 proc mtmtcl::rings::semigroup_algebra::ens::canonise {R iszero S c1 c2 API a} {
    set res [dict create]
    foreach k [lsort -dictionary [dict keys $a]] {
-      set r [dict get $a $k]
-      if {![{*}$iszero $r]} then {
-         dict set res $k [{*}$R canonise $r]
-      }
+      set r [{*}$R canonise [dict get $a $k]]
+      if {![{*}$iszero $r]} then {dict set res $k $r}
    }
    return $res
 }
 %     \end{tcl}
+%     One subtle detail in this procedure is that it first canonises 
+%     and then checks the result for being zero; this order of things 
+%     is needed for the algebra to satisfy \APIref+{canonise}{1.0} 
+%     without the ring satisfying \APIref+{canonise}{1.1}, as the 
+%     difference is precisely whether canonisation can change the 
+%     equality class of an element (in particular from zero to 
+%     nonzero)! This order of operations is probably also good 
+%     performance-wise, since equality testing often begins with 
+%     canonising.
 %   \end{proc}
 %   
 %   
@@ -2827,105 +2890,271 @@ namespace ensemble configure mtmtcl::rings::semigroup_algebra::ens\
 %   \end{displaysyntax}
 %   and as usual returns the command prefix for the semigroup algebra.
 %   
-%   The \word{iszero}-prefix either refers to an underlying |iszero| 
-%   subcommand, or to a comparison with an explicit (and thus cached) 
-%   zero value.
+%   The preferred \word{iszero}-prefix refers to an underlying |iszero| 
+%   subcommand, but a perfectly good alternative is to compare with an 
+%   explicit (and thus cached) zero value. However if there is no 
+%   known way of producing such a zero value, then all 
+%   ``\word{ring}'' elements are considered automatically nonzero.
 %   \begin{tcl}
 proc mtmtcl::rings::semigroup_algebra::make {R S} {
    if {[{*}$R API "additive group" 2.1]} then {
       set iszero [list {*}$R iszero]
-   } else {
+   } elseif {[{*}$R API "additive group" 2.0] ||\
+     [{*}$R API "additive group" 1.0]} then {
       set iszero [list {*}$R = [{*}$R 0]]
+   } else {
+      set iszero [list ::apply {arg {return 0}}]
    }
 %   \end{tcl}
-%   The |c1| and |c2| booleans need more tests to set.
+%   The |c1| and |c2| booleans need more tests to set. They are set 
+%   to the noncanonical boolean false value |no| when canonisation 
+%   would be needed but isn't available, and to |yes| when it is 
+%   available and needed but possibly not good enough; performing 
+%   operations without proper canonisation make them slightly wrong, 
+%   but not so much that they are obviously useless.
 %   \begin{tcl}
-   if {[{*}$S API onlycanonical 1.0] || ![{*}$S API canonise 1.0]} then {
+   if {[{*}$S API onlycanonical 1.0] || [{*}$S API autocanonical 1.0]} then {
       set c1 0
       set c2 0
    } else {
+      set c1 [expr {![{*}$S API "autocanonical 1" 1.0]}]
+      set c2 [expr {![{*}$S API "autocanonical *" 1.0]}]
+      if {[{*}$S API autocanonical 2.0]} then {
+         set c1 [expr {$c1 && ![{*}$S autocanonical 1]}]
+         set c2 [expr {$c2 && ![{*}$S autocanonical *]}]
+      }
+   }
+   if {![{*}$S API canonise 1.0]} then {
+      if {$c1} then {set c1 no}
+      if {$c2} then {set c2 no}
+   } elseif {![{*}$S API canonise 1.1]} then {
+      if {$c1} then {set c1 yes}
+      if {$c2} then {set c2 yes}
    }
 %   \end{tcl}
-%   The API is computed by a call to |API::dynamic|.
-%   \begin{tcl}
-   set API [::API::dynamic {} {
-%   \end{tcl}
-%   The first interface to consider is \APIref{equality}{1.0}. 
-%   Version~1.1 would require |=| to be variadic, which it is not, 
-%   but what is required for version~1.0? Arguably only that the 
-%   \word{ring} supports the same!
-%   \begin{tcl}
-      equality {1.0 {
-         eval {{*}$R API equality 1.0}
-      }}
-%   \end{tcl}
-%   There is a reasonable concern that equality of algebra elements 
-%   involves canonicity of semigroup elements, and therefore should 
-%   require the \word{semigroup} to support the 
-%   \APIref{canonise}{1.1} interface, but this is rather an aspect of 
-%   the definition of valid algebra element\Dash it is assumed 
-%   throughout that semigroup elements being used as keys in the 
-%   dictionary \emph{are} on canonical form, and as long as this 
-%   assumption holds no further processing of the keys are needed 
-%   when determining equality. The same is true for all linear 
-%   structure operations: they perform their operations on formal 
-%   linear combinations of keys, regardless of any interpretation of 
-%   these keys.
+%   It looks from this as though the \APIref{autocanonical 
+%   \meta{method}}{1.0} interface is a more convenient mechanism than 
+%   \APIref+{autocanonical}{2.0}.
 %   
-%   The next step on the structural ladder is the \APIref{additive 
-%   group}{2.0} interface. As mentioned above, the |-| operation is 
-%   what determines whether higher versions of this are supported.
+%   Most work lies in computing the API, which is done using 
+%   |API::recursive|. The \word{ring} and \word{semigroup} are in 
+%   recursive API tests referred to by the keys |R| and |S| 
+%   respectively.
+%   \begin{tcl}
+   set API [::API::recursive {} {
+%   \end{tcl}
+%   The first order of business is to consider equality and related 
+%   concepts. The ensemble subcommands use semigroup elements as 
+%   dictionary keys, so \emph{any dictionary key must already be on 
+%   canonical form} (putting newly generated semigroup elements on that 
+%   form will be a separate problem)\Dash this means equality in the 
+%   algebra hinges only upon equality in ring.
+%   \begin{tcl}
+      equality {1.0 {API R equality 1.0}}
+%   \end{tcl}
+%   There are some non-obvious implications here, however. Since the 
+%   |=| procedure also makes use of the |iszero| prefix in tests, and 
+%   since that has the fallback implementation of just returning 
+%   false when no $0$ element is known, the semigroup algebra 
+%   structure ends up implicitly adjoining a $0$ element to every 
+%   \word{ring} that is not an \APIref{additive group}{2.0}. (This 
+%   point should be revisited if ever an additive monoid interface 
+%   gets formalised.)
+%   
+%   Closely related is \APIref{canonise}{1.0}. Here the versions for 
+%   the \word{ring} just filter down to to the algebra, but in the 
+%   case of version~1.0 that is not entirely trivial, since 
+%   canonisation not supporting version~1.1 is allowed to change the 
+%   equality class of elements, and terms with coefficient equal to 
+%   zero are dropped. Canonising before equality test ensures that 
+%   canonisation is an idempotent operation.
+%   \begin{tcl}
+      canonise {
+         1.1 {API R canonise 1.1}
+         1.0 {API R canonise 1.0}
+      }
+%   \end{tcl}
+%   
+%   For the algebraic interfaces, one begins with \APIref{additive 
+%   group}{2.0}, which gets inherited by the algebra from the ring 
+%   essentially because a space of group-valued functions inherits a 
+%   group structure. Major version~1 is never supported since |-| only 
+%   has the binary form, but major version~2 is supported whenever 
+%   reasonable. Variadic addition and |iszero| tests are provided 
+%   even if the ring does not have them, but subtraction is hardwired 
+%   to use the subtraction method of the ring. (Changing this would 
+%   not be hard, but the gain of doing so is unclear.)
 %   \begin{tcl}
       "additive group" {
-         2.0 {eval {{*}$R API "additive group" 2.0}}
-         2.1 {eval {{*}$R API "additive group" 2.0.1}}
+         2.1 {API R "additive group" 2.0.1}
+         2.0 {API R "additive group" 2.0}
       }
 %   \end{tcl}
-%   After that comes the module structure step, which requires that 
-%   the \word{ring} is an associative ring with unit. Since this is 
-%   a composite test (\APIref{ring}{2.0} \emph{and} 
-%   \APIref{monoid}{1.0}) which figures for several interfaces, it is 
-%   wrapped up as the named test \texttt{scalars}.
+%   Adding support for \APIref{additive group}{2.2} versions 
+%   2.2 or~2.3 would be quite feasible, but the methods aren't there 
+%   right now. Adding them would probably require another prefix 
+%   parameter containing the efficient implementation of integer 
+%   multiple in the ring.
+%   
+%   Support for the \APIref{ring}{2.0} interface requires the 
+%   \word{ring} to be a ring, but it also requires the 
+%   \word{semigroup} to contribute a |*| operation, although merely 
+%   having that operation is sufficient; it need not have any 
+%   particular properties, as distributivity boils down to 
+%   distibutivity for individual terms:
+%   \begin{multline*}
+%     q\mu * (r\nu + s\nu) = 
+%     q\mu * (r+s)\nu =
+%     \bigl(q * (r+s)\bigr) (\mu*\nu) = 
+%     (q*r + q*s)(\mu*\nu) = \\ =
+%     (q*r)(\mu*\nu) + (q*s)(\mu*\nu) =
+%     q\mu * r\nu + q\mu * s\nu
+%   \end{multline*}
+%   for $q,r,s$ in the \word{ring} and $\mu,\nu$ in the 
+%   \word{semigroup}. At first sight it might rather appear that the 
+%   more subtle \APIref{ring}{2.0} interface requirement of 
+%   congruence will become decisive, since \APIref+{magma}{1.0} does 
+%   not promise congruence whereas \APIref+{magma}{1.1} can. However 
+%   the congruence in question for the algebra |*| deals with algebra 
+%   equality, which only asks whether identical keys are associated 
+%   with equal coefficients; the semigroup products that are computed 
+%   get identical pairs of operands, so they will produce identical 
+%   results.\footnote{
+%     Or do they? The assumption here is that the semigroup \texttt{*} 
+%     operation is a function, whose output is determined solely by 
+%     the input, but it is not inconceivable that the implementation 
+%     of an algebraic operation might utilise randomness\Ldash 
+%     picking a random starting point is in many algorithms the key 
+%     to achieving good average complexity by avoiding degenerate 
+%     cases, even if it is rare to see such algorithms for 
+%     multiplication type operations\Rdash and then the exact 
+%     representation picked might depend on the random component, 
+%     even if the operation is mathematically deterministic. However 
+%     in such cases the structure can reasonably be expected to also 
+%     provide means of canonising values, so to the extent that this 
+%     congruence is a lie, it it is a lie-to-children.
+%   } Therefore congruence in the \word{semigroup} is not a 
+%   requirement for the algebra to be a ring.
 %   \begin{tcl}
-      ring-module        {2.1 {test scalars}}
-      "free ring-module" {2.1 {test scalars}}
+      ring  {2.0 {
+         API R ring 2.0
+         API S magma 1.0
+      }}
+      magma {1.1 {self ring 2.0}}
 %   \end{tcl}
 %   
-%   Now it is time to consider the |*| operation. 
-%   
-%   ---
+%   What are then the requirements for the algebra to be a 
+%   \APIref{semigroup}{1.0} or \APIref{monoid}{1.0}? At the very 
+%   least that the \word{ring} and \word{semigroup} both have these 
+%   properties, as algebra multiplication of single term operands 
+%   perform one multiplication in each. The \word{ring} also needs to 
+%   be a \APIref{ring}{2.0} (well, semiring might suffice), since 
+%   reordering terms can result in coefficients being computed in 
+%   different ways. Finally there must be a way to ensure congruent 
+%   canonicity of \word{semigroup} elements.
 %   \begin{tcl}
-      ring {2.0 {
-         test scalars  test semigroup
-      }}
-      ring-algebra {2.0 {
-         test scalars  test semigroup
-      }}
-      semigroup {2.0 {
-         test scalars  test semigroup
+      semigroup {1.0 {
+         API S semigroup 1.0
+         API R semigroup 1.0
+         self ring 2.0
+         expr {$c2 in {0 1}}
       }}
       monoid {1.0 {
-         test scalars
-         eval {{*}$S API monoid 1.0}
+         API S monoid 1.0
+         API R monoid 1.0
+         self ring 2.0
+         expr {$c2 in {0 1} && $c1 in {0 1}}
+      }}
+%   \end{tcl}
+%   (Higher versions of these interfaces are out, since |*| is not 
+%   variadic.) Similarly, commutativity of |*| requires both the 
+%   \word{ring} and the \word{semigroup} to be commutative.
+%   \begin{tcl}
+      "commutative *" {1.0 {
+         API S "commutative *" 1.0
+         API R "commutative *" 1.0
+         self ring 2.0
+         expr {$c2 in {0 1}}
+      }}
+%   \end{tcl}
+%   
+%   The other algebraic direction is that towards the 
+%   \APIref{ring-module}{2.1} interface; here we explicitly get the 
+%   requirement that the \word{ring} is both a \APIref{ring}{2.0} and 
+%   a \APIref{monoid}{1.0}, which in fact is what suffices.
+%   \begin{tcl}
+      ring-module {2.1 {
+         API R ring 2.0
+         API R monoid 1.0
+      }}
+%   \end{tcl}
+%   Mathematically, the module of formal linear combinations is 
+%   always free, but for this implementation to satisfy the 
+%   \APIref{free ring-module}{2.1} interface, the \word{semigroup} 
+%   must also know how to canonise (for the |basiselement| and 
+%   |coeff| methods both).
+%   \begin{tcl}
+      "free ring-module" {2.1 {
+         self ring-module 2.1
+         API S canonise 1.1
+      }}
+%   \end{tcl}
+%   
+%   The two directions combine in the \APIref{ring-algebra}{2.0} 
+%   interface, which however adds one more requirement: that the 
+%   \word{ring} is commutative, since
+%   \begin{multline*}
+%     (r*s)(\mu*\nu) = 
+%     r\bigl(s (\mu*\nu) \bigr) = 
+%     s\bigl( (r\mu) * \nu \bigr) =
+%     (r\mu) * (s\nu) = \\ =
+%     r\bigl( \mu * (s\nu) \bigr) =
+%     s\bigl( r (\mu*\nu) \bigr) =
+%     (s*r)(\mu*\nu)
+%     \text{;}
+%   \end{multline*}
+%   for algebras in general this is merely a sufficient (although 
+%   very natural) condition, but in the semigroup algebra 
+%   construction the above implies \(rs=sr\) regardless of what 
+%   happens in the \word{semigroup}.
+%   \begin{tcl}
+      ring-algebra {2.0 {
+         self ring-module 2.1
+         self ring 2.0
+         API R "commutative *" 1.0
+      }}
+%   \end{tcl}
+%   
+%   The remaining algebra-flavoured interface is 
+%   \APIref{division}{1.0}, which divides in \word{ring} and 
+%   \word{semigroup}, as well as canonises in the \word{semigroup}.
+%   \begin{tcl}
+      division {1.0 {
+         API R division 1.0
+         API S division 1.0
+         API S canonise 1.1
+      }}
+%   \end{tcl}
+%   
+%   For import--export interfaces, there are 
+%   \APIref{named element}{1.0} and \APIref{export}{2.0}, whose 
+%   requirements from underlying structures are straightforwardly 
+%   about ensuring that the called methods are available.
+%   \begin{tcl}
+      "named element" {1.0 {
+         API S "named element" 1.0
+         API S canonise 1.0
+         API R monoid 1.0
       }}
       export {2.0 {
-         eval {{*}$R API export 2.0}
-         eval {{*}$S API export 2.0}
+         API R export 2.0
+         API S export 2.0
       }}
-      division {1.0 {
-         eval {{*}$R API division 1.0}
-         eval {{*}$S API division 1.0}
-      }}
-   } {
-      scalars {
-         eval {{*}$R API ring 2.0}
-         eval {{*}$R API monoid 1.0}
-      }
-      semigroup {
-         eval {{*}$S API semigroup 1.0}
-      }
-   }]
-   return [list [namespace current]::end $R $iszero $S $c1 $c2 $API]
+%   \end{tcl}
+%   And that's it.
+%   \begin{tcl}
+   } R $R S $S]
+   return [list [namespace current]::ens $R $iszero $S $c1 $c2 $API]
 }
 %   \end{tcl}
 % \end{proc}
@@ -3373,15 +3602,17 @@ namespace eval ::mtmtcl::rings::complex {
 %   
 %   \begin{tcl}
 
-   interp alias {} [namespace current]::API {} ::APIutil::API {
+   interp alias {} [namespace current]::API {} ::API::static {
       equality 1.0
       "additive group" 2.0.1
       canonise 1.1
       export 2.0
       import 1.0
       "named element" 1.0
+      magma 1.1
       semigroup 1.0
       monoid 1.0
+      "commutative *" 1.0
       ring 2.0
       division 1.0
       ring-module 2.1

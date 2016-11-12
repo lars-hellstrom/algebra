@@ -266,8 +266,8 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 %     \begin{APImethod}{=}
 %       \word{element} \word{element}
 %     \end{APImethod}
-%       The |=| method satisfies version~1.0 of the \texttt{equality} 
-%       interface.
+%       The |=| method satisfies version~1.0 of the 
+%       \APIref{equality}{1.0} interface.
 %       
 %     \begin{APImethod}{+}
 %       \word{element} \word{element}
@@ -308,6 +308,85 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 % \end{APIspec}
 % 
 % 
+% The above are pretty obvious translations of standard textbook 
+% definitions, but there are also some computational subtleties in 
+% them that disappear among the mathematical content. Defining the 
+% minimalistic structure of a \texttt{magma} serves, if nothing else, 
+% the purpose of letting these details be discussed.
+% 
+% \begin{APIspec}{magma}{1.0}
+%   A magma is mathematically a set $M$ together with a binary 
+%   operation \(*\colon M \times M \longrightarrow M\).
+%   \begin{APIdescription}{magma}
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method returns an element of the magma.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% Does that capture the conventional sense of what it means to be a 
+% magma, though? A slightly stronger formalisation is the following.
+% 
+% \begin{APIspec}{magma}{1.1}
+%   A magma is a set $M$ together with the equality relation on $M$ 
+%   and a binary operation \(*\colon M \times M \longrightarrow M\).
+%   \begin{APIdescription}{magma}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies version~1.0 of the 
+%       \APIref{equality}{1.0} interface.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method returns an element of the magma, and is congruent.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% What \APIref+{magma}{1.1} claims in addition to the conjunction of 
+% \APIref+{magma}{1.0} and \APIref+{equality}{1.0} is that |*| is 
+% congruent, which is not a trivial claim\Dash indeed, it is often a 
+% claim that is required for a construction to make sense. It is 
+% however traditionally not given the status of axiom, since it is 
+% trivial for the set-theoretic equality relation.
+% 
+% \begin{APIspec}{commutative *}{1.0}
+%   This interface is simply the statement that the |*| operation, 
+%   whatever it computes, is commutative.
+%   \begin{APIdescription}{magma}
+%     \begin{APImethod}{=}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |=| method satisfies version~1.0 of the 
+%       \APIref{equality}{1.0} interface.
+%       
+%     \begin{APImethod}{*}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       The |*| method returns an element of the magma. 
+%       The |*| method has the property that
+%       \begin{displaysyntax}
+%         [$M$ * $a$ $b$]\par
+%         [$M$ * $b$ $a$]
+%       \end{displaysyntax}
+%       are |=|-equal for any two elements $a$ and $b$ of a 
+%       \meta{magma} $M$.
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% Why not call \APIref{commutative *}{1.0} something like 
+% \tclverb*|commutative magma|, though? While that would be more in 
+% line with traditional mathematical terminology, it doesn't 
+% generalise all that well\Dash commutativity is a property that one 
+% might require for quite a number of different operations (besides 
+% addition and the main multiplication). By including the operation 
+% name in the interface name, one opens up for having multiple such 
+% interfaces around. On the other hand, something like dot-product 
+% commutativity would be slightly different, as in that case the 
+% equality in the axiom is equality in a different (but related) 
+% structure.
 % 
 % 
 % 
