@@ -9,10 +9,10 @@
 % 
 %<*pkg>
 package require Tcl 8.2
-package provide API 1.0
+package provide API 1.1
 
 namespace eval ::API {
-    namespace export static nstatic staticn dynamic ensemble
+    namespace export static nstatic staticn recursive
 }
 
 ## 
@@ -88,7 +88,7 @@ proc ::API::static {dict args} {
  #   same arguments as it but only following some fixed number of 
  #   initial arguments which should be skipped. It might be used to 
  #   implement an API subcommand for an ensemble with parameters that 
- #   has the API dictionary are the final parameter. In that case, 
+ #   has the API dictionary as the final parameter. In that case, 
  #   one would map API to a command prefix
  #       ::API::nstatic $n
  #   where $n is one less than the number of ensemble parameters.
@@ -186,106 +186,132 @@ proc ::API::staticn {n dict args} {
 
 
 ## 
- # ::API::dynamic - dynamic API query handler
+ # ::API::recursive - recursive API query handler
  # 
  # Synopsis:
- #   ::API::dynamic $APIargs $interfaces $tests
+ #   ::API::recursive $APIargs $tests ?$key $prefix ...?
  #   
- #   APIargs    - Like $args list of ::API::static.
- #   interfaces - Interface test dictionary (see below).
- #   tests      - Named test dictionary (see below)
+ #   APIargs  - Like $args list of ::API::static.
+ #   tests    - Interfaces and named tests dictionary (see below)
+ #   prefix   - Prefix for recursive API queries
+ #   key      - Key associated with prefix
  # 
  # Result:
- #   Depending on the number of arguments specified, this 
- #   procedure returns an interface dictionary, a list of versions, 
- #   or a boolean.
+ #   Depending on the number of elements in $APIargs, this procedure 
+ #   returns an interface dictionary, a list of versions, or a boolean.
  #   
  # Side-effects:
- #   None.
+ #   None, unless scripts embedded in $tests have side-effects.
  #   
  # Details:
- #   The dynamic command is meant to be called from within a procedure 
- #   body. It is a sort of control structure that aims to arrive at the 
+ #   The recursive command is meant to be called from within a procedure 
+ #   body. It is sort of a control structure that aims to arrive at the 
  #   answer to an API query with as little work as possible, by using 
  #   demand-driven computation.
  #   
- #   The basic concept in understanding its arguments is the idea of 
- #   a requirements list. This is a list with an even number of elements, 
- #   where each pair has one of the five forms
- #     try $script
+ #   The interface support is specified in the $tests nested dictionary. 
+ #   The first level keys are interface names, whereas the second level 
+ #   keys are versions. The second level values are *requirement scripts* 
+ #   that state the conditions needed for that version of the interface 
+ #   to be supported. Alternatively, the first level key can be the name 
+ #   of a *test* (local to this $tests dictionary), in which case the first 
+ #   level value is a list of length 1 having a requirement script as its 
+ #   element.
+ #   
+ #   Requirement scripts are semantically lists of conditions to test, 
+ #   but they are scripts in syntax, so items are newline (or semicolon) 
+ #   separated, and standard Tcl comments are allowed. The supported 
+ #   commands are
+ #     API $key $interface $version ?$version ...?
  #     eval $script
  #     expr $expression
+ #     try $script
+ #     not $requirementsScript
  #     test $name
- #     not $requirementsList
- #   Each such item is used to perform some test and will thereby produce 
- #   a boolean value. The requirements list as a whole is true iff all 
- #   items in it produces a true value. Evaluation of a requirements list 
- #   proceeds in short-curcuit manner, and will stop after the first item 
- #   which produces a false value.
+ #     self $interface $version
+ #   The API command performs an API test for whether some $version of 
+ #   the specified $interface is supported by the command prefix associated 
+ #   with the $key in the call to ::API::recursive. The eval command evaluates 
+ #   the $script in the calling context; it is supposed to return a boolean 
+ #   where true means condition satisfied. The expr command is similar, 
+ #   but evaluates an ::expr $expression instead of a script. The try 
+ #   command evaluates a script, but looks at its return code rather than 
+ #   its result: ok is success, anything else is fail.
  #   
- #   The various items are generally evaluated in the calling context of 
- #   the dynamic command, which is one reason the latter is typically 
- #   placed within a procedure body. A try item is considered to be true 
- #   if the $script returns with a -code of 0 (ok). For an eval item the 
- #   $script must have a boolean return value, which is taken as the 
- #   value being produced. For an expr item the same holds for the 
- #   $expression; expr $expression may be regarded as a shorthand for
- #   eval [list ::expr $expression]. A test item is true if the test named 
- #   $name is true. Finally, a not item evaluates the $requirementsList 
- #   and takes the opposite boolean value.
+ #   The not command processes its $requirementsScript, but negates the 
+ #   outcome; the not condition is satisfied if any condition in the 
+ #   $requirementsScript fails. (Two levels of not's can be used to 
+ #   achieve logical or of two or more conditions.) The test command 
+ #   uses the value of a named test. The self command queries the API being 
+ #   computed, treating the $interface-$version combination as the composite 
+ #   name of a test. (In particular the $version is compared by string 
+ #   equality; it needs to be that exact version.)
  #   
- #   The $tests dictionary has test names as keys and requirements lists 
- #   as values; an example might be
- #     Tk {
- #        try {package require Tk}
- #     } colordisplay {
- #        test Tk
- #        expr {[winfo screendepth .] > 1}
- #     }
- #   $interfaces is a nested dictionary, where the outer key is an interface 
- #   name and the inner key is a version of that interface. The entries 
- #   are again requirements lists. An example might be
+ #   An example of a partial $tests dictionary is
  #     foo {1.0 {} 1.3 {test foo}}
- #     bar {1.0 {test foo expr {$baz>3}}}
+ #     bar {1.0 {test foo; expr {$baz>3}}}
  #   which means:
  #     foo version 1.0 is always supported, 
- #     foo version 1.3 is supported if the test named foo succeeds,
- #     bar version 1.0 is supported if the test named foo succeeds
+ #     foo version 1.3 is supported if the test named foo is satisfied,
+ #     bar version 1.0 is supported if the test named foo is satisfied
  #                        and additionally the $baz variable in the 
  #                        calling context is greater than 3.
- #   The point of having named tests is that common conditions can be 
- #   factored out of individual version tests. In addition, the results 
- #   of those tests need only be computed once for each ::API::dynamic 
- #   call, which can make a significant difference for queries that are 
- #   not restricted to a specific version.
+ #   Whether a named test is satisfied is evaluated the first time that 
+ #   test is referenced by a test requirements script command. The result 
+ #   is then cached, which makes named tests appropriate when some set of 
+ #   conditions is common for several different interface versions. 
+ #   An example might be that in
+ #     Tk {{
+ #        try {package require Tk}
+ #     }} colordisplay {{
+ #        test Tk
+ #        expr {[winfo screendepth .] > 1}
+ #     }}
+ #   the [package require Tk] call is performed at most once per 
+ #   ::API::recursive call. Whether the [package require Tk] was done in 
+ #   response to some interface referring to the colordisplay test or 
+ #   directly to the Tk test is irrelevant.
  #   
  # Notes:
  #   The implementation is optimised for cases where individual 
- #   requirements are expensive to compute.
+ #   requirements are expensive to compute. If the satisfaction status 
+ #   for an interface version can be deduced from previous computed 
+ #   satisfaction statuses for other versions, then later requirement 
+ #   scripts might be ignored.
  #   
  ##
 
-proc ::API::dynamic {APIargs interfaces tests} {
+proc ::API::recursive {APIargs tests args} {
     array set testA $tests
-    array set interfaceA $interfaces
+    array set prefixA $args
+    array set testres {}
+    # testres array entries are 0 for a failed test and 1 for a successful
+    # test. There are three types of index:
+    #  - a list "$test", caching the result for a named test.
+    #  - a list "$interface $version", caching the result for a version 
+    #    in the API being computed.
+    #  - a list "$key $interface $version", caching the result
+    #    of a recursive API call.
+    
     # There are two main cases: Test for a specific version, or test 
     # for all versions.
     if {[llength $APIargs] > 1} then {
-        if {![info exists interfaceA([lindex $APIargs 0])]} then {return 0}
+        if {
+            ![info exists testA([lindex $APIargs 0])] ||
+            1&[llength $testA([lindex $APIargs 0])]
+        } then {return 0}
         set target [lindex $APIargs 1]
-        foreach {version reqlist} $interfaceA([lindex $APIargs 0]) {
+        foreach {version reqs} $testA([lindex $APIargs 0]) {
             if {[package vsatisfies $version $target] && (
                 ![info exists best] || [package vsatisfies $best $version]
             )} then {
                 set best $version
-                set bestreq $reqlist
+                set bestreq $reqs
             }
         }
-        if {[info exists best]} then {
-            return [dynamic,reqs $bestreq]
-        } else {
-            return 0
-        }
+        return [expr {[info exists best] && ![catch {
+            recursive,parse eval $bestreq
+        }]}]
     }
     # The area where there can be implications is within different versions 
     # of the same interface, so the code for handling that is common for 
@@ -294,42 +320,66 @@ proc ::API::dynamic {APIargs interfaces tests} {
     # from the $interfaces dictionary.
     if {[llength $APIargs]} then {
         set interface [lindex $APIargs 0]
-        if {![info exists interfaceA($interface)]} then {return ""}
-        set interfaces [list $interface $interfaceA($interface)]
+        if {
+            ![info exists testA($interface)] ||
+            1&[llength $testA($interface)]
+        } then {return ""}
+        set tests [list $interface $testA($interface)]
     } else {
         set res {}
     }
-    foreach {interface verlist} $interfaces {
+    foreach {interface verlist} $tests {
+        # If the $verlist has odd length then this is a test,
+        # so don't treat that here.
+        if {1&[llength $verlist]} then {continue}
         # For each specific interface, the versions are tested in 
         # the order they are listed, and it is remembered which pass 
         # and which fail. Additional versions are first compared against 
         # those for which the result is known, to avoid evaulating 
-        # a reqlist for which the result should already be known.
+        # a reqscript for which the result should already be known.
         set yesL {}
         set noL {}
-        foreach {version reqlist} $verlist {
+        foreach {version reqs} $verlist {
+            if {[info exists testres([list $interface $version])]} then {
+                if {$testres([list $interface $version])} then {
+                    lappend yesL $version
+                } else {
+                    lappend noL $version
+                }
+                continue
+            }
             set known 0
             foreach ver $yesL {
                 if {[package vsatisfies $ver $version]} then {
                     set known 1; break
                 }
             }
-            if {$known} then {continue}
+            if {$known} then {
+                set testres([list $interface $version]) 1
+                continue
+            }
             foreach ver $noL {
                 if {[package vsatisfies $version $ver]} then {
                     set known 1; break
                 }
             }
-            if {$known} then {continue}
-            if {[
-                dynamic,reqs $reqlist
-            ]} then {
-                lappend yesL $version
-            } else {
+            if {$known} then {
+                set testres([list $interface $version]) 0
+                continue
+            }
+            if {[catch {
+                recursive,parse eval $reqs
+            }]} then {
                 lappend noL $version
+                set testres([list $interface $version]) 0
+            } else {
+                lappend yesL $version
+                set testres([list $interface $version]) 1
             }
         }
-        lappend res $interface $yesL
+        if {[llength $yesL]} then {
+            lappend res $interface $yesL
+        }
     }
     if {[llength $APIargs]} then {
         return $yesL
@@ -340,146 +390,109 @@ proc ::API::dynamic {APIargs interfaces tests} {
 
 
 ## 
- # ::API::dynamic,reqs - helper for ::API::dynamic
+ # ::API::recursive,parse* - helpers for ::API::recursive
  # 
- # This is the command that actually produces the value of a requirements 
- # list. It expects to be called from within ::API::dynamic, as it will
- # [uplevel 2] the various $script and $expression elements in the 
- # requirements list. The call syntax is
+ # The various recursive,parse* commands are helpers that access the 
+ # local context of ::API::recursive using upvar and uplevel. "uplevel 1" 
+ # is the local context of ::API::recursive, whereas "uplevel 2" is the 
+ # context from which ::API::recursive was called; the latter context is 
+ # used by the "API", "eval", "expr", and "try" requirements commands.
  # 
- #   ::API::dynamic,reqs $reglist
+ # ::API::recursive,parse itself is the slave command of an interp that 
+ # is empty except for the six requirement script commands, which in 
+ # turn are aliases back to corresponding ::API::recursive,parse_* commands. 
+ # A requirements condition that is not satisfied will throw an error, 
+ # thereby short-circuit testing of subsequent conditions. A requirements 
+ # condition that is satisfied returns with a code of ok, allowing parsing 
+ # to continue with the next condition. Thus what is done to parse a 
+ # requirements script is to [::API::recursive,parse eval] it.
  # 
- # and it returns the value produced for $reqlist. It will also access 
- # the tests variable and testres array in its calling context, setting 
- # elements of testres whenever it has determined the value of the 
- # corresponding test.
+ # There are three arrays in the "uplevel 1" context which are used by 
+ # ::API::recursive,parse_* commands, namely testA, prefixA, and testres. 
+ # Recursive calls to the ::API::recursive,parse interpreter must be 
+ # uplevel'ed so that these are in the local context (but note that 
+ # local context levels are per interpreter, so the switches to and from 
+ # ::API::recursive,parse interpreter are invisible in the uplevel counts).
  # 
  ##
 
-proc ::API::dynamic,reqs {reqlist} {
-    upvar 1 testA testA testres testres
-    foreach {type data} $reqlist {
-        switch -- $type "test" {
-            if {![info exists testres($data)]} then {
-                # One could guard against circular test definitions 
-                # by setting testres($data) to a non-boolean value here,
-                # but the recursionlimit should also catch such errors.
-                set testres($data)\
-                  [uplevel 1 [list dynamic,reqs $testA($data)]]
-            }
-            if {!$testres($data)} then {return 0}
-        } "try" {
-            if {[catch {uplevel 2 $data}]} then {return 0}
-        } "eval" {
-            if {![uplevel 2 $data]} then {return 0}
-        } "expr" {
-            if {![uplevel 2 [list ::expr $data]]} then {return 0}
-        } "not" {
-            if {[uplevel 1 [list dynamic,reqs $data]]} then {return 0}
-        } default {
-            error "Bad requirement type: $type"\
-              "$reqlist\n  being processed by"
+
+interp create -safe ::API::recursive,parse
+::API::recursive,parse hide namespace
+::API::recursive,parse invokehidden namespace delete ::
+
+
+::API::recursive,parse alias API ::API::recursive,parse_API
+proc ::API::recursive,parse_API {key interface args} {
+    upvar 1 prefixA prefixA testres testres
+    foreach version $args {
+        if {![info exists testres([list $key $interface $version])]} then {
+            set testres([list $key $interface $version]) [
+                uplevel 2 [linsert $prefixA($key) end API $interface $version]
+            ]
         }
+        if {$testres([list $key $interface $version])} then {return}
     }
-    return 1      
+    return -code error
 }
 
-
-## 
- # ::API::ensemble - create ensemble supporting API convention
- # 
- # Synopsis:
- #   ::API::ensemble $name $APIs ?$subcommand $prefix ...?
- # 
- # Side-effects:
- #   A new command $name is created. The first argument of that 
- #   command is a subcommand name. The available subcommands will 
- #   be (i) API, behaving as required by the API convention and 
- #   (ii) those listed as $subcommand's in the call, behaving as 
- #   aliases to the corresponding $prefix'es. An empty $prefix is 
- #   equivalent to a $prefix equal to the preceeding $subcommand. 
- #   The namespace current in the context calling 
- #   ::API::ensemble will be prepended to each $prefix that is 
- #   not fully namespace qualified.
- # 
- # Result:
- #   The name of the command created.
- # 
- # Note:
- #   In Tcl 8.5, this command is implemented using
- #   [namespace ensemble]. Prior to that, the command creates an 
- #   ordinary procedure.
- # 
- ##
-
-if {[package vsatisfies [package provide Tcl] 8.5]} then {
-    proc ::API::ensemble {name APIs args} {
-        if {[llength $args] & 1} then {
-            return -code error {wrong # args: should be\
-              "ensemble name APIs ?subcmd prefix ...?"}
-        }
-        set ns [uplevel 1 {::namespace current}]
-        set map [list API [list ::API::static $APIs]]
-        foreach {subcmd prefix} $args {
-            if {![llength $prefix]} then {
-                 set prefix [list $subcmd]
-            }
-            if {![string match ::* [lindex $prefix 0]]} then {
-                set full "${ns}::[lindex $prefix 0]"
-                lappend map $subcmd [lreplace $prefix 0 0 $full]
-            } else {
-                lappend map $subcmd $prefix
-            }
-        }
-        uplevel 1 [list ::namespace ensemble create\
-          -command $name -map $map -prefixes 0]
+::API::recursive,parse alias test ::API::recursive,parse_test
+proc ::API::recursive,parse_test {name} {
+    upvar 1 testA testA testres testres
+    if {![info exists testres([list $name])]} then {
+        set testres([list $name]) [expr {
+            [info exists testA($name)] && 
+            [llength $testA($name)]==1 && 
+            ![catch {
+                uplevel 1 [list\
+                  ::API::recursive,parse eval [lindex $testA($name) 0]]
+            }]
+        }]
+        # One could guard against circular test definitions 
+        # by setting testres($data) to a non-boolean value before 
+        # making the recursive call, but the recursionlimit should 
+        # also catch such errors.
     }
-} else {
-    proc ::API::ensemble {name APIs args} {
-        if {[llength $args] & 1} then {
-            return -code error {wrong # args: should be\
-              "ensemble name APIs ?subcmd1 prefix1 ...?"}
-        }
-        set ns [uplevel 1 {::namespace current}]
-        set map [list API [list ::API::static $APIs]]
-        foreach {subcmd prefix} $args {
-            if {![llength $prefix]} then {
-                 set prefix [list $subcmd]
-            }
-            if {![string match ::* [lindex $prefix 0]]} then {
-                set full "${ns}::[lindex $prefix 0]"
-                lappend map $subcmd [lreplace $prefix 0 0 $full]
-            } else {
-                lappend map $subcmd $prefix
-            }
-        }
-        #
-        # The procedure created will look like
-        #   proc $name {subcmd args} {
-        #      switch -- $subcmd ...
-        #   }
-        # The ... part is constructed in the $switch variable.
-        # 
-        set switch {}
-        set L {}
-        foreach {subcmd prefix} $map {
-            lappend switch $subcmd\
-              "\n  ::uplevel 1 \[::list $prefix\] \$args\n"
-            lappend L $subcmd
-        }
-        set L [lsort -dictionary $L]
-        if {[llength $L]>2} then {
-            set L [lreplace $L end end "or [lindex $L end]"]
-        } elseif {[llength $L]==2} then {
-            set L [list [join $L { or }]]
-        }
-        lappend switch default "\n  ::return -code error\
-          \"unknown subcommand \\\"\$subcmd\\\":\
-          must be \[[list ::join $L {, }]\]\"\n"
-        uplevel 1 [list ::proc $name {subcmd args}\
-          "::switch -- \$subcmd $switch"]
-        uplevel 1 [list ::namespace which -command $name]
+    return -code [expr {!$testres([list $name])}]
+}
+
+::API::recursive,parse alias self ::API::recursive,parse_self
+proc ::API::recursive,parse_self {name version} {
+    upvar 1 testA testA testres testres
+    if {![info exists testres([list $name $version])]} then {
+        set testres([list $name $version]) [expr {
+            [info exists testA($name)] && 
+            !([llength $testA($name)]&1) && 
+            [array set A $testA($name); info exists A($version)] &&
+            ![catch {
+                uplevel 1 [list ::API::recursive,parse eval $A($version)]
+            }]
+        }]
+        # One could guard against circular test definitions 
+        # by setting testres($data) to a non-boolean value before 
+        # making the recursive call, but the recursionlimit should 
+        # also catch such errors.
     }
+    return -code [expr {!$testres([list $name $version])}]
+}
+
+::API::recursive,parse alias try uplevel 1
+
+::API::recursive,parse alias eval ::API::recursive,parse_eval
+proc ::API::recursive,parse_eval {script} {
+    return -code [expr {![uplevel 2 $script]}]
+}
+
+::API::recursive,parse alias expr ::API::recursive,parse_expr
+proc ::API::recursive,parse_expr {expression} {
+    return -code [expr {![uplevel 2 [list ::expr $expression]]}]
+}
+
+::API::recursive,parse alias not ::API::recursive,parse_not
+proc ::API::recursive,parse_not {script} {
+    return -code [expr {![catch {
+        uplevel 1 [list ::API::recursive,parse eval $script]
+    }]}]
 }
 %</pkg>
 %

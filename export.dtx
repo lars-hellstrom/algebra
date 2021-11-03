@@ -3,13 +3,14 @@
 %<*driver>
 \documentclass{mtmtcl}
 \begin{document}
+\tableofcontents
 \DocInput{export.dtx}
 \end{document}
 %</driver>
 % \fi
 % 
 % 
-% \part{Conversion of exported data}
+% ^^A \part{Conversion of exported data}
 % 
 % 
 % The basic format for exporting structure elements is as a 
@@ -1395,7 +1396,8 @@ proc mtmtcl::present::typography {tree} {
    tpp::tool::tpp {*}[
       openmath::desala $tree \
         arith1 times multiply {}  arith1 power power {} \
-        arith1 plus add {}  arith1 unary_minus negate {}
+        arith1 plus add {}  arith1 unary_minus negate {} \
+        nums1 rational fraction {}
    ] 0
 }
 %   \end{tcl}
@@ -1416,6 +1418,8 @@ proc mtmtcl::present::typography {tree} {
 %     the $0$th power, or from a nullary product.
 %   \item[\OMSref*{arith1}{plus}]
 %     Addition.
+%   \item[\OMSref*{nums1}{rational}]
+%     Rational number constructor, but typographically a |\frac|.
 % \end{description}
 % In processing, these are |desala|d into specialised node types:
 % \begin{description}
@@ -1431,6 +1435,14 @@ proc mtmtcl::present::typography {tree} {
 %     Additive negation.
 %   \item[add]
 %     Addition.
+%   \item[distributive]
+%     Meant for non-associative multiplication operations. Currently 
+%     unused.
+%   \item[fraction]
+%     Fractions used to be mapped to \texttt{distributive} (since 
+%     |tpp| is mainly doing minus migration, that came out 
+%     mathematically correct), but that did not handle removing 
+%     pointless denominators.
 % \end{description}
 % As a rule these |OMA|-normalises themselves upon returning, but 
 % |negate| nodes may remain to denote points of soft negation. 
@@ -1767,6 +1779,46 @@ proc mtmtcl::present::tpp::distributive {attr children want} {
          set child [lindex $child 2 1]
       }
       lappend newchildren $child
+   }
+   set res [list OMA [dict get $attr OMA] $newchildren]
+   if {$negate} then {
+      return [tool::negate $res $want]
+   } else {
+      return $res
+   }
+}
+%     \end{tcl}
+%   \end{ensproc}
+%   
+%   \begin{ensproc}{fraction}
+%     There are two differences between |distributive| and 
+%     |fraction|: first, |fraction| always wants minuses to migrate 
+%     outwards (since $\frac{-1}{2}$ looks worse than 
+%     $-\frac{1}{2}$), and second, if the denominator is $1$ then 
+%     return just the numerator.
+%     \begin{tcl}
+proc mtmtcl::present::tpp::fraction {attr children want} {
+   set newchildren [list [tool::tpp {*}[lindex $children 0] 0]]
+   set negate 0
+   foreach child [lrange $children 1 end] {
+      set child [tool::tpp {*}$child 1]
+      while {[lindex $child 0] eq "negate"} {
+         set negate [expr {!$negate}]
+         set child [lindex $child 2 1]
+      }
+      lappend newchildren $child
+   }
+   if {[llength $newchildren] == 3 && (
+      [lindex $newchildren 2 0] eq "OMS" &&\
+        [dict get [lindex $newchildren 2 1] cd] eq "alg1" &&\
+        [dict get [lindex $newchildren 2 1] name] eq "one"
+      ||
+      [lindex $newchildren 2 0] eq "integer" &&\
+        [dict get [lindex $newchildren 2 1] value] == 1
+   )} then {
+      set res [lindex $newchildren 1]
+   } else {
+      set res [list OMA [dict get $attr OMA] $newchildren]
    }
    if {$negate} then {
       return [tool::negate $res $want]
@@ -3087,15 +3139,24 @@ proc mtmtcl::present::fence::postfix {attr children left right block} {
 %   
 %   \begin{ensproc}{enclosed}
 %     Enclosed notation completely separates each operand from its 
-%     surroundings. The operation child is processed as well, just 
-%     for the sake of it.
+%     surroundings, although the whole may still require fencing due 
+%     to blocking. If there is a \describestring+[attribute]{blockings} 
+%     attribute on the node, then it is a list of those blockings 
+%     which are acceptable for this node without fencing, otherwise 
+%     all blockings are acceptable.
+%     
+%     The operation child is processed as well, just for the sake of it.
 %     \begin{tcl}
 proc mtmtcl::present::fence::enclosed {attr children left right block} {
    set new {}
    foreach child $children {
       lappend new [tool::fence {*}$child -Inf -Inf none]
    }
-   return [tool::reform enclosed $attr $new 0]
+   set fence [expr {
+      [dict exists $attr blockings] &&\
+      !($block in [dict get $attr blockings])
+   }]
+   return [tool::reform enclosed $attr $new $fence]
 }
 %     \end{tcl}
 %   \end{ensproc}
@@ -4442,6 +4503,7 @@ mtmtcl::latex::make::tool::safe eval {
 %     \text{.}
 %   \end{equation*}
 %   
+%   ToDo: Support requesting the |mrow| to be |tight|.
 %   \begin{tcl}
 mtmtcl::latex::make::tool::safe eval {
    proc mrowjoin {begin end before after between \
@@ -5027,7 +5089,7 @@ proc mtmtcl::latex::convertto {tree} {
 %   \begin{center}
 %     \begin{tabular}{l r@{}l}
 %       \textbf{Operation}& \multicolumn{2}{c}{\textbf{Time} (s)}\\
-%       \meta{ring}| export|& 6&222223\\
+%       \meta{ring}| export|& 6&.222223\\
 %       \texttt{mtmtcl::present::typography}& 23&.990825\\
 %       \texttt{mtmtcl::present::decorate}& 8&.300743\\
 %       \texttt{mtmtcl::present::fence::tool::fence}&
@@ -5126,6 +5188,20 @@ set mtmtcl::latex::phrasebook(arith1#times) {
 set mtmtcl::latex::phrasebook(arith1#power) {
    rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
       attrdefault form exponent
+   }
+}
+%   \end{tcl}
+%   The fourth operation is the fraction of rational numbers. 
+%   \begin{tcl}
+set mtmtcl::latex::phrasebook(nums1#rational) {
+   rootwards -past {OMATTR 1} -to {OMA 0} -not OM* {
+      OMATTR altenc#LaTeX_encoding {
+         OMFOREIGN {encoding Tcl-prefix} {
+           {#text {mrowjoin {{#text {\frac}}} {}\
+             {{#text \{}} {{#text \}}} {}}}
+         }
+      }
+      attrdefault form enclosed blockings none
    }
 }
 %   \end{tcl}

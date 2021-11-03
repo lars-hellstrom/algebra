@@ -4,6 +4,7 @@
 \documentclass{mtmtcl}
 \begin{document}
 \DocInput{groups.dtx}
+\PrintIndex
 \end{document}
 %</driver>
 % \fi
@@ -20,9 +21,21 @@
 % since these are the same things as rings which also satisfy the 
 % axioms for a semigroup and monoid, respectively.
 % 
+% Implementation-wise, there is one package |mtmtcl::groups::util| 
+% which collects utility commands that are useful for several groups, 
+% and some number of sibling packages which implement particular 
+% groups (or families of groups). For historical reasons, there is 
+% also a docstrip module {\Module{pkg}} which pretty much includes 
+% all code (sans that for package handling). The trend is to migrate 
+% code from this big combination to functionality-specific packages. 
+% The {\Module{common}} module is for code common to such packages 
+% (namely the |mtmtcl::groups| namespace declaration).
 % \begin{tcl}
-%<*pkg>
-namespace eval ::mtmtcl::groups {}
+%<pkg,common>namespace eval ::mtmtcl::groups {}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::groups::util 1.0 util
+%</docstrip.tcl::catalogue>
+%<util,pkg>namespace eval ::mtmtcl::groups::util {}
 % \end{tcl}
 % \setnamespace{mtmtcl::groups}
 % 
@@ -102,6 +115,10 @@ namespace eval ::mtmtcl::groups {}
 %   \end{displaysyntax}
 %   and the implemented subcommands are |API|, |=|, |*|, and |1|.
 %   \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::groups::string_free_monoid 1.0 {stringmonoid common}
+%</docstrip.tcl::catalogue>
+%<*pkg,stringmonoid>
 proc ::mtmtcl::groups::string_free_monoid {method args} {
    switch -- $method {
 %   \end{tcl}
@@ -158,6 +175,7 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
       }
    }
 }
+%</pkg,stringmonoid>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -395,10 +413,11 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 % \subsection{Variadic operation versions}
 % 
 % While the methods specified by interfaces in the previous section 
-% suffice for any computation with elements in a semigroup, monoid, or 
-% group, it is often possible to provide more optimised implementation 
-% of specific operations. One example is that one $n$-ary product might 
-% be quicker to compute than $n-1$ binary products.
+% suffice for any computation with elements in a magma, semigroup, 
+% monoid, or group, it is often possible to provide more optimised 
+% implementation of specific operations. One example is that one 
+% $n$-ary product might be quicker to compute than $n-1$ binary 
+% products.
 % 
 % \begin{APIspec}{semigroup}{1.1}
 %   Version~1.1 of \texttt{semigroup} extends the |*| operation to be 
@@ -489,6 +508,10 @@ proc ::mtmtcl::groups::string_free_monoid {method args} {
 %     do-procedure. (LH)}
 %   
 %   \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::groups::list_free_monoid 1.0 {listmonoid common}
+%</docstrip.tcl::catalogue>
+%<*pkg,listmonoid>
 proc ::mtmtcl::groups::list_free_monoid_1.1_do {base API method args} {
    switch -- $method {
 %   \end{tcl}
@@ -660,7 +683,7 @@ proc ::mtmtcl::groups::list_free_monoid_1.1_do {base API method args} {
 %   returns the corresponding free monoid.
 %   
 %   \begin{tcl}
-proc mtmtcl::groups::list_free_monoid_1.1 {base} {
+proc ::mtmtcl::groups::list_free_monoid_1.1 {base} {
    set D [dict create]
    if {[{*}$base API equality 1.0]} then {
       dict lappend D equality 1.0 
@@ -687,21 +710,29 @@ proc mtmtcl::groups::list_free_monoid_1.1 {base} {
    }
    return [list [namespace which list_free_monoid_1.1_do] $base D]
 }
+%</pkg,listmonoid>
 %     \end{tcl}
 % \end{proc}
 % 
 % 
 % \subsection{Powers}
 % 
-% Another example is that there might be quicker ways of computing 
-% powers than repeated multiplication\Dash even when that means 
-% squaring at $O(\log_2 n)$ multiplications rather the $n-1$ required 
-% by the trivial algorithm of multiplying by the base. Examples include:
+% A power operation makes sense for two reasons. First, it is 
+% customary to express things using powers whenever possible. Second, 
+% there might be quicker ways of computing powers than just what you 
+% get from repeated multiplication (even when repeated multiplication 
+% includes squaring in $O(\log_2 n)$ multiplications rather the $n-1$ 
+% required by the trivial algorithm of multiplying by the base). 
+% Examples include:
 % \begin{enumerate}
 %   \item
-%     Diagonalisation of matrices (or more generally, transformation to 
-%     Jordan normal form), since powers of a diagonal matrix can be 
-%     computed without matrix multiplication.
+%     In a power product monoid, taking a power just means taking a 
+%     multiple of the exponents.
+%   \item
+%     Large powers of a matrix can be mostly reduced to large powers 
+%     of scalars, by diagonalising the matrix (or more generally, 
+%     transformation to Jordan normal form). Although for practical 
+%     computations, it often works out the other way around.
 %   \item
 %     Employing knowledge about periods to limit the powers that need 
 %     to be computed. A permutation can be factorised into 
@@ -709,6 +740,32 @@ proc mtmtcl::groups::list_free_monoid_1.1 {base} {
 % \end{enumerate}
 % In such cases, an implementation of a power method constitutes a 
 % useful addition to a group.
+% 
+% \begin{APIspec}{semigroup}{1.2}
+%   Version 1.2 of \texttt{semigroup} improves on v\,1.1 by adding 
+%   a power method.
+%   \begin{APIdescription}{semigroup}
+%     \begin{APImethod}{^}
+%       \word{element} \word{integer}
+%     \end{APImethod}
+%       The \word{integer} must be positive. 
+%       The value of \texttt{[\meta{group} \^{} $a$ $n$]} is $a^n$.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
+% 
+% \begin{APIspec}{monoid}{1.2}
+%   Version 1.2 of \texttt{monoid} improves on v\,1.1 by adding 
+%   a power method.
+%   \begin{APIdescription}{monoid}
+%     \begin{APImethod}{^}
+%       \word{element} \word{integer}
+%     \end{APImethod}
+%       The \word{integer} must be nonnegative. 
+%       The value of \texttt{[\meta{group} \^{} $a$ $n$]} is $a^n$.
+%   \end{APIdescription}
+%   All methods are congruent.
+% \end{APIspec}
 % 
 % \begin{APIspec}{group}{1.2}
 %   Version 1.2 of \texttt{group} improves on v\,1.1 by adding a power 
@@ -721,6 +778,15 @@ proc mtmtcl::groups::list_free_monoid_1.1 {base} {
 %   \end{APIdescription}
 %   All methods are congruent.
 % \end{APIspec}
+% 
+% A \APIref+{group}{1.2} satisfies \APIref+{monoid}{1.2} and 
+% \APIref+{semigroup}{1.2}, but a \APIref+{group}{1.1} that satisfies 
+% \APIref+{monoid}{1.2} is not necessarily a \APIref+{group}{1.2}, 
+% since the latter makes claims about e.g.~\texttt{[\meta{group} \^{} $a$ 
+% -1]} whereas the former does not\Dash there an exponent of $-1$ 
+% could cause the power operation to error out as not implemented.
+% 
+% ---
 % 
 % \begin{APIspec}{group}{1.3}
 %   Version 1.3 of \texttt{group} improves on v\,1.2 by adding a power 
@@ -770,6 +836,7 @@ proc mtmtcl::groups::list_free_monoid_1.1 {base} {
 %   non-negative integers.
 %   
 %   \begin{tcl}
+%<*pkg>
 proc ::mtmtcl::groups::power_product_monoid_1.3 {base method args} {
    switch -- $method {
 %   \end{tcl}
@@ -989,10 +1056,75 @@ proc ::mtmtcl::groups::power_product_monoid_1.3 {base method args} {
       }
    }
 }
+%</pkg>
 %   \end{tcl}
 % \end{proc}
 % 
 % 
+% \setnamespace{mtmtcl::groups::util}
+% 
+% 
+% \begin{proc}{balanced_nassoc}
+%   This procedure implements a variadic $n$-associative product (for 
+%   \(n \geqslant 1\)) on top of a binary product. The call syntax is
+%   \begin{displaysyntax}
+%     |::mtmtcl::groups::util::balanced_nassoc| \word{binary-prefix} 
+%     \word{factor}\regplus
+%   \end{displaysyntax}
+%   where the \word{binary-prefix} is a command prefix with the syntax
+%   \begin{displaysyntax}
+%     \meta{binary-prefix} \word{factor} \word{factor}
+%   \end{displaysyntax}
+%   that returns the ``product'' of those two factors. The operation 
+%   implemented by this prefix should be associative.
+%   
+%   The `balanced' part of the name has to do with the fact that the 
+%   tree of intermediate binary products being computed is ensured to 
+%   be balanced, i.e., the distances from any \word{factor} leaf in 
+%   this tree to the root may differ by at most one. The way the 
+%   algorithm works is that the list of factors is processed in a 
+%   number of rounds, and in each round factors are paired up and 
+%   multiplied using the binary operation, meaning the number of 
+%   things still left to multiply is halved for each round. If at 
+%   some round the number of factors is odd, then an intermediate 
+%   round multiplying just two of them is performed, to make the 
+%   number of factors in the main round even. The choice of two 
+%   factors for the intermediate round is such that no descendant of 
+%   such an intermediate round product will appear in another 
+%   intermediate round product, so the tree overall ends up balanced.
+%   
+%   \begin{tcl}
+%<*util>
+proc ::mtmtcl::groups::util::balanced_nassoc {bincmd args} {
+   while {[llength $args] > 1} {
+      if {[llength $args] & 1} then {
+         set args [lreplace $args 1 2 [
+            {*}$bincmd {*}[lrange $args 1 2]
+         ]]
+      }
+      set args [lmap {l r} $args {
+         {*}$bincmd $l $r
+      }]
+   }
+   return [lindex $args 0]
+}
+%</util>
+%   \end{tcl}
+%   
+%   What is then the importance of balancing this tree? It tends to 
+%   reduce the sizes of the factors passed to the \word{binary-prefix}, 
+%   which is often a major factor in the overall complexity, and 
+%   sometimes also in precision. The details depend on the complexity 
+%   of the \meta{binary-prefix}, but the improvement seems more often 
+%   to be in the constant factor of the complexity than in the hard 
+%   asymptotics; still, it can be useful.
+%   
+%   Note also that regardless of how the products are arranged, this 
+%   procedure still makes $n-1$ calls to the \word{binary-prefix}. 
+%   Powers are better computed using |squaring_power|, which takes 
+%   advantage of some intermediate results being equal when computing 
+%   a pure power.
+% \end{proc}
 % 
 % \begin{proc}{variadic_product}
 %   The |variadic_product| procedure implements a variadic product on 
@@ -1017,7 +1149,10 @@ proc ::mtmtcl::groups::power_product_monoid_1.3 {base method args} {
 %   using \word{binary command} and \word{nullary command}. Otherwise 
 %   the $1$ factor form is not allowed either.
 %   \begin{tcl}
-proc ::mtmtcl::groups::variadic_product {bincmd use1 uncmd nullcmd args} {
+%<*pkg,util>
+proc ::mtmtcl::groups::util::variadic_product {
+   bincmd use1 uncmd nullcmd args
+} {
    if {[llength $args] == 2} then {
       return [eval $bincmd $args]
    } elseif {[llength $args] > 2} then {
@@ -1083,15 +1218,16 @@ proc ::mtmtcl::groups::variadic_product {bincmd use1 uncmd nullcmd args} {
 %   using \word{binary command} and \word{nullary command}. Otherwise 
 %   the $1$ factor form is not allowed either.
 %   \begin{tcl}
-proc ::mtmtcl::groups::squaring_power {bincmd use1 uncmd idcmd invcmd\
-  base exp} {
+proc ::mtmtcl::groups::util::squaring_power {
+   bincmd use1 uncmd idcmd invcmd base exp
+} {
    if {$exp < 0} then {
 %   \end{tcl}
 %   Negative exponents are straightforward: an inverse is needed. 
 %   After inverting \word{base}, the exponent can be negated.
 %   \begin{tcl}
       if {[llength $invcmd]} then {
-         set base [eval $invcmd [list $base]]
+         set base [{*}$invcmd $base]
          if {$exp == -1} then {return $base}
          set exp [expr {-$exp}]
       } else {
@@ -1103,7 +1239,7 @@ proc ::mtmtcl::groups::squaring_power {bincmd use1 uncmd idcmd invcmd\
 %   identity element (preferred), or try the expression $b b^{-1}$.
 %   \begin{tcl}
       if {[llength $idcmd]} then {
-         return [eval $idcmd]
+         return [{*}$idcmd]
       } elseif {[llength $invcmd]} then {
          return [{*}$bincmd $base [{*}$invcmd $base]]
       } else {
@@ -1120,15 +1256,14 @@ proc ::mtmtcl::groups::squaring_power {bincmd use1 uncmd idcmd invcmd\
       if {!$use1} then {
          return $base
       } elseif {[llength $uncmd]} then {
-         return [eval $uncmd [list $base]]
+         return [{*}$uncmd $base]
       } elseif {[llength $idcmd] || [llength $invcmd]} then {
          if {[llength $idcmd]} then {
-            set id [eval $idcmd]
+            set id [{*}$idcmd]
          } else {
-            set id [eval\
-              $bincmd [list $base [eval $invcmd [list $base]]]]
+            set id [{*}$bincmd $base [{*}$invcmd $base]]
          }
-         return [eval $bincmd [list $base $id]]
+         return [{*}$bincmd $base $id]
       } else {
          return -code error "1st power not supported"
       }
@@ -1141,21 +1276,33 @@ proc ::mtmtcl::groups::squaring_power {bincmd use1 uncmd idcmd invcmd\
 %   \begin{tcl}
    set power $base
    for {} {!($exp & 1)} {set exp [expr {$exp/2}]} {
-      set power [eval $bincmd [list $power $power]]
+      set power [{*}$bincmd $power $power]
    }
    set res $power
    while {$exp>=2} {
-      set power [eval $bincmd [list $power $power]]
+      set power [{*}$bincmd $power $power]
       set exp [expr {$exp/2}]
       if {$exp & 1} then {
-         set res [eval $bincmd [list $res $power]]
+         set res [{*}$bincmd $res $power]
       }
    }
    return $res
 }
 %   \end{tcl}
-%   It is known that this algorithm is not optimal for all exponents 
-%   (see e.g.~\cite{Knuth:TAOCP}), but it has the right complexity.
+%   For an $n$-bit exponent (one at least $2^n$ but less than 
+%   $2^{n+1}$), this algorithm does between $n$ and $2n$ calls to the 
+%   \word{binary command}, and whereas $n$ is an unescapable lower 
+%   bound, it would be possible to improve on the upper bound, 
+%   although only to improve the constant factor: one may 
+%   asymptotically attain $(1+\nobreak\varepsilon)n$ for any 
+%   \(\varepsilon>0\). However, the trick to do that is to work with 
+%   groups of \(k > \frac{1}{\varepsilon}\) bits, view such groups as 
+%   ``base $2^k$ digits'', and first spending another $2^k-2$ 
+%   multiplications on computing all single digit powers; in other 
+%   words this only applies when $2^k$ is $o(n)$. This makes sense 
+%   for certain number-theoretical applications, but not so much in 
+%   symbolic computation, so it is not really something to worry 
+%   about for the general implementation.
 % \end{proc}
 % 
 % \begin{proc}{power_product}
@@ -1177,15 +1324,19 @@ proc ::mtmtcl::groups::squaring_power {bincmd use1 uncmd idcmd invcmd\
 %   \end{quote}
 %   \Dash to multiply these powers. The return value is that product.
 %   \begin{tcl}
-proc ::mtmtcl::groups::power_product {prodcmd powcmd args} {
+proc ::mtmtcl::groups::util::power_product {prodcmd powcmd args} {
    set call [list $prodcmd]
    foreach {base exponent} $args {
       lappend call [eval $powcmd [list $base $exponent]]
    }
    return [eval $call]
 }
+%</pkg,util>
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% \setnamespace{mtmtcl::groups}
 % 
 % \begin{proc}{group_1.3_upgrade}
 %   The |group_1.3_upgrade| procedure is an adaptor which creates 
@@ -1203,6 +1354,7 @@ proc ::mtmtcl::groups::power_product {prodcmd powcmd args} {
 %   
 %   The implementation uses the |APIutil::ensemble| command.
 %   \begin{tcl}
+%<*pkg&deadapproach>
 proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
    if {![eval $args [list API group 1.0]]} then {
       error "Base structure is not a: group 1.0"
@@ -1259,6 +1411,7 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
       semigroup 1.3 {}
    }
 }
+%</pkg&deadapproach>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -1537,6 +1690,8 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %   argument representation could well be unreasonably expensive. 
 % \end{APIspec}
 % 
+% 
+% 
 % \begin{ensemble}{free_abelian_group}
 %   The |free_abelian_group| ensemble implements a free abelian group 
 %   on top of a structure with \APIref{canonise}{1.0}. Unlike 
@@ -1545,6 +1700,11 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %   suited in cases with many generators. It is expected that 
 %   combining this with |semigroup_algebra| will be the main way of 
 %   implementing polynomial-like expressions.
+%   \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::groups::free_abelian_group 1.0 freeabelian
+%</docstrip.tcl::catalogue>
+%   \end{tcl}
 %   
 %   The full call syntax of the ensemble is
 %   \begin{displaysyntax}
@@ -1560,6 +1720,7 @@ proc ::mtmtcl::groups::group_1.3_upgrade {name args} {
 %   which, when given a list of elements from the generator 
 %   structure, returns a sorted list of those elements.
 %   \begin{tcl}
+%<*freeabelian,pkg>
 namespace eval mtmtcl::groups::free_abelian_group {
    namespace ensemble create -parameters {set sorter}
    namespace export {[!-^`-~]*}
@@ -1717,7 +1878,7 @@ proc mtmtcl::groups::free_abelian_group::generators {X sorter args} {
 %   
 %   \begin{ensproc}{export}
 %     Of practical importance is the |export| subcommand required by  
-%     the \APIref*{export}{2.0} interface.
+%     the \APIref+{export}{2.0} interface.
 %     \begin{tcl}
 proc mtmtcl::groups::free_abelian_group::export {X sorter elem attr} {
    set root [list OMA $attr]
@@ -1753,6 +1914,7 @@ proc mtmtcl::groups::free_abelian_group::API {X sorter args} {
       export 2.0
    }} [{*}$X API canonise 1.0]] {*}$args
 }
+%</freeabelian,pkg>
 %     \end{tcl}
 %   \end{ensproc}
 % \end{ensemble}
@@ -1854,10 +2016,6 @@ proc mtmtcl::groups::free_abelian_group::API {X sorter args} {
 %   This is the same as version~2.0, except that it incorporates 
 %   version 1.0 of \APIref{additive group}{1.0} rather than~2.0.
 % \end{APIspec}
-% 
-% \begin{tcl}
-%</pkg>
-% \end{tcl}
 % 
 % 
 \endinput

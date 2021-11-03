@@ -120,7 +120,7 @@ package require Tcl 8.6
 package require mtmtcl::openmath 1.1
 package require API 1.0
 package require mtmtcl::rings::integers 1.2
-namespace eval ::mtmtcl::rings::power_products::dense {
+namespace eval ::mtmtcl::groups::power_products::dense {
 %   \end{tcl}
 %   
 %   \begin{tcl}
@@ -134,7 +134,7 @@ namespace eval ::mtmtcl::rings::power_products::dense {
    } -map {
       API {::API::staticn 1 {
          equality 1.0  canonise 1.1
-         monoid 1.3  semigroup 1.3
+         monoid 1.0  semigroup 1.0
          division 1.0
          export 2.0
          named 1.0
@@ -652,7 +652,7 @@ oo::define mtmtcl::rings::semigroup_algebra::accumulator method value {} {
 oo::define mtmtcl::rings::semigroup_algebra::accumulator method pop {} {
    set raw [heap::skiplist::pop $HeapPrefix $Skiplist]
    if {[llength $raw]} then {
-      return [list [lindex $entry 1] [lindex $entry 0]]
+      return [list [lindex $raw 1 1] [lindex $raw 1 0]]
    } else {
       return
    }
@@ -667,7 +667,7 @@ oo::define mtmtcl::rings::semigroup_algebra::accumulator method pop {} {
 oo::define mtmtcl::rings::semigroup_algebra::accumulator method peek {} {
    set raw [heap::skiplist::peek $HeapPrefix $Skiplist]
    if {[llength $raw]} then {
-      return [list [lindex $entry 1] [lindex $entry 0]]
+      return [list [lindex $raw 1 1] [lindex $raw 1 0]]
    } else {
       return
    }
@@ -941,9 +941,22 @@ proc Groebner::degrevlex {degL} {
 %     leading monomial of the \word{polynomial} and whose right hand 
 %     side is such that the difference between left and right hand 
 %     side is a scalar multiple of the \word{polynomial}. The return 
-%     value is the identifier for the new rule. Errors are thrown 
+%     value is a pair
+%     \begin{displaysyntax}
+%       \word{rule identifier} \word{coefficient}
+%     \end{displaysyntax}
+%     where the first element is the identifier for the new rule and 
+%     the second element is the coefficient that one would have to 
+%     multiply the difference $\mathit{rhs} - \mathit{lhs}$ by to 
+%     recover the \word{polynomial}. Errors are thrown 
 %     only if the \word{polynomial} is zero or the leading 
 %     coefficient of it is noninvertible.
+%     
+%     The reason the right hand side of the rule is taken as primary 
+%     is that in this direction \emph{applying} the rule amounds to 
+%     \emph{adding} (a multiple of) that polynomial; it's fewer 
+%     negations, at least conceptually (whereas computationally those 
+%     negations are typically folded into multiplications anyway).
 % \end{APIdescription}
 % 
 % 
@@ -1070,7 +1083,7 @@ oo::define Groebner::rewrite_system method reducerecord {poly} {
 %     \begin{tcl}
    set res [dict create]
    set record {}
-   set topP $RulesSkip
+   set topP no
    set curP no
    set active_rules [set new_active Inf]
 %     \end{tcl}
@@ -1089,9 +1102,9 @@ oo::define Groebner::rewrite_system method reducerecord {poly} {
 %     beginning.
 %     \begin{tcl}
          if {!$curP} then {
-            set topP [heap::skiplist::search $HeapPrefix $RulesSkip $topP [
+            set topP [heap::skiplist::search $HeapPrefix $RulesSkip [
                {*}$KeyPrefix [{*}$Monoid multidegree [lindex $term 0]]
-            ]]
+            ] $topP]
             if {!$topP} then {set active_rules 0; break}
             set curP $topP
             set active_rules $new_active
@@ -1212,7 +1225,8 @@ oo::define Groebner::rewrite_system method addrulefrompoly {polynomial} {
 %     The second step is to adjust the coefficients in the |rest| by 
 %     multiplying them by minus one over |lcoeff|.
 %     \begin{tcl}
-   set factor [{*}$Ring neg [{*}$Ring / [{*}$Ring 1] $lcoeff]]
+   set ncoeff [{*}$Ring neg $lcoeff]
+   set factor [{*}$Ring / [{*}$Ring 1] $ncoeff]
    set rhs [dict create]
    foreach {mu coeff} $rest {
       dict set rhs $mu [{*}$Ring * $factor $coeff]
@@ -1220,9 +1234,9 @@ oo::define Groebner::rewrite_system method addrulefrompoly {polynomial} {
 %     \end{tcl}
 %     Then actually adding the rule is again straightforward.
 %     \begin{tcl}
-   set res [llength $RulesL]
+   set res [list [llength $RulesL] $ncoeff]
    lappend RulesL [list $lmu $rhs]
-   heap::skiplist::insert $HeapPrefix $RulesSkip $lkey $res
+   heap::skiplist::insert $HeapPrefix $RulesSkip $lkey [lindex $res 0]
    return $res
 }
 %     \end{tcl}
@@ -1312,6 +1326,10 @@ oo::define Groebner::rewrite_system destructor {
    $Accumulator destroy
 }
 %     \end{tcl}
+%     The destructor should not destroy the heap, since if it is 
+%     owned by (created by) the rewrite system object, it is also 
+%     stored inside that object and will therefore be cleaned up 
+%     automatically when the object namespace dies.
 %   \end{tclcommand}
 %   
 %   \begin{tclcommand}{constructor}{}
@@ -1326,10 +1344,6 @@ oo::define Groebner::rewrite_system constructor\
    if {![{*}$monoid API monoid 1.0]} then {
       return -code error "This is not a monoid: $monoid"
    }
-   set Accumulator [
-      ::mtmtcl::rings::semigroup_algebra_accumulator new\
-        $ring $monoid $heap $order
-   ]
    set Monoid $monoid
 %     \end{tcl}
 %     \begin{variable}{heapstore}
@@ -1344,11 +1358,16 @@ oo::define Groebner::rewrite_system constructor\
       set HeapPrefix $heap
    } else {
       set HeapPrefix [heap::makecmd [self namespace]::heapstore -prefix 1]
+      {*}$HeapPrefix create
    }
 %       \end{tcl}
 %     \end{variable}
 %     \begin{tcl}
    set KeyPrefix $order
+   set Accumulator [
+      ::mtmtcl::rings::semigroup_algebra::accumulator new\
+        $ring $monoid $HeapPrefix $order
+   ]
    set RulesSkip [heap::skiplist::create $HeapPrefix {*}[
       lrepeat [llength [
          {*}$KeyPrefix [{*}$Monoid multidegree [{*}$Monoid 1]]
@@ -1400,6 +1419,9 @@ oo::define Groebner::rewrite_system constructor\
 %   general polynomial, but those operations are not core aspects of 
 %   the functioning of a rewriting system, so they are not provided 
 %   here. Practically, they could be bundled up as a mixin class.
+%   
+%   
+%   
 % \end{tclcommand}
 % 
 % 
@@ -1461,6 +1483,9 @@ oo::class create Groebner::Buchberger
 %       store.
 %   \end{ttdescription}
 %   
+%   \textbf{ToDo:} Implement keeping records. (First figure out how 
+%   to store them.)
+%   
 %   \begin{variable}{RewriteSystem}
 %   \begin{variable}{HeapPrefix}
 %     The |RewriteSystem| and |HeapPrefix| variables hold those 
@@ -1470,7 +1495,29 @@ oo::define Groebner::Buchberger variable RewriteSystem HeapPrefix
 %     \end{tcl}
 %   \end{variable}\end{variable}
 %   
-%   
+%   \begin{variable}{Derivation}
+%     The |Derivation| variable stores the records of how each 
+%     particular element in the (preliminary) Gr\"obner basis was 
+%     computed.
+%     \begin{tcl}
+oo::define Groebner::Buchberger variable Derivation
+%     \end{tcl}
+%     The value of this variable is a nested dictionary, where the 
+%     primary level keys are identifiers of current rewrite system 
+%     rules and the secondary level keys are identifiers of initial 
+%     rewrite system rules. The secondary level values are 
+%     polynomials. If $f_i$ is $\mathit{rhs} - \mathit{lhs}$ for the 
+%     rule with identifier $i$, then the invariant is
+%     \[
+%       f_i = 
+%       \sum_j \texttt{[dict get \$Derivation $i$ $j$]} \cdot f_j
+%     \]
+%     (an identity that would hold also under the opposite 
+%     convention that the $f_i$s are $\mathit{lhs} - \mathit{rhs}$). 
+%     Note however that making a rule out of a polynomial will turn 
+%     that polynomial into a monic polynomial; these identities need 
+%     not hold with the ideal generators that were given.
+%   \end{variable}
 %   
 %   \begin{tclcommand}{constructor}{}
 %     The first part of the constructor is about setting up the data 
@@ -1478,7 +1525,7 @@ oo::define Groebner::Buchberger variable RewriteSystem HeapPrefix
 %     \begin{tcl}
 oo::define Groebner::Buchberger constructor {rwsys args} {
    set RewriteSystem $rwsys
-   array set Opt {-heap {}}
+   array set Opt {-heap {} -record 0}
    array set Opt $args
    switch -- $Opt(-heap) "" {
       set HeapPrefix [list $RewriteSystem heap]
@@ -1486,13 +1533,13 @@ oo::define Groebner::Buchberger constructor {rwsys args} {
       set HeapPrefix [heap::makecmd [self namespace]::heap -prefix 1]
 %     \end{tcl}
 %     \begin{variable}{heap}
-%       If an object variable named |heap| exists, then it is used 
-%       for storing the heap used by this object. It is not imported 
-%       into the local scopes of methods, because it is always fully 
-%       namespace-qualified when accessed (and only accessed through 
-%       commands in the |heap| package). The heap need not be 
-%       explicitly destroyed, because it will go away when the object 
-%       is destroyed.
+%       In the case a self-hosted heap stores the critical pairs 
+%       queue, that heap is stored in the object variable named 
+%       |heap|. This variable is not imported into the local scopes 
+%       of methods, because it is always fully namespace-qualified 
+%       when accessed (and only accessed through commands in the 
+%       |heap| package). The heap need not be explicitly destroyed, 
+%       because it will go away when the object is destroyed.
 %     \end{variable}
 %     \begin{tcl}
    } default {
@@ -1552,14 +1599,22 @@ oo::define Groebner::Buchberger constructor {rwsys args} {
 %       the ideal.
 %     \end{tclcommand}
 %     
-%     
+%     When attaching a |Buchberger| object to a rewriting system, 
+%     critical pairs are generated for all rules already present. 
 %     \begin{tcl}
+   set allrules [$RewriteSystem dump]
+   for {set j 0} {$j < [llength $allrules]} {incr j 3} {
+      for {set i 0} {$i < $j} {incr i 3} {
+         my makepair {*}[lrange $allrules $i $i+2]\
+           {*}[lrange $allrules $j $j+2]
+      }
+   }
 }
 %     \end{tcl}
 %   \end{tclcommand}
 %   
 %   \begin{tclcommand}{destructor}{}
-%     All the constructor has to do is destroy the critical pairs 
+%     All the destructor has to do is destroy the critical pairs 
 %     queue.
 %     \begin{tcl}
 oo::define Groebner::Buchberger destructor {
@@ -1580,7 +1635,7 @@ oo::define Groebner::Buchberger destructor {
 %     $0$ otherwise. 
 %     
 %     \begin{tcl}
-oo::define Groebner::Buchberger method {id1 lhs1 rhs1 id2 lhs2 rhs2} {
+oo::define Groebner::Buchberger method makepair {id1 lhs1 rhs1 id2 lhs2 rhs2} {
    set gcd [$RewriteSystem monoid 3gcd $lhs1 $lhs2]
    if {[lindex $gcd 0] ne "commutative"} then {
       return -code error "Don't know how to deal with a 3gcd of type:\
@@ -1635,13 +1690,366 @@ oo::define Groebner::Buchberger method {id1 lhs1 rhs1 id2 lhs2 rhs2} {
 %     \end{tcl}
 %   \end{tclcommand}
 %   
+%   \begin{tclcommand}{method}{extend}
+%     This method extends the preliminary Gr\"obner basis with a new 
+%     element, and computes the critical pairs formed by that new 
+%     element. The call syntax is
+%     \begin{displaysyntax}
+%       my extend \word{polynomial}
+%     \end{displaysyntax}
+%     where the \word{polynomial} should not be zero. The return 
+%     value is a list
+%     \begin{displaysyntax}
+%       \word{id} \word{coeff} \word{no.~pairs}
+%     \end{displaysyntax}
+%     where \word{id} is the identifier of the new rule, \word{coeff} 
+%     is the coefficient to recreate the \word{polynomial} (as with 
+%     |addrulefrompoly|), and \word{no.~pairs} is the number of 
+%     new critical pairs that were created.
+%     
+%     Since we want to consider all pairs of new rule and previously 
+%     existing rule, we start out listing all existing rules before 
+%     adding the new one.
+%     \begin{tcl}
+oo::define Groebner::Buchberger method extend {poly} {
+   set oldsys [$RewriteSystem dump]
+   set res [$RewriteSystem addrulefrompoly $poly]
+   set id1 [lindex $res 0]
+   lassign [$RewriteSystem get $id1] lhs1 rhs1
+   set n 0
+   foreach {id2 lhs2 rhs2} $oldsys {
+      incr n [
+         my makepair $id1 $lhs1 $rhs1 $id2 $lhs2 $rhs2
+      ]
+   }
+   lappend res $n
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{advance}
+%     This method advances the Buchberger algorithm calculation by a 
+%     step of one critical pair. The call syntax is
+%     \begin{displaysyntax}
+%       my advance
+%     \end{displaysyntax}
+%     and the return value is a dictionary with various keys 
+%     describing how much was done:
+%     \begin{description}
+%       \item[popped]
+%         The number of critical pairs that have been removed from 
+%         the queue: |0| or |1|. If |0|, the queue was empty (and 
+%         still is).
+%       \item[newrule]
+%         If |1|, the critical pair did not resolve and a new rule 
+%         has been added. If |0|, the critical pair did resolve.
+%       \item[newpairs]
+%         The number of new critical pairs that were added.
+%     \end{description}
+%     
+%     \begin{tcl}
+oo::define Groebner::Buchberger method advance {} {
+   set cpair [lindex [my Queue pop] 1]
+   if {![llength $cpair]} then {
+      return {popped 0 newrule 0 newpairs 0}
+   }
+   switch -- [lindex $cpair 0] "overlap" {
+      lassign $cpair "" mu1 mu2 mu3 id1 id2
+      if {![$RewriteSystem exists $id1] ||\
+        ![$RewriteSystem exists $id2]} then {
+         return {popped 1 newrule 0 newpairs 0}
+%     \end{tcl}
+%     Critical pairs involving a discarded rule need not be processed 
+%     further; correctness only requires processing the |inclusion| 
+%     pair generated from that rule when it was discarded.
+%     \begin{tcl}
+      }
+      set rule1 [$RewriteSystem get $id1]
+      set rule2 [$RewriteSystem get $id2]
+      set syzygy [$RewriteSystem polynomial - [
+         $RewriteSystem polynomial * [lindex $rule1 1]\
+           [$RewriteSystem polynomial basiselement $mu3]
+      ] [
+         $RewriteSystem polynomial *\
+           [$RewriteSystem polynomial basiselement $mu1]\
+           [lindex $rule2 1]
+      ]]
+      set result [$RewriteSystem reduce $syzygy]
+      if {[$RewriteSystem polynomial iszero $result]} then {
+         return {popped 1 newrule 0 newpairs 0}
+      } else {
+         return [dict create  popped 1  newrule 1  newpairs [lindex [
+            my extend $result
+         ] 2]]
+      }
+   } "inclusion" {
+      set result [$RewriteSystem reduce [lindex $cpair 1]]
+      if {[$RewriteSystem polynomial iszero $result]} then {
+         return {popped 1 newrule 0 newpairs 0}
+      } else {
+         return [dict create  popped 1  newrule 1  newpairs [lindex [
+            my extend $result
+         ] 2]]
+      }
+   } default {
+      error "Unknown type of critical pair: $cpair"
+   }
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   \begin{tclcommand}{method}{run}
+%     The |run| method automates repeatedly calling |advance| until 
+%     the queue is empty, but it also maintains a timeout to prevent 
+%     the process from becoming nonresponsive. The call syntax is
+%     \begin{displaysyntax}
+%       my run \word{timeout}\regopt
+%     \end{displaysyntax}
+%     where the \word{timeout} is in a number of milliseconds; the 
+%     default is |30000| for half a minute.
+%     
+%     The return value is a dictionary, with one entry |done| that is 
+%     |1| if the Buchberger algorithm has terminated and |0| if |run| 
+%     timed out. Remaining entries are cumulative sums of the entries 
+%     in the return values from the |advance| calls that actually 
+%     process the critical pairs.
+%     
+%     \begin{tcl}
+oo::define Groebner::Buchberger method run {{timeout 30000}} {
+   set stop [expr {[clock milliseconds] + $timeout}]
+   set res [dict create done 0]
+   while {[dict get [set D [
+      my advance
+   ]] popped]} {
+      dict for {key val} $D {dict incr res $key $val}
+      if {[clock milliseconds] >= $stop} then {return $res}
+   }
+   dict set res done 1
+   return $res
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
 %   
 % \end{tclcommand}
 % 
 % 
+% \subsection{Enumerating the irreducibles}
+% 
+% For some operations, it is useful to have an explicit list of all 
+% irreducible monomials (at least when there are finitely many of 
+% them). The ``space'' in which they live can however be rather 
+% high-dimensional (as well as discrete), so computing that list is 
+% not entirely trivial. Therefore it is convenient to have a method 
+% that does this built into the rewrite system already.
+% 
+% \begin{tclcommand}{class}{irreducibles}
+%   The |Grobner::irreducibles| class is a mixin for the 
+%   |Grobner::rewrite_system| class, which provides a method 
+%   irreducibles that returns the list of irreducible monomials (as 
+%   elements of the |monoid|). The reason it is a mixin rather than a 
+%   part of the |rewrite_system| class is that it requires a bit more 
+%   of the |monoid| substructure than |rewrite_system| does, so it is 
+%   only mixed in if the |monoid| supports the necessary interfaces.
+%   
+%   
+%   \begin{tcl}
+oo::class create Groebner::irreducibles
+%   \end{tcl}
+%   \setnamespace{\meta{rewrite system}}
+%   
+%   Most of the work is done operating on lists of exponents (the 
+%   |multidegree|s). Let us call the list\slash set of tuples a 
+%   \emph{tableaux} (as that's pretty much what they are in the $2$ 
+%   variables case). The algorithm employed extends the current 
+%   tableaux with one variable\slash axis at a time, treating the 
+%   previous tableaux constructed as a slice of the current tableaux. 
+%   There are two basic operations:
+%   \begin{itemize}
+%     \item
+%       Inserting a coordinate for the new axis\slash variable into 
+%       each tuple of a tableaux. This is essentially an idiom
+%       \begin{quote}
+%         |lmap tuple $tableaux {linsert $tuple 0 $newcoord}|
+%       \end{quote}
+%       so it needs no helper method.
+%     \item
+%       Filtering out tuples above a given tuple from a tableaux 
+%       slice: this is complicated enough that one might factor it 
+%       out, but since it's only done at one point the extra hassle 
+%       of making it a method doesn't seem worth it.
+%   \end{itemize}
+%   To add an axis, you start out with a slice, inserting $0$ as the 
+%   new coordinate. Then for each new level you filter out those 
+%   tuples that become dominated by some left hand side, before 
+%   inserting that level as the new coordinate. Stop when the slice 
+%   has been filtered down to empty; if it never becomes empty then 
+%   the set of irreducibles is infinite, so error out instead.
+%   
+%   \begin{tclcommand}{method}{complement_tableaux}
+%     This method takes a list of multidegree tuples (and optionally 
+%     a mask of indices) as argument, and returns the largest tableaux 
+%     (a set\slash list of tuples closed under decrementing 
+%     individual elements) not containing any of those specified. 
+%     This operation constitutes the heart of computing the 
+%     irreducible monomials with respect to a rewrite system, but it 
+%     does not by itself use any part of the object, so in principle 
+%     it could be turned into an ordinary procedure instead.
+%     
+%     The call syntax is
+%     \begin{displaysyntax}
+%       my |complement_tableaux| \word{tuple-list} \word{mask}\regopt
+%     \end{displaysyntax}
+%     where all elements in the \word{tuple-list} are required to be 
+%     equal length lists of natural numbers. The \word{mask} is a 
+%     list of indices into these tuples; if provided, the tableaux 
+%     returned is restricted to tuples which are $0$ in all positions 
+%     listed in the \word{mask}. It is an error (which will be 
+%     detected) if the sought tableaux is infinite; useful data may 
+%     then be obtained by masking out those coordinates which are 
+%     unbounded.
+%     
+%     
+%     \begin{tcl}
+oo::define Groebner::irreducibles method complement_tableaux {
+   corners {mask {}}
+} {
+%     \end{tcl}
+%     The first step is to preprocess the |corners| list, to organise 
+%     the tuples by the number of leading zeroes; the |cornersD| 
+%     variable is a dictionary indexed by number of leading zeroes, 
+%     and whose values are lists of those tuples.
+%     \begin{tcl}
+   set cornersD [dict create]
+   foreach c $corners {
+      foreach i $mask {lset c $i 0}
+      set i [lsearch -integer -not $c 0]
+      if {$i<0} then {
+         return {}
+%     \end{tcl}
+%     If there is an all-zeroes tuple, then the sought tableaux is 
+%     empty.
+%     \begin{tcl}
+      }
+      dict lappend cornersD $i $c
+   }
+   foreach i $mask {dict set cornersD $i {}}
+%     \end{tcl}
+%     Having an empty entry in the |cornersD| dictionary is used as a 
+%     signal that an axis is masked. An axis not having an entry in 
+%     the |cornersD| dictionary dictionary is possible, but an error; 
+%     this is an extreme case of that axis needing to be masked.
+%     
+%     The main loop is over the tableaux axes. The previous 
+%     preliminary result is declared a mere slice of the full 
+%     tableaux, which is built level by level. As we raise in 
+%     |level|, the |slice| is thinned out by the corner tuples we 
+%     encounter.
+%     \begin{tcl}
+   set res {{}}
+   for {
+      set i [expr {[llength [lindex $corners 0]] - 1}]
+   } {$i >= 0} {incr i -1} {
+      set slice $res
+      set res {}
+      if {![dict exists $cornersD $i]} then {
+         return -code error "Axis $i is unbounded (and not masked);\
+           tableaux would be infinite"
+      }
+      if {![llength [dict get $cornersD $i]]} then {
+         foreach t $slice {
+            lappend res [linsert $t 0 0]
+         }
+         continue
+      }
+%     \end{tcl}
+%     Now we are past the exceptional cases of manifestly unbounded 
+%     axes, and into the main case of a diminishing slice. Here, we 
+%     have a loop over the corners that we are going to cut out, 
+%     intervowen with a loop over the levels (the corner loop being 
+%     the controlling one). To that end, we need to sort the corners 
+%     by the level at which they become active.
+%     \begin{tcl}
+      set level 0
+      foreach corner [lsort -integer -index $i [dict get $cornersD $i]] {
+%     \end{tcl}
+%     At all levels below that of the current corner, the current 
+%     slice is the one to copy. Depending on how the corners are 
+%     distributed, that may be one, multiple, or no levels.
+%     \begin{tcl}
+         for {} {$level < [lindex $corner $i]} {incr level} {
+            foreach t $slice {
+               lappend res [linsert $t 0 $level]
+            }
+         }
+%     \end{tcl}
+%     The purpose of a |corner| is to be cut off from the |slice|; 
+%     those tuples that |pass| (and may remain in the slice) are 
+%     those that in some coordinate are strictly smaller than the 
+%     |corner|. This is examined coordinate by coordinate, where 
+%     those tuples that have not yet passed are thrown on the |maybe| 
+%     pile.
+%     \begin{tcl}
+         set pass {}
+         for {set j 0} {$j < [llength $corner] - $i - 1} {incr j} {
+            set limit [lindex $corner [expr {$i+1+$j}]]
+            set maybe {}
+            foreach t $slice {
+               if {[lindex $t $j] < $limit} then {
+                  lappend pass $t
+               } else {
+                  lappend maybe $t
+               }
+            }
+            set slice $maybe
+         }
+         set slice $pass
+      }
+%     \end{tcl}
+%     After processing all corners, we expect the |slice| to be 
+%     empty. If it isn't then the current axis is unbounded.
+%     \begin{tcl}
+      if {[llength $slice]} then {
+         return -code error "Axis $i is unbounded (and not masked);\
+           tableaux would be infinite"
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   
+%   \begin{tclcommand}{method}{irreducibles}
+%     This is a wrapper around the |complement_tableaux| method, that 
+%     works with algebraic objects rather than multidegree tuples. 
+%     The call syntax is
+%     \begin{displaysyntax}
+%       my irreducibles \word{mask}\regopt
+%     \end{displaysyntax}
+%     where the \word{mask} argument is the same as for the 
+%     |complement_tableaux| method.
+%     
+%     
+%     \begin{tcl}
+oo::define Groebner::irreducibles method irreducibles {{mask {}}} {
+   lmap tuple [
+      my complement_tableaux [
+         lmap {id lhs rhs} [my dump] {my monoid multidegree $lhs}
+      ] $mask
+   ] {my monoid tuple {*}$tuple}
+}
+%     \end{tcl}
+%   \end{tclcommand}
+%   
+%   
+%   
+% 
+% 
+% \end{tclcommand}
 % 
 % ---
 % 
 % 
-%   
-endinput
+% 
+\endinput

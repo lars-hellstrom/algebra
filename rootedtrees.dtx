@@ -1,0 +1,1224 @@
+% \iffalse
+%<*driver>
+\documentclass{mtmtcl}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{tikz}
+\usetikzlibrary{fit,shapes.geometric}
+\newcommand{\graft}{\mathbin{\curvearrowright}}
+\begin{document}
+\DocInput{rootedtrees.dtx}
+\end{document}
+%</driver>
+% \fi
+% 
+% 
+% \title{The rooted trees pre-Lie algebra --- a case study}
+% \author{Lars Hellstr\"om}
+% \maketitle
+% 
+% 
+% \begin{abstract}
+%   The following is a case study of implementing an algebra whose 
+%   linear structure is just that of formal linear combinations of 
+%   some combinatorial objects, but where the operation on these 
+%   combinatorial objects which give rise to the algebra 
+%   multiplication does not stay within these combinatorial objects. 
+%   The object of that study is the rooted trees pre-Lie algebra, 
+%   where the combinatorial objects are rooted trees (in the proper 
+%   graph-theoretical sense) and the combinatorial operation consists 
+%   of mounting one tree on top of another.
+% \end{abstract}
+% 
+% \subsection*{Acknowledgement}
+% 
+% This study grew from some questions inspired by a lecture series 
+% held by Prof.~Chengming Bai.
+% 
+% 
+% \section{The mathematical background}
+% \label{Sec:MathBackground}
+% 
+% If we are to be formal about it, a \emph{rooted tree} is a triplet 
+% $(V,E,r)$ where $V$ and $E$ are the sets of vertices and edges 
+% respectively of a tree (connected simple acyclic graph), and \(r 
+% \in V\) is a vertex designated as root. Two rooted trees 
+% $(V_1,E_1,r_1)$ and $(V_2,E_2,r_2)$ are isomorphic if the trees 
+% $(V_1,E_1)$ and $(V_2,E_2)$ are isomorphic as graphs, and the 
+% isomorphism maps $r_1$ to $r_2$. (Our objects are formally going to 
+% be isomorphism classes of rooted trees, but as is customary these 
+% will be thought of as unlabelled graphs.) It turns out there is a 
+% convenient textual notation for (unlabelled) rooted trees which we 
+% will develop shortly, but for now let's stick with them being given 
+% as labelled graphs.
+% 
+% The multiplication operation in the rooted trees pre-Lie algebra is 
+% $\graft$, defined as
+% \begin{equation} \label{Eq:GraftDefinition}
+%   (V_1,E_1,r_1) \graft (V_2,E_2,r_2) =
+%   \sum_{v \in V_2} \bigl( 
+%     V_1 \mathbin{\dot{\cup}} V_2, E_1 \cup \{r_1v\} \cup E_2, r_2
+%   \bigr)
+%   \text{,}
+% \end{equation}
+% i.e., the left tree is grafted onto the right tree by connecting 
+% the left tree root $r_1$ to some vertex $v$ of the right tree via 
+% the new edge $r_1 v$. Rather than having a rule distinuishing one 
+% grafting position, the result is the (formal) sum over all possible 
+% grafting positions, so the operation naturally lives in an algebra 
+% with the rooted trees as basis; grafting can be extended to 
+% arbitrary elements of that algebra by bilinearity.
+% 
+% Having this linear structure at hand allows for a compact algebraic 
+% statement of some combinatorial observations. To wit, doing two 
+% grafting steps produces a linear combination of trees with vertex 
+% sets the disjoint union of the three factor trees, but the order of 
+% grafting matters. In $(T_1 \graft\nobreak T_2) \graft T_3$ the 
+% parent of the root of $T_1$ will always be a vertex of $T_2$, but in 
+% $T_1 \graft (T_2 \graft\nobreak T_3)$ that parent is a vertex of 
+% $T_2$ or $T_3$). Hence the difference
+% \begin{equation} \label{Eq:Negassoc}
+%   T_1 \graft (T_2 \graft T_3) - (T_1 \graft T_2) \graft T_3
+% \end{equation}
+% is a sum over all ways of grafting $T_1$ and $T_2$ onto just $T_3$, 
+% i.e.,
+% \begin{multline} \label{Eq:GraftSumDifference}
+%   (V_1,E_1,r_1) \graft
+%     \bigl( (V_2,E_2,r_2) \graft (V_3,E_3,r_3) \bigr) 
+%     +{}\\{}-
+%   \bigl( (V_1,E_1,r_1) \graft (V_2,E_2,r_2) \bigr) \graft
+%     (V_3,E_3,r_3)
+%   = \\ =
+%   \sum_{u,v \in V_3} \bigl( 
+%     V_1 \mathbin{\dot{\cup}} V_2 \mathbin{\dot{\cup}} V_3, 
+%     E_1 \cup E_2 \cup \{r_1 u, r_2 v\} \cup E_3, 
+%     r_3
+%   \bigr)
+%   \text{.}
+% \end{multline}
+% This kind of inclusion--exclusion counting is a powerful tool in 
+% combinatorics, but the difference \eqref{Eq:Negassoc} is also 
+% familiar from higher abstract algebra. Normally one would define 
+% the \emph{associator} (for the $\graft$ operation) as
+% \begin{equation}
+%   (T_1,T_2,T_3) := 
+%   (T_1 \graft T_2) \graft T_3 - T_1 \graft (T_2 \graft T_3)
+%   \text{,}
+% \end{equation}
+% i.e., the negative of \eqref{Eq:Negassoc}, and then the symmetry 
+% between left and middle factor in \eqref{Eq:GraftSumDifference} 
+% leads to the algebraic identity
+% \begin{equation} \label{Eq:leftsymmety}
+%   (T_1, T_2, T_3) = (T_2, T_1, T_3)
+%   \qquad\text{for all rooted trees $T_1,T_2,T_3$;}
+% \end{equation}
+% this is the identity characterising \emph{left-symmetric algebras}, 
+% which are also called \emph{pre-Lie algebras}. That latter name 
+% come from the fact that any algebra with a multiplication $\graft$ 
+% satisfying \eqref{Eq:leftsymmety} is also a Lie algebra under the 
+% commutator bracket \([a,b] = a \graft b - b \graft a\), as the 
+% Jacobi identity \(\bigl[ [a,b], c\bigr] + \bigl[ [b,c], a\bigr] + 
+% \bigl[ [c,a], b\bigr] = 0\) of a Lie algebra is then exactly the sum 
+% of three instances of the left-symmetric identity 
+% \eqref{Eq:leftsymmety}.
+% 
+% 
+% \section{Technical background}
+% 
+% \mtl\footnote{
+%   Basically the word `mathematical' abbreviated by throwing away 
+%   half the letters, particularly the vowels.
+% } is a system for implementing mathematical (primarily algebraic) 
+% computations. Rather than being a monolithic Computer Algebra 
+% System, it is an open collection of small packages that build upon 
+% each other; it turns out that it is in this way possible to quite 
+% quickly realise mathematical objects of surprising complexity, 
+% intricacy, and power.
+% 
+% A key observation guiding the design of \mtl\ is that most textbook 
+% constructions are stated not in terms of fixed mathematical 
+% objects, but in terms of abstract structures\Dash when defining an 
+% algebra, one typically makes (explicit or implicit) use of the 
+% operations in the underlying ring of scalars, but there is rarely 
+% just one ring that would work; the normal state of affairs is 
+% rather that the construction will work for \emph{any} set of 
+% scalars satisfying the appropriate list of axioms! A typical 
+% \mtl\ package implements a construction of some algebraic 
+% structure, taking zero or more previously constructed structures as 
+% parameters of the construction, so that one for example may have 
+% one package |mtmtcl::rings::semigroup_algebra| implementing the 
+% construction of a semigroup algebra $\mathcal{R}[\mathcal{S}]$ for 
+% arbitrary combinations of coefficient ring $\mathcal{R}$ and basis 
+% semigroup $\mathcal{S}$.\footnote{
+%   That there is one package which can construct any semigroup 
+%   algebra does not mean that \emph{it} should construct every 
+%   semigroup algebra; there can be several approaches to 
+%   implementing a construction, and the openness of \mtl\ means 
+%   anyone is free to provide an alternative for any link in a chain 
+%   of constructions. This case study was begun at a time where the 
+%   standard semigroup algebra package was aquiring its third 
+%   implementation, despite all three versions using the same 
+%   representation of data; exercising a different data storage is 
+%   otherwise one of the main reasons for creating an alternative 
+%   implementation of a construction.
+% }
+% 
+% Mathematical structures exist as explicit entities within the \mtl\ 
+% system, though primarily in an operational sense: a mathematical 
+% structure is manifested as a collection of operations on or related 
+% to said structure. Some of these are the |+|, |*|, or whatever 
+% operations of a standard axiomatisation of this kind of structure; 
+% notable constants such as zero and one (where applicable) are provided 
+% in the universal algebra way, as operations |0| and |1| that return 
+% the wanted element without taking any arguments. Other 
+% operations are more about synthesising or analysing elements of the 
+% structure, for example the semigroup algebra 
+% $\mathcal{R}[\mathcal{S}]$ by definition has the semigroup 
+% $\mathcal{S}$ as basis, so there is an $\mathcal{R}$-valued 
+% operation \texttt{coeff} taking operands $s$ and $a$ that returns 
+% the coefficient that in the formal linear combination \(a \in 
+% \mathcal{R}[\mathcal{S}]\) is attached to the basis element 
+% \(s \in \mathcal{S}\). A third type of 
+% operation is the |API| operation, which does not act upon structure 
+% elements at all, but rather queries the structure 
+% whether it supports some named set of 
+% axioms (including details of syntaxes for the covered operations). 
+% A construction such as that of a semigroup algebra may use |API| 
+% queries of the underlying structures to choose one of several 
+% possible implementations of an operation, and also to determine 
+% what properties it should claim that the result will have. For 
+% example, if the supplied $\mathcal{R}$ is not commutative then the 
+% structure produced by the construction of 
+% $\mathcal{R}[\mathcal{S}]$ will not be an algebra, but it will 
+% still be a ring and a left $\mathcal{R}$-module, so rather than 
+% having the construction error out, it can do its thing best as 
+% possible, and then be honest about what that achieved.
+% 
+% Sometimes, practical implementations require operations that have 
+% no standard notation in printed mathematics, perhaps because the 
+% operation is not uniquely determined. For example, a Principal Ideal 
+% Domain has the property that any ideal is generated by one element, 
+% so there is an operation \(\gcd\colon (a,b) \mapsto d\) such that 
+% \(\langle d \rangle = \langle a,b \rangle\), and although this 
+% condition typically does not uniquely determine that $\gcd$ map (since 
+% \(\langle -d\rangle = \langle d\rangle\), among other reasons), it 
+% is still a useful operation. Continuing, there is also the ``extended 
+% GCD'' operation \((a,b) \mapsto (r,s)\) such that $ra + sb$ alone 
+% generates the ideal $\langle a,b\rangle$, for which there is even 
+% less of an established notation even though the concept is clear 
+% enough. In practice, it would probably be futile to expect there to 
+% be traditional  
+% formula expressions for all operations that may come up, so \mtl\ 
+% documentation instead uses a hybrid notation that combines computer 
+% code with mathematical expressions: besides standard mathematical 
+% notation, one may also use phrases such as `\texttt{[$\mathcal{A}$ 
+% * $a$ $b$]}'---the main parts of which are: left bracket 
+% \texttt{[}, structure $\mathcal{A}$, operation name \texttt{*}, 
+% operands $a$ and $b$, and right bracket \texttt{]}---to denote the 
+% result of applying the \texttt{*} operation of the $\mathcal{A}$ 
+% structure to the operands $a$ and $b$. The brackets are there as 
+% delimiters in case such a hybrid expression occurs as a 
+% subexpression of a larger formula, and the use of 
+% \texttt{typewriter} type is to signal that this is not ordinary 
+% mathematical notation. As a slightly larger example, the associator 
+% \((a,b,c) := (ab)c - a(bc)\) of an algebra $\mathcal{A}$ would in 
+% this notation appear as
+% \begin{displaysyntax}
+%   [$\mathcal{A}$ -
+%   [$\mathcal{A}$ * [$\mathcal{A}$ * $a$ $b$] $c$] 
+%   [$\mathcal{A}$ * $a$ [$\mathcal{A}$ * $b$ $c$]]]
+% \end{displaysyntax}
+% This is of course more cluttered than the standard way of writing 
+% that formula, but it is on par with what it would look like if 
+% fully parenthesised and every operation tagged with the relevant 
+% structure, i.e.,
+% $$
+%   ((a *_\mathcal{A} b) *_\mathcal{A} c) -_\mathcal{A} 
+%   (a *_\mathcal{A} (b *_\mathcal{A} c))
+% $$
+% For reading aloud, `\texttt{[$\mathcal{A}$ * $b$ $c$]}' becomes 
+% ``$\mathcal{A}$-multiply $b$ and $c$'', which works quite well; 
+% $b *_\mathcal{A} c$ is less clear how to pronounce all pieces of. 
+% Still, these hybrid formulae are no practical replacement for the 
+% traditional mathematical notation; their main use is in highly 
+% formalised contexts, such as stating axioms or definitions, in  
+% direct relation to \mtl\ structures.
+% 
+% Finally, a different reason for the name \mtl\ is that the system 
+% uses the \Tcl\ language~\cite{www.tcl.tk} for its main 
+% computational environment. What this technically means is that the 
+% way different packages are combined is via calls through a \Tcl\ 
+% interpreter; this is at its core a lightweight generic dispatch 
+% engine, which just so happens to have complete dynamic programming 
+% language built in. In practice that programming language also tends 
+% to be used for implementing the packages (especially the higher 
+% level ones), since it provides an adequate combination of ease of 
+% implementation and runtime performance. The following is no 
+% exception; the curious reader can look up details of the core 
+% commands at \texttt{http://www.tcl.tk/documentation}.
+% 
+% 
+% 
+% 
+% \section{The API situation}
+% 
+% Since much of the machinery needed to implement the rooted trees 
+% algebra is common with that for an ordinary semigroup algebra\Ldash
+% algebra elements are formal linear combinations of elements from 
+% some other set, which as far as the linear operations are concerned 
+% need have no inner structure at all\Rdash one might wonder what 
+% opportunities there are for also integrating the implementations of 
+% these two algebra types, while of course keeping separate concerns 
+% separate. As it turns out this can be done, mostly by providing a 
+% rooted trees structure in place of the ordinary semigroup, but it 
+% requires defining a new interface.
+% 
+% \begin{APIspec}{multiset-valued product}{1.0}
+%   The \verb*|multiset-valued product| interface extends 
+%   \APIref+{equality}{1.0} with one method
+%   \begin{APIdescription}{structure}
+%     \begin{APImethod}{multiset-valued product}
+%       \word{element} \word{element}
+%     \end{APImethod}
+%       which is conceptually like the |*| method of a 
+%       \APIref{magma}{1.0}, computing some product of two 
+%       \word{element}s, but syntactically different in that it 
+%       returns a \emph{list} of \meta{structure} elements, 
+%       interpreted as a multiset by ignoring order in the list.
+%       
+%       The \verb*|multiset-valued product| operation is required to 
+%       be congruent, in the sense that |=|-equal operands return 
+%       equivalent multisets. Technically, if $M$ is a structure 
+%       satisfying this interface, \(a_1,a_2,b_1,b_2 \in M\) are 
+%       elements such that \texttt{[$M$ = $a_1$ $a_2$]} and 
+%       \texttt{[$M$ = $b_1$ $b_2$]}, furthermore $P_1$ is the result 
+%       of
+%       \begin{displaysyntax}
+%         [$M$ multiset-valued\PrintChar{32}product $a_1$ $b_1$]
+%       \end{displaysyntax}
+%       and $P_2$ is the result of
+%       \begin{displaysyntax}
+%         [$M$ multiset-valued\PrintChar{32}product $a_2$ $b_2$]
+%       \end{displaysyntax}
+%       then there is a bijection \(\sigma\colon \{0,1,\dotsc, n 
+%       -\nobreak 1\} \longrightarrow \{0,1,\dotsc, n 
+%       -\nobreak 1\}\) (where \(n = \texttt{[llength $P_1$]} = 
+%       \texttt{[llength $P_2$]}\)) such that
+%       \begin{displaysyntax}
+%         [lindex $P_1$ $i$]\par
+%         [lindex $P_2$ $\sigma(i)$]
+%       \end{displaysyntax}
+%       are |=|-equal for all \(i=0,\dotsc,n-1\).
+%   \end{APIdescription}
+% \end{APIspec}
+% 
+% Note that despite the rather large amounts of text, that places 
+% about as few requirements on the operation as a magma does. The 
+% whole thing could be shortened considerably if there was an 
+% explicit multiset equality operation that could be used to state 
+% the congruence condition, but we do not make that requirement 
+% (since implementing one can be much messier than implementing the 
+% product operation that is the point of the whole thing). Still, 
+% having a `multiset of \meta{structure} elements' structure hung off 
+% this one through a |Multiset| method could be a worthwhile 
+% addition, especially if one wants to go on to state things such as 
+% associativity for the product operation. An analogy with semigroups 
+% would suggest going in that direction, but here our primary 
+% objective is the rooted trees algebra which is not associative anyway. 
+% A condition implying left-symmetry can still be stated, but it is 
+% growing increasingly esoteric to do so in the form of a property of 
+% the structure that serves as basis of the algebra, rather than  
+% introducing it as a property of the algebra.
+% 
+% A better question might be why we bring multisets into the picture 
+% in the first place, as \eqref{Eq:GraftDefinition} is explicitly an 
+% equality of elements in the \emph{algebra}. The reasons for that 
+% have more to do with style than with logic.
+% The `formal linear combinations of \dots' construction that 
+% underlies the semigroup algebra machinery that we hope to make use 
+% of derives some of its strength from its ability to combine two 
+% very different structures into one algebra\Dash on the one hand 
+% there is some ring that provides the scalar coefficients, and on 
+% the other hand there is the set that will become the basis. The 
+% structure of this latter set is often closer to discrete 
+% mathematics than to algebra (trees are definitely discrete 
+% mathematics), so there is a point in sticking to the concepts of 
+% that realm when defining it. 
+% 
+% \subsection{Coproducts: a digression}
+% 
+% Multiset-valued products may not have 
+% seen much use in the literature, but there is plenty of precedence 
+% for (multi)set-valued \emph{coproducts}, since a coalgebra 
+% coproduct \(\Delta\colon C \longrightarrow C \otimes C\) 
+% immediately puts the spotlight on the differences between the 
+% tensor product $\otimes$ and the plain Cartesian product $\times$; 
+% the discrete realisation of this concept (that actually is used in 
+% some parts of computer science) cannot simply be the same as the 
+% algebraic definition with the linear structure omitted. Making the 
+% (co)operations set-valued lets you define a coproduct $\Delta$ on 
+% a discrete set such as $\{1,p\}$ by
+% \begin{align*}
+%   \Delta(1) ={}& \bigl\{ (1,1) \bigr\} \text{,}\\
+%   \Delta(p) ={}& \bigl\{ (p,1), (1,p) \bigr\} 
+% \end{align*}
+% which can sensibly be regarded as having a counit partner 
+% satisfying \(\varepsilon(p) = \varnothing\) and \(\varepsilon(1) = 
+% \bigl\{ () \bigr\}\), since then \(\bigl( (\varepsilon \times\nobreak 
+% \mathrm{id}) \circ\nobreak \Delta \bigr)(p) = (\varepsilon 
+% \times\nobreak \mathrm{id})\bigl( \bigl\{ (p,1), (1,p) \bigr\} 
+% \bigr) = (\varepsilon \times\nobreak \mathrm{id})(p,1) \cup 
+% (\varepsilon \times\nobreak \mathrm{id})(1,p) = 
+% \bigl( \varepsilon(p) \times\nobreak \mathrm{id}(1) \bigr) \cup
+% \bigl( \varepsilon(1) \times\nobreak \mathrm{id}(p) \bigr) =
+% \bigl( \varnothing \times\nobreak \{1\} \bigr) \cup
+% \bigl( \{()\} \times\nobreak \{p\} \bigr) = \varnothing \cup \{p\} 
+% = \{p\}\) as expected. Although (multi)sets do not provide all 
+% the features of a linear structure, they provide enough detail to 
+% be useful.
+% 
+% \begin{APIspec}{comagma}{1.0}
+%   Elaborating upon that, one may define an interface |comagma| that 
+%   prescribes exactly one operation |coproduct|. Concretely,
+%   \begin{APIdescription}{comagma}
+%     \begin{APImethod}{coproduct}
+%       \word{element}
+%     \end{APImethod}
+%       returns a list of pairs of elements of the structure. The 
+%       \emph{intent} is that if $\mathcal{C}$ is a \meta{comagma} 
+%       equipped with some manner of tensor product $\otimes$ and 
+%       addition, then the map \(\Delta_\mathcal{C}\colon \mathcal{C} 
+%       \longrightarrow \mathcal{C} \otimes \mathcal{C}\) defined by
+%       \[
+%         \Delta_\mathcal{C}(a) = \sum_{(l,r) \in 
+%           \text{\ttfamily [$\mathcal{C}$ coproduct $a$]}
+%         } l \otimes r
+%         \text{,}
+%       \]
+%       should be a standard algebraic coproduct on $\mathcal{C}$.
+%   \end{APIdescription}
+%   Note, however, that this interface does not make any claims about 
+%   what the moral codomain $\mathcal{C} \otimes \mathcal{C}$ of that 
+%   $\Delta_\mathcal{C}$ map would be, nor that $\otimes$ exists as 
+%   an explicit operation. It \emph{only} claims that there exists an 
+%   operation \texttt{coproduct} which has this syntax.
+% \end{APIspec}
+% 
+% Only making that syntactic claim---which in universal algebra would 
+% be akin to including a specific operation in the signature but not 
+% having it occur in any axiom---has advantages and disadvantages. An 
+% advantage is that it is general enough to fit both the discrete and 
+% the linear concepts of coproduct; a concrete linear coproduct may in 
+% practice rather be defined as a sum of triplets scalar 
+% coefficient--left part basis element--right part basis element, but 
+% it is then always possible to bundle the scalar with one of the two 
+% parts, and for the discrete coproduct concept this list of pairs is 
+% what there is. A disadvantage is that there is no obvious 
+% continuation to properties such as coassociativity or counitality. 
+% Even the more elementary congruence property---that equal (though 
+% possibly differently represented) operands produce equivalent 
+% results---cannot be stated in this generality, because equality in 
+% a tensor product of two sums $\sum_{i=1}^n l_i \otimes r_i$ becomes 
+% nontrivial to decide; an appropriate equality test in one setting 
+% can be wrong in another. Thus any property which speaks about 
+% equality of elements in a tensor product set will quite likely 
+% require that the tensor product is first given, and that again 
+% renders it a property that is more appropriately defined at the 
+% algebra level than at the discrete level.
+% 
+% That concludes this little digression on coproducts. It is not in 
+% vain, however, since it turns out the rooted trees algebra also 
+% carries a Hopf algebra structure.
+% 
+% 
+% \subsection{Why stop at multisets?}
+% 
+% Returning to the issue of the \APIref{multiset-valued product}{1.0} 
+% interface, one final question that should be raised is why one 
+% would stop at multisets, which in a sense is equivalent to formal 
+% linear combinations where all coefficients are natural numbers; 
+% wouldn't it be better to allow arbitrary coefficients? That would 
+% mean that one's set of algebra elements is still that of formal 
+% $\mathcal{R}$-linear combinations of elements from some discrete 
+% basis $\mathcal{S}$, but now the multiplication is determined by a 
+% map \(\mathcal{S} \times \mathcal{S} \longrightarrow 
+% \mathcal{R}[\mathcal{S}]\). This is indeed a significant 
+% generalisation of the multiplication operations that can be 
+% defined; to begin with it captures all near-commutative algebras by 
+% taking $\mathcal{S}$ as the same set of power products as for a 
+% commutative polynomial algebra, while picking something nonstandard 
+% for the multiplication. By picking as $\mathcal{S}$ some subset of 
+% the free monoid, one can even conver any algebra describable using 
+% Bergman's Diamond Lemma on this form, with the \(\mathcal{S} \times 
+% \mathcal{S} \longrightarrow \mathcal{R}[\mathcal{S}]\) map 
+% returning the normal form of the free monoid product of its two 
+% arguments! Although this latter definition may in practice be 
+% sweeping some computational problems under the rug, it remains a 
+% fact that many concrete definitions of multiplication operations 
+% have the form of specifying what the product of two basis elements 
+% is as a linear combination of basis elements. Why not adopt that as 
+% the main form of a multiplication operation, then? Mostly for what 
+% is arguably stylistic reasons.
+% 
+% The catch in defining an \emph{interface} with such a 
+% multiplication prototype map going \(\mathcal{S} \times \mathcal{S} 
+% \longrightarrow \mathcal{R}[\mathcal{S}]\) is that this map would 
+% then be an operation of the basis set $\mathcal{S}$, that at the 
+% same time would have to know what scalar ring $\mathcal{R}$ this 
+% basis set is going to be combined with; this introduces an 
+% unhealthy dependency between supposedly independent structures. 
+% Using multisets instead of formal linear combinations avoids this, 
+% since addition in always supported. An argument could be had for 
+% allowing at least linear combinations with integer 
+% coefficients---besides the formal generalisation to cover negative 
+% numbers, that also provides a practical optimisation for cases with 
+% large coefficients (factorials and binomial coefficients are 
+% familiar ingredients in formulae for noncommutative products)---but 
+% linear combinations do not come quite as naturally as multisets in 
+% settings where the focus is on discrete mathematics. Remember that 
+% the goal is not only to get the mathematics right, but also to 
+% implement it in a comprehensible way. To the latter end, it helps 
+% if each particular (sub)package can draw on just a few branches of 
+% mathematics; the cognitive burden of the reader is increased for 
+% every new branch that gets mixed in.
+% 
+% A better way of presenting algebras whose multiplications are 
+% defined by \(\mathcal{S} \times \mathcal{S} \longrightarrow 
+% \mathcal{R}[\mathcal{S}]\) prototype maps is to first construct the 
+% set $\mathcal{R}[\mathcal{S}]$ of formal linear combinations without 
+% a multiplication (something |mtmtcl::rings::semigroup_algebra| can 
+% do for you) and then in a second construction step equip it with 
+% the prototype-based multiplication operation. The multiplication 
+% prototype is still for a particular combination of scalars and 
+% basis, but at least now its codomain can be constructed (as a 
+% module) before the map taking values there is defined.
+% 
+% 
+% 
+% 
+% \section{The discrete rooted trees structure}
+% 
+% Since the end product is going to be the rooted trees 
+% \emph{algebra}, even the discrete structure is implemented under 
+% |mtmtcl::rings|.
+% \begin{tcl}
+%<*pkg>
+namespace eval ::mtmtcl::rings::rooted_trees_algebra {}
+% \end{tcl}
+% \setnamespace{mtmtcl::rings::rooted_trees_algebra}
+% 
+% 
+% \subsection{A string representation for rooted trees}
+% 
+% Encoding rooted trees as instances of simple graphs, as was done in 
+% Section~\ref{Sec:MathBackground}, carries the significant 
+% disadvantage that it labels all vertices even though we really want 
+% to work with unlabelled graphs. A simple record of the nesting of 
+% branches, without naming any vertices, actually suffices for 
+% encoding the rooted tree (and tends to be much shorter). 
+% Concretely, to encode the branch rooted at $v$ as a string, one may 
+% do the following:
+% \begin{enumerate}
+%   \divide \csname @topsep\endcsname 2
+%   \setlength{\itemsep}{0pt plus 1pt}
+%   \item
+%     Emit a left parenthesis `\texttt{(}'.
+%   \item
+%     For each child $u$ of $v$, in any order, encode the branch 
+%     rooted at $u$.
+%   \item
+%     Emit a right parenthesis `\texttt{)}'.
+% \end{enumerate}
+% In this way, the $4$-vertex rooted tree with one branch of length 
+% $1$ and one branch of length $2$ can get encoded as 
+% `\texttt{(()(()))}'. We will use that encoding, with the slight 
+% optimisation of writing leaves as `\texttt{o}' rather than 
+% `\texttt{()}', since that both saves some characters and makes the 
+% strings less monotonous: compare `\texttt{(()(()))}' to 
+% `\texttt{(o(o))}'.
+% 
+% This encoding also has the visual advantage of being interpretable 
+% as an ASCII art depiction of the tree itself, although in a 
+% slightly quaint perspective. Consider as in 
+% Figure~\ref{Fig:TreeEncoding} the tree as a physical object 
+% built from balls (vertices) and sticks (edges), with the root at 
+% the coordinate system origin. Then image this tree ``from 
+% infinity'', in some sort of inverse perspective that makes each 
+% parent larger than all of its children combined; the edges are then 
+% all obscured by their child side endpoints, but one can still tell 
+% which vertices are adjacent by the fact that a parent encloses each 
+% child. This demonstrates that a rooted tree can alternatively be 
+% encoded as a system of sets, where $A$ is a descendant of $B$ 
+% iff \(A \subset B\). Taking these sets to be convex and placing all 
+% leaves on a line, the above string encoding simply becomes a record 
+% of what is seen when travelling along that line: `\texttt{(}' for 
+% entering a set and `\texttt{)}' for leaving it.
+% 
+% \begin{figure}
+%   \[
+%     \begin{tikzpicture}
+%       \draw[yellow,draw opacity=0.4,line width=12pt] (0,0) -- (4,0)
+%         node[pos=0.5](subroot){};
+%       \path (subroot) 
+%         node[above=2cm,circle,draw] (root) {} [grow'=up]
+%         child { node[circle,draw]{} }
+%         child { 
+%           node[circle,draw]{} 
+%           child { node[circle,draw]{} } 
+%         }
+%       ;
+%       \node[circle,draw](s1) at (root-1 |- subroot) {};
+%       \node[circle,draw](s21) at (root-2-1 |- subroot) {};
+%       \node[draw,ellipse,fit=(s21)] (s2) {};
+%       \node[draw,ellipse,fit=(s2) (s1)] (sroot) {};
+%       \path (sroot.east) node[right] 
+%         {\quad$\rightarrow$\quad \texttt{(o(o))}};
+%       \path (root) node[below=0.5cm]{$\downarrow$};
+%     \end{tikzpicture}
+%   \]
+%   \caption{Graphical view of the string encoding of rooted trees}
+%   \label{Fig:TreeEncoding}
+% \end{figure}
+% 
+% For internal processing we will also use an encoding of rooted 
+% trees in terms of \Tcl\ lists, where the encoding for a branch is 
+% the list of its subbranches. The string representation of this is 
+% very close to the above externally visible encoding, except that 
+% (i)~it has braces instead of parentheses (and \texttt{o}s), 
+% (ii)~there are spaces between sibling subbranches, and (iii)~there 
+% are no delimiters for the root (although there could appear to be 
+% such delimiters if a tree appears as an explicit constant in source 
+% code\Dash compare how one writes |set L {}| to set |L| to the empty 
+% list, even though the string representation of the empty list is 
+% the empty string; this is a common point of confusion for 
+% beginners).
+% 
+% \begin{proc}{decode_treestring}
+%   This procedure converts an external parentheses-and-os encoding 
+%   of a rooted tree to the internal \Tcl\ list format. The call 
+%   syntax is
+%   \begin{displaysyntax}
+%     |decode_treestring| \word{string}
+%   \end{displaysyntax}
+%   and it returns the internal encoding of the tree, or throws an 
+%   error if the \word{string} is malformed. In addition to the 
+%   official encoding characters \texttt{(}, \texttt{)}, and 
+%   \texttt{o}, it allows (but assigns no meaning to) whitespace 
+%   characters in the \word{string}, and accepts braces as synonyms 
+%   of parentheses.
+%   
+%   What this procedure does is primarily to convert the 
+%   parentheses-and-os string into the string representation of the 
+%   correspoding \Tcl-list tree, and rely on \Tcl's list parser for 
+%   figuring out how things are nested.
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::decode_treestring {str} {
+   set braces [string map {( \{ ) \} o \{\}} $str]
+   if {[regexp {[^{}[:space:]]} $braces bad]} then {
+      return -code error "Character not allowed in rooted tree\
+        encoding: $bad"
+   }
+%   \end{tcl}
+%   One extra tweak that needs doing is to insert spaces between 
+%   siblings, but that too is a simple matter of replacing one 
+%   character sequence with another.
+%   \begin{tcl}
+   set L [string map {"\}\{" "\} \{"} $braces]
+   if {[catch {llength $L} len]} then {
+      return -code error "Nesting error in tree: $str"
+   } elseif {$len != 1} then {
+      return -code error "Wrong number of roots in tree: should be 1,\
+        found $len"
+   }
+   return [lindex $L 0]
+}
+%   \end{tcl}
+%   The effective purpose of the final |lindex| is to remove the 
+%   delimiters around the root.
+% \end{proc}
+% 
+% \begin{proc}{encode_treestring}
+%   The opposite encoding operation do the same steps in the other 
+%   direction, and can skip error detection. The call syntax is
+%   \begin{displaysyntax}
+%     |encode_treestring| \word{\Tcl-list tree}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::encode_treestring {L} {
+   return "([
+      string map {() o} [
+         string map {\{ ( \} ) { } ""} $L
+      ]
+   ])"
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Closely related to the matter of decoding and encoding treestrings 
+% is an operation, that although mathematically somewhat of a no-op, 
+% is technically very significant: the operation |canonise| of 
+% computing the canonical string representation of a rooted tree (or 
+% whatever kind of element one is working with). Note that 
+% \texttt{(o(o))} and \texttt{((o)o)} are both valid string encodings 
+% of the tree in Figure~\ref{Fig:TreeEncoding}; in general one has a 
+% choice in how to encode a tree wherever a vertex has more than one 
+% child. A |canonise|ing operation selects one encoding of each tree 
+% as the canonical encoding, and maps all other ways of encoding that 
+% tree onto the canonical one.
+% 
+% The need for this operation here comes primarily from the way that 
+% the |mtmtcl::rings::semigroup_algebra| package encodes formal 
+% linear combinations of objects: as a table\footnote{
+%   The technical name for the value type is \emph{dictionary}; in 
+%   database table terminology it has two columns \emph{key} and 
+%   \emph{value}, where the key uniquely identifies a row (no two 
+%   rows can have the same key). The data structure used to 
+%   implement it is a hash table, meaning lookup by key is fast.
+% } mapping basis elements to their corresponding scalar coefficient. 
+% The table itself cannot discover that two different strings in fact 
+% encode the same basis element (since different structures used as 
+% basis have different opinions on what counts as equal), so the rule 
+% is that every basis element must be canonised before it is used as 
+% a key in this table. Therefore any structure one wishes to use as 
+% basis must provide a canonisation operation for its elements.
+% 
+% How might a canonisation operation for rooted trees look like, 
+% then? Since the only choice lies in the order in which children are 
+% enumerated, we can achieve canonicity simply by sorting (|lsort|) 
+% the list of children! However we must remember to do this for all 
+% vertices of the tree, not just for the root, which suggests 
+% defining a helper.
+% 
+% \begin{proc}{canonise_core}
+%   This procedure takes a \Tcl-list rooted tree as argument, and 
+%   returns the canonical form of that \Tcl-list rooted tree. It is 
+%   (unsurprisingly) a rather recursive operation.
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::canonise_core {L} {
+   lsort [lmap branch $L {canonise_core $branch}]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Putting together these three procedures, we have our first official 
+% operation of the rooted trees set structure.
+% 
+% \begin{proc}{canonise}
+%   Canonising is straightforward: decode treestring, canonise 
+%   \Tcl-list rooted tree, encode back to treestring.
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::canonise {tree} {
+   encode_treestring [canonise_core [decode_treestring $tree]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% Now what does that canonical form look like? It turns out to be 
+% `\texttt{(o(o))}' rather than `\texttt{((o)o)}', but giving 
+% comprehensive principles for writing down the canonical form of 
+% a rooted tree using pen and paper is surprisingly hard. On the 
+% one hand, it is not really something with which users need to 
+% concern themselves; canonical forms are allowed to change from one 
+% minor version of a package to the next, so it is best viewed as an 
+% internal implementation detail, even though it tends to be 
+% externally visible. On the other hand, this text is all about the 
+% internal implementation details, so this is the appropriate place 
+% to discuss it.
+% 
+% In one way, the choice of canoncial form points forwards to the 
+% algebra of commutative products of rooted trees, because it treats 
+% the children of the root as factors in such a product, and orders 
+% them so that smaller factors come first; this is similar to 
+% imposing an order on the variables of a polynomial ring, and 
+% ordering power products so that smaller variables come first. So 
+% far so good, but what is then the order between trees? This is 
+% where the results start getting unintuitive.
+% 
+% From a technical perspective, the order may still seem 
+% straightforward since it is strict ASCII order of strings (raw 
+% codepoints throughout, no funny collation orders in sight), but one 
+% must keep in mind how the strings encoding a rooted tree look: 
+% there is an opening delimiter when beginning a child, and a closing 
+% delimiter when ending it. (Since the strings being compared are for 
+% the \Tcl-list encoding, they use braces rather than parentheses, 
+% but that matters little since `|{|' comes before `|}|' just as 
+% `|(|' comes before `|)|'.) The beginning of a tree is always some 
+% sequence of opening delimiters, followed at some point by a closing 
+% delimiter that completes the first leaf in the tree encoding. Since 
+% the closing delimiter is sorted after the opening delimiter, the 
+% tree counts as \emph{smaller} the longer that initial sequence of 
+% opening delimiters is, so in particular the paths 
+% $\{P_n\}_{n=2}^\infty$ constitute an infinite descending chain of 
+% trees in this order. However all that is required for the 
+% |canonise| operation to be well-defined is that the sorting 
+% operation employs a \emph{total order}, not that it is a 
+% well-order; any particular vertex only has finitely many children, 
+% so infinite descending chains is not an issue.
+% 
+% But why is then `\texttt{(o(o))}' a canonical form\Dash shouldn't 
+% the longer path in \(P_2 = \texttt{(o)}\) make it smaller than 
+% \(P_1 = \texttt{o}\)? As it turns out, no, because what is being 
+% compared is always \emph{the list of children}, and the empty list 
+% of children for $P_1$ is on account of containing no delimiters at 
+% all smaller than every nonempty list of children. A leaf as a child 
+% will on the other hand exhibit a closing delimiter immediately 
+% after the opening delimiter, and thus constitute the largest 
+% possible single child contribution to a tree. This does not make 
+% $P_2$ the maximal rooted tree however; adding another leaf child of 
+% the root will always make a tree larger in the comparison order.
+% 
+% An additional complication is that the children being compared are 
+% always in canonical form, which means the leaf siblings appear 
+% first, and are thus looked at first when comparing the parent tree 
+% to its siblings. This means it is not necessarily tree height 
+% (length of longest path from root to leaf) that dominates the order 
+% either, since a leaf sibling somewhere on that path can get 
+% precedence; \(t_1 = \texttt{((o))}\) compares as smaller than 
+% \(t_2 = \texttt{(((o))o)}\) despite the latter being higher, since 
+% the canonised form of $t_2$ is $\texttt{(o((o)))}$ which descends 
+% where $t_1$ is still ascending. From a purely mathematical 
+% perspective, the order used for the canonisation operation is 
+% frankly a mess, but again: it doesn't have to be sensible, it only 
+% needs to be total! And it has the distinct advantage of requiring 
+% very little source code (as codepoint-lexical sorting is built into 
+% the language).
+% 
+% Are there any feasible alternatives, though? One that is simple 
+% (just add a |-decreasing| option to the |lsort| call) would be to 
+% sort in descending order rather than the default ascending one; 
+% this will place leaves last among siblings, reducing their influence 
+% on the sorting order, but at the same time put $P_2$ children mostly 
+% at the front, so the result would be to emphasise peaks of low 
+% prominence strictly greater than $1$; this is probably not more 
+% intuitive than the plain sorting above. Slightly more complicated, 
+% but still feasible, is to filter out the leaves before sorting and 
+% then explicitly put them last in the result; as a procedure to call 
+% instead of |lsort|, this can be coded as
+% \begin{quote}
+%   \small
+%   |proc altsort {tree} {|\\
+%   |   concat [lsort [lsearch -all -inline -exact -not $tree ""]]\|\\
+%   |     [lsearch -all -inline -exact $tree ""]|\\
+%   |}|
+% \end{quote}
+% although it might be easier to integrate the filtering with adjacent 
+% loops. Experiments suggest that this might indeed look slightly 
+% better, but perhaps not enough to at this point warrant the 
+% increased code complexity.
+% 
+% 
+% \begin{proc}{=}
+%   Having defined canonical representations of rooted trees, we now 
+%   have an obvious algorithm for testing equality: test 
+%   representation equality of canonical representations. This can be 
+%   slightly optimised by skipping the |encode_treestring| steps, as 
+%   equality or not of canonical representations is obvious already 
+%   from the corresponding \Tcl-list trees.
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::= {tree1 tree2} {
+   string equal [
+      canonise_core [decode_treestring $tree1]
+   ] [
+      canonise_core [decode_treestring $tree2]
+   ]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% This completes the requirements for the \APIref{equality}{1.0} 
+% interface, and also the \APIref+{canonise}{1.1} interface. Now back 
+% to the Main Topic.
+% 
+% 
+% \subsection{The grafting operation}
+% 
+% Like canonisation, grafting $\graft$ can be split into a core 
+% operation working with \Tcl-list trees, and a wrapper handling 
+% decoding and encoding of the string representation.
+% 
+% \begin{proc}{graft_core}
+%   Like canonisation, grafting is most easily implemented 
+%   recursively, so there is a procedure
+%   \begin{displaysyntax}
+%     |graft_core| \word{left} \word{right}
+%   \end{displaysyntax}
+%   which returns the multiset\slash list of all trees that result 
+%   from grafting the \word{left} tree onto the \word{right} tree. 
+%   The \word{left} and \word{right} are trees in list format. If 
+%   these are canonical, then the returned trees will also be 
+%   canonical.
+%   
+%   The idea is to replace the sum \eqref{Eq:GraftDefinition} over 
+%   all vertices of \word{right} with a sum with one term for the 
+%   root, and one term for each child, where the child terms by 
+%   recursion care for all their descendants; this avoids deep 
+%   accesses to tree nodes (which, although quite possible, tend to 
+%   get technical). One must however note that it is not sufficient 
+%   to just |graft_core| the \word{left} tree onto a child, one must 
+%   also remember to let the results of that replace the child in the 
+%   list of children.
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::graft_core {left right} {
+   set res {}
+%   \end{tcl}
+%   So: first a loop over the children,
+%   \begin{tcl}
+   for {set k 0} {$k < [llength $right]} {incr k} {
+      foreach tree [
+         graft_core $left [lindex $right $k]
+      ] {
+         lappend res [lsort [lreplace $right $k $k $tree]]
+      }
+   }
+%   \end{tcl}
+%   then do the root case by adding \word{left} as another child.
+%   \begin{tcl}
+   lappend res [lsort [lappend right $left]]
+}
+%   \end{tcl}
+%   The two |lsort| calls is all that is needed to ensure new trees 
+%   produced during this operation are canonical.
+% \end{proc}
+% 
+% 
+% \begin{proc}{multiset-valued product}
+%   The official \verb*|multiset-valued product| operation is the 
+%   obvious combination of |decode_treestring|, |graft_core|, and 
+%   |encode_treestring|, but there are two nonobvious steps. First, 
+%   the grafing operands are canonised before passing them to 
+%   |graft_core|; this will ensure the result trees are automatically 
+%   canonical. Second, the result list (multiset) is sorted; this 
+%   allows us to claim that the entire operation is 
+%   \APIref{autocanonical}{1.0}.
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::multiset-valued\ product {
+   left right
+} {
+   lmap tree [lsort [
+      graft_core [canonise_core [decode_treestring $left]]\
+        [canonise_core [decode_treestring $right]]
+   ]] {encode_treestring $tree}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Other operations}
+% 
+% \begin{proc}{named}
+%   There aren't that many established systematic names for 
+%   particular trees in graph theory, but two graph classes that are 
+%   trees are the paths $\mathrm{P}_n$ and the complete bipartite 
+%   graphs $\mathrm{K}_{1,n}$. Hence we'll recognise
+%   \begin{displaysyntax}
+%     P\meta{n}\par
+%     K1,\meta{n}
+%   \end{displaysyntax}
+%   \Ldash where \meta{n} is a positive integer\Rdash as |names| of 
+%   rooted trees. The paths have the root at one endpoint, whereas 
+%   the complete graphs have it in the size $1$ component.
+%   
+%   These two families of rooted trees are actually easier to generate 
+%   using |string repeat| than via the \Tcl-list representation.
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::named {name} {
+   if {[scan $name P%d n] && n>0} then {
+      incr n -1
+      return [string repeat ( $n]o[string repeat ) $n]
+   } elseif {[scan $name K1,%d n] && n>0} then {
+      return ([string repeat o $n])
+   } else {
+      return -code error "Not a known name of a tree: $name"
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{The basis as a \mtl\ structure}
+% 
+% \begin{ensemble}{trees_set}
+%   The trees set ensemble has no parameters, and is located inside 
+%   its own namespace (since there is little point in having it drop 
+%   outside it).
+%   \begin{tcl}
+namespace eval ::mtmtcl::rings::rooted_trees_algebra {
+   namespace ensemble create -command [namespace current]::trees_set\
+     -subcommands {canonise "multiset-valued product" named}
+}
+%   \end{tcl}
+%   The ensemble will be extended, as additional methods get 
+%   implemented.
+% \end{ensemble}
+% 
+% 
+% 
+% \section{The rooted trees algebra}
+% 
+% As far as the algebra operations are concerned, the main piece 
+% missing is the algebra multiplication based on the multiset-valued 
+% discrete product. This should eventually become a feature of the 
+% |semigroup_algebra| package, but for now it is a procedure here.
+% 
+% \begin{proc}{*_using_autocanonical_msvp}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |*_using_autocanonical_msvp| 
+%     \word{ring} \word{iszero-prefix} \word{basis} \word{API-dict} 
+%     \word{left} \word{right}
+%   \end{displaysyntax}
+%   to match that of subcommands in the 
+%   |mtmtcl::rings::semigroup_algebra::ens2| ensemble(s). The 
+%   \word{ring} must be a command prefix for the coefficient ring, 
+%   the \word{iszero-prefix} is a command prefix which tests elements 
+%   of that ring for being $0$, the \word{basis} must be the command 
+%   prefix for a structure satisfying \APIref{multiset-valued 
+%   product}{1.0} and where that operation furthermore is 
+%   \APIref{autocanonical}{1.0}. What the procedure actually does is 
+%   that it multiplies the two algebra elements \word{left} and 
+%   \word{right} using the 
+%   \texttt{multiset-valued\PrintChar{32}product} operation of the 
+%   \word{basis} to multiply basis elements.
+%   
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::*_using_autocanonical_msvp {
+   R iszero S API left right
+} {
+   set res [dict create]
+   dict for {lk lv} $left {
+      dict for {rk rv} $right {
+         set lrv [{*}$R * $lv $rv]
+         foreach lrk [
+            {*}$S "multiset-valued product" $lk $rk
+         ] {
+            if {[dict exists $res $lrk]} then {
+               dict set res $lrk [{*}$R + [dict get $res $lrk] $lrv]
+            } else {
+               dict set res $lrk $lrv
+            }
+         }
+      }
+   }
+   foreach k [dict keys $res] {
+      if {[{*}$iszero [dict get $res $k]]} then {
+         dict unset res $k
+      }
+   }
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% With that taken care of, it is time to |make| the algebra.
+% 
+% \begin{proc}{make}
+%   At this point, the only input to the construction is the 
+%   coefficient ring, so the call syntax becomes
+%   \begin{displaysyntax}
+%     |::mtmtcl::rings::rooted_trees_algebra::make| 
+%     \word{coefficient ring}
+%   \end{displaysyntax}
+%   
+%   The construction makes use of the |mtmtcl::support::vensemble| 
+%   facilities.
+%   \begin{tcl}
+proc ::mtmtcl::rings::rooted_trees_algebra::make {R} {
+   ::mtmtcl::support::vensemble::start E\
+     ::mtmtcl::rings::semigroup_algebra::ens2 algebra -parameters {
+      R iszero S API
+   } -prefix 0
+   ::mtmtcl::support::vensemble::subcommands E = + 0 neg iszero 
+   ::mtmtcl::support::vensemble::variation E [
+      {*}$R API "additive group" 2.0.1
+   ] - {-_using_+neg -_using_-}
+   ::mtmtcl::support::vensemble::variation E [expr {
+      [{*}$R API "additive group" 2.2] ? 0 :
+      [{*}$R API monoid 1.0] ? 1 : 2
+   }] integer. {
+      integer._using_integer. integer._using_scalar* integer._using_+
+   }
+   ::mtmtcl::support::vensemble::mapping E *\
+     ::mtmtcl::rings::rooted_trees_algebra::*_using_autocanonical_msvp
+   ::mtmtcl::support::vensemble::subcommands E\
+     scalar basis support coeff basiselement
+   ::mtmtcl::support::vensemble::mapping E named named_nocanonise
+   ::mtmtcl::support::vensemble::mapping E API ::API::nstatic 3
+   if {[{*}$R API "additive group" 2.1]} then {
+      set iszero [list {*}$R iszero]
+   } elseif {[{*}$R API "additive group" 2.0] ||\
+     [{*}$R API "additive group" 1.0]} then {
+      set iszero [list {*}$R = [{*}$R 0]]
+   } else {
+      set iszero [list ::apply {arg {return 0}}]
+   }
+   return [list [
+      ::mtmtcl::support::vensemble::finish E
+   ] $R $iszero [namespace which trees_set] {
+      "additive group" 2.2
+      ring 2.0
+      magma 1.1
+      ring-module 2.1
+      "free ring-module" 2.1
+      ring-algebra 2.0
+      "named element" 1.0
+   }]
+}
+%</pkg>
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \section{Generating a multiplication table}
+% 
+% Some products are rather long, and the number of trees (even of 
+% medium orders) is large, so a matrix layout for the multiplication 
+% table (though awesome in theory) would be impractical. Let's aim 
+% instead for nondisplayed equations.
+% 
+% One practical subproblem of computing a multiplication table is to 
+% generate all the trees to multiply, since generating all rooted 
+% trees efficiently is nonobvious, but here that turns out to be 
+% trivial since the fact that $\mathrm{P}_1$ generates the algebra 
+% implies that all trees of larger sizes appear somewhere in the 
+% product of trees of smaller sizes!
+% 
+% \setnamespace{}
+% 
+% \begin{variable}{graded_basisD}
+%   The |graded_basisD| variable is a nested dictionary. First level 
+%   key is tree order (number of vertices). Second level key is trees 
+%   of that order. Second level values are all the empty string, 
+%   since we merely use this to encode a set.
+% \end{variable}
+% 
+% \begin{proc}{texify_tree_lincomb}
+%   This procedure generates \LaTeX\ code for an element of the 
+%   rooted trees algebra. The call syntax is
+%   \begin{displaysyntax}
+%     |texify_tree_lincomb| \word{element}
+%   \end{displaysyntax}
+%   In the long run, this should really be done via an |export| 
+%   method of the rooted trees algebra, but for this application we 
+%   take a quick and dirty route of \TeX\ code generation facilitated 
+%   by knowing that we use the ring of integers. \emph{In fact}, this 
+%   procedure would give rather strange results for any nonpositive 
+%   integers as coefficients, but those do not occur in the simple 
+%   products.
+%   
+%   Concretely, each tree is set |\texttt| (as |\mathtt| would not 
+%   change the font of the parentheses).
+%   \begin{tcl}
+%<*multtable>
+proc texify_tree_lincomb {element} {
+   set termL {}
+   foreach tree [lsort [dict keys $element]] {
+      if {[dict get $element $tree] == 1} then {
+         lappend termL [format {\texttt{%s}} $tree]
+      } else {
+         lappend termL [format {%d\texttt{%s}} [dict get $element $tree] $tree]
+      }
+   }
+   return [join $termL { + }]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% For the table layout, it seems practical to make a separate 
+% |\section| for each order of the products, and in later cases 
+% divide that into |\subsection|s according to the order of the 
+% factors.
+% 
+% \begin{proc}{table_subsection}
+%   This procedure writes \LaTeX\ code for a subsection of the table 
+%   to a channel open for writing. The call syntax is
+%   \begin{displaysyntax}
+%     |table_subsection| \word{channel} \word{algebra-prefix} 
+%     \word{left factor order} \word{right factor order}
+%   \end{displaysyntax}
+%   where \word{algebra-prefix} is the command prefix of the rooted 
+%   trees algebra. There is no particular return value, but 
+%   |graded_basisD| is updated to cover all trees that have been 
+%   computed. The \word{left factor order} and the \word{right factor 
+%   order} are the orders of the factors being multiplied in this 
+%   subsection; both are integers $\geqslant 1$.
+%   \begin{tcl}
+proc table_subsection {F A lorder rorder} {
+   global graded_basisD
+   if {$lorder + $rorder > 3} then {
+      puts $F [format {\subsection{Order $%d$ by order $%d$ products}}\
+        $lorder $rorder]
+      set ln [dict size [dict get $graded_basisD $lorder]]
+      set rn [dict size [dict get $graded_basisD $rorder]]
+      if {$ln>1 && $rn>1} then {
+         puts $F [format {There are \(%d \cdot %d = %d\) products\
+           in this subsection.} $ln $rn [expr {$ln*$rn}]]
+      } elseif {$ln>1 || $rn>1} then {
+         puts $F [format {There are \(%d\) products\
+           in this subsection.} [expr {$ln*$rn}]]
+      }
+      puts $F ""
+   }
+   set lL [lsort [dict keys [dict get $graded_basisD $lorder]]]
+   set rL [lsort [dict keys [dict get $graded_basisD $rorder]]]
+   set prodorder [expr {$lorder+$rorder}]
+   foreach lt $lL {
+      foreach rt $rL {
+         set product [{*}$A * [{*}$A basiselement $lt]\
+           [{*}$A basiselement $rt]]
+         puts $F [format {\(\texttt{%s} \graft \texttt{%s} =} $lt $rt]
+         puts $F "[texify_tree_lincomb $product]\\).\n"
+         dict for {tree coeff} $product {
+            dict set graded_basisD $prodorder $tree {}
+         }
+      }
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{write_table}
+%   This procedure writes a \texttt{.tex}-file (complete document) 
+%   for typesetting the multiplication table of the rooted trees 
+%   pre-Lie algebra. The call syntax is
+%   \begin{displaysyntax}
+%     |write_table| \word{filename} \word{maxorder}
+%   \end{displaysyntax}
+%   where \word{filename} is the name of the file to write and 
+%   \word{maxorder} is the maximal order of the products to include.
+%   \begin{tcl}
+proc write_table {filename maxorder} {
+   global graded_basisD
+   set F [open $filename w]
+   try {
+      puts $F {\documentclass{article}}
+      puts $F {\usepackage{amssymb}}
+      puts $F {\newcommand{\graft}{\mathbin{\curvearrowright}}}
+      puts $F {\begin{document}}
+      puts $F {\begin{abstract}}
+      puts $F [format {  This document gives the multiplication table\
+        of the rooted trees pre-Lie algebra, up to and including\
+        products of order $%d$.} $maxorder]
+      puts $F {\end{abstract}}
+      puts $F {\tableofcontents}
+      puts $F {\raggedright}
+      set A [::mtmtcl::rings::rooted_trees_algebra::make\
+        ::mtmtcl::rings::integers::all]
+      set graded_basisD [dict create 1 {o {}}]
+      for {set total 2} {$total <= $maxorder} {incr total} {
+         puts $F [format {%s\section{Products of order $%d$}} \n\
+           $total]
+         for {set k 1} {$k < $total} {incr k} {
+            table_subsection $F $A $k [expr {$total-$k}]
+         }
+      }
+      puts $F "\n\\end{document}"
+   } finally {
+      close $F
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+\endinput
+

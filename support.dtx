@@ -425,7 +425,19 @@ proc mtmtcl::adaptors::equality::to-1.1 {base args} {
 % 
 % \begin{APIspec}{autocanonical \meta{method}}{1.0}
 %   This interface claims that elements output from the \meta{method} 
-%   are on canonical form.
+%   are on canonical form. \textbf{Note:} For greater 
+%   distinctiveness, the \meta{method} is \emph{the canonical 
+%   list-coded form of the method name}, rather than the raw 
+%   string.\footnote{
+%     Note to self: 
+%     Therefore the interface name should preferably appear as 
+%     \texttt{autocanonical\PrintChar{32}\word{method}} rather than 
+%     \texttt{autocanonical\PrintChar{32}\meta{method}}, but that 
+%     will have to wait until the \textsf{tclldoc} \LaTeX\ package 
+%     gets based on \textsf{harmless}.
+%   }
+%   This makes a difference if for example the method name contains a 
+%   space.
 % \end{APIspec}
 % 
 % \begin{APIspec}{autocanonical}{2.0}
@@ -1879,12 +1891,418 @@ proc ::mtmtcl::support::sdAPI {interfaces prefix paramcount args} {
    }
    return $res
 }
+%</support,pkg>
 %   \end{tcl}
 % \end{proc}
 % 
 % 
+% \subsubsection{Ensemble variant families}
+% 
+% It often happens that a structure operation needs to be implemented 
+% in several different ways, depending on the features provided by 
+% the underlying structures: sometimes subtraction is provided as a 
+% separate operation, whereas other times it will have to be done by 
+% a combination of negation and addition. Dynamically choosing one 
+% implementation or the other is one possibility, but it would be 
+% neater if already the ensemble of the structure took care of 
+% routing all calls to the correct implementation. The main obstacle 
+% to setting up that manually is that there can be several 
+% independent implementation variants, which (by the multiplication 
+% principle) would combine to a rather large set of implementing 
+% ensembles; easily too many to manage manually.
+% 
+% The idea of having variant families of ensembles is instead that 
+% an ensemble is only created on demand, when a |make|-command 
+% returns a prefix that would make use of it. Each variant is 
+% assigned a unique name, so different variants can coexist, but 
+% different command prefixes that make use of the same variant will 
+% call the same underlying ensemble command; there is no need for any 
+% garbage collection as the ensemble commands are not owned by the 
+% command prefixes they are generated for.
+% 
+% To begin defining an ensemble variant, one uses the command
+% \begin{displaysyntax}
+%   mtmtcl::support::vensemble::start \word{variable} \word{namespace} 
+%   \word{root} \begin{regblock}[\regstar] \word{option} \word{value} 
+%   \end{regblock}
+% \end{displaysyntax}
+% The \word{variable} is the name of a variable in the local context 
+% of the caller; this is used to store a preliminary definition of 
+% the ensemble, which will be modified by subsequent commands, until 
+% finalised by the |finish| command. The \word{namespace} is the 
+% namespace of the ensemble, where not-fully-qualified names are 
+% interpreted relative to the current namespace in the calling context; 
+% an empty \word{namespace} refers to that current namespace. The 
+% \word{root} is used as root of the name for the ensemble command to 
+% create; to this will be appended a suffix that is unique for each 
+% variant. If the \word{root} is empty then it is taken equal to the 
+% name of the ensemble's namespace. If the \word{root} is not fully 
+% qualified then the components of the current 
+% namespace in the calling context are prepended to this to make it 
+% fully qualified. The \word{option}s and \word{value}s can be used 
+% to specify additional options for the ensemble to create; this is 
+% mostly useful for the |-prefixes| and |-parameters| options, as the 
+% other options are managed by the ensemble variant mechanisms.
+% 
+% To finish defining an ensemble variant, one uses the command
+% \begin{displaysyntax}
+%   mtmtcl::support::vensemble::finish \word{variable}
+%   \begin{regblock}[\regstar] \word{option} \word{value} 
+%   \end{regblock}
+% \end{displaysyntax}
+% which returns the fully qualified name of the ensemble command 
+% whose variant was encoded into the \word{variable}, if necessary 
+% creating that command first. The \word{option} and \word{value} 
+% arguments give another chance of setting unmanaged options of the 
+% ensemble. In addition, there is an option |-withapi| which takes an 
+% API-dict as \word{value}; it creates an |API| subcommand that is 
+% mapped to |API::static| or |API::staticn| as required for the 
+% effective |-parameters| setting.
+% 
+% Between these two commands, one may use
+% \begin{displaysyntax}
+%   mtmtcl::support::vensemble::subcommands \word{variable}
+%   \word{subcommand-name}\regstar
+%   \par
+%   mtmtcl::support::vensemble::mapping \word{variable}
+%   \word{subcommand-name} \meta{prefix}
+%   \par
+%   mtmtcl::support::vensemble::variation \word{variable}
+%   \word{choice} \begin{regblock}[\regstar] \word{subcommand-name} 
+%   \word{prefix-list} \end{regblock}
+% \end{displaysyntax}
+% to add subcommands to the ensemble description in the 
+% \word{variable}. The ensemble as a whole is of the |-map|-based 
+% type; the |subcommands| command adds each \word{subcommand-name} as 
+% a mapping to itself and the |mapping| command adds one mapping to a 
+% custom prefix.
+% 
+% For |variation|, each \word{prefix-list} is a \emph{list} of 
+% prefixes (where each prefix is itself a list), of which one is 
+% picked as that which the \word{subcommand-name} is mapped to; it is 
+% an error if different \word{prefix-list}s of the same |variation| 
+% call have different lengths. Which element is picked is controlled 
+% by the \word{choice}, which must be a nonnegative integer. This integer 
+% (in hexadecimal) is appended to the name of the ensemble command, 
+% to make sure that ensembles made with different choices have 
+% different command names. An element in a \word{prefix-list} that is 
+% `|-|' (a hyphen) is interpreted as ``same as the next element'', in 
+% analogy with how hyphen branches are treated in |switch|. An 
+% element that is empty means ``don't define this subcommand in this 
+% variant''.
+% 
+% One variation can control several subcommands, but each subcommand 
+% can only be dependent on one |variant|. It is not necessary that 
+% the \word{choice}s for separate |variant| calls are independent; 
+% the only harm there can be in that is getting a slightly longer 
+% name for the ensemble command. The |variation| command returns the 
+% \word{choice}, so that it may be reused in further processing (see 
+% the |apichoice| command).
+% 
+% For more general variation, one may use
+% \begin{displaysyntax}
+%   mtmtcl::support::vensemble::branch \word{variable} \word{choice} 
+%   \word{script}\regplus\par
+%   mtmtcl::support::vensemble::when \word{variable} 
+%   \begin{regblock}[\regstar] \word{condition} \word{script} 
+%   \end{regblock}
+% \end{displaysyntax}
+% for which the variability consists of evaluating one of the 
+% \word{script}s, which in turn may contain |subcommands| and 
+% |mapping| commands to define subcommands of the ensemble. Like 
+% |variation|, but unlike the core conditionals |if| and |switch|, 
+% the |branch| and |when| commands record the choice made in the name 
+% of the ensemble being constructed. For |branch|, the \word{choice} 
+% is a nonnegative integer just as for |variation|; it is an error if 
+% the \word{choice} is greater than or equal to the number of 
+% \word{script}s. For |when|, the choice is instead computed by the 
+% command itself: the \word{condition}s are |expr|essions evaluated 
+% one by one until encountering one that is true, and then the 
+% corresponding \word{script} will be the one chosen; it behaves like 
+% an |elseif| chain. If the last \word{condition} is |1| (as 
+% expression, not merely in value) then that behaves as the final 
+% |else| branch, otherwise a final choice with empty \word{script} is 
+% implicitly provided. Both |branch| and |when| return the effective 
+% \word{choice} used.
+% 
+% For even more free-form variations, there is
+% \begin{displaysyntax}
+%   mtmtcl::support::vensemble::freechoice \word{variable} 
+%   \word{choice}
+% \end{displaysyntax}
+% where \word{choice} is still a natural number, but unlike all 
+% previous cases not limited to a particular range. This is intended 
+% for situations where the number of possible choices is large 
+% (perhaps infinite), but the number of choices that at any run will 
+% be realised remains small; situations where the potential and the 
+% actual are quite different. The command \emph{only} affects the 
+% ensemble by encoding the \word{choice} into the command name, so 
+% whatever calls for this variation remains the responsibility of the 
+% user (both to effect and to contain).
+% 
+% A suggested rule of thumb is that if a variation can be 
+% characterised by one string literal that is explicit somewhere in 
+% the source code (of the whole program, not necessarily in the source 
+% code of the package calling |vensemble::finish|) then it can be 
+% justified to use |freechoice| for that variation, whereas if the 
+% variation is not so explicit then it is probably better encoded 
+% into an ensemble parameter.
+% 
+% 
 % \begin{tcl}
-%</support,pkg>
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::support::vensemble 1.0 vensemble
+%</docstrip.tcl::catalogue>
+%<*vensemble>
+package require API 1.0
+namespace eval mtmtcl::support::vensemble {
+% \end{tcl}
+% \setnamespace{mtmtcl::support::vensemble}
+% \begin{variable}{force}
+%   There is a variable |force| which takes a boolean value. When 
+%   true, this causes |finish| to always redefine the ensemble 
+%   command even if it already exists, whereas when false the 
+%   ensemble command will not be redefined if it already exists. The 
+%   default setting of false is natural in production environments, 
+%   but for interactive development setting it to true simplifies 
+%   replacing a buggy definition with a fixed one.
+%   \begin{tcl}
+   variable force 0
+}
+%   \end{tcl}
+% \end{variable}
+% 
+% 
+% \begin{proc}{start}
+%   As stated above, the |start| procedure has the syntax
+%   \begin{displaysyntax}
+%     mtmtcl::support::vensemble::start \word{variable} \word{namespace} 
+%     \word{root} \begin{regblock}[\regstar] \word{option} \word{value} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::start {var namespace root args} {
+   upvar 1 $var D
+   set D [dict create {*}$args]
+   set ns [uplevel 1 {namespace current}]
+   switch -glob -- $namespace "::*" {
+      dict set D -namespace $namespace
+   } "" {
+      dict set D -namespace $ns
+   } default {
+      dict set D -namespace ${ns}::${namespace}
+   }
+   switch -glob -- $root "::*" {
+      dict set D -command $root
+   } "" {
+      dict set D -command [dict get $D -namespace]
+   } default {
+      dict set D -command ${ns}::${root}
+   }
+   dict append D -command +
+   dict set D -map {}
+}
+%   \end{tcl}
+%   The |-subcommands| are not used, so never initialised.
+% \end{proc}
+% 
+% \begin{proc}{subcommands}
+%   Instead the |subcommands| procedure will install a mapping of 
+%   each \word{subcommand} to itself.
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::subcommands {var args} {
+   upvar 1 $var D
+   foreach subcmd $args {
+      dict set D -map $subcmd [list $subcmd]
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{mapping}
+%   Mapping a subcommand to a differently named command can be done 
+%   as a |mapping|. A non-fully-qualified name gets appended to the 
+%   ensemble's namespace by |namespace ensemble|. Each word of the 
+%   target prefix is a separate argument of |mapping|, which means it 
+%   is easy to explicitly include a |[namespace current]| or whatnot 
+%   if that is what is desired.
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::mapping {var subcmd args} {
+   upvar 1 $var D
+   dict set D -map $subcmd $args
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{variation}
+%   In summary, this command has the call syntax
+%   \begin{displaysyntax}
+%     mtmtcl::support::vensemble::variation 
+%     \word{vensemble-var} \word{choice}
+%     \begin{regblock}[\regstar] \word{subcommand} \word{prefix-list} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   where \word{vensemble-var} is the name in the calling context of 
+%   the variable in which the preliminary definition of the ensemble 
+%   variant is being stored; modifying this variable is what the 
+%   command does. The return values is the \word{choice}.
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::variation {varname choice args} {
+   upvar 1 $varname V
+   foreach {subcommand prefixL} $args {
+      if {![info exists len]} then {
+         set len [llength $prefixL]
+      } elseif {$len != [llength $prefixL]} then {
+         return -code error "Inconsistent number of choices for:\
+           $subcommand"
+      }
+      set c $choice
+      while {$c<[llength $prefixL] &&\
+        [llength [lindex $prefixL $c]]==1 &&\
+        [lindex $prefixL $c] eq "-"} {incr c}
+      if {[llength [lindex $prefixL $c]] > 0} then {
+         dict set V -map $subcommand [lindex $prefixL $c]
+      }
+   }
+   if {![info exists len]} then {return}
+   if {$choice >= $len || $choice<0} then {
+      return -code error "Choice $choice not in range."
+   }
+   set digits [string length [format %x [incr len -1]]]
+   dict append V -command [format %0${digits}x $choice]
+   return $choice
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{branch}
+%   Choosing one branch by index is quite straightforward.
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::branch {varname choice args} {
+   upvar 1 $varname D
+   set len [string length [format %x [expr {[llength $args]-1}]]]
+   dict append D -command [format %0*x $len $choice]
+   uplevel 1 [lindex $args $choice]
+   return $choice
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{when}
+%   Choosing one branch based on evaluating conditions is a bit 
+%   more work, but still fairly straightforward. First do some error 
+%   checking \dots
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::when {varname args} {
+   upvar 1 $varname D
+   if {[llength $args] & 1} then {
+      return -code error "wrong # args: should be\
+        \"[namespace which when] varname ?condition script ...?\""
+   }
+%   \end{tcl}
+%   \dots\ then figure out which branch to take and evaluate it \dots
+%   \begin{tcl}
+   set choice 0
+   foreach {cond script} $args {
+      if {[uplevel 1 [list ::expr $cond]]} then {
+         uplevel 1 $script
+         break
+      }
+      incr choice
+   }
+%   \end{tcl}
+%   \dots\ finally record the choice in the command name.
+%   \begin{tcl}
+   set last [expr {[llength $args]/2}]
+   if {[lindex $args end-1] eq "1"} then {incr last -1}
+   dict append D -command\
+     [format %0*x [string length [format %x $last]] $choice]
+   return $choice
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{freechoice}
+%   On the practical side, this is \emph{only} about appending a 
+%   number to the command name, but there is the extra complication 
+%   that the number of digits in that number is not fixed, so how can 
+%   one tell where it ends? The following exploits some properties of 
+%   the ASCII table to injectively map the \emph{last} digit to an 
+%   upper case letter (|0|--|9| becomes |P|--|Y|).
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::freechoice {varname choice} {
+   upvar 1 $varname D
+   set hex [format {%llx} $choice]
+   scan [string index $hex end] %c c
+   dict append D -command [string range $hex 0 end-1]\
+     [format %c [expr {$c&31 | 64}]]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{finish}
+%   The actual definition work is carried out by the |finish| procedure.
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::finish {varname args} {
+   variable force
+   upvar 1 $varname D
+   foreach {key val} $args {dict set D $key $val}
+   if {[dict exists $D -withapi]} then {
+      if {![dict exists $D -parameters]} then {
+         set call [list ::API::static]
+      } else {
+         set call [list ::API::nstatic\
+           [llength [dict get $D -parameters]]]
+      }
+      lappend call [dict get $D -withapi]
+      dict set D -map API $call
+   }
+   if {$force ||\
+     [namespace which -command [dict get $D -command]] eq ""} then {
+      namespace inscope [dict get $D -namespace] {
+         ::namespace ensemble create
+      } {*}[dict filter $D key -command -map -prefixes -parameters -unknown]
+   }
+   return [dict get $D -command]
+}
+%   \end{tcl}
+%   Possibly this should, when not creating the ensemble command but 
+%   called |-withapi|, verify that the two API-dicts are equivalent.
+% \end{proc}
+% 
+% \begin{proc}{apichoice}
+%   This procedure adds material to an API dictionary based on a 
+%   choice, similar to how |variation| adds material to an ensemble 
+%   |-map|. The call syntax is
+%   \begin{displaysyntax}
+%     mtmtcl::support::vensemble::apichoice \word{dict-var} 
+%     \word{choice} \word{addition}\regstar
+%   \end{displaysyntax}
+%   where \word{dict-var} is the name in the calling context of the 
+%   variable that will be modified; the return value is the 
+%   \word{choice}, which is also used as index into the list of 
+%   \word{addition}s. An \word{addition} is either a dash `|-|' 
+%   (meaning `same as the next item') or an API-style dictionary. 
+%   The way an \word{addition} is merged into the \word{dict-var} is 
+%   that corresponding version lists are concatenated.
+%   \begin{tcl}
+proc mtmtcl::support::vensemble::apichoice {var choice args} {
+   upvar 1 $var D
+   set c $choice
+   while {[lindex $args $c] eq "-"} {incr c}
+   dict for {interface verL} [lindex $args $c] {
+      dict lappend D $interface {*}$verL
+   }
+   return $choice
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{tcl}
+%</vensemble>
 % \end{tcl}
 % 
 % 

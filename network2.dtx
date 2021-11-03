@@ -21,6 +21,7 @@
 \providecommand{\marg}[1]{\textnormal{%
    \texttt{\symbol{123}}\meta{#1}\texttt{\symbol{125}}%
 }}
+\providecommand{\cs}[1]{\texttt{\symbol{92}#1}}
 
 \newenvironment{ttdescription}{%
   \description
@@ -142,6 +143,7 @@
 %</driver>
 % \fi
 % 
+% 
 % \title{A \PROP py network library}
 % \author{Lars Hellstr\"om}
 % \maketitle
@@ -182,14 +184,17 @@
 % namespace (although mostly in the children of |network|).
 % \begin{tcl}
 %<*pkg>
-package require Tcl 8.4
-package provide network 2
+package require Tcl 8.5
+package provide network 2.10
 namespace eval network {}
 % \end{tcl}
 % \setnamespace{network}
+% \changes{2.10}{2017/02/08}{Noticed that several splodes had crept
+%   into the code, so bump Tcl version to 8.5. Also bump network 
+%   package number to what current \cs{changes} say. (LH)}
 % 
 % For some commands, test code is inlined in these sources, guarded 
-% by the \Module{test} expression. These are currently not structured 
+% by the {\Module{test}} expression. These are currently not structured 
 % to be extracted into a separate test file.
 % \begin{tcl}
 %<test>package require tcltest 2
@@ -10338,6 +10343,9 @@ proc network::rich::Tk_from_pure {NW vSizes vApp args} {
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% \subsubsection{Layout from pure network}
+% 
 % \begin{proc}{align_active_midpoints}
 %   This procedure implements the default mode of aligning 
 %   neighbouring levels within a network to each other. The call 
@@ -10424,7 +10432,7 @@ proc network::rich::align_active_midpoints {NW belowL aboveL} {
 %     \item[-prehints]
 %       Early hints for relative order of items (`|vertex |$v$', 
 %       `|edge |$e$~\textit{level}').
-%     \item[-prehints]
+%     \item[-posthints]
 %       Late hints for relative order of items (`|vertex |$v$', 
 %       `|edge |$e$~\textit{level}').
 %   \end{ttdescription}
@@ -10645,6 +10653,8 @@ proc network::rich::make_level-layout-Tk {vsizes args} {
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% \subsubsection{Vertices and edges}
 % 
 % \begin{proc}{vpos-Tk_by_level}
 %   This procedure sets the |vpos-Tk| entry of a network to the 
@@ -11043,6 +11053,630 @@ proc network::rich::MetaFont_controls {X0 Y0 ofs0 X3 Y3 ofs3 atleast\
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% \subsubsection{Layout from construction}
+% 
+% An alternative route is to |construct| the layout for a network 
+% at the same time as the network itself; the \word{scan-list} of 
+% |network::pure::construct| already specifies a layout, minus only 
+% some geometrical details. While it would certainly be possible to 
+% compute those geometrical details in the same way as is used in 
+% |make_level-layout-Tk|, this is however not necessarily the best 
+% approach for some likely usecases.
+% 
+% A natural form of interactive input would be for the user to type 
+% the \word{scan-list} for a network, while seeing the network (as 
+% typed so far) drawn. If using |make_level-layout-Tk|, the position 
+% of a vertex depends on the whole line it is in, so adding more 
+% vertices will move those already there. A more consistent-looking 
+% result can be had if the position of the first item in a line 
+% determines the positions of subsequent items, and its position in 
+% turn depends only on the positions of items in the previous line.
+% 
+% 
+% \begin{proc}{edges_vertxpos}
+%   This procedure computes $x$-axis positions for edges as they 
+%   escape the immediate influence of a vertex; this is interpreted 
+%   as the $x$-position for which a circle arc would become vertical. 
+%   The call syntax is
+%   \begin{quote}
+%     |network::rich::edges_vertxpos| \word{vertex-appearance}
+%   \end{quote}
+%   \word{vertex-appearance} is a list
+%   \begin{quote}
+%     \word{vertex-Tk} \word{outputs} \word{inputs} \word{vertex-size}
+%   \end{quote}
+%   that describes the appearance of the vertex. The \word{vertex-Tk} 
+%   element is ignored. \word{output} and \word{input} are lists of 
+%   lists
+%   \begin{quote}
+%     \word{x-attach} \word{y-attach} 
+%     \begin{regblock}[\regopt] \word{x-dir} \word{y-dir} 
+%     \end{regblock}
+%   \end{quote}
+%   where the two \emph{attach} elements are positions of the 
+%   edge-to-vertex attachment points, in the Tk'ish coordinate system 
+%   that has the vertex reference point at $(0,0)$, and the two 
+%   \emph{dir} elements give the endpoint direction of the edge, 
+%   oriented away from the vertex; there is one such list per 
+%   incedent edge. Finally, the \word{vertex-size} is a pair
+%   \begin{quote}
+%     \word{width} \word{height}
+%   \end{quote}
+%   specifying the width and height of the region dominated by this 
+%   vertex; the vertex reference point is the midpoint of this 
+%   rectangle.
+%   
+%   The return value is a list
+%   \begin{quote}
+%     \word{in-xpos-list} \word{out-xpos-list}
+%   \end{quote}
+%   where the order of in and out is chosen to match that in the 
+%   \word{type-dict} argument of |network::pure::construct|.
+%   
+%   \begin{tcl}
+proc network::rich::edges_vertxpos {appearance} {
+   set hheight [expr {[lindex $appearance 3 1] * 0.5}]
+%   \end{tcl}
+%   
+%   The turning angle $\theta$ of the arc is easy to compute if one 
+%   views the starting and final directions as complex numbers, since 
+%   the turning angle is then the argument (use \texttt{atan2}) of the 
+%   quotient of final direction by starting direction. Moreover
+%   \[
+%     \theta = 
+%     \arg\left(\frac{f}{s}\right) = 
+%     \arg\left(\frac{f \overline{s} }{s \overline{s}}\right) =
+%     \arg(f \overline{s})
+%   \]
+%   and the final direction is either $i$ or $-i$, so the 
+%   multiplication is only a swap of parts and a sign change. 
+%   Moreover, the starting direction is expressed in the Tk 
+%   coordinate system, which means negative $y$ direction is up and 
+%   positive $y$ direction is down; the complex conjugation of $s$ 
+%   is thus already taken care of!
+%   
+%   The turning angle is on one hand the change in direction, but it 
+%   is also the midpoint angle of the arc in question. Hence the 
+%   radius is the vertical position difference divided by the sine of 
+%   the turning angle, and the horizontal position difference is the 
+%   radius times $1$ minus the cosine of the angle. This gives the 
+%   formula
+%   \[
+%     \mathit{\Delta x} = 
+%     \frac{1 - \cos\theta}{\sin\theta} \mathit{\Delta y}
+%   \]
+%   for the difference from the edge attachment point to the sought 
+%   reference point. For e.g.~an incoming edge `\texttt{-5.657 -5.657 
+%   -1 -1}' (northwest of a circle with radius $8$), the (unsigned) 
+%   turning angle is $\frac{\pi}{4}$ and the vertical distance to 
+%   where the arc should be vertical is $4.343$, so the arc radius is 
+%   $6.142$ and the horizontal offset is $1.799$. Repeating the 
+%   calculation with signs has \(\theta = -\frac{\pi}{4}\) while 
+%   $\mathit{\Delta x}$ should be negative, so the vertical distance 
+%   should be vertex attachment position minus vertex region boundary 
+%   position; this convention works also on the output side.
+%   
+%   A problem with the formula is however that it is numerically 
+%   unstable near \(\theta = 0\), with cancellation and a possible 
+%   $0/0$ quotient. Those zeroes can be removed by rewriting the 
+%   expression as
+%   \[
+%     \frac{1 - \cos\theta}{\sin\theta} =
+%     \frac{2 \sin^2 \frac{\theta}{2}}
+%       {2 \sin\frac{\theta}{2} \cos \frac{\theta}{2}} =
+%     \tan \frac{\theta}{2}
+%     \text{;}
+%   \]
+%   the interval \(-\pi < \theta < \pi\) is mapped to the whole real 
+%   line. Intuitively it might seem wasteful to evaluate 
+%   transcendental functions when separate $x$- and $y$-displacements 
+%   are the given inputs, but the inputs are not cosines and sines, 
+%   and halving the angle introduces the complications of choosing 
+%   the right branch cut, so as long as the built-in functions 
+%   elegantly give the right answers, it's well worth using them.
+%   
+%   Practically, there is also the special case that edges without a 
+%   specified direction default to being vertical, and thus have 
+%   their reference position equal to their attachment position.
+%   \begin{tcl}
+   set L {}
+   foreach edge [lindex $appearance 2] {
+      if {[llength $edge] < 4} then {
+         lappend L [lindex $edge 0]
+      } else {
+%   \end{tcl}
+%   The boundary position here is $-\frac{1}{2}\textit{height}$, but 
+%   it gets subtracted. Multiplying by $i$ swaps real and imaginary 
+%   parts, but |atan2| also has them swapped, so the net effect is 
+%   only that the element in position |3| should be negated.
+%   \begin{tcl}
+         lappend L [expr {[lindex $edge 0] +\
+           ([lindex $edge 1] + $hheight) *\
+           tan(atan2([lindex $edge 2],-[lindex $edge 3])/2) }]
+      }
+   }
+   set res [list $L]
+   set L {}
+   foreach edge [lindex $appearance 1] {
+      if {[llength $edge] < 4} then {
+         lappend L [lindex $edge 0]
+      } else {
+         lappend L [expr {[lindex $edge 0] +\
+           ([lindex $edge 1] - $hheight) *\
+           tan(atan2(-[lindex $edge 2],[lindex $edge 3])/2) }]
+      }
+   }
+   lappend res $L
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{construct}
+%   The |construct| procedure constructs a network from a vertex 
+%   appearance dictionary and a list of components. The syntax is
+%   \begin{quote}
+%     |network::rich::construct| \word{appearance-dict} 
+%     \word{scan-list} \begin{regblock}[\regopt] \word{option} 
+%     \word{value} \end{regblock}
+%   \end{quote}
+%   where \word{scan-list} is the list of ``items'' in the network 
+%   written in a top--down (input--output) and left--right (low index 
+%   to hight index) manner, just as for |network::pure::construct|. 
+%   The \word{appearance-dict} is a dictionary mapping known vertex 
+%   types to their appearances, which are lists
+%   \begin{quote}
+%     \word{vertex-items} \word{outputs} \word{inputs} 
+%     \word{size}\regopt
+%   \end{quote}
+%   although the \word{vertex-items} element is not used. The 
+%   optional \word{size} is a pair specifying the desired size of the 
+%   vertex; if omitted, the value from is determined by matching 
+%   against the |-vsizes| option. The defaults for option values are 
+%   taken from the
+%   \describestring+[var.][network::rich]{level-layout-Tk_defaults} 
+%   variable.
+%   
+%   The return value is a rich network with three entries: |pure|, 
+%   |level-layout-Tk|, and |bbox-Tk|. The layout always has one 
+%   component only. (This is a consequence of the consistency of 
+%   layout under extension of the \word{scan-list}: you can't know 
+%   that a vertex won't end up in the main component, so it must be 
+%   placed there.)
+%   
+%   One important structure in the procedure is the |Type| array, 
+%   which is indexed by a scanlist item. Most such items are the 
+%   annotation string for a vertex; in that case the corresponding 
+%   entry in the |Type| array is a list
+%   \begin{quote}
+%     |vertex| \word{in-edge-offsets} \word{out-edge-offsets} 
+%     \word{width} \word{height}
+%   \end{quote}
+%   where the \word{in-edge-offsets} and \word{out-edge-offsets} are 
+%   lists whose lengths determine the numbers of incoming and 
+%   outgoing edges, respectively. The other forms of a |Type| array 
+%   entry are
+%   \begin{quote}
+%     \texttt{same} \word{$n$} \word{options}\regopt\\
+%     \texttt{cross} \word{m} \word{n} \word{options}\regopt\\
+%     \texttt{newline}
+%   \end{quote}
+%   A \texttt{same} entry passes the next $n$ edges on to the next 
+%   row; this is effectively a $\same{n}$ permutation. A 
+%   \texttt{cross} entry passes $m+n$ edges on to the next row, but 
+%   the first $m$ of them will be placed after the last $n$; this is 
+%   effectively a $\cross{m}{n}$ permutation. The optional 
+%   \word{options} allow for passing on data that might specify 
+%   arrangement of edges in more detail, however that is currently 
+%   not implemented. Finally, a \texttt{newline} entry passes all 
+%   remaining edges on to the next row, and begins a new row.
+%   
+%   ---
+%   
+%   Unless this is explicitly overridden by the \word{appearance-dict}, 
+%   the following items have such special meanings:
+%   \begin{description}
+%     \item[\texttt{.} (period)]
+%       Equivalent to |same 1|
+%     \item[carriage return]
+%       Equivalent to |newline|.
+%     \item[line feed]
+%       Equivalent to |newline|.
+%     \item[\texttt{X}]
+%       Equivalent to |cross 1 1|.
+%     \item[\meta{k}\texttt{X}\meta{l}]
+%       Equivalent to |cross| \word{k} \word{l}.
+%   \end{description}
+%   The \meta{k}\texttt{X}\meta{l} items are generated on the fly, 
+%   but the other ones are put into the |Type| array to start with.
+%   
+%   The edge offsets are relative to the 
+%   \word{width} midpoint.
+%   \begin{quote}
+%     \texttt{cross} \word{edge-offsets} \word{width} \word{height} 
+%     \word{m} \word{n}
+%   \end{quote}
+%   The next $m+n$ edges are passed on to the next row, but the first 
+%   $m$ of them will be placed after the last $n$; this is 
+%   effectively a $\cross{m}{n}$ permutation. The \word{edge-offsets} 
+%   specify the positions of the edges after the permutation, since 
+%   the |level-layout-Tk| format by design does permutations between 
+%   levels, even if the \word{scanlist} format by design does them in 
+%   levels.
+%   \begin{quote}
+%     \texttt{newline}
+%   \end{quote}
+%   All remaining edges are passed on to the next row, and a new row 
+%   is begun.
+%   
+%   \begin{tcl}
+proc network::rich::construct {appearanceD scanL args} {
+   variable level-layout-Tk_defaults
+   array set O ${level-layout-Tk_defaults}
+   array set O $args
+   array set Type {
+      \r newline
+      \n newline
+      .  {same 1}
+      X  {cross 1 1}
+   }
+   dict for {name app} $appearanceD {
+      if {[llength $app] < 4} then {
+         foreach {pat wh} $O(-vsizes) {
+            if {[string match $pat $name]} then {
+               lappend app $wh
+               break
+            }
+         }
+      }
+      set Type($name) [list vertex {*}[edges_vertxpos $app]\
+        {*}[lindex $app 3]]
+   }
+%   \end{tcl}
+%   The result is built in two phases. The construction phase builds 
+%   the pieces of the pure network and establishes what goes into the 
+%   various levels of the layout. Then the layout phase refines the 
+%   layout by assigning coordinates to items.
+%   
+%   During the construction phase, different pieces of the pure 
+%   network are kept in different variables, so that it is convenient 
+%   to append to them. |V| and |E| are the vertex and edge parts 
+%   respectively of the |pure| network. 
+%   |in| in the list of labels of edges going in to the current 
+%   level, |out| is the list of labels of edges going out from the 
+%   current level. These edges have been added to |E|, but their 
+%   output ends are empty strings until they get attached to 
+%   something. |NWin| similarly is the list of labels of input legs. 
+%   The |i| variable is a pointer to the next |in| edge to use.
+%   \begin{tcl}
+   set V [list {"" {} {}} {"" {} {}}]
+   set E {}
+   set NWin {}
+   set in {}
+   set out {}
+   set i 0
+%   \end{tcl}
+%   The layout-to-be is similar, but has fewer pieces. The |level| is 
+%   the list of items in the level being constructed, and |completed| 
+%   is the list of completed levels. There is no level for input 
+%   edges in |completed|; if there are input edges then the extra 
+%   initial level for those is generated later, at the end of the 
+%   layout phase. 
+%   The items in |level| are similar to those in the final layout, 
+%   but they are \emph{not} the same; the possible forms are
+%   \begin{quote}
+%     |vertex| \word{label} \word{in-edge-offsets} 
+%       \word{out-edge-offsets} \word{width} \word{height}\\
+%     |edges| \word{label}\regplus
+%   \end{quote}
+%   where an |edges| item is for one or several edges. The difference 
+%   between an |edges| item covering several edges and several 
+%   |edges| items with just one edge each is in how many of them are 
+%   considered when aligning different levels.
+%   \begin{tcl}
+   set level {}
+   set completed {}
+   foreach t $scanL {
+      if {![info exists Type($t)]} then {
+         if {[
+            regexp -- {^([1-9][0-9]*)X([1-9][0-9]*)$} $t -> k l
+         ]} then {
+            set Type($t) [list cross $k $l]
+         } else {
+            error "Unknown item type: $t"
+         }
+      }
+%   \end{tcl}
+%   Auto-extension with new network inputs is a bit more of a bother 
+%   here than for pure networks, since the extra edges have to be 
+%   inserted into all completed levels as well. Therefore that step 
+%   is factored out from the processing of individual item types.
+%   \begin{tcl}
+      switch -- [lindex $Type($t) 0] "same" {
+         set ar [lindex $Type($t) 1]
+      } "cross" {
+         set ar [expr {[lindex $Type($t) 1] + [lindex $Type($t) 2]}]
+      } "vertex" {
+         set ar [llength [lindex $Type($t) 1]]
+      } default {
+         set ar 0
+      }
+      if {$i + $ar > [llength $in]} then {
+         set item [list edges]
+         while {$i + $ar > [llength $in]} {
+            set l [llength $E]
+            lappend E {"" "" "" ""}
+            lappend NWin $l
+            lappend item $l
+            lappend in $l
+         }
+         set recompleted {}
+         foreach lvl $completed {
+            lappend lvl $item
+            lappend recompleted $lvl
+         }
+         set completed $recompleted
+      }
+%   \end{tcl}
+%   Then comes the main insertion of the scanlist item into the 
+%   network.
+%   \begin{tcl}
+      switch -- [lindex $Type($t) 0] "newline" {
+         foreach l [lrange $in $i end] {
+            lappend out $l
+            lappend level [list edges $l]
+         }
+         set in $out
+         lappend completed $level
+         set i 0
+         set out {}
+         set level {}
+      } "same" {
+         set item [list edges]
+         for {set n [lindex $Type($t) 1]} {$n >= 1} {incr n -1} {
+         lappend out [lindex $in $i]
+            lappend item [lindex $in $i]
+            incr i
+         }
+         lappend level $item
+      } "cross" {
+         set item [list edges]
+         set j $i
+         incr i [lindex $Type($t) 1]
+         for {set n [lindex $Type($t) 2]} {$n >= 1} {incr n -1} {
+            lappend out [lindex $in $i]
+            lappend item [lindex $in $i]
+            incr i
+         }
+         for {set n [lindex $Type($t) 1]} {$n >= 1} {incr n -1} {
+            lappend out [lindex $in $j]
+            lappend item [lindex $in $j]
+            incr j
+         }
+         lappend level $item
+      } "vertex" {
+%   \end{tcl}
+%   Need to construct a new vertex, construct the edges out from it, 
+%   and attach the edges coming in to it.
+%   \begin{tcl}
+         lappend level [linsert $Type($t) 1 [llength $V]]
+         set new [list $t]
+         set ca [llength [lindex $Type($t) 2]]
+         set L {}
+         for {set n 0} {$n<$ca} {incr n} {
+            lappend out [llength $E]
+            lappend L [llength $E]
+            lappend E [list "" "" [llength $V] $n]
+         }
+         lappend new $L
+         set ar [llength [lindex $Type($t) 1]]
+         set L {}
+         for {set n 0} {$n<$ar} {incr n} {
+            lappend L [lindex $in $i]
+            lset E [lindex $in $i] 0 [llength $V]
+            lset E [lindex $in $i] 1 $n
+            incr i
+         }
+         lappend new $L
+         lappend V $new
+      } default {
+         error "This shouldn't happen"
+      }
+   }
+%   \end{tcl}
+%   Now we may complete the pure network, and the final layout level.
+%   \begin{tcl}
+   if {[llength $level]} then {
+      foreach e [lrange $in $i end] {
+         lappend out $e
+         lappend level [list edges $e]
+      }
+      lappend completed $level
+   } else {
+      set out $in
+   }
+   if {[llength $out]} then {
+      set level {}
+      set item [list [lindex $E [lindex $out 0] 2]]
+      foreach e $out {
+         if {[lindex $E $e 2] != [lindex $item 0]} then {
+            lset item 0 edges
+            lappend level $item
+            set item [list [lindex $E $e 2]]
+         }
+         lappend item $e
+      }
+      lset item 0 edges
+      lappend level $item
+      lappend completed $level
+   }
+   lset V 0 2 $out
+   set n -1; foreach e $out {incr n
+      lset E $e 0 0
+      lset E $e 1 $n
+   }
+   lset V 1 1 $NWin
+   set n -1; foreach e $NWin {incr n
+      lset E $e 2 1
+      lset E $e 3 $n
+   }
+   set res [dict create pure [list $V $E]]
+%   \end{tcl}
+%   When assigning positions to layout items, positions of edges from 
+%   the previous level is the primary reference. Therefore $x$ positions 
+%   of outgoing edges are stored in the |Pos| array, which is indexed 
+%   by edge label; when this array is nonempty, there is some edge from 
+%   the previous level, so $x$ positions in this level are based on 
+%   aligning edges. Otherwise alignment is of left side to left side; 
+%   the |left| variable is the position of the left side of the 
+%   current level (including $\frac{1}{2}$ |-padx|). Alignment is 
+%   achieved by computing the |left| position that would produce it: 
+%   width of vertices with arity $0$ is subtracted from |left|, edge 
+%   positions are averaged. If there are no edges between two levels, 
+%   then the |left| position is equal to that of the previous level.
+%   \begin{tcl}
+   set component {}
+   set left 0
+   set minleft 0
+   set maxright 0
+   set y 0
+   set top 0
+   foreach level $completed {
+      if {[array size Pos]} then {
+         set left 0
+         foreach item $level {
+            switch -- [lindex $item 0] "vertex" {
+               if {![llength [lindex $item 2]]} then {
+                  set left [expr {$left - $O(-padx) -\
+                    [lindex $item 4]}]
+                  continue
+               }
+               set left [expr {$left - 0.5*$O(-padx) -\
+                 0.5*[lindex $item 4]}]
+               set pL [lindex $item 2]
+               set eL [lindex $V [lindex $item 1] 2]
+            } "edges" {
+               set pL {}
+               while {[llength $pL] < [llength $item]-1} {
+                  lappend pL [expr {($O(-padx)+$O(-edgew))*0.5*\
+                    (2*[llength $pL]+1)}]
+               }
+               set eL [lrange $item 1 end]
+            }
+            foreach e $eL p $pL {
+               set left [expr {$left +\
+                 double($Pos($e)-$p)/[llength $eL]}]
+            }
+            break
+         }
+         array unset Pos
+      }
+      if {$left < $minleft} then {set minleft $left}
+%   \end{tcl}
+%   The |x| positions starts at |left| (once that is known), and is 
+%   advanced for each item. At the beginning and end of a 
+%   items-in-level loop iteration, |x| is a position halfway between 
+%   two items. |y| is on the other hand at the bottom side of a level 
+%   when the outer iteration ends.
+%   \begin{tcl}
+      set clevel {}
+      set x $left
+      set h 0
+      foreach item $level {
+         switch -- [lindex $item 0] "vertex" {
+            set x [expr {$x + 0.5*$O(-padx) + 0.5*[lindex $item 4]}]
+            lappend clevel [list vertex [lindex $item 1] $x]
+            foreach  e [lindex $V [lindex $item 1] 1] \
+              p [lindex $item 3]  {
+               set Pos($e) [expr {$x + $p}]
+            }
+            if {$h < [lindex $item 5]} then {set h [lindex $item 5]}
+            set x [expr {$x + 0.5*$O(-padx) + 0.5*[lindex $item 4]}]
+         } "edges" {
+            foreach e [lrange $item 1 end] {
+               set Pos($e) [expr {$x + 0.5*$O(-padx) + 0.5*$O(-edgew)}]
+               lappend clevel [list edge $e $Pos($e)]
+               set x [expr {$x + $O(-padx) + $O(-edgew)}]
+            }
+            if {$h < $O(-edgeh)} then {set h $O(-edgeh)}
+         }
+      }
+      if {$x > $maxright} then {set maxright $x}
+      if {$y==0} then {
+         set top [expr {$y - 0.5*$h}]
+      } else {
+         set y [expr {$y + $O(-pady) + 0.5*$h}]
+      }
+      lappend component clevel $y [expr {0.5*$h}]
+      set y [expr {$y + 0.5*$h}]
+   }
+%   \end{tcl}
+%   The above does the right thing also for output edges, but input 
+%   edges are (to preserve positions, when they arise) aligned to the 
+%   level below and therefore need separate processing. It can 
+%   however be simplified, since the edges affecting the alignment 
+%   all go to the same item in the second level; we merely have to 
+%   locate it.
+%   \begin{tcl}
+   if {[llength $NWin]} then {
+      foreach item [lindex $component 0] {
+         switch -- [lindex $item 0] "edge" {
+%   \end{tcl}
+%   An |edge| item is on the one hand obscure, because it is not 
+%   visible in the resulting component how many edges contribute to 
+%   the scanlist item it was produced from. On the other hand that 
+%   doesn't matter, since the result would always be that this edge 
+%   lines up with the first edge from the input edges level. 
+%   Therefore we can always just use this first $x$ position of an 
+%   edge that we find.
+%   \begin{tcl}
+            set x [lindex $item 2]
+         } "vertex" {
+%   \end{tcl}
+%   Vertices are more complicated. If there are no incoming edges, we 
+%   continue to the next item in the level. Otherwise calculate the 
+%   aligned |x| position of the first edge, using the fact that the 
+%   distance between two successive edges is the |-edgew| plus the 
+%   |-padx|.
+%   \begin{tcl}
+            set pL [lindex $Type([lindex $V [lindex $item 1] 0]) 1]
+            if {![llength $pL]} then {continue}
+            set sum 0
+            foreach p $pL {set sum [expr {$sum + $p}]}
+            set x [expr {[lindex $item 2] +\
+              $sum/double([llength $pL]) -\
+              0.5*($O(-edgew)+$O(-padx))*([llength $pL]-1)}]
+         }
+         break
+      }
+      if {$left > $x - 0.5*$O(-edgew)} then {
+         set left [expr {$x - 0.5*$O(-edgew)}]
+      }
+      set clevel {}
+      foreach e $NWin {
+         lappend clevel [list edge $e $x]
+         set x [expr {$x + $O(-edgew) + $O(-padx)}]
+      }
+      if {$right < $x - 0.5*$O(-edgew)} then {
+         set right [expr {$x - 0.5*$O(-edgew)}]
+      }
+      set top [expr {$top - $O(-pady) - $O(-edgeh)}]
+      set component [linsert $component [set component 0]\
+        $clevel [expr {$top + 0.5*$O(-edgeh)}] [expr {0.5*$O(-edgeh)}]]
+   }
+%   \end{tcl}
+%   Now all that remains is to return the result.
+%   \begin{tcl}
+   dict set res bbox-Tk [list $minleft $top $maxright $y]
+   dict set res level-layout-Tk [list $component [dict get $res bbox-Tk]]
+   return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
 % 
 % 
 % \subsection{Elastic edges}
@@ -13257,7 +13891,7 @@ proc network_as_LaTeX {NW args} {
 % 
 % \bibitem{Colley}
 %    \textsc{Wesley N. Colley}: 
-%    \textit{Colley’s Bias Free College Football Ranking Method: 
+%    \textit{Colley's Bias Free College Football Ranking Method: 
 %    The Colley Matrix Explained} (2003), 23~pp. 
 %    Retrieved 18 November 2006 from \textsc{http:}/\slash
 %    \texttt{www.colleyrankings.com}\slash \texttt{matrate.pdf}.

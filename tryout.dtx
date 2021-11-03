@@ -2,6 +2,8 @@
 % \iffalse
 %<*driver>
 \documentclass{mtmtcl}
+\newcommand{\PROP}{PROP}
+\newcommand{\PROPs}{\PROP s}
 \begin{document}
 \DocInput{tryout.dtx}
 \end{document}
@@ -2307,6 +2309,351 @@ set code [mtmtcl::latex::convertto [PROP export $epsilon {}]]
 % 
 % \begin{tcl}
 %</PROPcompare>
+% \end{tcl}
+% 
+% 
+% \section{2017 reimplementation of PROP-twist ordering problem}
+% 
+% This time, be explicit about code requirements.
+% \begin{tcl}
+%<*PROPcompare2017>
+package require mtmtcl::rings::integers
+package require mtmtcl::sets::universe 1.0
+package require mtmtcl::groups::free_abelian_group 1.0
+package require mtmtcl::rings::semigroup_algebra 1.1
+package require mtmtcl::matprop 1.0
+% \end{tcl}
+% 
+% 
+% \newcommand{\bsln}{\PrintChar{92}n}
+% 
+% There are (at least) two different comparisons that one would want 
+% to make: in scan-line notation
+% \[
+%   (\texttt{\frenchspacing T . \bsln\ . T \bsln\ T .}) >
+%   (\texttt{\frenchspacing . T \bsln\ T . \bsln\ . T})
+% \]
+% and
+% \begin{multline*}
+%   (\texttt{\frenchspacing
+%     . T . \bsln\ T . . \bsln\ . T . \bsln\ . . x \bsln\ 
+%     . T . \bsln\ T . .}) 
+%   > \\ >
+%   (\texttt{\frenchspacing
+%     T . . \bsln\ . T . \bsln\ . . x \bsln\ . T . \bsln\
+%     T . . \bsln\ . T .})
+% \end{multline*}
+% each of which gives rise to one group of inequalities. In each 
+% group, we want at least one strict inequality.
+% 
+% There are also some different PROPs one wants to consider:
+% \begin{enumerate}
+%   \item
+%     biaffine PROP over real numbers,
+%   \item
+%     hom-PROP over a finite-dimensional (parameter!) real vector 
+%     space,
+%   \item
+%     biaffine PROP over some set of matrices of real numbers\Dash 
+%     let's try $2 \times 2$ matrices to begin with.
+% \end{enumerate}
+% For these calculations, one furthermore wants to replace the 
+% ordinary scalars by polynomials, so that one may compute with 
+% ``general elements'' by having a variable for each matrix element. 
+% How can that be managed?
+% 
+% One approach is to have an OO object represent the choice of PROP. 
+% Methods one would need from these objects include
+% \begin{APIdescription}{object}
+%   \begin{APImethod}{representative}
+%     \word{name} \word{coarity} \word{arity}
+%   \end{APImethod}
+%     Return the \PROP\ element that represents a vertex\slash 
+%     operation named \word{name}, having \word{coarity} outputs and 
+%     \word{arity} inputs.
+%     
+%   \begin{APImethod}{decompose}
+%     \word{\PROP\ element}
+%   \end{APImethod}
+%     Returns the list of polynomials constituting the scalar 
+%     elements of the \word{\PROP\ element}. The order (and length) 
+%     depends on the \PROP\ in question, but is consistent.
+%     
+%   \begin{APImethod}{polynomial}
+%     \word{method} \word{arg}\regstar
+%   \end{APImethod}
+%   \begin{APImethod}{polyPROP}
+%     \word{method} \word{arg}\regstar
+%   \end{APImethod}
+%     Prefixes for calling the ring of polynomials\Ldash lists of 
+%     elements of which are returned by |decompose|\Rdash and the 
+%     \PROP\ to which the \word{\PROP\ element} argument belongs.
+% \end{APIdescription}
+% Given these, the two above comparison groups can be computed as 
+% follows.
+% 
+% \begin{proc}{Yang--Mills_group}
+%   This procedure takes an object representing the \PROP\ used for 
+%   comparisons as its only argument, and returns the list of nonzero 
+%   polynomials of the comparison group expressing that the 
+%   left-heavy side of the abstract twist Yang--Mills equation is 
+%   larger than the right-heavy side.
+%   \begin{tcl}
+proc Yang--Mills_group {obj} {
+   set T [$obj representative T 2 2]
+   set left [$obj polyPROP fuse {o1 o2 o3} \
+     {o1 o2} $T {m1 m2}  {m2 o3} $T {m3 i3}  {m1 m3} $T {i1 i2} \
+     {i1 i2 i3}]
+   set right [$obj polyPROP fuse {o1 o2 o3} \
+     {o2 o3} $T {m1 m2}  {o1 m1} $T {i1 m3}  {m3 m2} $T {i2 i3} \
+     {i1 i2 i3}]
+   lmap l [$obj decompose $left] r [$obj decompose $right] {
+      set d [$obj polynomial - $l $r]
+      if {[$obj polynomial iszero $d]} then {continue}
+      set d
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{second_group}
+%   This procedure takes an object representing the \PROP\ used for 
+%   comparisons as its only argument, and returns the list of nonzero 
+%   polynomials of the comparison group expressing 
+%   \begin{multline*}
+%     (\texttt{\frenchspacing
+%       . T . \bsln\ T . . \bsln\ . T . \bsln\ . . x \bsln\ 
+%       . T . \bsln\ T . .}) 
+%     \geqslant \\ \geqslant
+%     (\texttt{\frenchspacing
+%       T . . \bsln\ . T . \bsln\ . . x \bsln\ . T . \bsln\
+%       T . . \bsln\ . T .})
+%   \end{multline*}
+%   \begin{tcl}
+proc second_group {obj} {
+   set T [$obj representative T 2 2]
+   set left [$obj polyPROP fuse {o1 o2 o3 o4} \
+     {o1 o2} $T {m1 m2}  {m2 o3} $T {m3 i4}  {m3 o4} $T {m5 m6} \
+     {m1 m5} $T {i1 m7}  {m7 m6} $T {i2 i3} \
+     {i1 i2 i3 i4}]
+   set right [$obj polyPROP fuse {o1 o2 o3 o4} \
+     {o2 o3} $T {m2 m4}  {o1 m2} $T {m7 m3}  {m3 m4} $T {m5 i4} \
+     {m5 o4} $T {m6 i3}  {m7 m6} $T {i1 i2} \
+     {i1 i2 i3 i4}]
+   lmap l [$obj decompose $left] r [$obj decompose $right] {
+      set d [$obj polynomial - $l $r]
+      if {[$obj polynomial iszero $d]} then {continue}
+      set d
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% But what do the implementations of such objects look like? There is 
+% one class per case of \PROP; some may take parameters, others do 
+% not.
+% 
+% \begin{tclcommand}{class}{biaffine1}
+%   This class implements the above interface for simple biaffine 
+%   \PROPs. 
+%   \begin{tcl}
+oo::class create biaffine1 {
+   method decompose {biaff} {
+      set res [list [lindex $biaff 0]]
+      lappend res {*}[lindex $biaff 1] {*}[lindex $biaff 2]
+      foreach L [lindex $biaff 3] {lappend res {*}$L}
+      return $res
+   }
+%   \end{tcl}
+%   The polynomials are implemented sparsely, as a 
+%   |semigroup_algebra| over integers on the |free_abelian_group| on 
+%   the |universe|. (In principle that will give Laurent polynomials, 
+%   but who cares.) The advantage of using |universe| here is that we 
+%   don't need to predict what the variables are named (every string 
+%   denotes a separate variable), but a disadvantage is that the 
+%   |export| becomes an \texttt{OMFOREIGN}; that will need adjusting 
+%   afterwards.
+%   \begin{tcl}
+   set poly [mtmtcl::rings::semigroup_algebra::make\
+     [mtmtcl::rings::integers::make] [
+      list ::mtmtcl::groups::free_abelian_group\
+        [list ::matrixelemvars] {::lsort -dictionary}
+   ]]
+   forward polynomial {*}$poly
+   forward polyPROP ::mtmtcl::matprop::biaffine $poly
+%   \end{tcl}
+%   The by far longest method to implement is that generating a 
+%   representative.
+%   \begin{tcl}
+   method representative {name coarity arity} {
+      set d [my polynomial named "${name}_0_0"]
+      set c {}
+      for {set j 1} {$j <= $arity} {incr j} {
+         lappend c [my polynomial named "${name}_0_${j}"]
+      }
+      set b {}
+      set A {}
+      for {set i 1} {$i <= $coarity} {incr i} {
+         lappend b [my polynomial named "${name}_${i}_0"]
+         set row {}
+         for {set j 1} {$j <= $arity} {incr j} {
+            lappend row [my polynomial named "${name}_${i}_${j}"]
+         }
+         lappend A $row
+      }
+      my polyPROP fromparts $d $b $c $A
+   }
+}
+%   \end{tcl}
+% \end{tclcommand}
+% ^^A oo::define biaffine1
+% 
+% \begin{proc}{matrixelemvars}
+%   This is basically the |::mtmtcl::sets::universe| structure, but 
+%   hacked to produce more sensible |export| results. The idea is 
+%   (i)~that the strings are valid OM variable names, and (ii)~that 
+%   names of the form \meta{letter}|_|\meta{digits}|_|\meta{digits} 
+%   are to be rendered as 
+%   $\meta{letter}_{\meta{digits},\meta{digits}}$.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     ::matrixelemvars \word{subcommand} \word{argument}\regstar
+%   \end{displaysyntax}
+%   \begin{tcl}
+proc ::matrixelemvars {subcmd args} {
+   switch -- $subcmd "API" {
+      ::API::static {
+         equality 1.0
+         canonise 1.1
+         onlycanonical 1.0
+         export 2.0
+      } {*}$args
+   } "=" {
+      string equal [lindex $args 0] [lindex $args 1]
+   } "canonise" {
+      lindex $args 0
+   } "export" {
+      set name [lindex $args 0]
+      set core [mtmtcl::openmath::OM V $name]
+      if {[scan $name {%[A-Za-z]_%d_%d} var i j] < 3} then {
+         return $core
+      } else {
+         return [
+            mtmtcl::openmath::OM UATTR $core altenc#LaTeX_encoding [
+               mtmtcl::openmath::OM STR\
+                 [format {%s_{%d,%d}} $var $i $j]
+            ]
+         ]
+      }
+   } default {
+      return -code error "Unknown subcommand \"$subcmd\": must be\
+        API, =, canonise, or, export"
+   }
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{tclcommand}{class}{homfd}
+%   This class implements the above interface for the 
+%   $\mathcal{H}\mathit{om}$ \PROP\ over a finite-dimensional vector 
+%   space. 
+%   \begin{tcl}
+oo::class create homfd {
+   variable N
+   constructor {n} {
+      set N $n
+%   \end{tcl}
+%   The polynomials are implemented sparsely, as a 
+%   |semigroup_algebra| over integers on the |free_abelian_group| on 
+%   the |universe|. (In principle that will give Laurent polynomials, 
+%   but who cares.)
+%   \begin{tcl}
+      set poly [mtmtcl::rings::semigroup_algebra::make\
+        [mtmtcl::rings::integers::make] [
+         list ::mtmtcl::groups::free_abelian_group\
+           [list ::matrixelemvars] {::lsort -dictionary}
+      ]]
+      oo::objdefine [self] forward polynomial {*}$poly
+      oo::objdefine [self] forward polyPROP\
+        ::mtmtcl::matprop::homfdpower $n $poly
+   }
+   method decompose {matrix} {concat {*}$matrix}
+   method representative {name coarity arity} {
+      set A {}
+      for {set i 1} {$i <= $N**$coarity} {incr i} {
+         set row {}
+         for {set j 1} {$j <= $N**$arity} {incr j} {
+            lappend row [my polynomial named "${name}_${i}_${j}"]
+         }
+         lappend A $row
+      }
+      return $A
+   }
+}
+%   \end{tcl}
+% \end{tclcommand}
+% 
+% 
+% \begin{proc}{comparison_inequalities}
+%   This procedure returns \LaTeX\ code for the comparison 
+%   inequalities, given only the object for its underlying \PROP.
+%   \begin{tcl}
+proc comparison_inequalities {obj} {
+   set res "First group:"
+   append res \n {\begin{enumerate}}
+   foreach p [Yang--Mills_group $obj] {
+      append res \n {  \item \(} [mtmtcl::latex::convertto [
+         $obj polynomial export $p {}
+      ]] { \geqslant 0\)}
+   }
+   append res \n {\end{enumerate}}
+%   \end{tcl}
+%   Example output:
+%   \begin{quote}
+%     First group:
+%     \begin{enumerate}
+%       \item \(T_{0,1} T_{1,0} + T_{0,2} T_{1,1} T_{2,0} - T_{0,1} T_{1,0} T_{2,2} - 
+%         T_{0,2} T_{2,0}  \geqslant 0\)
+%       \item \(T_{1,0} T_{1,1} + T_{1,1} T_{1,2} T_{2,0}  \geqslant 0\)
+%       \item \(T_{2,0} + T_{1,0} T_{2,1} + T_{1,0} T_{2,2} + T_{1,1} T_{2,0} T_{2,2} 
+%         - T_{1,0} - T_{1,1} T_{2,0} - T_{1,0} T_{1,1} T_{2,2} - 
+%         T_{1,2} T_{2,0}  \geqslant 0\)
+%       \item \(- T_{1,0} T_{2,1} T_{2,2} - T_{2,0} T_{2,2}  \geqslant 0\)
+%       \item \(T_{0,1} T_{1,1} + T_{0,2} T_{1,1} T_{2,1}  \geqslant 0\)
+%       \item \(T_{0,2} + T_{0,1} T_{2,2} + T_{0,1} T_{1,2} + T_{0,2} T_{1,1} T_{2,2} 
+%         - T_{0,1} - T_{0,2} T_{1,1} - T_{0,1} T_{1,1} T_{2,2} - 
+%         T_{0,2} T_{2,1}  \geqslant 0\)
+%       \item \(- T_{0,1} T_{1,2} T_{2,2} - T_{0,2} T_{2,2}  \geqslant 0\)
+%       \item \({T_{1,1}}^2 + T_{1,1} T_{1,2} T_{2,1} - T_{1,1}  \geqslant 0\)
+%       \item \(T_{1,1} T_{1,2} T_{2,2}  \geqslant 0\)
+%       \item \(T_{1,1} T_{2,1} T_{2,2}  \geqslant 0\)
+%       \item \(T_{1,1} {T_{2,2}}^2 - {T_{1,1}}^2 T_{2,2}  \geqslant 0\)
+%       \item \(- T_{1,1} T_{1,2} T_{2,2}  \geqslant 0\)
+%       \item \(- T_{1,1} T_{2,1} T_{2,2}  \geqslant 0\)
+%       \item \(T_{2,2} - T_{1,2} T_{2,1} T_{2,2} - {T_{2,2}}^2  \geqslant 0\)
+%     \end{enumerate}
+%   \end{quote}
+%   An \texttt{align} or similar might feel more obvious, but some of 
+%   the inequalities are too long to fit on one line.
+%   \begin{tcl}
+   append res \n "Second group:"
+   append res \n {\begin{enumerate}}
+   foreach p [second_group $obj] {
+      append res \n {  \item \(} [mtmtcl::latex::convertto [
+         $obj polynomial export $p {}
+      ]] { \geqslant 0\)}
+   }
+   append res \n {\end{enumerate}}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{tcl}
+%</PROPcompare2017>
 % \end{tcl}
 % 
 \endinput

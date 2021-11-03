@@ -328,7 +328,7 @@ rapid prototyping, particularly of interfaces) and maybe later
 reimplements critical parts in a lower level language if the \Tcl\ 
 implementation turned out to not be performant enough. (Another 
 time-tested approach, which is appropriate when the wanted operations 
-are already available in some code library, it to provide a thin 
+are already available in some code library, is to provide a thin 
 wrapper for that library which makes its functionality available as 
 \Tcl\ commands.)
 
@@ -340,7 +340,7 @@ a sequence of \emph{words}, which are separated by ordinary
 whitespace. The basic idea is that each sentence codes one command 
 call, and each word of that sentence contributes one element to the 
 list of values making up that call, but there is (as explained below) 
-some room for bending that rule.
+some room for bending those rules.
 
 Words in \Tcl\ programs tend to fall in five functional categories:
 \begin{description}
@@ -352,12 +352,16 @@ Words in \Tcl\ programs tend to fall in five functional categories:
     
   \item[Barewords]
     A word simply denotes itself if it does not contain any of the 
-    characters `|{|' (left brace), `|}|' (right brace), `|[|' (left 
-    bracket), `|]|' (right bracket), `|$|' (dollar), `|\|' 
-    (backslash), `|"|' (quotation mark), `|#|' (hash sign), 
-    `|;|'~(semicolon), or whitespace; such words typically serve as 
+    characters |{}[]$\"#;| (left and right brace, left and right 
+    bracket, dollar, backslash, quotation mark, hash sign, and 
+    semicolon) 
+%     `|{|' (left brace), `|}|' (right brace), `|[|' (left 
+%     bracket), `|]|' (right bracket), `|$|' (dollar), `|\|' 
+%     (backslash), `|"|' (quotation mark), `|#|' (hash sign), 
+%     `|;|'~(semicolon), 
+    or whitespace; such \emph{barewords} typically serve as 
     identifiers\slash symbols or explicit constants. Note that the 
-    characters allowed in such barewords thus include `|+|', `|-|', 
+    characters allowed in barewords include `|+|', `|-|', 
     `|*|', `|/|', `|=|', `|<|', `|>|', `|!|', and many more, in 
     particular all the non-ASCII characters in Unicode! This often 
     makes it possible to use the ``proper'' mathematical symbol when 
@@ -450,9 +454,9 @@ asterisk, brace), then the rest of that word first gives rise to a
 value as explained above, but then that value is interpreted as a 
 list and each element of that list is contributed as a separate 
 element to the call being constructed. A word such as `|{*}$list|' or 
-`|{*}[foo $bar]|' thus contributes zero or more values to call 
-constructed from the surrounding sentence. This has several 
-applications in common \mtl\ idioms.
+`|{*}[foo $bar]|' thus contributes zero or more values to the 
+surrounding sentence. This has several applications in common \mtl\ 
+idioms.
 
 In order to parse a \Tcl\ program, one must in addition to the 
 overall language syntax also be aware of the syntaxes of the 
@@ -462,7 +466,7 @@ system). Some important commands, and some commands whose existence
 may be hard to guess, are:
 \begin{longtable}{l p{0.7\linewidth}}
   \texttt{set}& Assign new value to a variable.\\
-  \texttt{proc}& Define a procedure\Dash a command that is a 
+  \texttt{proc}& Define a procedure\Dash a command that executes a 
     subroutine whose body is a \Tcl\ script.\\
   \texttt{if}& Conditional controlled by boolean expression.\\
   \texttt{switch}& Multiway-choice conditional.\\
@@ -492,9 +496,9 @@ Some notable functional areas and commands related to these are:
   Lists&
     \texttt{concat}, \texttt{join}, \texttt{lappend}, 
     \texttt{lassign}, \texttt{lindex}, \texttt{list}, 
-    \texttt{llength}, \texttt{lrange}, \texttt{lrepeat}, 
-    \texttt{lreplace}, \texttt{lreverse}, \texttt{lsearch}, 
-    \texttt{lset}, \texttt{lsort}, \texttt{split}
+    \texttt{llength}, \texttt{lmap}, \texttt{lrange}, 
+    \texttt{lrepeat}, \texttt{lreplace}, \texttt{lreverse}, 
+    \texttt{lsearch}, \texttt{lset}, \texttt{lsort}, \texttt{split}
     \\
   Dictionaries&
     \texttt{dict}, \texttt{array}
@@ -730,7 +734,8 @@ function to an element of that set), but there is none of that business of
 values being associated to one specific type that is frequently presumed 
 in computer science. Hence mathematics as such is untyped, or if you 
 will one-typed: everything is a set, period. For a system for mathematics 
-to be otherwise would therefore be a deviation from the true thing.
+to be otherwise would therefore be a deviation from the established 
+standard.
 
 The historically versed reader may here object that it has not always been 
 the case that the standard foundation was untyped. The 
@@ -739,7 +744,7 @@ certainly typed (it is even known as ``the type theory of sets'').
 In Greek antiquity (or at least that period during it which became 
 authorative for subsequent ages), a quantity had to be specified as 
 either length, area, volume, or whatever; there was no canonical way in 
-which e.g. the an area and a length could have comparable ``numerical 
+which e.g.~an area and a length could have comparable ``numerical 
 values'', so they were of different types.
 % is indeed true. 
 Type distinctions of this kind have however a strong tendency to dissolve 
@@ -747,7 +752,7 @@ over time, as the cost of maintaining them (which can be found in the
 form of frequent extra manoeuvres in arguments to work around the 
 type boundaries) is rarely accompanied by any advantages whatsoever. 
 In particular the type theory of sets has, to the 21th century observer, 
-the distinct smell of a failed high-profile standard that collapses under 
+the distinct smell of a failed high-profile standard that collapsed under 
 its own weight: too impractical and complicated to see much in the area 
 of actual implementations, but nonetheless taken seriously and being 
 pursued because of its association with big names and high-profile 
@@ -914,15 +919,15 @@ mathematics. It should however be observed that this model has two
 rather different faces: on one hand, there is the formal model 
 against which program correctness should be judged, and on the other 
 hand there is the underlying technology, which determines the 
-complexity of algorithm implementations. (There have unfortunately 
-been some widely disseminated, although by now rather old, analyses 
-of \Tcl\ whose outdated conclusions about complexity are based on 
-the formal model alone.)
+computational complexity of algorithm implementations. (There have 
+unfortunately been some widely disseminated, although by now rather 
+old, analyses of \Tcl\ whose outdated conclusions about complexity 
+are based on the formal model alone.)
 
 The formal model is simply this: \emph{everything} (i.e., every 
 value) \emph{is a string!} Every value has a unique decomposition 
 into a finite sequence (of length zero or more) of characters, and 
-two values are equal if and only if the decompose to the same 
+two values are equal if and only if they decompose to the same 
 sequence of characters. Commands are allowed to treat unequal 
 strings as denoting equivalent values\Ldash for example 
 `\texttt{0xFF}' and `\texttt{255}' are equivalent to commands 
@@ -999,7 +1004,17 @@ commands take the name of the variable in which the value to modified
 is stored as argument; had they only taken the value, then the 
 internal representation would always be shared (one reference is 
 passed to the command, and one reference continues to be held by the 
-variable).
+variable). Thus to set element $2$ of the list stored in variable |L| 
+to |x| one would say
+\begin{quote}
+  |lset L 2 x|
+\end{quote}
+with the variable name |L| as a bareword, whereas to retrieve element 
+$2$ of the list stored in variable |L| one would say
+\begin{quote}
+  |lindex $L 2|
+\end{quote}
+where the |$L| retrieves the value of stored in |L|.
 
 
 
@@ -1405,7 +1420,7 @@ string and the \word{version} is defined by the rules
 \end{displaysyntax}
 The most important form of the |API| method is the first, since it 
 constitutes the query ``does \meta{structure} support version 
-\meta{version} of \word{interface}''; the return value is a boolean. 
+\word{version} of \word{interface}''; the return value is a boolean. 
 When the result is true, the user knows that this structure lives up 
 to what is specified in that version of the interface.
 
@@ -1444,7 +1459,7 @@ in a \texttt{group} $G$ it would unintuitively imply that
 but there could have been.) Bumping the major version number up to~1 
 would then be the way to start anew. Structures where |*| is 
 commutative could actually claim to support both versions, but 
-noncommutative ones would have to choose on or the other.
+noncommutative ones would have to choose one or the other.
 
 For minor version numbers, one could imagine a \texttt{division}~1.1 
 where the syntax of |/| was generalised to
@@ -1631,7 +1646,7 @@ data-is-code technique}.
 \DocInclude{support}
 \DocInclude{groups}
 \DocInclude{rings}
-% \DocInclude{export}
+% \DocInclude%{export}
 
 
 \begin{thebibliography}{99}

@@ -35,7 +35,8 @@ the true source is the file from which this one was generated.
 %       \from{rings.dtx}{integers,float,SemigroupAlgebra}
 %       \from{props.dtx}{pkg}
 %       \from{heap.dtx}{pkg,skiplist}
-%       \from{cmplutil2.dtx}{vsquare,Tk,stats,splitnewrule,lazier,eventbug}
+%       \from{cmplutil2.dtx}{vsquare,Tk,stats,splitnewrule,lazier,%
+%         sqlite3.16.0fix,eventbug}
 %    }
 % The following all contains the settings and congruences for 
 % specific problems.
@@ -47,7 +48,7 @@ the true source is the file from which this one was generated.
 %       \from{heap.dtx}{pkg,skiplist}
 %       \from{cmplutil2.dtx}
 %         {vsquare,Tk,Frobenius,coproduct,stats,splitnewrule,lazier,%
-%          eventbug,testserver}
+%          sqlite3.16.0fix,eventbug,testserver}
 %    }
 %    \file{cmplfrobnoweb.tcl}{
 %       \from{network2.dtx}{pkg}
@@ -76,7 +77,7 @@ the true source is the file from which this one was generated.
 %       \from{heap.dtx}{pkg,skiplist}
 %       \from{cmplutil2.dtx}
 %         {vsquare,noTk,Hopf,twist,untwist,stats,splitnewrule,lazier,pairmap,%
-%           eventbug,testserver,zlib}
+%           sqlite3.16.0fix,eventbug,testserver,zlib}
 %    }
    \file{cmplhopftk.tcl}{
       \from{network2.dtx}{pkg}
@@ -87,7 +88,33 @@ the true source is the file from which this one was generated.
       \from{heap.dtx}{pkg,skiplist}
       \from{cmplutil2.dtx}
         {vsquare,Tk,Hopf,stats,splitnewrule,lazier,pairmap,%twist,untwist,
-          eventbug,testserver,zlib,division}
+          sqlite3.16.0fix,eventbug,testserver,zlib}
+   }
+   \file{cmplhopfdivtk.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,Hopf,stats,splitnewrule,lazier,pairmap,zlib,%
+          %twist,untwist,
+          sqlite3.16.0fix,eventbug,testserver,axiomsfirst,%
+          division}
+   }
+   \file{cmplhopf-indigo.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,Hopf,stats,splitnewrule,%
+          lazy,%lazier,pairmap,zlib,
+          twist,%untwist,division,
+          sqlite3.16.0fix,eventbug,testserver}
    }
 %    \file{cmplweak.tcl}{
 %       \from{network2.dtx}{pkg}
@@ -116,19 +143,31 @@ the true source is the file from which this one was generated.
 %       \from{heap.dtx}{pkg,skiplist}
 %       \from{cmplutil2.dtx}
 %         {vsquare,Tk,BraidMatrix,stats,splitnewrule,lazier,%
-%          eventbug,testserver}
+%          sqlite3.16.0fix,eventbug,testserver}
 %    }
-%    \file{cmplhomass.tcl}{
-%       \from{network2.dtx}{pkg}
-%       \from{export.dtx}{openmath,xmlgen,pkg}
-%       \from{rings.dtx}{integers,float,SemigroupAlgebra}
-%       \from{props.dtx}{pkg}
-%       \from{heap.dtx}{pkg,skiplist}
-%       \from{cmplutil2.dtx}
-%         {vsquare,Tk,HomAss,stats,splitnewrule,lazier,pairmap,%
-%           aishom,bihomass,%
-%           eventbug,testserver,zlib}
-%    }
+   \file{cmplhomass.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,HomAss,stats,splitnewrule,lazier,pairmap,%
+          aishom,bihomass,%
+          sqlite3.16.0fix,eventbug,testserver,zlib}
+   }
+   \file{cmplhomtype2tk.tcl}{
+      \from{network2.dtx}{pkg}
+      \from{api.dtx}{pkg}
+      \from{export.dtx}{openmath,xmlgen,pkg}
+      \from{rings.dtx}{integers,float,SemigroupAlgebra}
+      \from{props.dtx}{pkg}
+      \from{heap.dtx}{pkg,skiplist}
+      \from{cmplutil2.dtx}
+        {vsquare,Tk,stats,splitnewrule,lazier,pairmap,%
+          hopfbase,HomAssTypeII,%
+          sqlite3.16.0fix,eventbug,testserver,zlib,division}
+   }
 %    \file{cmplhomleibtk.tcl}{
 %       \from{network2.dtx}{pkg}
 %       \from{api.dtx}{pkg}
@@ -138,7 +177,7 @@ the true source is the file from which this one was generated.
 %       \from{heap.dtx}{pkg,skiplist}
 %       \from{cmplutil2.dtx}
 %         {vsquare,Tk,HomLeib,twist,untwist,stats,splitnewrule,lazier,pairmap,%
-%           eventbug,testserver,zlib}
+%           sqlite3.16.0fix,eventbug,testserver,zlib}
 %    }
 %    \file{cmpltransp.tcl}{
 %       \from{network2.dtx}{pkg}

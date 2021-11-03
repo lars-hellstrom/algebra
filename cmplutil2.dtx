@@ -221,6 +221,11 @@
 % to compare networks; this is probably the closest one can get to 
 % the standard strategy.
 % 
+% The \Module{axiomsfirst} module modifies the initial processing (in 
+% some problem initialisations) to process all entered congruences 
+% before looking at pairs. Whether takes effect also depends on 
+% having modules \Module{lazier} and \Module{vsquare}.
+% 
 % 
 % \subsubsection*{Data structure variants}
 % 
@@ -234,6 +239,20 @@
 % ``large'' pairs (i.e., those that wouldn't be processed for quite 
 % some time) to go into this more compact table, rather than the 
 % basic |pa1rs| table.
+% 
+% \begin{variable}{code_variants}
+%   The |code_variants| variable is a list of those \textsf{docstrip} 
+%   options which affect how (and what) data are stored in the database 
+%   and which are true for this instance of the utility.
+%   \begin{tcl}
+set code_variants {}
+%<zlib>lappend code_variants zlib
+%<aprofile>lappend code_variants aprofile
+%<pairmap>lappend code_variants pairmap
+%   \end{tcl}
+%   This list can be compared against the cached value stored in a 
+%   database to determine if opening the database would be reliable.
+% \end{variable}
 % 
 % 
 % \subsubsection*{Problem initialisation modules}
@@ -285,6 +304,9 @@
 %     input values as necessary, and then the best one could hope for 
 %     would be a Hopf algebra.
 % \end{itemize}
+% The module \Module{hopfbase} only contains the vertex definitions 
+% and ordering, but no congruences. It is meant as a starting point 
+% for experimentation.
 % 
 % The \Module{HomAss} module initialising the utility with the axioms 
 % of a hom-associative algebra or variation thereof. The 
@@ -469,20 +491,40 @@ lappend DB_column(ru1es) wh3n1 INTEGER wh3n2 INTEGER
 lappend DB_column(le9end) k3y {UNIQUE} va1ue {}
 % \end{tcl}
 % 
-% The \describestring+[legend key]{coeff_cmd} entry in the legend is 
-% the command prefix of the ring of coefficients. 
-% The \describestring+[legend key]{coeff_setup} entry is a script 
-% that sets up anything needed for the |coeff_cmd| (requires 
-% packages, creates aliases, etc.).
+% The \describestring+[legend key]{code_variants} entry in the legend 
+% stores the value of the |code_variants| variable for the version of 
+% the utility that created the database. If the two are different 
+% then there may be problems with trying to opening.
 % 
 % The \describestring+[legend key]{signature} entry in the legend is 
 % the signature of the free \PROP\ in which the calculations are 
 % carried out, in the form of a dictionary mapping each annotation 
 % $x$ to the pair `$\alpha(x) \ \omega(x)$' of arity and coarity. In 
 % other words, it has the structure of the \word{type-dict} argument 
-% of the |network::pure::construct| procedure. \emph{The order of 
+% of the |network::pure::construct| procedure. \textbf{The order of 
 % the keys in this dictionary is significant} since the interpretation 
-% of the profile columns depend on it.
+% of the profile columns depend on it. \textbf{The existence of this 
+% entry in a database} signals that the signature may no longer the 
+% modified; there may be data stored elsewhere that would be 
+% extremely difficult to adjust according to changes in the signature.
+% 
+% The \describestring+[legend key]{coeff_setup} entry is a script 
+% that sets up anything needed for the |coeff_cmd| (requires 
+% packages, creates aliases, etc.).
+% The \describestring+[legend key]{coeff_cmd} entry in the legend is 
+% the command prefix of the ring of coefficients. 
+% \begin{quote}
+%   \textbf{Discussion.} \itshape
+%   It might be better to store a make-command for the coefficient 
+%   ring prefix than to store the actual prefix, on the grounds that 
+%   this is more likely to survive updates in the package. On the 
+%   other hand, neither approach would survive an update in the 
+%   package that changes the data representation, so persistence here 
+%   is an interesting problem on the level of principles.
+% \end{quote}
+% 
+% Other \texttt{le9end} entries are described where the corresponding 
+% runtime variables are introduced.
 % 
 % 
 % \subsection{Network profiles}
@@ -586,7 +628,7 @@ proc network_profile {signature {NW {{{"" {} {}} {"" {} {}}} {}}}} {
 % ambiguity. Each of these steps is a linear combination of networks, 
 % and therefore a dictionary mapping monomials to coefficients. The 
 % first step for an ambiguity $(t_1,\mu,t_2)$ is always the 
-% difference $t_1(\mu) - t_2(\mu)$ (the ``S-polynomial'').
+% difference $t_1(\mu) \mathcar"2200 t_2(\mu)$ (the ``S-polynomial'').
 % Since each network typically appears in more than one step of the 
 % |re5olution|, the \emph{monomials} there are not the networks 
 % themselves, but indices into a list of networks that have occurred 
@@ -1468,6 +1510,22 @@ proc init_database {db signature} {
 % \end{proc}
 % 
 % 
+% I have no idea what that 3.16.0 version is supposed to be (it came 
+% with the OS), but it's broken, so forget about it.
+% \begin{tcl}
+%<*sqlite3.16.0fix>
+{*}[package unknown] sqlite3
+apply {{} {
+   set D [dict create]
+   foreach ver [package versions sqlite3] {
+      dict set D $ver [package ifneeded sqlite3 $ver]
+   }
+   package forget sqlite3
+   dict unset D 3.16.0
+   dict for {ver script} $D {package ifneeded sqlite3 $ver $script}
+}}
+%</sqlite3.16.0fix>
+% \end{tcl}
 % 
 % \begin{proc}{sqlite3_init}
 %   This procedure creates and opens an SQLite database, setting up 
@@ -2129,7 +2187,7 @@ proc reduce_step {{leading ""}} {
 %   of |irr| and |rest| changed.
 %   \begin{tcl}
    set D $RS(irr)
-   foreach {key val} [heap::skiplist::getall restheap $RS(rest)] {
+   foreach {key val} [heap::skiplist::contents restheap $RS(rest)] {
       dict set D [lindex $key end] $val
    }
    lappend RS(re5olution) $D
@@ -4036,6 +4094,27 @@ proc pick_next_ambiguity {} {
      [if {[info exists amb]} then {dict get $amb v2Re5Sum}]
    variable pair_level\
      [if {[info exists pair]} then {format %.1f [dict get $pair pick8y]}]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% \begin{proc}{force_next_ambiguity}
+%   This is a variant of |pick_next_ambiguity| which always picks an 
+%   ambiguity regardless of whether there are pairs to process. It 
+%   can be used to force conversion of initial congruences to rules, 
+%   for viewing.
+%   \begin{tcl}
+proc force_next_ambiguity {} {
+   variable DBCMD
+   variable pairs_top
+   set aobj [$DBCMD(ChooseAmbiguity) execute]
+   if {[$aobj nextdict amb]} then {
+      prepare_ambiguity $amb
+      push_main_task reduce_step
+   }
+   $aobj close
+   variable ambiguity_level\
+     [if {[info exists amb]} then {dict get $amb v2Re5Sum}]
 }
 %</lazier&vsquare>
 %   \end{tcl}
@@ -6124,18 +6203,38 @@ proc solve_SAR_for {SAR lhs args} {
 %       The name of the main \LaTeX\ environment for the rule. 
 %       Defaults to |equation| in |equation| style, but to |lemma| in 
 %       |theorem| style.
+%     \item[-axiomenvironment]
+%       The name an alternative \LaTeX\ environment for rules that 
+%       have no proof (concretely: the corresponding 
+%       \texttt{am6iguities} row has a null |p1us| column). 
+%       Defaults to |equation| in |equation| style, but to |axiom| in 
+%       |theorem| style.
+%       \changes{2.1}{2019/10/13}{Refined the axiom\slash lemma 
+%         distinction. (LH)}
 %   \end{ttdescription}
 %   Other options are passed on to lower level commands, particularly 
 %   |network::rich::as_PGF|.
 %   
 %   \begin{tcl}
 proc rule_as_LaTeX {ruleno args} {
-   array set O {-style equation}
+   array set O {
+      -style equation
+   }
    array set O $args
    if {$O(-style) eq "theorem"} then {
-      set O(-environment) lemma
+      if {![info exists O(-environment)]} then {
+         set O(-environment) lemma
+      }
+      if {![info exists O(-axiomenvironment)]} then {
+         set O(-axiomenvironment) axiom
+      }
    } else {
-      set O(-environment) equation
+      if {![info exists O(-environment)]} then {
+         set O(-environment) equation
+      }
+      if {![info exists O(-axiomenvironment)]} then {
+         set O(-axiomenvironment) equation
+      }
    }
 %   \end{tcl}
 %   \begin{tcl}
@@ -6145,9 +6244,40 @@ proc rule_as_LaTeX {ruleno args} {
       error "No rule $ruleno found in database"
    }
    set rrow [lindex $rows 0]
-   set res "\\begin{$O(-environment)}"
-   if {[dict exists $args -labelprefix]} then {
-      append res " \\label{[dict get $args -labelprefix]$ruleno}"
+   set arow [lindex [$DBCMD(GetAmbiguity) allrows\
+     [dict create num6er [dict get $rrow pr00f]]] 0]
+   set hasproof [dict exists $arow p1us]
+   if {$hasproof} then {
+      if {[info exists O(-environment)]} then {
+         set env $O(-environment)
+      } elseif {$O(-style) eq "theorem"} then {
+         set env lemma
+      } else {
+         set env equation
+      }
+   } else {
+      if {[info exists O(-axiomenvironment)]} then {
+         set env $O(-axiomenvironment)
+      } elseif {$O(-style) eq "theorem"} then {
+         set env axiom
+      } else {
+         set env equation
+      }
+   }
+   set res "\\begin{$env}"
+   if {$O(-style) eq "theorem" && !$hasproof &&\
+     [dict exists $arow m1nus2eg]} then {
+%   \end{tcl}
+%   A lot of axioms have short descrptions, so add those as notes in 
+%   the axiom heading. This is somewhat hacky, but should suffice for 
+%   the moment.
+%   \begin{tcl}
+      append res \[ [
+        mtmtcl::latex::make::tool::str2licr [dict get $arow m1nus2eg]
+      ] \]
+   }
+   if {[info exists O(-labelprefix)]} then {
+      append res " \\label{$O(-labelprefix)$ruleno}"
    }
    set nl "\n  "
    if {$O(-style) eq "theorem"} then {
@@ -6157,9 +6287,7 @@ proc rule_as_LaTeX {ruleno args} {
    append res $nl [string map [list \n $nl] [
      network_as_LaTeX [dict get $rrow lhs] {*}$args
    ]]
-   set arow [lindex [$DBCMD(GetAmbiguity) allrows\
-     [dict create num6er [dict get $rrow pr00f]]] 0]
-   if {$O(-style) eq "theorem" || ![dict exists $arow p1us]} then {
+   if {$O(-style) eq "theorem" || !$hasproof} then {
       if {[dict get $rrow st4te] in {R r}} then {
          append res $nl {\rightarrow}
       } else {
@@ -6170,9 +6298,10 @@ proc rule_as_LaTeX {ruleno args} {
       ]
    }
    if {$O(-style) eq "theorem"} then {
-      append res \n {  \end{displaymath}} \n "\\end{$O(-environment)}"
+      append res \n {  \end{displaymath}}
    }
-   if {[dict exists $arow p1us]} then {
+   append res \n "\\end{$env}"
+   if {$hasproof} then {
       if {$O(-style) eq "theorem"} then {
          append res \n {\begin{proof}} \n {  \begin{math}}
          append res $nl [string map [list \n $nl] [
@@ -6204,9 +6333,6 @@ proc rule_as_LaTeX {ruleno args} {
       if {$O(-style) eq "theorem"} then {
          append res \n {  \end{math}} \n {\end{proof}}
       }
-   }
-   if {$O(-style) ne "theorem"} then {
-      append res "\n\\end{$O(-environment)}"
    }
    return $res
 }
@@ -6683,7 +6809,7 @@ enter_congruence -short "Coproduct" {} 1 {Delta} -1 {cap . \n . m}
 % As ever, the motivating example.
 % 
 % \begin{tcl}
-%<*Hopf>
+%<*Hopf,hopfbase>
 set vertex_appearances {
    m {
       {oval {square 8} {}} 
@@ -6760,7 +6886,12 @@ set vertex_appearances {
       {}
    }
 }
-sqlite3_init [tk_getSaveFile -initialdir ~/tmp -initialfile Hopfrules] {
+if {[llength $argv]==1} then {
+   set fname [lindex $argv 0]
+} else {
+   set fname [tk_getSaveFile -initialdir ~/tmp -initialfile Hopfrules]
+}
+sqlite3_init $fname {
   Delta {1 2}  epsilon {1 0}  S {1 1}  m {2 1}  unit {0 1}
 %<twist>  twist {2 2}
 %<twist&untwist>  untwist {2 2}
@@ -6791,8 +6922,8 @@ sqlite3_init [tk_getSaveFile -initialdir ~/tmp -initialfile Hopfrules] {
 %   that \PROP. The return value is the flat list of components in 
 %   that element.
 %   \begin{tcl}
-%</Hopf>
-%<*Hopf,Transposition>
+%</Hopf,hopfbase>
+%<*Hopf,hopfbase,Transposition>
 proc flatten_biaffine {prefix element} {
    set res [list [{*}$prefix part closed $element]]
    lappend res {*}[{*}$prefix part end $element]
@@ -6807,7 +6938,7 @@ proc flatten_biaffine {prefix element} {
 %   This procedure returns a dictionary whose entries are flat lists 
 %   of components from a biaffine \PROP\ element. The call syntax is
 %   \begin{displaysyntax}
-%     |flatten_biaffine| \word{PROP} \word{element}
+%     |semiflatten_biaffine| \word{PROP} \word{element}
 %   \end{displaysyntax}
 %   where the \word{PROP} is a command prefix supporting the |part| 
 %   method of a |biaffine| \PROP, and \word{element} is an element of 
@@ -6922,8 +7053,8 @@ proc list_select_flatten {indexL prefix arg} {
    }
    return $res
 }
-%</Hopf,Transposition>
-%<*Hopf>
+%</Hopf,hopfbase,Transposition>
+%<*Hopf,hopfbase>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -7119,6 +7250,7 @@ proc set_cmpcmds {} {
    set RS(cmpblocks)\
      [lrepeat $blocks {*}[lrepeat [expr {$size-1}] 0] 1]
 }
+%</Hopf,hopfbase>
 %   \end{tcl}
 % \end{proc}
 % 
@@ -7128,6 +7260,7 @@ proc set_cmpcmds {} {
 % No need to add the basic congruencies again if we're restarting a 
 % completion.
 % \begin{tcl}
+%<*Hopf>
 database_counts
 if {$Count(Aa)<=0} then {
 %<lazy>set am6iguity_top 30
@@ -7262,6 +7395,17 @@ enter_congruence -short "Coproduct(Im)" {}\
 enter_congruence -short "Counit(Im)" {}\
    -1 {Im \n epsilon}
 %</cocomplex>
+% \end{tcl}
+% 
+% 
+% It is for presentation purposes frequently convenient to first 
+% convert the congruences to rules, before working generally.
+% \begin{tcl}
+%<*axiomsfirst&lazier&vsquare>
+for {set n 0} {$n < $Count(Aa)} {incr n} {
+   push_main_task force_next_ambiguity
+}
+%</axiomsfirst&lazier&vsquare>
 % \end{tcl}
 % 
 % 
@@ -8448,6 +8592,91 @@ enter_congruence -short "Weak associative" {}\
 % \end{tcl}
 % 
 % 
+% \subsubsection{Hom-associativity type II}
+% 
+% The following are meant to be used with \Module{hopfbase} for 
+% ordering (rather than \Module{HomAss}), since the congruences added 
+% are not height-homogeneous.
+% 
+% \begin{proc}{set_cmpcmds}
+%   However, we still need to override |set_cmpcmds| itself, since 
+%   the |biaffine_PROP_key| \word{maps} argument must be changed.
+%   
+%   \begin{tcl}
+%<*HomAssTypeII>
+proc set_cmpcmds {} {
+   variable RS
+%   \end{tcl}
+%   Contrary to the main Hopf case, the first level ignores |S| but 
+%   cares about left and right for multiplication.
+%   \begin{tcl}
+   set iPROPprefix [list integer_biaffine_PROP]
+   dict set seed1 m\
+     [integer_biaffine_PROP fromparts 0 1 {0 0} {{1 1}}]
+   dict set seed1 unit\
+     [integer_biaffine_PROP fromparts 0 1 {} {}]
+   dict set seed1 Delta\
+     [integer_biaffine_PROP fromparts 0 {0 1} 1 {{1} {1}}]
+   dict set seed1 epsilon\
+     [integer_biaffine_PROP fromparts 0 {} 1 {}]
+   dict set seed1 S\
+     [integer_biaffine_PROP fromparts 1 0 0 1]
+   dict set seed1 twist\
+     [integer_biaffine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
+   dict set seed1 untwist\
+     [integer_biaffine_PROP fromparts 0 {0 0} {0 0} {{0 1} {1 0}}]
+   dict set seed1 Re [dict get $seed1 unit]
+   dict set seed1 Im [dict get $seed1 unit]
+   set map {}
+   lappend map $iPROPprefix $seed1 [list flatten_biaffine $iPROPprefix]
+%   \end{tcl}
+%   The second comparison level is almost like the first, but 
+%   puts an extra endpoint (beginpoint) in the right branch of |m| 
+%   (|Delta|) to make the right-branching side of the 
+%   (co)associativity axiom larger than the left-branching.
+%   \begin{tcl}
+   lappend map $iPROPprefix [
+      dict replace $seed1\
+        S [integer_biaffine_PROP fromparts 0 0 0 1]\
+        m [integer_biaffine_PROP fromparts 0 0 {0 1} {{1 1}}]
+   ] [list flatten_biaffine $iPROPprefix]
+   set blocks 2
+   set RS(cmpkeycmd) [list [namespace which biaffine_PROP_key] $map]
+   set inputs [llength [lindex $RS(si7e) 0 1 1]]
+   set outputs [llength [lindex $RS(si7e) 0 0 2]]
+   set size [expr { (1+$outputs) * (1+$inputs) }]
+   set L [list d]
+   lappend L {*}[lrepeat $inputs c] {*}[lrepeat $outputs b]
+   lappend L {*}[lrepeat [expr {$inputs*$outputs}] A]
+   set RS(cmpclass) [lrepeat $blocks {*}$L]
+   set RS(cmpcmds)\
+     [lrepeat [expr {$blocks*$size}] [list ::tcl::mathop::-]]
+   set RS(cmpblocks)\
+     [lrepeat $blocks {*}[lrepeat [expr {$size-1}] 0] 1]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% No need to add the basic congruencies again if we're restarting a 
+% completion.
+% \begin{tcl}
+database_counts
+if {$Count(Aa)>0} then {return}
+%<lazy>set am6iguity_top 30
+% \end{tcl}
+% 
+% \begin{tcl}
+enter_congruence -short "Type II hom-associative" {}\
+  1 {. m \n . S \n m} -1 {m . \n S . \n m}
+enter_congruence -short "Anti-homomorphism" {}\
+  1 {S S \n m} -1 {1X1 \n m \n S}
+enter_congruence -short "Involutive" {}\
+  1 {S \n S} -1 {.}
+%</HomAssTypeII>
+% \end{tcl}
+% 
+% 
+% 
 % 
 % 
 % \subsection{Transposition}
@@ -8670,6 +8899,26 @@ set i 0; foreach row $diff {incr i
 % \begin{tcl}
 %</BraidMatrix>
 % \end{tcl}
+% 
+% 
+% \section{A GUI for generating problems}
+% 
+% Writing code for individual example problems is fine when 
+% developing the utility, but it really doesn't scale well to usage 
+% focused on examining a particular mathematical problem, not even 
+% when the user is also the original program developer (because the 
+% two modes of thinking are a bit too different)! Hence it makes 
+% sense to offer a more convenient (even graphical) interface for 
+% setting up problems.
+% 
+% 
+% \subsection{The signature}
+% 
+% 
+% 
+% \subsection{Monomial ordering}
+% 
+% 
 % 
 % 
 % \section*{Closing}

@@ -729,7 +729,7 @@ namespace eval mtmtcl::matprop::trivial {
 %   \begin{ensproc}{arity}
 %     Since the arity is the number of columns, it is measured as the 
 %     length of the first row. This works also in the degenerate $0 
-%     \times 0$ matrix.
+%     \times 0$ matrix.
 %     \begin{tcl}
 proc mtmtcl::matprop::trivial::arity {shape ring matrix} {
    llength [lindex $matrix 0]
@@ -1037,16 +1037,15 @@ proc mtmtcl::matprop::trivial::1 {shape ring args} {
 %     symbols provide a standard and straightforward encoding for the 
 %     elements of this structure.
 %     \begin{tcl}
-proc mtmtcl::matprop::trivial::export {shape ring A path} {
-   set spath [linsert $path end scalar]
-   set rowattr [dict create  cd linalg2  name matrixrow \
-     mtmtcl:path $path]
+proc mtmtcl::matprop::trivial::export {shape ring A attr} {
+   set rowattr [dict replace $attr  cd linalg2  name matrixrow]
+   dict lappend attr mtmtcl:path scalar
    set rowsymb [list OMS $rowattr {}]
    set mat [list [list OMS [dict replace $rowattr name matrix] {}]]
    foreach Arow $A {
       set row [list $rowsymb]
       foreach a $Arow {
-         lappend row [{*}$ring export $a $spath]
+         lappend row [{*}$ring export $a $attr]
       }
       lappend mat [list OMA {} $row]
    }
@@ -2453,6 +2452,18 @@ proc mtmtcl::matprop::biaffine::export {ring elem attr} {
 % 
 % \begin{tcl}
 %</pkg>
+% \end{tcl}
+% 
+% 
+% \section{Docstrip catalogue}
+% 
+% There is much interdependency between the ensembles, so it's 
+% easiest to put them all in the same package.
+% 
+% \begin{tcl}
+%<*docstrip.tcl::catalogue>
+pkgProvide mtmtcl::matprop 1.0 pkg
+%</docstrip.tcl::catalogue>
 % \end{tcl}
 % 
 % 

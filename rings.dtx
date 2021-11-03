@@ -993,7 +993,7 @@ namespace eval ::mtmtcl::rings::Q {
       foreach term $args {
          lassign $sum n1 d1
          lassign $term n2 d2
-         set sum [list [expr {$n1*d2 + $n2*$d1}] [expr {$d1*d2}]]
+         set sum [list [expr {$n1*$d2 + $n2*$d1}] [expr {$d1*$d2}]]
       }
       canonise $sum
    }
@@ -1048,7 +1048,7 @@ namespace eval ::mtmtcl::rings::Q {
    proc - {t1 t2} {
       lassign $t1 n1 d1
       lassign $t2 n2 d2
-      canonise [list [expr {$n1*d2 - $n2*$d1}] [expr {$d1*d2}]]
+      canonise [list [expr {$n1*$d2 - $n2*$d1}] [expr {$d1*$d2}]]
    }
 %     \end{tcl}
 %   \end{procmethod}
@@ -1201,11 +1201,11 @@ namespace eval ::mtmtcl::rings::Q {
 %   \end{procmethod}
 %   
 %   \begin{tcl}
-   namespace ensemble create -prefix no -commands {
+   namespace ensemble create -prefix no -subcommands {
       0 iszero = + neg - * 1 inverse /
       canonise
       numer denom frac fracdomain
-      export import
+      export import API
    } -map [dict create\
       fracdomain [::mtmtcl::rings::integers::make]\
       API {::API::static {
@@ -2872,7 +2872,886 @@ proc mtmtcl::rings::semigroup_algebra::ens::canonise {R iszero S c1 c2 API a} {
 %   
 %   \begin{tcl}
 namespace ensemble configure mtmtcl::rings::semigroup_algebra::ens\
-  -commands {
+  -subcommands {
+   API = + neg - 0 . * 1 iszero / 
+   scalar basis support coeff basiselement 
+   named export canonise
+}
+%   \end{tcl}
+%   
+% \end{ensemble}
+% 
+% \begin{proc}{make}
+%   This brings us to the matter of a |make| command for semigroup 
+%   algebras, which has the call syntax
+%   \begin{displaysyntax}
+%     |mtmtcl::rings::semigroup_algebra::make| \word{ring} 
+%     \word{semigroup}
+%   \end{displaysyntax}
+%   and as usual returns the command prefix for the semigroup algebra.
+%   
+%   The preferred \word{iszero}-prefix refers to an underlying |iszero| 
+%   subcommand, but a perfectly good alternative is to compare with an 
+%   explicit (and thus cached) zero value. However if there is no 
+%   known way of producing such a zero value, then all 
+%   ``\word{ring}'' elements are considered automatically nonzero.
+%   \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::make {R S} {
+   if {[{*}$R API "additive group" 2.1]} then {
+      set iszero [list {*}$R iszero]
+   } elseif {[{*}$R API "additive group" 2.0] ||\
+     [{*}$R API "additive group" 1.0]} then {
+      set iszero [list {*}$R = [{*}$R 0]]
+   } else {
+      set iszero [list ::apply {arg {return 0}}]
+   }
+%   \end{tcl}
+%   The |c1| and |c2| booleans need more tests to set. They are set 
+%   to the noncanonical boolean false value |no| when canonisation 
+%   would be needed but isn't available, and to |yes| when it is 
+%   available and needed but possibly not good enough; performing 
+%   operations without proper canonisation make them slightly wrong, 
+%   but not so much that they are obviously useless.
+%   \begin{tcl}
+   if {[{*}$S API onlycanonical 1.0] || [{*}$S API autocanonical 1.0]} then {
+      set c1 0
+      set c2 0
+   } else {
+      set c1 [expr {![{*}$S API "autocanonical 1" 1.0]}]
+      set c2 [expr {![{*}$S API "autocanonical *" 1.0]}]
+      if {[{*}$S API autocanonical 2.0]} then {
+         set c1 [expr {$c1 && ![{*}$S autocanonical 1]}]
+         set c2 [expr {$c2 && ![{*}$S autocanonical *]}]
+      }
+   }
+   if {![{*}$S API canonise 1.0]} then {
+      if {$c1} then {set c1 no}
+      if {$c2} then {set c2 no}
+   } elseif {![{*}$S API canonise 1.1]} then {
+      if {$c1} then {set c1 yes}
+      if {$c2} then {set c2 yes}
+   }
+%   \end{tcl}
+%   It looks from this as though the \APIref{autocanonical 
+%   \meta{method}}{1.0} interface is a more convenient mechanism than 
+%   \APIref+{autocanonical}{2.0}.
+%   
+%   Most work lies in computing the API, which is done using 
+%   |API::recursive|. The \word{ring} and \word{semigroup} are in 
+%   recursive API tests referred to by the keys |R| and |S| 
+%   respectively.
+%   \begin{tcl}
+   set API [::API::recursive {} {
+%   \end{tcl}
+%   The first order of business is to consider equality and related 
+%   concepts. The ensemble subcommands use semigroup elements as 
+%   dictionary keys, so \emph{any dictionary key must already be on 
+%   canonical form} (putting newly generated semigroup elements on that 
+%   form will be a separate problem)\Dash this means equality in the 
+%   algebra hinges only upon equality in ring.
+%   \begin{tcl}
+      equality {1.0 {API R equality 1.0}}
+%   \end{tcl}
+%   There are some non-obvious implications here, however. Since the 
+%   |=| procedure also makes use of the |iszero| prefix in tests, and 
+%   since that has the fallback implementation of just returning 
+%   false when no $0$ element is known, the semigroup algebra 
+%   structure ends up implicitly adjoining a $0$ element to every 
+%   \word{ring} that is not an \APIref{additive group}{2.0}. (This 
+%   point should be revisited if ever an additive monoid interface 
+%   gets formalised.)
+%   
+%   Closely related is \APIref{canonise}{1.0}. Here the versions for 
+%   the \word{ring} just filter down to to the algebra, but in the 
+%   case of version~1.0 that is not entirely trivial, since 
+%   canonisation not supporting version~1.1 is allowed to change the 
+%   equality class of elements, and terms with coefficient equal to 
+%   zero are dropped. Canonising before equality test ensures that 
+%   canonisation is an idempotent operation.
+%   \begin{tcl}
+      canonise {
+         1.1 {API R canonise 1.1}
+         1.0 {API R canonise 1.0}
+      }
+%   \end{tcl}
+%   
+%   For the algebraic interfaces, one begins with \APIref{additive 
+%   group}{2.0}, which gets inherited by the algebra from the ring 
+%   essentially because a space of group-valued functions inherits a 
+%   group structure. Major version~1 is never supported since |-| only 
+%   has the binary form, but major version~2 is supported whenever 
+%   reasonable. Variadic addition and |iszero| tests are provided 
+%   even if the ring does not have them, but subtraction is hardwired 
+%   to use the subtraction method of the ring. (Changing this would 
+%   not be hard, but the gain of doing so is unclear.)
+%   \begin{tcl}
+      "additive group" {
+         2.1 {API R "additive group" 2.0.1}
+         2.0 {API R "additive group" 2.0}
+      }
+%   \end{tcl}
+%   Adding support for \APIref{additive group}{2.2} versions 
+%   2.2 or~2.3 would be quite feasible, but the methods aren't there 
+%   right now. Adding them would probably require another prefix 
+%   parameter containing the efficient implementation of integer 
+%   multiple in the ring.
+%   
+%   Support for the \APIref{ring}{2.0} interface requires the 
+%   \word{ring} to be a ring, but it also requires the 
+%   \word{semigroup} to contribute a |*| operation, although merely 
+%   having that operation is sufficient; it need not have any 
+%   particular properties, as distributivity boils down to 
+%   distibutivity for individual terms:
+%   \begin{multline*}
+%     q\mu * (r\nu + s\nu) = 
+%     q\mu * (r+s)\nu =
+%     \bigl(q * (r+s)\bigr) (\mu*\nu) = 
+%     (q*r + q*s)(\mu*\nu) = \\ =
+%     (q*r)(\mu*\nu) + (q*s)(\mu*\nu) =
+%     q\mu * r\nu + q\mu * s\nu
+%   \end{multline*}
+%   for $q,r,s$ in the \word{ring} and $\mu,\nu$ in the 
+%   \word{semigroup}. At first sight it might rather appear that the 
+%   more subtle \APIref{ring}{2.0} interface requirement of 
+%   congruence will become decisive, since \APIref+{magma}{1.0} does 
+%   not promise congruence whereas \APIref+{magma}{1.1} can. However 
+%   the congruence in question for the algebra |*| deals with algebra 
+%   equality, which only asks whether identical keys are associated 
+%   with equal coefficients; the semigroup products that are computed 
+%   get identical pairs of operands, so they will produce identical 
+%   results.\footnote{
+%     Or do they? The assumption here is that the semigroup \texttt{*} 
+%     operation is a function, whose output is determined solely by 
+%     the input, but it is not inconceivable that the implementation 
+%     of an algebraic operation might utilise randomness\Ldash 
+%     picking a random starting point is in many algorithms the key 
+%     to achieving good average complexity by avoiding degenerate 
+%     cases, even if it is rare to see such algorithms for 
+%     multiplication type operations\Rdash and then the exact 
+%     representation picked might depend on the random component, 
+%     even if the operation is mathematically deterministic. However 
+%     in such cases the structure can reasonably be expected to also 
+%     provide means of canonising values, so to the extent that this 
+%     congruence is a lie, it is a lie-to-children.
+%   } Therefore congruence in the \word{semigroup} is not a 
+%   requirement for the algebra to be a ring.
+%   \begin{tcl}
+      ring  {2.0 {
+         API R ring 2.0
+         API S magma 1.0
+      }}
+      magma {1.1 {self ring 2.0}}
+%   \end{tcl}
+%   
+%   What are then the requirements for the algebra to be a 
+%   \APIref{semigroup}{1.0} or \APIref{monoid}{1.0}? At the very 
+%   least that the \word{ring} and \word{semigroup} both have these 
+%   properties, as algebra multiplication of single term operands 
+%   perform one multiplication in each. The \word{ring} also needs to 
+%   be a \APIref{ring}{2.0} (well, semiring might suffice), since 
+%   reordering terms can result in coefficients being computed in 
+%   different ways. Finally there must be a way to ensure congruent 
+%   canonicity of \word{semigroup} elements.
+%   \begin{tcl}
+      semigroup {1.0 {
+         API S semigroup 1.0
+         API R semigroup 1.0
+         self ring 2.0
+         expr {$c2 in {0 1}}
+      }}
+      monoid {1.0 {
+         API S monoid 1.0
+         API R monoid 1.0
+         self ring 2.0
+         expr {$c2 in {0 1} && $c1 in {0 1}}
+      }}
+%   \end{tcl}
+%   (Higher versions of these interfaces are out, since |*| is not 
+%   variadic.) Similarly, commutativity of |*| requires both the 
+%   \word{ring} and the \word{semigroup} to be commutative.
+%   \begin{tcl}
+      "commutative *" {1.0 {
+         API S "commutative *" 1.0
+         API R "commutative *" 1.0
+         self ring 2.0
+         expr {$c2 in {0 1}}
+      }}
+%   \end{tcl}
+%   
+%   The other algebraic direction is that towards the 
+%   \APIref{ring-module}{2.1} interface; here we explicitly get the 
+%   requirement that the \word{ring} is both a \APIref{ring}{2.0} and 
+%   a \APIref{monoid}{1.0}, which in fact is what suffices.
+%   \begin{tcl}
+      ring-module {2.1 {
+         API R ring 2.0
+         API R monoid 1.0
+      }}
+%   \end{tcl}
+%   Mathematically, the module of formal linear combinations is 
+%   always free, but for this implementation to satisfy the 
+%   \APIref{free ring-module}{2.1} interface, the \word{semigroup} 
+%   must also know how to canonise (for the |basiselement| and 
+%   |coeff| methods both).
+%   \begin{tcl}
+      "free ring-module" {2.1 {
+         self ring-module 2.1
+         API S canonise 1.1
+      }}
+%   \end{tcl}
+%   
+%   The two directions combine in the \APIref{ring-algebra}{2.0} 
+%   interface, which however adds one more requirement: that the 
+%   \word{ring} is commutative, since
+%   \begin{multline*}
+%     (r*s)(\mu*\nu) = 
+%     r\bigl(s (\mu*\nu) \bigr) = 
+%     s\bigl( (r\mu) * \nu \bigr) =
+%     (r\mu) * (s\nu) = \\ =
+%     r\bigl( \mu * (s\nu) \bigr) =
+%     s\bigl( r (\mu*\nu) \bigr) =
+%     (s*r)(\mu*\nu)
+%     \text{;}
+%   \end{multline*}
+%   for algebras in general this is merely a sufficient (although 
+%   very natural) condition, but in the semigroup algebra 
+%   construction the above implies \(rs=sr\) regardless of what 
+%   happens in the \word{semigroup}.
+%   \begin{tcl}
+      ring-algebra {2.0 {
+         self ring-module 2.1
+         self ring 2.0
+         API R "commutative *" 1.0
+      }}
+%   \end{tcl}
+%   
+%   The remaining algebra-flavoured interface is 
+%   \APIref{division}{1.0}, which divides in \word{ring} and 
+%   \word{semigroup}, as well as canonises in the \word{semigroup}.
+%   \begin{tcl}
+      division {1.0 {
+         API R division 1.0
+         API S division 1.0
+         API S canonise 1.1
+      }}
+%   \end{tcl}
+%   
+%   For import--export interfaces, there are 
+%   \APIref{named element}{1.0} and \APIref{export}{2.0}, whose 
+%   requirements from underlying structures are straightforwardly 
+%   about ensuring that the called methods are available.
+%   \begin{tcl}
+      "named element" {1.0 {
+         API S "named element" 1.0
+         API S canonise 1.0
+         API R monoid 1.0
+      }}
+      export {2.0 {
+         API R export 2.0
+         API S export 2.0
+      }}
+%   \end{tcl}
+%   And that's it.
+%   \begin{tcl}
+   } R $R S $S]
+   return [list [namespace current]::ens $R $iszero $S $c1 $c2 $API]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{Variant ensemblified implementation}
+% 
+% This variant implementation (the third version of the 
+% |semigroup_algebra|) is designed to take advantage of the features 
+% of the |mtmtcl::support::vensemble| package.
+% \begin{tcl}
+package require mtmtcl::support::vensemble 1.0
+% \end{tcl}
+% 
+% \begin{ensemble}{ens2+\meta{variant}}
+%   The variant ensemble implementation is similar to the previous 
+%   one, but obviously the boolean parameters are dropped in favour 
+%   of |mtmtcl::support::vensemble| variants. Less obviously the API 
+%   dictionary can also be moved from dynamic parameter to static 
+%   data in the ensemble |-map|. Thus there are three parameters: 
+%   the scalar ring |R|, a command prefix |iszero| performing tests 
+%   for equality to $0$ in |R|, and the semigroup |S|.
+%   \begin{tcl}
+package require mtmtcl::groups::util 1.0
+namespace eval mtmtcl::rings::semigroup_algebra::ens2 {}
+%   \end{tcl}
+%   The procs implementing the subcommands are placed in the |ens2| 
+%   namespace rather than the |ens| namespace, since they have a 
+%   different call syntax (fewer parameters).
+%   
+%   \begin{proc}{=}
+%     Equality is tested by comparing entry by entry. It is forgiving 
+%     for entries with an explicit zero coefficient, since the 
+%     overhead of this for canonical representations is at most one 
+%     ring comparison (if canonical arguments have you do that 
+%     comparison, you will then immediately discover that the answer 
+%     is no).
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::= {R iszero S lD rD} {
+   dict for {k v} $lD {
+      if {![dict exists $rD $k]} then {
+         if {![{*}$iszero $v]} then {return 0}
+      } elseif {[{*}$R = $v [dict get $rD $k]]} then {
+         dict unset rD $k
+      } else {
+         return 0
+      }
+   }
+   dict for {k v} $rD {
+      if {![{*}$iszero $v]} then {return 0}
+   }
+   return 1
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{+}
+%     Addition can be made variadic with little effort, since the 
+%     algebra elements themselves are collections of terms.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::+ {R iszero S args} {
+   if {![llength $args]} then {return {}}
+   foreach term [lassign $args sum] {
+      dict for {k v} $term {
+         if {[dict exists $sum $k]} then {
+            dict set sum $k [{*}$R + [dict get $sum $k] $v]
+         } else {
+            dict set sum $k $v
+         }
+      }
+   }
+   foreach k [dict keys $sum] {
+      if {[{*}$iszero [dict get $sum $k]]} then {
+         dict unset sum $k
+      }
+   }
+   return $sum
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{neg}
+%     Negation is easy, since one only has to switch the sign of 
+%     every coefficient.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::neg {R iszero S arg} {
+   set res [dict create]
+   dict for {k v} $arg {
+      dict set res $k [{*}$R neg $v]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   The first operation to have variant implementations is 
+%   subtraction.
+%   
+%   \begin{proc}{-_using_-}
+%     The colloquial implementation of subtraction is to do termwise 
+%     subtraction in the underlying coefficient ring. However this 
+%     presumes that the coefficient rings supports \APIref+{additive 
+%     group}{2.0.1}.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::-_using_- {
+   R iszero S res term
+} {
+   dict for {k v} $term {
+      if {[dict exists $res $k]} then {
+         dict update res $k s {
+            set s [{*}$R - $s $v]
+            if {[{*}$iszero $s]} then {unset s}
+         }
+      } else {
+         dict set res $k [{*}$R neg $v]
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{-_using_+neg}
+%     The more basic implementation of subtraction is as a 
+%     combination of addition and negation, which makes more calls to 
+%     the underlying ring.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::-_using_+neg {
+   R iszero S res term
+} {
+   dict for {k v} $term {
+      if {[dict exists $res $k]} then {
+         dict update res $k s {
+            set s [{*}$R + $s [{*}$R neg $v]]
+            if {[{*}$iszero $s]} then {unset s}
+         }
+      } else {
+         dict set res $k [{*}$R neg $v]
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{0}
+%     The zero value is an empty dictionary.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::0 {R iszero S API} {
+   return {}
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{iszero}
+%     At this point, the thing missing to satisfy 
+%     \APIref+{additive group}{2.1} is the |iszero| method. This is 
+%     made tolerant for zero coefficients.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::iszero {R iszero S a} {
+   dict for {k v} $a {
+      if {![{*}$iszero $v]} then {return 0}
+   }
+   return 1
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{.}
+%     Multiplication by scalar is straightforward, with only one 
+%     implementation.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::. {R iszero S r a} {
+   set res [dict create]
+   dict for {k v} $a {
+      set rv [{*}$R * $r $v]
+      if {![{*}$iszero $rv]} then {dict set res $k $rv}
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{integer._using_integer.}
+%     Multiplication by an integer is not necessarily that 
+%     straightforward\dots\ well, it is easy if the scalar ring also 
+%     provides this operation.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::integer._using_integer. {
+   R iszero S n a
+} {
+   set res [dict create]
+   dict for {k v} $a {
+      set nv [{*}$R integer. $n $v]
+      if {![{*}$iszero $nv]} then {dict set res $k $nv}
+   }
+   return $res
+}
+%     \end{tcl}
+%     But if it doesn't then things get more complicated.
+%   \end{proc}
+%   
+%   \begin{proc}{integer._using_+}
+%     What is trickiest about the whole thing is that the operation 
+%     surely is mathematically well-defined, if nothing else then by 
+%     repeated addition, so the expectation of providing it is always 
+%     there. For the last resort approach of repeated addition, we 
+%     can take advantage of |mtmtcl::groups::util::squaring_power| to 
+%     at least achieve complexity polynomial in the size of $n$.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::integer._using_+ {
+   R iszero S n a
+} {
+   set multcmd [list ::mtmtcl::groups::util::squaring_power]
+   lappend multcmd [list {*}$R +] 0 {} [list {*}$R 0] [list {*}$R neg]
+%     \end{tcl}
+%     The boolean |0| argument is that we don't care about canonising 
+%     the coefficients here, since the semigroup algebra isn't 
+%     autocanonical anyway.
+%     \begin{tcl}
+   set res [dict create]
+   dict for {k v} $a {
+      set nv [{*}$multcmd $v $n]
+      if {![{*}$iszero $nv]} then {dict set res $k $nv}
+   }
+   return $res
+}
+%     \end{tcl}
+%     Note that this computes the integer multiple separately for 
+%     each coefficient, using (primarily) the scalar ring addition. 
+%     An alternative arrangement of the calculations would be a 
+%     repetition of the algebra addition; the trade-off there would 
+%     be less overhead for managing the repetition, but more calls to 
+%     \meta{iszero}. The repetition overhead is known and small, 
+%     whereas the \meta{iszero} overhead is unknown; it is sometimes 
+%     tiny, but not always small. Hence sticking with the known cost 
+%     seems advisable.
+%   \end{proc}
+%   
+%   \begin{proc}{integer._using_scalar*}
+%     But shouldn't one be able to compute integer multiples using the 
+%     multiplication of the ring? Yes, provided that the ring has a 
+%     unit, although even then repeated addition is the only guaranteed 
+%     way of computing the scalar corresponding to the integer. 
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::integer._using_scalar* {
+   R iszero S n a
+} {
+   set r [::mtmtcl::groups::util::squaring_power [list {*}$R +] 0 {}\
+     [list {*}$R 0] [list {*}$R neg] [{*}$R 1] $n]
+   tailcall . $R $iszero $S $r $a
+}
+%     \end{tcl}
+%     Clearly this is more compact, but is it better complexity-wise? 
+%     As a matter of fact, that depends on the ring. In the case of 
+%     the ring of integers $\mathbb{Z}$, this replaces repeated 
+%     addition by multiplication, which should be a win since we 
+%     usually know of and employ multiplication algorithms that are 
+%     significantly faster than repeated addition (a.k.a.~Egyptian 
+%     multiplication). That observation carries over to many 
+%     polynomial-like rings, since multiples of the unit are 
+%     single-term polynomials. But there are rings where the 
+%     comparison ends up getting reversed.
+%     
+%     In a ring of $m \times m$ matrices, addition is an $O(m^2)$ 
+%     operation whereas multiplication rather tends to be $O(m^3)$ 
+%     (it doesn't need to be, for a number of reasons, but $O(m^3)$ 
+%     might well be what a naive implementation delivers), and then 
+%     repeated addition conversely has an edge over multiplication 
+%     (up to a certain size of the integer factor $n$)! Hence, 
+%     although multiplication can usually be done in smarter ways 
+%     than repeated addition, it is not necessarily the case that 
+%     those are faster. However, the cases where they are faster seem 
+%     prominent enough that |integer._using_scalar*| should have 
+%     precedence over |integer._using_+|; if that is not appropriate, 
+%     then have your ring implement the |integer.| operation in the 
+%     first place.
+%   \end{proc}
+%   
+%   
+%   \begin{proc}{*_with_canonise}
+%     The algebra multiplication operation is conceptually done in 
+%     the trivial way, by expanding both factors:
+%     \begin{equation*}
+%       \biggl( \sum_{\mu \in S_1} a_\mu \mu \biggr)
+%       \biggl( \sum_{\nu \in S_2} b_\nu \nu \biggr) =
+%       \sum_{\mu \in S_1} \sum_{\nu \in S_2} (a_\mu b_\nu) (\mu\nu)
+%       \text{.}
+%     \end{equation*}
+%     Since this gives rise to one nested loop per factor, it would 
+%     be somewhat awkward to make variadic.
+%     
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::*_with_canonise {
+   R iszero S left right
+} {
+   set res [dict create]
+   dict for {lk lv} $left {
+      dict for {rk rv} $right {
+         set lrv [{*}$R * $lv $rv]
+%     \end{tcl}
+%     This is the first operation to produce a new element in the 
+%     semigroup, and since that element will immediately be used as a 
+%     dictionary key, it must be made canonical. The easiest way to 
+%     ensure that is to explicitly |canonise| it.
+%     \begin{tcl}
+         set lrk [{*}$S canonise [{*}$S * $lk $rk]]
+         if {[dict exists $res $lrk]} then {
+            dict set res $lrk [{*}$R + [dict get $res $lrk] $lrv]
+         } else {
+            dict set res $lrk $lrv
+         }
+         
+      }
+   }
+   foreach k [dict keys $res] {
+      if {[{*}$iszero [dict get $res $k]]} then {
+         dict unset res $k
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%     As in the previous implementation, all |iszero| tests are done 
+%     at the end.
+%   \end{proc}
+%   
+%   \begin{proc}{*_without_canonise}
+%     The |canonise| step may however be questioned, from two 
+%     opposite directions. One is that the semigroup |*| may well 
+%     return the product on canonical form already, in which case the 
+%     call to |canonise| is redundant. The other direction is that 
+%     the semigroup might not provide a |canonise| operation (which 
+%     should raise questions about why it is being used with a 
+%     |semigroup_algebra| implementation that so heavily relies upon 
+%     canonical forms of semigroup element, but if the user requested 
+%     this then we might as well try to work with it), in which case 
+%     trying to call it would immediately throw an error. So we 
+%     provide an alternative that simply skips that step.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::*_without_canonise {
+   R iszero S left right
+} {
+   set res [dict create]
+   dict for {lk lv} $left {
+      dict for {rk rv} $right {
+         set lrv [{*}$R * $lv $rv]
+         set lrk [{*}$S * $lk $rk]
+         if {[dict exists $res $lrk]} then {
+            dict set res $lrk [{*}$R + [dict get $res $lrk] $lrv]
+         } else {
+            dict set res $lrk $lrv
+         }
+         
+      }
+   }
+   foreach k [dict keys $res] {
+      if {[{*}$iszero [dict get $res $k]]} then {
+         dict unset res $k
+      }
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{1_without_canonise}
+%     There is a similar split for the definition of the 
+%     multiplicative unit. In this case, chances are pretty good that 
+%     the semigroup unit returned by its |1| operation is on 
+%     canonical form.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::1_without_canonise {
+   R iszero S
+} {
+   dict create [{*}$S 1] [{*}$R 1]
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{1_with_canonise}
+%     For completeness, it is however necessary to also provide an 
+%     alternative implementation which makes a |canonise| call.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::1_with_canonise {
+   R iszero S
+} {
+   dict create [{*}$S canonise [{*}$S 1]] [{*}$R 1]
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   The |named| method has pretty much the same division.
+%   
+%   \begin{proc}{named}
+%     The |named| method is a shorthand for applying |basiselement| 
+%     to the result of the |named| method of the semigroup; the 
+%     algebra does not add any names of its own.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::named {R iszero S k} {
+   dict create [{*}$S canonise [{*}$S named $k]] [{*}$R 1]
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{named_nocanonise}
+%     The |named| method is a shorthand for applying |basiselement| 
+%     to the result of the |named| method of the semigroup; the 
+%     algebra does not add any names of its own.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::named_nocanonise {
+   R iszero S k
+} {
+   dict create [{*}$S named $k] [{*}$R 1]
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   
+%   The two methods for accessing the underlying ring and semigroup 
+%   need not worry about canonisation, since even if |basis| 
+%   subcommands do things with semigroup elements, they do not use 
+%   them as keys in an algebra element dictionary.
+%   
+%   \begin{proc}{scalar}
+%     The |scalar| method gives access to the coefficient ring.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::scalar {R iszero S args} {
+   tailcall {*}$R {*}$args
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{basis}
+%     The |basis| method gives access to monomial semigroup.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::basis {R iszero S args} {
+   tailcall {*}$S {*}$args
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   ---
+%   
+%   Other operations taking a \word{semigroup} element and turning it 
+%   into a dictionary key always canonise. For |coeff| and 
+%   |basiselement|, this is because the only case in which it could 
+%   be avoided is that the \word{semigroup} structure is 
+%   \APIref{onlycanonical}{1.0}, and in that case the |canonise| 
+%   method can be made very cheap. By contrast, the |*| and |1| 
+%   operations can be simplified also when the \word{semigroup} is 
+%   some manner of autocanonical. Technically a similar argument could 
+%   be made for the |named| and |/| operations, but the number of 
+%   canonisations that would be saved for these is much smaller than 
+%   for |*| (with comparable input sizes), so it is not clearly worth 
+%   bothering. |1| is similar to |named| in that it only does one 
+%   canonisation, but |1| is called from lots of places, so it makes 
+%   sense to optimise it.
+%   
+%   \begin{proc}{support}
+%     The support for an element is a native |dict| subcommand.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::support {R iszero S a} {
+   dict keys $a
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{coeff}
+%     The |coeff| method is almost a |dict get|, but sometimes it 
+%     needs to supply a $0$ by itself.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::coeff {R iszero S k a} {
+   set k [{*}$S canonise $k]
+   if {[dict exists $a $k]} then {
+      return [dict get $a $k]
+   } else {
+      return [{*}$R 0]
+   }
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{basiselement}
+%     Converting a semigroup element to the corresponding algebra 
+%     element is a matter of equipping it with a unit coefficient, 
+%     but to stay on the safe side the semigroup element must also be 
+%     canonised.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::basiselement {R iszero S k} {
+   dict create [{*}$S canonise $k] [{*}$R 1]
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{/}
+%     Having a division-by-monomial operation is convenient for 
+%     factoring.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::/ {R iszero S numer denom} {
+   if {[dict size $denom] != 1} then {
+      return -code error -errorcode {API division unimplemented}\
+        "Sorry, I only know how to handle single term denominators"
+   }
+%     \end{tcl}
+%     This relies heavily on having division in the underlying ring 
+%     and semigroup, and will in particular error out if any 
+%     coefficient or monomial errors out. Each term in the numerator 
+%     gives rise to a separate term in the result, since only 
+%     $k = {}$\texttt{[$S$ * $\mathit{sd}$ $x$]} can give rise to a 
+%     result term with key $x$.
+%     \begin{tcl}
+   lassign [dict get $denom] sd rd
+   set res {}
+   dict for {k v} $numer {
+      dict set res [{*}$S canonise [{*}$S / $k $sd]]\
+        [{*}$R / $v $rd]
+   }
+   return $res
+}
+%     \end{tcl}
+%   \end{proc}
+%   
+%   \begin{proc}{export}
+%     The part of the internal representation that this structure 
+%     needs to convert for export is the formal linear combination, 
+%     since that is what is represented. The sum is addition 
+%     throughout, even if the coefficients are negative, since a 
+%     general coefficient ring doesn't have a concept of negative; 
+%     if the minuses are to be extracted, then that should probably 
+%     be done at a later stage. For now the multiplication by scalar 
+%     is represented by the \OMSref{arith1}{times} symbol, 
+%     but this isn't quite right as it isn't really an associative 
+%     operation.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::export\
+  {R iszero S elemD attr} {
+   set battr $attr
+   set cattr $attr
+   set mattr [dict replace $attr  cd arith1  name times]
+   set aattr [dict replace $attr  cd arith1  name plus]
+   dict lappend battr mtmtcl:path basis
+   dict lappend cattr mtmtcl:path scalar
+   dict lappend mattr mtmtcl:path .
+   dict lappend aattr mtmtcl:path +
+   set mnode        [list OMS $mattr {}]
+   set childL [list [list OMS $aattr {}]]
+   dict for {k v} $elemD {
+      lappend childL [
+         list OMA $attr [list $mnode\
+           [{*}$R export $v $cattr] [{*}$S export $k $battr]]
+      ]
+   }
+   return [list OMA $attr $childL]
+}
+%     \end{tcl}
+%     
+%     It would probably be a good idea to present the terms in some 
+%     predictable order rather than the dict insertion order, but again 
+%     it is hard to express this generally. Canonising an element 
+%     before exporting it is probably the most practical solution, 
+%     but one could also consider providing a method that would 
+%     reorder the terms based on some custom order of semigroup 
+%     elements.
+%   \end{proc}
+%   
+%   \begin{proc}{canonise}
+%     A similar concern exists for canonisation of values, since this 
+%     means the terms have to be ordered somehow. An |lsort\
+%     -dictionary| of the string representations is one way to do 
+%     that, which probably isn't very mathematically meaningful, but 
+%     still has a chance of looking sort-of intuitive to the user.
+%     \begin{tcl}
+proc mtmtcl::rings::semigroup_algebra::ens2::canonise {R iszero S a} {
+   set res [dict create]
+   foreach k [lsort -dictionary [dict keys $a]] {
+      set r [{*}$R canonise [dict get $a $k]]
+      if {![{*}$iszero $r]} then {dict set res $k $r}
+   }
+   return $res
+}
+%     \end{tcl}
+%     One subtle detail in this procedure is that it first canonises 
+%     and then checks the result for being zero; this order of things 
+%     is needed for the algebra to satisfy \APIref+{canonise}{1.0} 
+%     without the ring satisfying \APIref+{canonise}{1.1}, as the 
+%     difference is precisely whether canonisation can change the 
+%     equality class of an element (in particular from zero to 
+%     nonzero)! This order of operations is probably also good 
+%     performance-wise, since equality testing often begins with 
+%     canonising.
+%   \end{proc}
+%   
+%   
+%   \begin{tcl}
+list namespace ensemble configure mtmtcl::rings::semigroup_algebra::ens\
+  -subcommands {
    API = + neg - 0 . * 1 iszero / 
    scalar basis support coeff basiselement 
    named export canonise
