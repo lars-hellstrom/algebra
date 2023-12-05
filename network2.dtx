@@ -968,19 +968,23 @@ namespace eval network::pure {namespace export tensorprod}
 % \end{proc}
 % 
 % 
-% A \index{permutation}\emph{permutation} $\sigma$ is encoded as the 
-% list where item $i$ is $\sigma(i)$.
+% A \index{permutation}\emph{permutation} \(\sigma\colon \{0,\dotsc, 
+% n -\nobreak 1\} \longrightarrow \{0,\dotsc, n -\nobreak 1\}$ is 
+% encoded as the list $L$ satisfying
+% \begin{displaysyntax}
+%   [lindex $L$ $i$]\({} = \sigma(i)\)
+% \end{displaysyntax}
 % 
 % \begin{proc}{permutation}
 %   The |permutation| procedure implements the $\phi_n$ maps of 
-%   Definition~\ref{Def:PROP}, i.e., it returns the network 
+%   \cite[Def.~2.4]{NR1}, i.e., it returns the network 
 %   corresponding to a given permutation. The call syntax is
 %   \begin{quote}
 %     |network::pure::permutation| \word{permutation}
 %   \end{quote}
 %   
 %   The edge labels are selected to coincide with the input indices. 
-%   The output list 
+%   The output list thus becomes the \word{permutation}.
 %   \begin{tcl}
 proc network::pure::permutation {sigma} {
    set outL $sigma
@@ -3110,6 +3114,424 @@ proc network::pure::list_paths_turning {NW} {
       lappend res $nrow
    }
    return $res
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsection{Network planarity}
+% 
+% Networks can encode arbitrary \PROP\ elements, but sometimes one is 
+% rather interested in working only with the elements of a \PRO. 
+% The networks one can construct in a \PRO\ constitute a subset of 
+% all networks, so we wouldn't need any new data structure, but we 
+% would like a way of distinguishing networks constructible without 
+% using permutations (other than identities) from those that require 
+% crossings. As it turns out, there is a quick way of doing this: 
+% computing the \emph{Euler characteristic}. For connected graphs 
+% embedded into a surface, the Euler characteristic is
+% \begin{equation} \label{Eq:EulerCharacteristic}
+%   (\text{\# vertices}) - (\text{\# edges}) + (\text{\# faces})
+% \end{equation}
+% and it is well known that this is $2$ for an embedding into the 
+% plane, but $2-2g$ if it cannot be realised on any surface of genus 
+% less than $g$. This allows distinguishing plane embeddings from 
+% non-plane (not realisable without crossing edges) embeddings!
+% 
+% Being a discrete rather than a geometric object, a network may not 
+% seem to have any well-defined faces, but in fact all networks do 
+% come with a combinatorial embedding: for each vertex a cyclic order 
+% of the edges incident with that vertex. This allows us to identify 
+% the boundaries of faces as closed walks which turn in the same 
+% direction whenever they reach a vertex, and thus in particular to 
+% count them. This combinatorial embedding is still orientable\Ldash 
+% when we traverse the two sides of an edge, we do so going in 
+% opposite directions\Rdash and thus the genus is always going to be 
+% an integer. This suggests taking that as the quantity reported.
+% 
+% \begin{proc}{genus}
+%   This procedure has the call syntax
+%   \begin{displaysyntax}
+%     |network::pure::genus| \word{network}
+%   \end{displaysyntax}
+%   and it returns the genus of that \word{network}, i.e., the 
+%   number $0$ if the network is plane, and a positive integer if it 
+%   cannot embedded in the plane. A word of warning is however 
+%   needed: the embeddings implicitly considered may have edges going 
+%   in spirals, which is not something we want for plane networks.
+%   
+%   It is explicitly 
+%   specified that the decorations in the \word{network} are ignored
+%   (because some callers may want to insert extra dummy vertices) 
+%   and directed acyclicity of the \word{network} is not required.
+%   
+%   There are certain clarifications to make regarding the quantity 
+%   computed. First, we identify vertices |0| and |1| (input side is 
+%   from |0|, output side is from |1|) since we do want those to be 
+%   external. Second, if the graph underlying the network is not 
+%   connected then one must adjust for the number of components. 
+%   Because we count face boundaries rather than faces, 
+%   \eqref{Eq:EulerCharacteristic} straight off sums the 
+%   contributions from different components, so the same happens to 
+%   the right hand side $2-2g$. Genus is an additive quantity, so we 
+%   end up with a combined right hand side of $2k-2g$ where $k$ is 
+%   the number of components. (Some books rather give the formula 
+%   \(n-m+f = 1+k\) for a plane, not necessarily connected graph, but 
+%   that presumes the number of faces $f$ is counted topologically, as 
+%   connected components of the plane minus the graph. Our count of 
+%   face boundaries is in comparison counting some topological faces 
+%   several times.)
+%   
+%   The \(\lvert V\rvert - \lvert E\rvert\) part of the Euler 
+%   characteristic is easy enough.
+%   \begin{tcl}
+proc network::pure::genus {NW} {
+   set res [expr {[llength [lindex $NW 0]] - [llength [lindex $NW 1]]}]
+%   \end{tcl}
+%   After that, we only need to increment (or decrement) |res| by $1$ 
+%   for each thing we count.
+%   
+%   The main task is that of counting the boundaries. We do this by 
+%   iterating over all sides of edges (each edge can be part of $2$ 
+%   boundaries), skipping those that are part of a boundary we've 
+%   already seen. To keep track of that, we have a list |seen| whose 
+%   elements are booleans, and whose indices are of the form $2e+d$ 
+%   where $e$ is the edge label and \(d \in \{0,1\}\). The |dir| 
+%   variable is |0| if we're going towards the head of the current 
+%   edge and |2| if we're going towards the tail.
+%   \begin{tcl}
+   set seen [list]
+   foreach e [lindex $NW 1] {lappend seen 0 0}
+   set e0 -1
+   foreach e [lindex $NW 1] {incr e0
+      foreach dir {0 2} {
+         set i [expr {($e0<<1) + ($dir>>1)}]
+         if {[lindex $seen $i]} then {continue}
+         lset seen $i 1
+%   \end{tcl}
+%   Face boundaries are traversed in a clockwise direction, so that 
+%   walking around the boundary the face is to our right. The two 
+%   variables that keep track of where we are in that traversal is 
+%   the edge label |e| and current direction |dir|.
+%   \begin{tcl}
+         set e $e0
+         while 1 {
+            set v [lindex $NW 1 $e $dir]
+            if {$dir} then {
+               if {[lindex $NW 1 $e 3] <\
+                 [llength [lindex $NW 0 $v 1]]-1} then {
+                  set e [lindex $NW 0 $v 1 [lindex $NW 1 $e 3]+1]
+                  set dir 0
+               } else {
+                  if {$v == 1} then {set v 0}
+                  if {[llength [lindex $NW 0 $v 2]]} then {
+                     set e [lindex $NW 0 $v 2 end]
+                  } else {
+                     if {$v == 0} then {set v 1}
+                     set e [lindex $NW 0 $v 1 0]
+                     set dir 0
+                  }
+               }
+            } else {
+               if {[lindex $NW 1 $e 1] > 0} then {
+                  set e [lindex $NW 0 $v 2 [lindex $NW 1 $e 1]-1]
+                  set dir 2
+               } else {
+                  if {$v == 0} then {set v 1}
+                  if {[llength [lindex $NW 0 $v 1]]} then {
+                     set e [lindex $NW 0 $v 1 0]
+                  } else {
+                     if {$v == 1} then {set v 0}
+                     set e [lindex $NW 0 $v 2 end]
+                     set dir 2
+                  }
+               }
+            }
+            set i [expr {($e<<1) + ($dir>>1)}]
+            if {[lindex $seen $i]} then {break}
+            lset seen $i 1
+         }
+         incr res
+      }
+   }
+%   \end{tcl}
+%   Having counted the face boundaries, we must next subtract twice 
+%   the number of graph components. Indices into |seen| are now 
+%   vertex labels. We keep a |queue| of adjacent vertices to 
+%   process, and don't mind a vertex showing up multiple times in 
+%   that queue. Reaching the end of the |queue| means we have 
+%   completed another component. Preloading the queue with |0| and 
+%   |1| puts those in the same component.
+%   \begin{tcl}
+   set seen {}
+   foreach v [lindex $NW 0] {lappend seen 0}
+   set queue [list 0 1]
+   set qp 0
+   while 1 {
+      for {} {$qp < [llength $queue]} {incr qp} {
+         set v [lindex $queue $qp]
+         if {[lindex $seen $v]} then {continue}
+         foreach e [lindex $NW 0 $v 1] {
+            lappend queue [lindex $NW 1 $e 0]
+         }
+         foreach e [lindex $NW 0 $v 2] {
+            lappend queue [lindex $NW 1 $e 2]
+         }
+         lset seen $v 1
+      }
+      incr res -2
+      set i [lsearch $seen 0]
+      if {$i<0} then {break}
+      lappend queue $i
+      if {![llength [lindex $NW 0 $i 1]] &&\
+        ![llength [lindex $NW 0 $i 2]]} then {
+         incr res
+%   \end{tcl}
+%   A slightly silly special case is that components consisting of 
+%   just an isolated vertex did not show up in the previous loop over 
+%   face boundaries, since that loop focused on edges and these don't 
+%   have any. Thus we add $1$ here for the trivial walk around that 
+%   vertex; it's easier to do that and then run through the |for| 
+%   loop than it is to have a special loop for dealing with isolated 
+%   vertices.
+%   \begin{tcl}
+      }
+   }
+%   \end{tcl}
+%   
+%   At this point, we still have an off-by-one error to correct, 
+%   namely that we counted |0| and |1| as separate vertices when in 
+%   fact we regard them as parts of the same vertex. There is also 
+%   the matter that the above isolated vertex adjustment is not 
+%   applied for this |0|--|1| vertex, but that ends up being 
+%   harmless; the division by $2$ corrects it.
+%   \begin{tcl}
+   return [expr {(1-$res)/2}]
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \begin{proc}{open_boundaries}
+%   This procedure is a sibling of |genus|, based on pretty much the 
+%   same graph theory, but with the important difference of regarding 
+%   inputs and outputs as dangling external edges rather than edges 
+%   connected to vertices |1| and |0| in a given order. This means it 
+%   rather examines the question of whether the network \emph{could be 
+%   made} plane through some permutation of inputs and outputs, or by 
+%   ending these with leaves rather than higher degree vertices. 
+%   Another way of looking at it is whether the network might appear 
+%   as a subnetwork of some plane network.
+%   
+%   There are two things checked: on the one hand the genus, and on 
+%   the other hand that boundary walks turn in a manner consistent 
+%   with a plane embedding. Positive direction for turning is 
+%   counter-clockwise and the unit is half a turn ($180^\circ$), 
+%   since the only two directions we care about are up and down. Thus 
+%   a boundary of the outer facet would have turning $2$, whereas a 
+%   boundary of the inner facet would have turning $-2$. Other 
+%   turning values would indicate the network cannot be plane, and 
+%   are considered \emph{weird}.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |network::pure::open_boundaries| \word{network}
+%   \end{displaysyntax}
+%   but the return value here is a list
+%   \begin{displaysyntax}
+%     \word{genus} \word{weird} \word{external boundary list}
+%   \end{displaysyntax}
+%   where \word{genus} is the genus of \word{network} when 
+%   disregarding external vertices (leaving external edges dangling) 
+%   and \word{weird} is the count of boundaries with weird turning. 
+%   Both have to be zero for the network to be plane.
+%   
+%   The \word{external boundary list} is a list with one element for 
+%   every boundary walk that contains some input or output. These 
+%   elements are pairs
+%   \begin{displaysyntax}
+%     \word{turning} \word{turn--leg list}
+%   \end{displaysyntax}
+%   where the \word{turning} is the turning of this boundary walk; 
+%   this may be used to distinguish outer boundaries (expected) from 
+%   inner boundaries (possible, but cannot do much). The 
+%   \word{turn--leg list} is a list with the structure
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regplus]
+%       \word{turning} \word{direction} \word{edge label}
+%     \end{regblock}
+%   \end{displaysyntax}
+%   This list may be viewed as cyclic; taking the first triple and 
+%   putting it last produces an equivalent list. The \word{edge 
+%   label}s are the labels of edges on this boundary which are 
+%   external. The \word{direction} is |0| if this is an output and 
+%   |1| if it is an input. The \word{turning} is how much the 
+%   boundary turns from the previous external edge to this one; it 
+%   will be even between two edges of equal \word{direction}, but odd 
+%   when the \word{direction} changes. As an illustration, the 
+%   \word{turn--leg list} of an isolated edge $e$ is
+%   \begin{displaysyntax}
+%     1 0 $e$ 1 1 $e$
+%   \end{displaysyntax}
+%   The purpose of reporting the partial turnings is that they 
+%   provide clues for which leg to pick as having index $0$: from the 
+%   last to the first output, we expect the boundary to turn by $2$. 
+%   Some of that turning may however happen between inputs, so it is 
+%   necessary to sum them up to tell the difference. The top 
+%   \word{turning} of an external boundary is the sum of all these 
+%   partial \word{turning}s.
+%   
+%   First step is to initialise variables for the three elements of 
+%   the result. We don't include |0| and |1| in the vertex count 
+%   here, but each leg-end count as a separate vertex.
+%   \begin{tcl}
+proc network::pure::open_boundaries {NW} {
+   set euler [expr {
+     [llength [lindex $NW 0]] - 2
+     + [llength [lindex $NW 0 0 2]] + [llength [lindex $NW 0 1 1]]
+     - [llength [lindex $NW 1]]
+   }]
+   set weird 0
+   set external {}
+%   \end{tcl}
+%   
+%   The main task is that of examining all boundaries. We do this by 
+%   iterating over all sides of edges (each edge can be part of $2$ 
+%   boundaries), skipping those that are part of a boundary we've 
+%   already seen. To keep track of that, we have a list |seen| whose 
+%   elements are booleans, and whose indices are of the form $2e+d$ 
+%   where $e$ is the edge label and \(d \in \{0,1\}\). The |dir| 
+%   variable is |0| if we're going towards the head of the current 
+%   edge and |2| if we're going towards the tail. 
+%   \begin{tcl}
+   set seen [list]
+   foreach e [lindex $NW 1] {lappend seen 0 0}
+   set e0 -1
+   foreach e [lindex $NW 1] {incr e0
+      foreach dir {0 2} {
+         set i [expr {($e0<<1) + ($dir>>1)}]
+         if {[lindex $seen $i]} then {continue}
+         lset seen $i 1
+%   \end{tcl}
+%   Face boundaries are traversed so that the face is to our right 
+%   when walking around the boundary. The two variables that keep track 
+%   of where we are in that traversal is the edge label |e| and 
+%   current direction |dir|. The current partial turning is |turn| 
+%   and the total turning is |total|; the latter is only updated 
+%   before clearing |turn|. The list |L| collects data for the 
+%   \word{turn--leg list}, but will remain empty for boundaries 
+%   without legs.
+%   \begin{tcl}
+         set turn 0
+         set total 0
+         set L {}
+         set e $e0
+         while 1 {
+            set v [lindex $NW 1 $e $dir]
+            if {$dir} then {
+               if {$v == 1} then {
+                  incr turn
+                  lappend L $turn 1 $e
+                  incr total $turn
+                  set turn 0
+                  set dir 0
+               } elseif {[lindex $NW 1 $e 3] <\
+                 [llength [lindex $NW 0 $v 1]]-1} then {
+                  incr turn -1
+                  set e [lindex $NW 0 $v 1 [lindex $NW 1 $e 3]+1]
+                  set dir 0
+               } elseif {[llength [lindex $NW 0 $v 2]]} then {
+                  set e [lindex $NW 0 $v 2 end]
+               } else {
+                  incr turn
+                  set e [lindex $NW 0 $v 1 0]
+                  set dir 0
+               }
+            } else {
+               if {$v == 0} then {
+                  incr turn
+                  lappend L $turn 0 $e
+                  incr total $turn
+                  set turn 0
+                  set dir 2
+               } elseif {[lindex $NW 1 $e 1] > 0} then {
+                  incr turn -1
+                  set e [lindex $NW 0 $v 2 [lindex $NW 1 $e 1]-1]
+                  set dir 2
+               } elseif {[llength [lindex $NW 0 $v 1]]} then {
+                  set e [lindex $NW 0 $v 1 0]
+               } else {
+                  incr turn
+                  set e [lindex $NW 0 $v 2 end]
+                  set dir 2
+               }
+            }
+            set i [expr {($e<<1) + ($dir>>1)}]
+            if {[lindex $seen $i]} then {break}
+            lset seen $i 1
+         }
+         incr total $turn
+         if {abs($total) != 2} then {incr weird}
+         incr euler
+         if {[llength $L]} then {
+            lset L 0 [expr {[lindex $L 0] + $turn}]
+            lappend external [list $total $L]
+         }
+      }
+   }
+%   \end{tcl}
+%   
+%   Having counted the face boundaries, we must next adjust for the 
+%   number of graph components. Indices into |seen| are now vertex 
+%   labels. We keep a |queue| of adjacent vertices to process, and 
+%   don't mind a vertex showing up multiple times in that queue; in 
+%   particular |0| and |1| are premarked as seen to stop them from 
+%   joining components. Reaching the end of the |queue| means we have 
+%   completed another component. Isolated vertices are handled 
+%   separately and don't make it into the queue.
+%   \begin{tcl}
+   set seen {1 1}
+   while {[llength $seen] < [llength [lindex $NW 0]]} {lappend seen 0}
+   set queue {}
+   set qp 0
+   while {[
+      set i [lsearch $seen 0]
+   ] >= 0} {
+      if {![llength [lindex $NW 0 $i 1]] &&\
+        ![llength [lindex $NW 0 $i 2]]} then {
+         incr euler -1
+         lset seen $i 1
+         continue
+      }
+      lappend queue $i
+      for {} {$qp < [llength $queue]} {incr qp} {
+         set v [lindex $queue $qp]
+         if {[lindex $seen $v]} then {continue}
+         foreach e [lindex $NW 0 $v 1] {
+            lappend queue [lindex $NW 1 $e 0]
+         }
+         foreach e [lindex $NW 0 $v 2] {
+            lappend queue [lindex $NW 1 $e 2]
+         }
+         lset seen $v 1
+      }
+      incr euler -2
+      
+   }
+%   \end{tcl}
+%   A final complication is that of isolated edges---edges both input 
+%   and output---since these count as separate components but are not 
+%   found by the above loop on account of not having any (inner) 
+%   vertices. But we can find these by iterating over the outputs.
+%   \begin{tcl}
+   foreach e [lindex $NW 0 0 2] {
+      if {[lindex $NW 1 $e 2] == 1} then {incr euler -2}
+   }
+%   \end{tcl}
+%   There is no constant offset to apply to get the genus, only a 
+%   change of sign and division by $2$.
+%   \begin{tcl}
+   list [expr {-$euler/2}] $weird $external
 }
 %   \end{tcl}
 % \end{proc}
@@ -5839,7 +6261,14 @@ proc network::pure::cosequence_levels {prehintL level_list posthintL} {
 %   gives the level of that vertex (if given, otherwise 
 %   |vertex_levels3| is called to compute it).
 %   
-%   The return value is the list of levels. Item names have the forms
+%   The return value is the list of levels. Each level is a list of 
+%   items in that level, in the down--up format where each item is a 
+%   list
+%   \begin{displaysyntax}
+%     \word{name} \word{down-neighbours} \word{up-neighbours}
+%   \end{displaysyntax}
+%   The \word{down-neighbours} and the \word{up-neighbours} are 
+%   themselves lists of item names. Item names have the forms
 %   \begin{displaysyntax}
 %     vertex \word{label}\par
 %     edge \word{label} \word{level no.}
@@ -5966,6 +6395,78 @@ proc network::pure::ordered_graded_components {args} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
+% 
+% \begin{proc}{grooming_permutations}
+%   This procedure was factored out of |groomed_ambiguities|, since 
+%   it turned out to be useful also in other cases. The call syntax is
+%   \begin{displaysyntax}
+%     |network::pure::grooming_permutations| \word{network}
+%   \end{displaysyntax}
+%   and the return value is a pair
+%   \begin{displaysyntax}
+%     \word{$\sigma$} \word{$\tau$}
+%   \end{displaysyntax}
+%   where $\sigma$ and $\tau$ are two permutations (as understood by 
+%   |network::pure::permutation| and the like) that may act on the 
+%   \word{network} from the left and from the right, respectively. 
+%   They are chosen with the intent that the resulting network should 
+%   be as close to plane as possible, but there are no optimality 
+%   guarantees.
+%   
+%   There's no need to worry about components without external edges, 
+%   so we pick out that containing $0$¬†and $1$. Then this is 
+%   converted to down-\slash up-neighbours format, from which the 
+%   input and output levels are deleted. Then the remainder is 
+%   cosequenced, and the permutations are chosen to put the external 
+%   edges in the order that this cosequenced remainder prefers.
+%   
+%   \begin{tcl}
+proc network::pure::grooming_permutations {NW} {
+   set duL [lrange [
+      component_DU_levels $NW [component $NW {0 1} {}]
+   ] 1 end-1]
+   if {![llength $duL]} then {
+%   \end{tcl}
+%   A complication is that the input and output levels can be all 
+%   there is---this happens is all legs go directly from input to 
+%   output. In that case we let $\sigma$¬†be the identity and choose 
+%   $\tau$ as the inverse of whatever permutation the network is 
+%   executing.
+%   \begin{tcl}
+      set tau [lists_to_permutation [lindex $NW 0 1 1] [lindex $NW 0 0 2]]
+      set sigma {}
+      foreach item $tau {lappend sigma [llength $sigma]}
+      return [list $sigma $tau]
+   }
+%   \end{tcl}
+%   Otherwise rewrite the extreme remaining levels to forget about 
+%   them having neighbours in the levels previously removed.
+%   \begin{tcl}
+   set L {}
+   foreach item [lindex $duL 0] {
+      lappend L [lreplace $item 1 1 {}]
+   }
+   lset duL 0 $L
+   set L {}
+   foreach item [lindex $duL end] {
+      lappend L [lreplace $item 2 2 {}]
+   }
+   lset duL end $L
+%   \end{tcl}
+%   Opinions on the order of items could be turned into hints used at 
+%   this point.
+%   \begin{tcl}
+   set ordered [cosequence_levels {} $duL {}]
+   set outL [piece_boundary $NW [lindex $ordered 0] 0]
+   set inL [piece_boundary $NW [lindex $ordered end] 1]
+   set sigma [lists_to_permutation $outL [lindex $NW 0 0 2]]
+   set tau [lists_to_permutation [lindex $NW 0 1 1] $inL]
+   return [list $sigma $tau]
+}
+%   \end{tcl}
+% \end{proc}
+% 
 % 
 % 
 % \iffalse
@@ -6627,6 +7128,7 @@ proc network::wfb::right_action {NW sigma} {
 }
 %   \end{tcl}
 % \end{proc}
+% 
 % 
 % 
 % \subsection{Listing isomorphic subnetworks}
@@ -7731,6 +8233,8 @@ tcltest::test instances-5.1 "Bug 2007-05-20" -body {
 % regions within this network which would be replaced by the two rules 
 % from which the ambiguity is formed.
 % 
+% \subsubsection{Main \texttt{ambiguities} procedure}
+% 
 % \begin{proc}{ambiguities}
 %   The |ambiguities| procedure computes the list of all ambiguities 
 %   that can be formed by overlapping two networks. The call syntax is
@@ -8527,6 +9031,8 @@ proc network::wfb::ambiguities {NW1 NW2} {
 % \end{proc}
 % 
 % 
+% \subsubsection{Groomed and plane ambiguities}
+% 
 % \begin{proc}{groomed_ambiguities}
 %   This procedure has the same call syntax and semantics as the 
 %   |ambiguities| procedure, i.e.,
@@ -8735,6 +9241,166 @@ proc network::wfb::groomed_ambiguities {NW1 NW2} {
 %   \end{tcl}
 % \end{proc}
 % 
+% 
+% \begin{proc}{ambiguities_by_planarity}
+%   This procedure takes a list of ambiguities as argument, and 
+%   separates plane from non-plane ambiguities in that list. It also 
+%   permutes inputs and outputs of the ambiguity sites according to 
+%   cyclic order around the boundary, which is expected to make these 
+%   sites as plane as they can be. In that sense, it provides an 
+%   alternative to the grooming of |groomed_ambiguities|, but does 
+%   not itself call |ambiguities| to generate a list of them. 
+%   Be warned that grooming results for non-plane networks are 
+%   sometimes surprising, because a lot of what you might have 
+%   expected to be in the interior is in fact part of the outer 
+%   boundary.
+%   
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |network::wfb::ambiguities_by_planarity| 
+%     \word{list of ambiguities}
+%   \end{displaysyntax}
+%   and it returns a pair
+%   \begin{displaysyntax}
+%     \word{plane ambiguities} \word{nonplane ambiguities}
+%   \end{displaysyntax}
+%   where plane ambiguities in the \word{list of ambiguities} are 
+%   returned in the first element and nonplane ambiguities in the 
+%   second.
+%   
+%   The overall organisation is that we call 
+%   |network::pure::open_boundaries| on the ambiguity site to compute 
+%   the information by which to classify this ambiguity, and then 
+%   append it to |planeL| or |nonplaneL| as appropriate.
+%   \begin{tcl}
+proc network::wfb::ambiguities_by_planarity {ambL} {
+   set planeL {}
+   set nonplaneL {}
+   foreach amb $ambL {
+      set triple [network::pure::open_boundaries [lindex $amb 0 0]]
+%   \end{tcl}
+%   Most lines of code are however spent figuring out an order for 
+%   the legs; |inputs| and |outputs| are lists of edge labels. We 
+%   work through each boundary cycle in the order they were returned 
+%   (usually there aren't that many), 
+%   gathering outputs on one pass and inputs on the next. Different 
+%   components have different boundaries, which separate their legs 
+%   into different intervals. A single component may however have 
+%   multiple boundaries (inner as well as outer), and no attempt is 
+%   made to combine those; it is considered \emph{better} if a leg at 
+%   an inner boundary gets highlighted by being shoved off to the 
+%   side, since it is a bit of an exception in a plane network.
+%   \begin{tcl}
+      set inputs {}
+      set outputs {}
+      foreach boundary [lindex $triple 2] {
+         foreach side {0 1} {
+%   \end{tcl}
+%   The main problem in a pass around a boundary is to figure out 
+%   where to cut the cycle. The idea is to do so between those two 
+%   legs where we see the largest turning, since in a plane network 
+%   all the turning would happen when going between the rightmost 
+%   leg and the leftmost leg. Thus the first step is to work out the 
+%   turning between two legs of the |side| kind. |L| is a list
+%   \begin{displaysyntax}
+%     \begin{regblock}[\regstar] \word{turn} \word{edge-label} 
+%     \end{regblock}
+%   \end{displaysyntax}
+%   \begin{tcl}
+            set turn 0
+            set L {}
+            foreach {t s e} [lindex $boundary 1] {
+               incr turn $t
+               if {$s == $side} then {
+                  lappend L $turn $e
+                  set turn 0
+               }
+            }
+            if {[llength $L]} then {
+               lset L 0 [expr {$turn + [lindex $L 0]}]
+            }
+%   \end{tcl}
+%   In non-plane networks there might be several candidates for where 
+%   to cut, so we pick one position with highest absolute value of 
+%   the turning, and additionally give a bonus for the turning having 
+%   the same sign as the boundary as a whole. Labels of edges before 
+%   the cut point are collected in |L1|, labels of edges after in 
+%   |L2|.
+%   \begin{tcl}
+            set best -1
+            set L1 {}
+            set L2 {}
+            foreach {t e} $L {
+               set b [expr {2*abs($t) + ($t*[lindex $boundary 0]>0)}] 
+               if {$b > $best} then {
+                  set best $b
+                  lappend L1 {*}$L2
+                  set L2 {}
+               }
+               lappend L2 $e
+            }
+%   \end{tcl}
+%   A complication is however that |{*}$L2 {*}$L1| is only the proper 
+%   order for going \emph{around} the boundary. |inputs| and 
+%   |outputs| rather go left to right, so one of them will have to be 
+%   reversed. Because we go around a boundary with the face to our 
+%   right, that means outputs are always the right way, whereas 
+%   inputs need reversing.
+%   \begin{tcl}
+            if {$side} then {
+               lappend inputs {*}[lreverse $L1] {*}[lreverse $L2]
+            } else {
+               lappend outputs {*}$L2 {*}$L1
+            }
+         }
+      }
+%   \end{tcl}
+%   Having filled in |inputs| and |outputs|, which will directly 
+%   replace lists of incident edges for vertices |0| and |1|, we next 
+%   update head and tail indices of the legs accordingly.
+%   \begin{tcl}
+      set t 0; foreach e $outputs {
+         lset amb 0 0 1 $e 1 $t
+         incr t
+      }
+      set t 0; foreach e $inputs {
+         lset amb 0 0 1 $e 3 $t
+         incr t
+      }
+%   \end{tcl}
+%   After that, but before overwriting with |input| and |output|, we 
+%   use the old lists of inputs and outputs to translate the 
+%   feedbacks.
+%   \begin{tcl}
+      set L {}
+      foreach fb [lindex $amb 0 1] {
+         lappend L [list [
+            lindex $amb 0 0 1 [lindex $amb 0 0 0 0 2 [lindex $fb 0]] 1
+         ] [
+            lindex $amb 0 0 1 [lindex $amb 0 0 0 1 1 [lindex $fb 1]] 3
+         ]]
+      }
+%   \end{tcl}
+%   Then it's just storing things away.
+%   \begin{tcl}
+      lset amb 0 1 $L
+      lset amb 0 0 0 0 2 $outputs
+      lset amb 0 0 0 1 1 $inputs
+      if {[lindex $triple 0] || [lindex $triple 1]} then {
+         lappend nonplaneL $amb
+      } else {
+         lappend planeL $amb
+      }
+   }
+   return [list $planeL $nonplaneL]
+%   \end{tcl}
+%   \begin{tcl}
+}
+%   \end{tcl}
+% \end{proc}
+% 
+% 
+% \subsubsection{Testing the ambiguity generation}
 % 
 % \begin{proc}[]{verified_ambiguities}
 %   This procedure is a helper for testing 
@@ -10435,12 +11101,29 @@ proc network::rich::align_active_midpoints {NW belowL aboveL} {
 %     \item[-posthints]
 %       Late hints for relative order of items (`|vertex |$v$', 
 %       `|edge |$e$~\textit{level}').
+%     \item[-vadjusts]
+%       This is a list (which defaults to being empty) of 
+%       adjustsments added to the vertical distance between levels; 
+%       it is provided as a means of manually tweaking a layout that 
+%       is not clear enough. Each gap between two levels in the same 
+%       component are given an element of this list, as long as there 
+%       are any, and that element (which must be a number) is added 
+%       to the distance between those two levels (whatever that 
+%       distance may be).
+%     \item[-hadjusts]
+%       Like |-vadjusts|, this is a list (which defaults to being 
+%       empty) of adjustsments added to the space between items, in 
+%       this case in the horizontal direction. Since this is one flat 
+%       list, it is again mostly useful as a means of tweaking a 
+%       layout; possible applications include ``grouping'' items by 
+%       forcing a larger separation between groups.
 %   \end{ttdescription}
 %   
 %   The first order of business is to interpret options and defaults.
 %   \begin{tcl}
 proc network::rich::make_level-layout-Tk {vsizes args} {
    variable level-layout-Tk_defaults
+   array set Opt {-vadjusts {} -hadjusts {}}
    array set Opt ${level-layout-Tk_defaults}
    array set Opt $args
    if {[info exists Opt(-val)]} then {
@@ -10481,6 +11164,8 @@ proc network::rich::make_level-layout-Tk {vsizes args} {
 %   Empty levels are discarded, as are empty components, unless we're 
 %   in the first component.
 %   \begin{tcl}
+   set vadjustP 0
+   set hadjustP 0
    set layout {}
    foreach part $grCompL {
       set comp {}
@@ -10490,8 +11175,14 @@ proc network::rich::make_level-layout-Tk {vsizes args} {
          set level {}
          set x 0
          set h 0
+         incr hadjustP -1
          foreach item $piece {
             set x [expr {$x + $Opt(-padx)}]
+            if {$hadjustP < [llength $Opt(-hadjusts)] &&\
+              $hadjustP >=0} then {
+               set x [expr {$x + [lindex $Opt(-hadjusts) $hadjustP]}]
+            }
+            incr hadjustP
             switch -- [lindex $item 0] "vertex" {
                set annot [lindex $NW(pure) 0 [lindex $item 1] 0]
                if {![info exists Size($annot)]} then {
@@ -10539,7 +11230,12 @@ proc network::rich::make_level-layout-Tk {vsizes args} {
          }
          lappend comp $level [expr {$y - 0.5*$h}] [expr {0.5*$h}]
          set y [expr {$y - $h - $Opt(-pady)}]
+         if {$vadjustP < [llength $Opt(-vadjusts)]} then {
+            set y [expr {$y - [lindex $Opt(-vadjusts) $vadjustP]}]
+         }
+         incr vadjustP
       }
+      incr vadjustP -1
       if {$left == "infinity"} then {
          set left 0; set right 0
       } else {
@@ -11273,8 +11969,6 @@ proc network::rich::edges_vertxpos {appearance} {
 %   not implemented. Finally, a \texttt{newline} entry passes all 
 %   remaining edges on to the next row, and begins a new row.
 %   
-%   ---
-%   
 %   Unless this is explicitly overridden by the \word{appearance-dict}, 
 %   the following items have such special meanings:
 %   \begin{description}
@@ -11290,7 +11984,20 @@ proc network::rich::edges_vertxpos {appearance} {
 %       Equivalent to |cross| \word{k} \word{l}.
 %   \end{description}
 %   The \meta{k}\texttt{X}\meta{l} items are generated on the fly, 
-%   but the other ones are put into the |Type| array to start with.
+%   but the other ones are put into the |Type| array to start with. 
+%   To allow for the case that one of these standard names are used 
+%   as a vertex annotation, it is possible to define alternatives 
+%   using the \word{appearance-dict}: if one entry there has list 
+%   length just~$1$, then the sole element of that list is taken to 
+%   be an explicit |Type| array entry. Thus
+%   \begin{displaysyntax}
+%     eks |{{|cross 1 1|}}|
+%   \end{displaysyntax}
+%   makes |eks| behave the way an |X| normally does.
+%   
+%   
+%   
+%   ---
 %   
 %   The edge offsets are relative to the 
 %   \word{width} midpoint.
@@ -11323,7 +12030,10 @@ proc network::rich::construct {appearanceD scanL args} {
       X  {cross 1 1}
    }
    dict for {name app} $appearanceD {
-      if {[llength $app] < 4} then {
+      if {[llength $app] < 3} then {
+         set Type($name) [lindex $app 0]
+         continue
+      } elseif {[llength $app] < 4} then {
          foreach {pat wh} $O(-vsizes) {
             if {[string match $pat $name]} then {
                lappend app $wh
@@ -11331,8 +12041,8 @@ proc network::rich::construct {appearanceD scanL args} {
             }
          }
       }
-      set Type($name) [list vertex {*}[edges_vertxpos $app]\
-        {*}[lindex $app 3]]
+      set Type($name)\
+        [list vertex {*}[edges_vertxpos $app] {*}[lindex $app 3]]
    }
 %   \end{tcl}
 %   The result is built in two phases. The construction phase builds 
@@ -11531,11 +12241,15 @@ proc network::rich::construct {appearanceD scanL args} {
 %   the previous level, so $x$ positions in this level are based on 
 %   aligning edges. Otherwise alignment is of left side to left side; 
 %   the |left| variable is the position of the left side of the 
-%   current level (including $\frac{1}{2}$ |-padx|). Alignment is 
+%   current level (including half a |-padx|). Alignment is 
 %   achieved by computing the |left| position that would produce it: 
 %   width of vertices with arity $0$ is subtracted from |left|, edge 
 %   positions are averaged. If there are no edges between two levels, 
 %   then the |left| position is equal to that of the previous level.
+%   
+%   Note that since we follow the scanlist order, the |component| 
+%   will be assembled backwards. It is reversed before dealing with 
+%   the inputs.
 %   \begin{tcl}
    set component {}
    set left 0
@@ -11609,9 +12323,10 @@ proc network::rich::construct {appearanceD scanL args} {
       } else {
          set y [expr {$y + $O(-pady) + 0.5*$h}]
       }
-      lappend component clevel $y [expr {0.5*$h}]
+      lappend component [expr {0.5*$h}] $y $clevel
       set y [expr {$y + 0.5*$h}]
    }
+   set component [lreverse $component]
 %   \end{tcl}
 %   The above does the right thing also for output edges, but input 
 %   edges are (to preserve positions, when they arise) aligned to the 
@@ -11621,7 +12336,7 @@ proc network::rich::construct {appearanceD scanL args} {
 %   locate it.
 %   \begin{tcl}
    if {[llength $NWin]} then {
-      foreach item [lindex $component 0] {
+      foreach item [lindex $component end] {
          switch -- [lindex $item 0] "edge" {
 %   \end{tcl}
 %   An |edge| item is on the one hand obscure, because it is not 
@@ -11651,26 +12366,69 @@ proc network::rich::construct {appearanceD scanL args} {
          }
          break
       }
-      if {$left > $x - 0.5*$O(-edgew)} then {
-         set left [expr {$x - 0.5*$O(-edgew)}]
+      if {$minleft > $x - 0.5*$O(-edgew)} then {
+         set minleft [expr {$x - 0.5*$O(-edgew)}]
       }
       set clevel {}
       foreach e $NWin {
          lappend clevel [list edge $e $x]
          set x [expr {$x + $O(-edgew) + $O(-padx)}]
       }
-      if {$right < $x - 0.5*$O(-edgew)} then {
-         set right [expr {$x - 0.5*$O(-edgew)}]
+      if {$maxright < $x - 0.5*$O(-edgew)} then {
+         set maxright [expr {$x - 0.5*$O(-edgew)}]
       }
       set top [expr {$top - $O(-pady) - $O(-edgeh)}]
-      set component [linsert $component [set component 0]\
-        $clevel [expr {$top + 0.5*$O(-edgeh)}] [expr {0.5*$O(-edgeh)}]]
+      lappend component $clevel [expr {$top + 0.5*$O(-edgeh)}]\
+        [expr {0.5*$O(-edgeh)}]
    }
+%   \end{tcl}
+%   A zero area bounding box might in some places be problematic, 
+%   so we ensure both sides are at least $1$ pixel.
+%   \begin{tcl}
+   if {$maxright <= $minleft} then {set maxright [expr {$minleft+1}]}
+   if {$y <= $top} then {set y [expr {$top+1}]}
+   dict set res bbox-Tk [list $minleft $top $maxright $y]
+%   \end{tcl}
+%   As in |make_level-layout-Tk|, the offsets for |-anchor|ing are 
+%   |dx2| and |dy2|.
+%   \begin{tcl}
+   switch -- $Opt(-anchor) "center" - "e" - "w" {
+      set dy2 [expr {-0.5*($top+$y)}]
+   } "n" - "ne" - "nw" {
+      set dy2 [expr {-$top}]
+   } "s" - "sw" - "se" {
+      set dy2 [expr {-$y}]
+   } default {
+      error "Bad -anchor value"
+   }
+   switch -- $Opt(-anchor) "w" - "nw" - "sw" {
+      set dx2 [expr {-$minleft}]
+   } "e" - "ne" - "se" {
+      set dx2 [expr {-$maxright}]
+   } "s" - "n" - "center" {
+      set dx2 [expr {-0.5*($minleft+$maxright)}]
+   } default {
+      error "Bad -anchor value"
+   }
+   set ncomp {}
+   foreach {tlevel ypos h} $component {
+      set nlevel {}
+      foreach item $tlevel {
+         lappend nlevel [lreplace $item 2 2 [
+            expr {$dx2 + [lindex $item 2]}
+         ]]
+      }
+      lappend ncomp $nlevel [expr {$ypos + $dy2}] $h
+   }
+   set L {}
+   foreach {x y} [dict get res bbox-Tk] {
+      lappend L [expr {$x+$dx2}] [expr {$y+$dy2}]
+   }
+   dict set res bbox-Tk $L
+   dict set res level-layout-Tk [list $ncomp $L]
 %   \end{tcl}
 %   Now all that remains is to return the result.
 %   \begin{tcl}
-   dict set res bbox-Tk [list $minleft $top $maxright $y]
-   dict set res level-layout-Tk [list $component [dict get $res bbox-Tk]]
    return $res
 }
 %   \end{tcl}
@@ -13870,7 +14628,14 @@ proc network_as_LaTeX {NW args} {
    set A(pure) $NW
    variable Hopf_appearance
    variable vertex_sizes
-   network::rich::make_level-layout-Tk $vertex_sizes {*}$args -var A
+   network::rich::make_level-layout-Tk $vertex_sizes\
+     -anchor sw {*}$args -var A
+%   \end{tcl}
+%   The point of the |-anchor| setting is that this places the 
+%   coordinate system origin in the lower left corner of the network. 
+%   When transitioning to PGF, this corresponds to having nonnegative 
+%   coordinates for everything, which should save us some minus signs.
+%   \begin{tcl}
    network::rich::vpos-Tk_by_level -var A
    network::rich::ecurve-Tk-raw_by_level $Hopf_appearance {*}$args -var A
    return "\\left\[ [
@@ -13895,6 +14660,12 @@ proc network_as_LaTeX {NW args} {
 %    The Colley Matrix Explained} (2003), 23~pp. 
 %    Retrieved 18 November 2006 from \textsc{http:}/\slash
 %    \texttt{www.colleyrankings.com}\slash \texttt{matrate.pdf}.
+%    
+% \bibitem{NR1}
+%   Lars Hellstr{\"o}m.
+%   \newblock {Network Rewriting I: The Foundation}, April 2012.
+%   \newblock arXiv:1204.2421 [math.RA].
+%   ^^A \newblock \href {http://arxiv.org/abs/1204.2421} {\path{arXiv:1204.2421}}.
 % 
 % \bibitem{CMfonts}
 %    \textsc{Donald E. Knuth}:

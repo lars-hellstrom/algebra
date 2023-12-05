@@ -1526,6 +1526,32 @@ apply {{} {
 }}
 %</sqlite3.16.0fix>
 % \end{tcl}
+% It turns out it wasn't just one version that's broken, but probably 
+% rather the way that the \texttt{.dylib} links against \Tcllogo; if 
+% memory serves there were some changes between 8.5 and 8.6. 
+% Unfortunately Apple seems to keep updating the sqlite but not how 
+% they interface with the \Tcllogo\ runtime! A more flexible fix 
+% should be to forget any \texttt{sqlite3} version that comes from 
+% the \texttt{/System/Library} hierarchy.
+% \begin{tcl}
+%<*AppleSqliteFix>
+{*}[package unknown] sqlite3
+apply {{} {
+   set D [dict create]
+   foreach ver [package versions sqlite3] {
+      dict set D $ver [package ifneeded sqlite3 $ver]
+   }
+   package forget sqlite3
+   dict for {ver script} $D {
+      if {[string match */System/Library/* $script]} then {
+         puts "Forgetting sqlite3 $ver, that would: $script"
+      } else {
+         package ifneeded sqlite3 $ver $script
+      }
+   }
+}}
+%</AppleSqliteFix>
+% \end{tcl}
 % 
 % \begin{proc}{sqlite3_init}
 %   This procedure creates and opens an SQLite database, setting up 
@@ -6196,9 +6222,28 @@ proc solve_SAR_for {SAR lhs args} {
 %       generated is a pair of theorem-like environment stating the 
 %       rule as such, and a |proof| environment giving the derivation.
 %     \item[-labelprefix]
-%       A string which is used as prefix for |\label|s of rule 
-%       equations. If this is not specified, then no referencing is 
-%       made.
+%       A string which is used as prefix for |\label|s of rules. If 
+%       this is not specified, then no referencing is made.
+%     \item[-refwrap]
+%       A list of one or two |format| strings, which should each 
+%       contain one |%s| specifier. These are used to produce the 
+%       \LaTeX\ code for rule references in proofs, and will be used 
+%       as the argument of a |\stackrel|. The first is used for rules 
+%       with proofs (lemmas), the last for rules without proofs 
+%       (axioms). The default is |{\eqref{%s}}| (list of one element, 
+%       thus used for both). An appropriate value in the |theorem| 
+%       style could rather be
+%       \begin{displaysyntax}
+%         |{\text{L\ref{%s}}} {\text{A\ref{%s}}}|
+%       \end{displaysyntax}
+%       \changes{2.1}{2021/11/15}{Added \texttt{-refwrap}, 
+%         \texttt{-pretheorem}, and \texttt{-posttheorem} options. (LH)}
+%     \item[-groom]
+%       Boolean, defaults to true, if which case the inputs and 
+%       outputs of rules are permutated to groom the left hand side 
+%       of the rule. If false, they are instead presented as they 
+%       appear in the the database, which rather means the site of 
+%       the ambiguity is groomed.
 %     \item[-environment]
 %       The name of the main \LaTeX\ environment for the rule. 
 %       Defaults to |equation| in |equation| style, but to |lemma| in 
@@ -6211,6 +6256,19 @@ proc solve_SAR_for {SAR lhs args} {
 %       |theorem| style.
 %       \changes{2.1}{2019/10/13}{Refined the axiom\slash lemma 
 %         distinction. (LH)}
+%     \item[-pretheorem]
+%       In |theorem| style, a script evaluated (directly in the 
+%       context of |rule_as_LaTeX|) after the |\begin| 
+%       (and associated material) of the main environment, but before 
+%       the diagram formula is appended to the result. Defaults to 
+%       appending a |\begin{displaymath}| line to the result variable 
+%       |res|. Could be used to employ a different environment, or 
+%       even insert more text.
+%     \item[-posttheorem]
+%       Analogous, but this script is evaluated after the diagram 
+%       formula and before the |\end| for the main environment. 
+%       Defaults to appending a |\end{displaymath}| line to the 
+%       result variable |res|.
 %   \end{ttdescription}
 %   Other options are passed on to lower level commands, particularly 
 %   |network::rich::as_PGF|.
@@ -6219,6 +6277,15 @@ proc solve_SAR_for {SAR lhs args} {
 proc rule_as_LaTeX {ruleno args} {
    array set O {
       -style equation
+      -refwrap {{\eqref{%s}}}
+      -pretheorem {
+         append res "\n  \\begin{displaymath}"
+         append nl "  "
+      }
+      -posttheorem {
+         append res "\n  \\end{displaymath}"
+      }
+      -groom 1
    }
    array set O $args
    if {$O(-style) eq "theorem"} then {
@@ -6246,6 +6313,31 @@ proc rule_as_LaTeX {ruleno args} {
    set rrow [lindex $rows 0]
    set arow [lindex [$DBCMD(GetAmbiguity) allrows\
      [dict create num6er [dict get $rrow pr00f]]] 0]
+   if {$O(-groom)} then {
+%   \end{tcl}
+%   Grooming the rule is done by modifying the |rrow|. Its proof (the 
+%   ambiguity) is however more complicated due to assumptions about 
+%   networks being canonical, so in that case the permutations are 
+%   applied to the |standalone_resolution|.
+%   \begin{tcl}
+      lassign [network::pure::grooming_permutations\
+        [dict get $rrow lhs]] sigma tau
+      dict set rrow lhs [network::pure::left_action $sigma\
+        [network::pure::right_action [dict get $rrow lhs] $tau]]
+      dict set rrow rhs [dict map {mu r} [dict get $rrow rhs] {
+         set mu [network::pure::left_action $sigma\
+           [network::pure::right_action $mu $tau]]
+         set r
+      }]
+      set tauinv $tau
+      for {set k 0} {$k < [llength $tau]} {incr k} {
+         lset tauinv [lindex $tau $k] $k
+      }
+      dict set rrow feed6acks [lmap pair [dict get $rrow feed6acks] {
+         list [lindex $sigma [lindex $pair 0]]\
+           [lindex $tauinv [lindex $pair 1]]
+      }]
+   }
    set hasproof [dict exists $arow p1us]
    if {$hasproof} then {
       if {[info exists O(-environment)]} then {
@@ -6280,10 +6372,7 @@ proc rule_as_LaTeX {ruleno args} {
       append res " \\label{$O(-labelprefix)$ruleno}"
    }
    set nl "\n  "
-   if {$O(-style) eq "theorem"} then {
-      append res "\n  \\begin{displaymath}"
-      append nl "  "
-   }
+   if {$O(-style) eq "theorem"} then $O(-pretheorem)
    append res $nl [string map [list \n $nl] [
      network_as_LaTeX [dict get $rrow lhs] {*}$args
    ]]
@@ -6297,10 +6386,8 @@ proc rule_as_LaTeX {ruleno args} {
         lincomb_as_LaTeX [dict get $rrow rhs] {*}$args
       ]
    }
-   if {$O(-style) eq "theorem"} then {
-      append res \n {  \end{displaymath}}
-   }
-   append res \n "\\end{$env}"
+   if {$O(-style) eq "theorem"} then $O(-posttheorem)
+   if {$O(-style) eq "theorem"} then {append res \n "\\end{$env}"}
    if {$hasproof} then {
       if {$O(-style) eq "theorem"} then {
          append res \n {\begin{proof}} \n {  \begin{math}}
@@ -6312,16 +6399,38 @@ proc rule_as_LaTeX {ruleno args} {
       dict set arow m0n0mials [encoding convertfrom utf-8\
         [zlib inflate [dict get $arow deflated_m0n0mials]]]
 %</zlib>
+%   \end{tcl}
+%   Acting with permutations on |arow| is quite complicated, because 
+%   monomials are stored in several places, and there are 
+%   presumptions about some of them being canonical (which permuting 
+%   the legs in general violates). Acting with permutations on a 
+%   standalone resolution is much easier, since there all monomials 
+%   are in a single list. Not canonising after acting means the 
+%   regions are still valid.
+%   \begin{tcl}
       set SAR0 [standalone_resolution $arow]
-      set mu0 [lsearch -exact [lindex $SAR0 5]\
-        [dict get $rrow lhs]]
+      if {$O(-groom)} then {
+         lset SAR0 5 [lmap mu [lindex $SAR0 5] {
+            network::pure::left_action $sigma\
+              [network::pure::right_action $mu $tau]
+         }]
+      }
+      set mu0 [lsearch -exact [lindex $SAR0 5] [dict get $rrow lhs]]
       if {$mu0<0} then {error "Couldn't find lhs in m0n0mials."}
       set SAR [solve_SAR_for $SAR0 $mu0]
       foreach lincomb [lindex $SAR 0] rule [lindex $SAR 1] {
-         if {[dict exists $args -labelprefix]} then {
-            append res $nl "\\stackrel{\\eqref{[
-               dict get $args -labelprefix
-            ]$rule}}{\\equiv}"
+         if {[info exists O(-labelprefix)]} then {
+            set rrow2 [lindex [
+               $DBCMD(GetRu1e) allrows [dict create num6er $rule]
+            ] 0]
+            set arow2 [lindex [$DBCMD(GetAmbiguity) allrows\
+              [dict create num6er [dict get $rrow2 pr00f]]] 0]
+            append res $nl "\\stackrel{[
+               format [
+                  lindex $O(-refwrap)\
+                    [lindex {end 0} [dict exists $arow2 p1us]]
+               ] $O(-labelprefix)$rule
+            ]}{\\equiv}"
          } else {
             append res $nl {\equiv}
          }
@@ -6334,6 +6443,7 @@ proc rule_as_LaTeX {ruleno args} {
          append res \n {  \end{math}} \n {\end{proof}}
       }
    }
+   if {$O(-style) ne "theorem"} then {append res \n "\\end{$env}"}
    return $res
 }
 %   \end{tcl}
@@ -6483,13 +6593,19 @@ proc lincomb_as_LaTeX {lincomb args} {
 %     \word{option} \word{value} \end{regblock}
 %   \end{displaysyntax}
 %   where \word{filename} is the name of the \LaTeX\ file to create. 
-%   Options and values are passed on to |rule_as_LaTeX|.
+%   Options and values are passed on to |rule_as_LaTeX|, but if 
+%   |-preamble| is provided then the value of this option is inserted 
+%   into the preamble of the created \LaTeX\ file; this is useful for 
+%   defining \texttt{lemma} and \texttt{axiom} environments for the 
+%   \texttt{theorem} style of a database dump.
 %   
 %   \begin{tcl}
 proc database_as_LaTeX {fname args} {
+   array set O $args
    set F [open $fname w]
    puts $F {\documentclass{article}}
    puts $F {\usepackage{amsmath,sdpgf}}
+   if {[info exists O(-preamble)]} then {puts $F $O(-preamble)}
    puts $F {\begin{document}}
    variable DBCMD
    foreach rule [lsort -integer [
@@ -6885,6 +7001,11 @@ set vertex_appearances {
       {{-5.657 5.657 -1 1} {5.657 5.657 1 1}}
       {}
    }
+   int {
+      {rectangle {square 8} {}} 
+      {}
+      {{0 -8}}
+   }
 }
 if {[llength $argv]==1} then {
    set fname [lindex $argv 0]
@@ -6897,6 +7018,7 @@ sqlite3_init $fname {
 %<twist&untwist>  untwist {2 2}
 %<cocomplex>  Re {0 1}  Im {0 1}
 %<division>  div {2 1}
+%<integral>  int {1 0}
 }
 % \end{tcl}
 % 
@@ -6929,9 +7051,11 @@ proc flatten_biaffine {prefix element} {
    lappend res {*}[{*}$prefix part end $element]
    lappend res {*}[{*}$prefix part begin $element]
    foreach row [{*}$prefix part open $element] {lappend res {*}$row}
-   return $res
+   return [lreverse $res]
 }
 %   \end{tcl}
+%   The |lreverse| is to allow considering different parts 
+%   separately, rather than all together.
 % \end{proc}
 % 
 % \begin{proc}{semiflatten_biaffine}
@@ -7102,6 +7226,16 @@ proc set_cmpcmds {} {
    dict set seed1 div\
      [integer_biaffine_PROP fromparts 0 3 {0 0} {{3 3}}]
 %</division>
+%<*integral>
+%   \end{tcl}
+%   As a first stab at values for the |int| vertex, make it like the 
+%   |epsilon| vertex but with a nonzero scalar part.
+%   \changes{2.2}{2023/05/25}{Adding rules for an integral\slash 
+%     measure operation. (LH)}
+%   \begin{tcl}
+   dict set seed1 int\
+     [integer_biaffine_PROP fromparts 1 {} 1 {}]
+%</integral>
    set map {}
    lappend map $iPROPprefix $seed1 [list flatten_biaffine $iPROPprefix]
 %   \end{tcl}
@@ -7247,8 +7381,19 @@ proc set_cmpcmds {} {
    set RS(cmpclass) [lrepeat $blocks {*}$L]
    set RS(cmpcmds)\
      [lrepeat [expr {$blocks*$size}] [list ::tcl::mathop::-]]
-   set RS(cmpblocks)\
-     [lrepeat $blocks {*}[lrepeat [expr {$size-1}] 0] 1]
+   set RS(cmpblocks) [lrepeat $blocks {*}[
+      if {$outputs && $inputs} then {
+         list {*}[lrepeat [expr {$inputs*$outputs-1}] 0] 1
+      }
+   ] {*}[
+      if {$outputs} then {
+         list {*}[lrepeat [expr {$outputs-1}] 0] 1
+      }
+   ] {*}[
+      if {$inputs} then {
+         list {*}[lrepeat [expr {$inputs-1}] 0] 1
+      }
+   ] 1]
 }
 %</Hopf,hopfbase>
 %   \end{tcl}
@@ -7397,6 +7542,17 @@ enter_congruence -short "Counit(Im)" {}\
 %</cocomplex>
 % \end{tcl}
 % 
+% These are the properties of an integral (left and right invariant 
+% measure).
+% \begin{tcl}
+%<*integral>
+enter_congruence -short "Left invariant" {}\
+  1 {Delta \n . int} -1 {int \n unit}
+enter_congruence -short "Right invariant" {}\
+  1 {Delta \n int .} -1 {int \n unit}
+%</integral>
+% \end{tcl}
+% 
 % 
 % It is for presentation purposes frequently convenient to first 
 % convert the congruences to rules, before working generally.
@@ -7477,6 +7633,51 @@ sqlite3_init [
 %<bihomass>  b {1 1}
 }
 % \end{tcl}
+%
+% 
+% \begin{proc}{tree_NW_to_traditional_LaTeX}
+%   This procedure converts a tree-like pure network to \LaTeX\ for a 
+%   traditional formula with variables and functions. The call syntax 
+%   is
+%   \begin{displaysyntax}
+%     |tree_NW_to_traditional_LaTeX| \word{network} \word{edge}
+%   \end{displaysyntax}
+%   where \word{edge} is the label of the root edge of the formula to 
+%   return. The \word{edge} argument is because this procedure 
+%   recursively calls itself, to produce operand subtrees.
+%   
+%   \begin{tcl}
+proc tree_NW_to_traditional_LaTeX {G e} {
+   if {[lindex $G 1 $e 2] == 1} then {
+      return [lindex {
+         x y z w v u t s r q p n m l k j i h g f d c b a
+      } [lindex $G 1 $e 3]]
+   }
+   set res [dict get {
+      m  {\mu}
+      a  {\alpha}
+      b  {\beta}
+      e1 {e_1}
+      e2 {e_2}
+      e3 {e_3}
+      S  {\alpha}
+   } [lindex $G 0 [lindex $G 1 $e 2] 0]]
+   set L {}
+   foreach e1 [lindex $G 0 [lindex $G 1 $e 2] 2] {
+      lappend L [tree_NW_to_traditional_LaTeX $G $e1]
+   }
+   if {[llength $L]} then {
+      append res ( [join $L ", "] )
+   }
+   return $res
+}
+%   \end{tcl}
+%   This implementation is rather quick-and-dirty, directly producing 
+%   \LaTeX\ code. A more robust implementation (also capable of 
+%   handling multiple terms and coefficients) would be to first 
+%   generate OpenMath and then a presentation of that, but then we'd 
+%   have more overhead with arranging the presentation.
+% \end{proc}
 % 
 % 
 % \subsubsection{Ordering}

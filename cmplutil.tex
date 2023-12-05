@@ -1256,82 +1256,58 @@ pieces removed, and other pieces spliced into their place.
   exactly in the scanlist order. A region in this network is
   \begin{quote}
     \ttfamily\makebraceother
-    {2 3 6} {0 9 8 4} {2 9 6}
+    {2 3 6} {0 9 4 8} {2 9 6}
     \makebracegroups
   \end{quote}
-  which is shown in green in subfigure~(a) below. Note how edge~$0$ 
-  has two segments in the region (and two outside it).
+  which is shown with thick lines in subfigure~(a) below. Note how 
+  edge~$0$ (the leftmost one) has two segments in the region (and two 
+  outside it).
   \[
     \text{(a):}\quad
     \left[ \begin{sdpgf}{0}{0}{150}{-268}{0.2pt}
-      \m 90 -263 \C 0 7 4 7 4 6 \S \m 60 -26 \L 0 21 \S \m 120 -118 \C
-      0 16 -15 14 0 16 \L 0 20 \C 0 16 -15 15 0 16 \S \m 122 -174 \C 0
-      8 -2 8 0 8 \S \m 60 -263 \C 0 14 -15 13 0 14 \S \m 15 -134 \L 0
-      10 \C 0 5 1 5 2 4 \S \m 34 -195 \C -10 10 -6 14 -2 13 \S \m 56
-      -195 \C 8 8 -6 8 -5 9 \S
-      \begin{pgfscope} \pgfsetcolor{green}
-      \m 53 -170 \C -6 9 -6 8 8 8 \S \m 98 -243 \C 3 7 4 7 0 7 \S \m
-      18 -110 \C 6 14 14 12 11 11 \S \m 94 -195 \C -13 13 3 24 -13 13
-      \S \m 60 -118 \C 0 15 25 16 -14 14 \S \m 16 -158 \C -1 5 0 5 0 4
-      \L 0 10 \S \m 116 -195 \C 6 6 1 7 -1 8 \S \m 60 -46 \L 0 20 \S
-      \end{pgfscope}
-      \begin{pgfscope}
-      \pgfsetcolor{green} \ov 44 -78 32 32 \S \ov 44 -150 32 32 \S
-      \end{pgfscope}
-      \re 104 -150 32 32 \S \ov 29 -222 32 32 \S
-      \begin{pgfscope}
-      \pgfsetcolor{green} \ov 89 -222 32 32 \S
-      \end{pgfscope}
+      \m 90 -263 \C 0 7 4 7 4 6 \S \m 60 -26 \L 0 21 \S \m 120 -118 \C 0 16
+      -15 14 0 16 \L 0 20 \C 0 16 -15 15 0 16 \S \m 122 -174 \C 0 8 -2 8 0
+      8 \S \m 60 -263 \C 0 14 -15 13 0 14 \S \m 15 -134 \L 0 10 \C 0 5 1 5
+      2 4 \S \m 34 -195 \C -10 10 -6 14 -2 13 \S \m 56 -195 \C 8 8 -6 8 -5
+      9 \S \begin{pgfscope} \pgfsetlinewidth{3\pgflinewidth} \m 98 -243 \C
+      3 7 4 7 0 7 \S \m 53 -170 \C -6 9 -6 8 8 8 \S \m 18 -110 \C 6 14 14
+      12 11 11 \S \m 94 -195 \C -13 13 3 24 -13 13 \S \m 60 -118 \C 0 15 25
+      16 -14 14 \S \m 16 -158 \C -1 5 0 5 0 4 \L 0 10 \S \m 116 -195 \C 6 6
+      1 7 -1 8 \S \m 60 -46 \L 0 20 \S \end{pgfscope} \ov 44 -78 32 32 \S
+      \ov 44 -150 32 32 \S \re 104 -150 32 32 \S \ov 29 -222 32 32 \S \ov
+      89 -222 32 32 \S
     \end{sdpgf} \right]
-%     \left[ \begin{sdpgf}{0}{0}{150}{-268}{0.2pt}
-%       \m 90 -263 \C 0 7 4 7 4 6 \S \m 60 -26 \L 0 21 \S \m 120 -118 \C
-%       0 16 -15 14 0 16 \L 0 20 \C 0 16 -15 15 0 16 \S \m 122 -174 \C 0
-%       8 -2 8 0 8 \S \m 60 -263 \C 0 14 -15 13 0 14 \S \m 15 -134 \L 0
-%       10 \C 0 5 1 5 2 4 \S \m 34 -195 \C -10 10 -6 14 -2 13 \S \m 56
-%       -195 \C 8 8 -6 8 -5 9 \S
-%       \begin{pgfscope} \pgfsetlinewidth{2\pgflinewidth}
-%       \m 53 -170 \C -6 9 -6 8 8 8 \S \m 98 -243 \C 3 7 4 7 0 7 \S \m
-%       18 -110 \C 6 14 14 12 11 11 \S \m 94 -195 \C -13 13 3 24 -13 13
-%       \S \m 60 -118 \C 0 15 25 16 -14 14 \S \m 16 -158 \C -1 5 0 5 0 4
-%       \L 0 10 \S \m 116 -195 \C 6 6 1 7 -1 8 \S \m 60 -46 \L 0 20 \S
-%       \end{pgfscope}
-%       \ov 44 -78 32 32 \S \ov 44 -150 32 32 \S \re 104 -150 32 32 \S
-%       \ov 29 -222 32 32 \S \ov 89 -222 32 32 \S
-%     \end{sdpgf} \right]
     \qquad
     \text{(b):}\quad
     \left[ \begin{sdpgf}{0}{0}{150}{-268}{0.2pt}
-      \m 79 -195 \C -18 18 58 14 -18 18 \S \m 30 -263 \C 0 16 -15 15
-      0 16 \L 0 20 \L 0 52 \L 0 20 \C 0 18 6 20 13 13 \S \m 90 -263
-      \L 0 41 \S \m 90 -118 \C 0 19 -20 12 -14 14 \S \m 101 -195 \C
-      15 15 19 16 0 20 \L 0 20 \C 0 18 -15 16 0 18 \L 0 20 \C 0 16
-      -15 15 0 16 \S \m 45 -46 \L 0 41 \S \m 60 -263 \C 0 16 -15 15
-      0 16 \L 0 20 \L 0 52 \L 0 20 \C 0 24 45 4 0 24 \L 0 20 \C 0 16
-      -15 15 0 16 \S \m 120 -263 \C 0 16 15 15 0 16 \L 0 20 \C 0 20
-      -91 -4 35 35 \S \ov 29 -78 32 32 \S \ov 74 -150 32 32 \S \ov
-      74 -222 32 32 \S
+      \m 109 -195 \C -13 13 18 24 -13 13 \S \m 30 -263 \C 0 16 -15 15 0 16
+      \L 0 20 \L 0 52 \L 0 20 \C 0 18 6 20 13 13 \S \m 120 -263 \L 0 41 \S
+      \m 90 -118 \C 0 19 -20 12 -14 14 \S \m 131 -195 \C 13 13 -9 21 0 17
+      \L 0 20 \C 0 18 -15 16 0 18 \L 0 20 \C 0 16 -15 15 0 16 \S \m 45 -46
+      \L 0 41 \S \m 60 -263 \C 0 16 -15 15 0 16 \L 0 20 \L 0 52 \L 0 20 \C
+      0 24 45 4 0 24 \L 0 20 \C 0 16 -15 15 0 16 \S \m 90 -263 \C 0 16 -15
+      15 0 16 \L 0 20 \C 0 17 -9 21 13 13 \S \ov 29 -78 32 32 \S \ov 74
+      -150 32 32 \S \ov 104 -222 32 32 \S
     \end{sdpgf} \right]
     \qquad
     \text{(c):}\quad
-    \left[ \begin{sdpgf}{0}{0}{210}{-176}{0.2pt}
-      \m 165 -171 \C 0 26 -60 -10 0 26 \L 0 10 \C 0 22 -45 -3 0 22 \S
-      \m 45 -171 \C 0 18 30 6 0 18 \L 0 10 \C 0 30 75 -19 0 30 \S \m
-      139 -51 \C -12 12 -7 18 0 16 \S \m 75 -171 \C 0 26 60 -10 0 26
-      \L 0 10 \C 0 27 60 -7 0 27 \L 0 20 \C 0 23 -45 1 0 23 \S \m 161
-      -51 \C 12 12 7 18 0 16 \S \m 105 -171 \C 0 26 -60 -10 0 26 \L 0
-      10 \C 0 19 -30 9 0 19 \L 0 20 \C 0 16 15 15 0 16 \S \m 135 -171
-      \C 0 18 30 6 0 18 \L 0 10 \C 0 27 -60 -7 0 27 \L 0 20 \C 0 16
-      -15 15 0 16 \S \m 60 -46 \L 0 41 \S \re 44 -78 32 32 \S \ov 134
-      -78 32 32 \S
+    \left[ \begin{sdpgf}{0}{0}{210}{-174}{0.2pt}
+      \m 180 -169 \L 0 41 \S \m 30 -169 \L 0 41 \S \m 19 -101 \C -69 69 185
+      -11 0 38 \S \m 60 -169 \C 0 23 45 1 0 23 \L 0 20 \C 0 47 90 3 0 47 \S
+      \m 41 -101 \C 37 37 87 5 0 54 \S \m 120 -169 \C 0 23 -45 1 0 23 \L 0
+      20 \C 0 39 -60 19 0 39 \S \m 150 -169 \C 0 16 -15 15 0 16 \L 0 20 \C
+      0 33 -30 31 0 33 \S \m 180 -96 \C 0 59 -135 -27 0 59 \S \re 164 -128
+      32 32 \S \ov 14 -128 32 32 \S
     \end{sdpgf} \right]
   \]
   Subfigure~(b) is the selected subnetwork uncovered, showing also the 
-  relative order between its inputs and outputs; $9$ denoting the 
-  second (index $1$) part of edge $0$, that is mostly parallel to the 
-  first part of the same edge. Subfigure~(c) is instead what remains 
-  of $G$ when the selected region has been detached; inner inputs and 
-  outputs (those that connected to the detached region) appear to the 
-  right of the original inputs and outputs from~(a).
+  relative order between its inputs and outputs; the $9$ in the above 
+  region is the second (index $1$) part of edge $0$, which is mostly 
+  parallel to the first part of the same edge. 
+  Subfigure~(c) is instead what remains of $G$ when the selected region 
+  has been detached; inner inputs and outputs (those that connected 
+  to the detached region) appear to the right of the original inputs 
+  and outputs from~(a).
   
   \caption{Region in a network}
   \label{Fig:Region}
@@ -1460,11 +1436,13 @@ The effect is similar to decomposing a network into scanlines as per
 Topic~\ref{Topic:Scanlines}, but different in that it allows for 
 arbitrary permutations \emph{between} levels whereas the scanlines 
 presentation only does permutations \emph{within} levels. Doing 
-permutations between levels can sometimes lead to messy situations: 
-the network in Figure~\ref{Fig:Region}c needed considerable tweaking 
-of the layout (in particular the insertion of an extra level without 
-vertices) to prevent certain edges from touching (to such an extent 
-that it became unclear what connected to what).
+permutations between levels can sometimes lead to messy situations; 
+in particular having several edges go many positions sideways can 
+lead to them touching and making it hard to tell which is which. 
+The network in Figure~\ref{Fig:Region}c has had its layout tweaked by 
+(among other things) increasing the distance between the input level 
+and the level below, so that the edges are distinct.
+
 
 \begin{topic}[Order within network levels] \label{Topic:LevelOrder}
   Having assigned every vertex to a specific level, what remains for 
@@ -1494,12 +1472,60 @@ that it became unclear what connected to what).
   when there indeed is close to a consensus on what should go left 
   and what should go right---with a slight reservation for the fact 
   that it has a tendency to make large jumps in order at the boundary 
-  between two ``zones of influence'' rather than many small 
+  between two ``zones of influence'' (see 
+  Figure~\ref{Fig:ZonesOfInfluence}) rather than many small 
   jumps to gradually switch between two conflicting opinions---but 
   appears to produce less aesthetically pleasing results when there 
   is much conflict; however it has not been systematically examined 
   to what extent there even exists more pleasing layouts in those 
   cases.
+  
+  \begin{figure}
+    \[
+      \text{(a):}\quad
+      \vcenter{
+        \hbox{\verb|Delta \n|}
+        \hbox{\verb|X \n|}
+        \hbox{\verb|Delta Delta \n|}
+        \hbox{\verb|m m \n|}
+        \hbox{\verb|m|}
+      }
+      \qquad
+      \text{(b):}\quad
+      \left[ \begin{sdpgf}{0}{0}{120}{-340}{0.2pt}
+        \m 71 -267 \C 12 12 7 17 0 16 \S \m 41 -195 \C 14 14 0 22 -14
+        14 \S \m 90 -118 \C 0 16 -68 2 27 27 \S \m 60 -335 \L 0 41 \S
+        \m 79 -195 \C -14 14 0 22 14 14 \S \m 30 -118 \C 0 16 68 2 -27
+        27 \S \m 101 -195 \C 14 14 0 22 -14 14 \S \m 60 -46 \L 0 41 \S
+        \m 49 -267 \C -12 12 -7 17 0 16 \S \m 19 -195 \C -14 14 0 22
+        14 14 \S \ov 44 -78 32 32 \S \ov 14 -150 32 32 \S \ov 74 -150
+        32 32 \S \ov 14 -222 32 32 \S \ov 74 -222 32 32 \S \ov 44 -294
+        32 32 \S
+      \end{sdpgf} \right]
+      \qquad
+      \text{(c):}\quad
+      \left[ \begin{sdpgf}{0}{0}{120}{-340}{0.2pt}
+        \m 71 -267 \C 12 12 7 17 0 16 \S \m 41 -195 \C 20 20 68 2 -28
+        28 \S \m 30 -118 \C 0 16 7 17 12 12 \S \m 60 -335 \L 0 41 \S
+        \m 79 -195 \C -20 20 -68 2 28 28 \S \m 90 -118 \C 0 16 -7 17
+        -12 12 \S \m 101 -195 \C 28 28 -68 2 -20 20 \S \m 60 -46 \L 0
+        41 \S \m 49 -267 \C -12 12 -7 17 0 16 \S \m 19 -195 \C -28 28
+        68 2 20 20 \S \ov 44 -78 32 32 \S \ov 74 -150 32 32 \S \ov 14
+        -150 32 32 \S \ov 14 -222 32 32 \S \ov 74 -222 32 32 \S \ov 44
+        -294 32 32 \S
+      \end{sdpgf} \right]
+    \]
+    Subfigure~(a) is the scanlist used to describe a network, divided 
+    into lines to clarify the structure. Subfigure~(b) is the network 
+    layout one might expect from that scanlist, but due to the zones 
+    of influence phenomenon, the layout produced from the pure network 
+    is rather that of Subfigure~(c): on the first round, the top and 
+    bottom vertices get to suggest how their neighbours should be 
+    ordered, and since there at that point are no suggestions to the 
+    contrary, these suggestions stick.
+    \caption{The ``zones of influence'' effect}
+    \label{Fig:ZonesOfInfluence}
+  \end{figure}
   
   Aesthetically superior heuristics for network layouts would be a 
   valuable addition, but the current ones do have the virtue of being 
@@ -1573,9 +1599,9 @@ and also that their codomains are again found in this filtration.
   matrix $q$: all elements are $1$ except those whose positions 
   $(i,j)$ are given. Some later additions to the completion utility 
   explicitly make this interpretation when exporting\slash displaying 
-  rewrite rules. It was however already in~\cite{NR1} observed that 
-  this model had certain problems, and in~\cite{LH:IWC} it was 
-  suggested that some further refinement might be needed.
+  rewrite rules. It was however already in~\cite[Ex.~10.28]{NR1} 
+  observed that this model had certain problems, and in~\cite{LH:IWC} 
+  it was suggested that some further refinement might be needed.
   
   The present~(2021) understanding is rather that the 
   \word{feedback-list}s have the right amount of detail, but that 
@@ -1964,7 +1990,9 @@ but targetting \LaTeX\ is another matter.
 The utility procedure \verb|network_as_LaTeX| included in the network 
 library sources is also worth mentioning: it takes a pure network as 
 argument and generates \LaTeX\ code to draw it. All networks in this 
-paper were drawn by code generated that way.
+paper were drawn by code generated that way. Layouts have sometimes 
+been tweaked by passing additional options; unrecognised options are 
+being passed on to all subordinate procedures.
 
 
 \section{The completion utility}
@@ -2163,15 +2191,15 @@ before we even get to them.
   preferably provides fast access to the largest term. The computer 
   science literature knows at least two data structures that provide 
   $O(\log n)$ access to arbitrary terms and $O(1)$ access to the 
-  leading term: threaded self-balancing trees and skiplists.
+  leading term: threaded self-balancing trees and skip lists.
   
   Self-balancing trees (of which there are a myriad of variants) are 
   standard material in the computer science curriculum, but 
-  skiplists~\cite{skiplist} tend to receive less attention; perhaps 
+  skip lists~\cite{skiplist} tend to receive less attention; perhaps 
   in part because they are probabilistic and thus attain their 
   complexity bound on average rather than in worst case, but for us 
   average complexity and implementation simplicity are what matters. 
-  The main reason for choosing skiplists in the completion 
+  The main reason for choosing skip lists in the completion 
   utility is however that their search model is one of shrinking a 
   closed interval rather than bisecting an open interval; one keeps 
   track of both endpoints of the interval where a sought node is to 
@@ -2179,21 +2207,21 @@ before we even get to them.
   of these data structures it is typically assumed that comparing two 
   keys is an atomic operation, but the comparison keys of networks 
   are anything but atomic. When searching for a node in one of these 
-  skiplists, one can advance either to the next level in the data 
+  skip lists, one can advance either to the next level in the data 
   structure or to the next element of the comparison keys, meaning 
-  the length of the comparison key $m$ and length of skiplist $n$ 
+  the length of the comparison key $m$ and length of skip list $n$ 
   contribute roughly as $O(m +\nobreak \log n)$ to the complexity, 
   provided one keeps track of how many key elements are in fact equal 
   throughout the current interval. If instead starting every 
   comparison from the start of the key, the complexity would be more 
   like $O(m \log n)$.
   
-  At each rewrite step, the monomial at the head of the skiplist is 
+  At each rewrite step, the monomial at the head of the skip list is 
   popped off and processed. If no rewrite rule applies to it, then 
   that term is added to a companion hashmap dictionary, whereas if a 
   rule is found that applies then terms corresponding to the right 
-  hand side of this rule are added to the skiplist formal linear 
-  combination. When the skiplist is empty, the normal form can be 
+  hand side of this rule are added to the skip list formal linear 
+  combination. When the skip list is empty, the normal form can be 
   found in the hashmap dictionary.
 \end{topic}
 
@@ -2270,9 +2298,9 @@ equalities, the completion procedure will not have produced a
 confluent rewrite system, but if a complete system of proper rules 
 exists then the completion procedure should eventually find it, 
 possibly by using equalities as intermediate steps in the deduction 
-of these rules. The task of designing an ordering which under which a 
-confluent system of orientable rules exists is conveniently left to 
-the user.
+of these rules. The nontrivial task of designing an ordering which 
+under which a confluent system of orientable rules exists is 
+conveniently left to the user.
 
 \begin{topic}[Lazy ambiguity generation] \label{Topic:Lazier}
   Given the tables mentioned so far---that of rules and that of 
@@ -2296,13 +2324,13 @@ the user.
   simpler general case causes them to be dropped. For each of those 
   special case rules not immediately involved in proving the general 
   case rule, the effort spent on generating ambiguities will have 
-  been completely useless! Better then to no be so eager.
+  been completely useless! Better then to not be so eager.
   
   The \textsf{lazier} algorithm variant makes use of a third table of 
   \emph{pairs} of rules, which lists those unordered pairs of rules 
   that have not yet been considered for ambiguity generation. Adding 
   rows to this table is quick, and it is equally quick to drop all 
-  pairs containing a rule that is dropped. Delaying abiguity 
+  pairs containing a rule that is dropped. Delaying ambiguity 
   generation pretty much reversed the percentages for how time was 
   spent, so that with this non-eager algorithm variant reducing far 
   outweighed ambiguity generation.
@@ -2629,7 +2657,7 @@ pane may be geometrically larger than what fits in that pane; in that
 case the user may grab the contents by holding down the mouse button 
 and then drag them around. There is also a top line specifying the 
 state of the item: proper rule or equality, active or dropped, and in 
-the latter case when time it was dropped.
+the latter case when it was dropped.
 
 \begin{topic}[Rule space navigation]
   Elementary controls provided for moving around in the rule space 
@@ -2731,7 +2759,7 @@ type explicit commands to order the export. The \verb|rule_as_LaTeX|
 command takes one rule number as argument and returns \LaTeX\ code 
 for that rule, whereas \verb|database_as_LaTeX| takes the name of a 
 file to create, which will be a \LaTeX\ document with all the rules. 
-\verb|ambiguities_as_LaTeX| rather take a list of ambiguity numbers 
+\verb|ambiguities_as_LaTeX| rather takes a list of ambiguity numbers 
 as first argument, and returns \LaTeX\ code for their resolutions, 
 regardless of whether those ended up prompting the creation of a new 
 rule or not; this latter thing is what one would need for a proof of 
@@ -2789,7 +2817,7 @@ author has coded but not gotten around to find a separate home for
 yet. They may certainly be read as examples of how one might code a 
 problem of one's own, but several have accumulated a lot of 
 \textsf{DocStrip} module guards which can make them hard to read; in 
-that case it may help to also look at the stripped sources prodcued 
+that case it may help to also look at the stripped sources produced 
 by \TeX ing \texttt{cmplutil2.ins}.
 
 As mentioned in Section~\ref{Sec:Introduction}, these examples need 
@@ -2988,9 +3016,9 @@ ambiguities in the database.
   \textit{The Computer Journal}, vol. 27, no. 2 (May 1984), 97--111.
 
 \bibitem{KnuthBendix}
-   D. E. Knuth and P. B. Bendix:
-   \textit{Simple word problems in universal algebras},
-   pp.~263--297 in: 
+   D. E. Knuth and P. B. Bendix.
+   Simple word problems in universal algebras.
+   Pp.~263--297 in: 
    \textit{Computational Problems in Abstract Algebra 
      (Proc. Conf., Oxford, 1967)} (ed. by \textsc{J. Leech}),
    Pergamon, Oxford, 1970.

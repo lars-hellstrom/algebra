@@ -1515,7 +1515,7 @@ proc show_calculation {fbL left middle right} {
 % 
 % 
 % \begin{proc}{run_ambiguities}
-%   The |run_ambiguities| procedure is the body of an interation in 
+%   The |run_ambiguities| procedure is the body of an iteration in 
 %   which the |minor_index| variable is incremented until it reaches the 
 %   length of the |rule_base| and then stops, while simultaneously 
 %   computing all ambiguities for the current pair of these. The 
@@ -1679,7 +1679,14 @@ proc equality_ambiguity {equality} {
 %   ambiguities are prepared to be checked.
 %   \changes{2.2}{2008/12/5}{Checking and reopening equalities. (LH)}
 %   
-%   There are no arguments, nor any particular return value.
+%   The call syntax is
+%   \begin{displaysyntax}
+%     |major_step_ambiguity| \word{base window}
+%   \end{displaysyntax}
+%   where the \word{base window} is the toplevel window relative to 
+%   which newly created ambiguity windows will be positioned; in 
+%   practice it is going to be |.controller|. There is no particular 
+%   return value.
 %   \begin{tcl}
 proc major_step_ambiguity {base_w} {
    global minor_index rule_base rule_queue rulesL Network lastrule\
@@ -3002,7 +3009,10 @@ add_rule {} pure [
 %   orders obtained by mapping the networks to a specific ordered 
 %   \PROP\ and comparing them there. The target \PROP, the array of 
 %   elements to map the original value to, and the command to use for 
-%   comparing them, are all provided as lists.
+%   comparing them, are all provided as lists; the first 20 lines or 
+%   so of the |foreach| command below are all about explicitly 
+%   stating these three lists, which the |foreach| will process in 
+%   parallel.
 %   
 %   For reference, the call syntax is
 %   \begin{quote}
@@ -3034,6 +3044,12 @@ proc compare_networks {args} {
       integer_biaffine_PROP_cmp
 %</twist>
    } {
+%   \end{tcl}
+%   Here follows the body of this drawn-out |foreach|: it essentially 
+%   maps both arguments into the \PROP\ specified by the |PROP| 
+%   iteration variables, mapping vertices using the |array|, and then 
+%   compares the results using the |cmpcmd|.
+%   \begin{tcl}
       foreach NW $args {
          set call $PROP
          lappend call fuse [lindex $NW 0 0 2]
@@ -4038,9 +4054,9 @@ proc compare_networks {NW1 NW2} {
 }
 %</Transposition>
 % \end{tcl}
-
-
-
+% 
+% 
+% 
 % \section{Sleep deprivation}
 % 
 % When running this application on a larger problem, the screen saver 
@@ -4136,7 +4152,7 @@ proc create_insomnia {} {
 % 
 % \bibitem{Colley}
 %    \textsc{Wesley N. Colley}: 
-%    \textit{Colley’s Bias Free College Football Ranking Method: 
+%    \textit{Colley's Bias Free College Football Ranking Method: 
 %    The Colley Matrix Explained} (2003), 23~pp. 
 %    Retrieved 18 November 2006 from \textsc{http:}/\slash
 %    \texttt{www.colleyrankings.com}\slash \texttt{matrate.pdf}.
